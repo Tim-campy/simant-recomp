@@ -26,7 +26,7 @@ Este documento especifica, para reimplementação 1:1, o que as formigas fazem *
 | `_HealthB` / `_HealthR` | `10:ac86` / `10:ac88` | sim | saúde da colônia, 0..100 |
 | `_WaterTable` | `9:99d8` | sim | linha y mais alta já inundada; 64 = nada inundado |
 | `_TemBModePop` / `_TemRModePop` | `9:786a` / `9:7be4` | não | contagem de modos do tick (20 palavras cada) |
-| `_MeColor` | `10:ce98` | não | cor da formiga amarela: 0 preta, ≠ 0 vermelha (o pseudocódigo do Ghidra mostra `_grndTile+2`) |
+| `_MeColor` | `10:ce98` | sim (bloco 188) | cor da formiga amarela: 0 preta, ≠ 0 vermelha (o pseudocódigo do Ghidra mostra `_grndTile+2`) |
 | `_MeWantFood` | `9:9af2` | sim | a amarela quer ser alimentada (trofalaxia) |
 | `_OptionStates[5]` | `8:85fc` | sim | balões de fala; só desenho, sem sorteio |
 

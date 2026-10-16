@@ -113,7 +113,7 @@ Contadores usados aqui (DGROUP, sem nome no `.SYM`): `0x02EE` atraso desde o úl
 | 10 | `_DoPillar` (`1030:4cdc`): lagarta; chama `_DoSow` no começo | só em ticks com `_Cycle` ímpar; nada faz na casa (`_TERRAINset` = 1) |
 | 11 | `_GetStrategy` (`1030:0000`): modo estratégico preto e vermelho, `_SetCasteProd`, `_SetModeProd` | todo tick |
 | 12 | zera `_TemBModePop` (`9:786a`) e `_TemRModePop` (`9:7be4`), 20 palavras cada (corpo de `_ClrModePop`) | todo tick |
-| 13 | `_FlyAwayB` (`9:7c44`) e `_FlyAwayR` (`9:8078`) −1 se > 0 | todo tick |
+| 13 | `_FlyAwayB` (`9:7c44`) e `_FlyAwayR` (`9:8078`) −1 se ≠ 0 (o código testa ≠ 0, não > 0: um valor negativo continuaria caindo) | todo tick |
 | 14 | `_DoAntSimA` (`1028:04d8`): formigas da superfície | todo tick |
 | 15 | `_DoAntSimB` (`1028:2d4e`): ninho preto | todo tick |
 | 16 | `_DoAntSimR` (`1028:5344`): ninho vermelho | todo tick |
@@ -132,6 +132,28 @@ Observações:
 - A fase 0 compacta a lista A e **também** roda `_FullCount`/`_HistUpdate`/`_SmoothAlarm`; a fase 2 roda só os três últimos. Contagem, histórico e alarme rodam, portanto, a cada 64 ticks.
 - `_DoSpider` não existe no `.SYM`. A aranha é `_MoveSpider`.
 - `_GameTime` só é incrementado aqui. **Verificado:** em `QUICK2.ANT`, `_GameTime = 78` e `_Cycle = 78` (o jogo começa com ambos em 0; `_RandWorld` `1030:6086` zera `_Cycle`).
+
+### 5.1 Contagem, histórico, resumo de modos e compactação
+
+**Fato visto no código** (pseudocódigo do Ghidra e, onde indicado, desmontagem do `SIMANTW.EXE`).
+
+**`_CountAnts` (`1020:04de`)**, chamado por `_FullCount` (`1020:07b4`, que depois chama `_Feedback`):
+
+1. Zera `_CastePopB[0]`, `_CastePopR[0]` e os 32 contadores de `_TemCensus` (`9:7c4e`).
+2. Para cada lista (A, B, R, nessa ordem), percorre as vagas de `_ListIndex − 1` até 0 e, se T ≠ 0, soma 1 em `_TemCensus[T >> 3]` (pretas nos índices 0–15, vermelhas em 16–31, pelo bit 7).
+3. Se `_MeMode` = 0, soma a amarela em `_TemCensus[(_MeType | cor) >> 3]`, com cor = 0x80 se `_MeColor` ≠ 0 (o Ghidra mostra a cor como `_grndTile+2`; o endereço é `10:ce98`, `_MeColor`).
+4. Pretas: `_CastePopB[0]` = k0; `[1]` = k1 + k2 + k3 + k5; `[2]` = k6 + k7 + k9; `[3]` = k4; `[4]` = k8 (kN = `_TemCensus[N]`).
+5. **Morte da rainha preta:** se o `_CastePopB[5]` anterior ≠ 0, k12 = 0 e `_JustXfered` = 0: música 0x2B0C e mensagem 10010; se `_CurGameType` < 2, também mensagem 10011, `_IsGameOver` = 1 e `_BlackWon` = 0. Depois `_CastePopB[5]` = k12.
+6. Vermelhas: o mesmo com k16…k28 em `_CastePopR`; na morte da rainha vermelha, música 0x2B0D, mensagens 10012 e (Tutorial/Quick) 10013, com `_BlackWon` = 1. **Além disso**, se `_CurGameType` = 2, `_ColonyTotalRed` = 1 e `_CurYardPnt` = (11, 8): `k = SRand1(6)` e o byte `8:0184 + 16·k` recebe 0x14. Esse endereço é `_YMapPopR` (`8:0164`) + 0x20 + 16·k, ou seja, 20 formigas vermelhas no patch (k + 2, 0). Fato visto na desmontagem: o seletor vem de `DGROUP:0xc2e4`, que a relocação NE liga ao segmento 8. [hipótese] Leitura: surge uma nova colônia vermelha na casa.
+7. `_BpopT` = soma de `_CastePopB[1..5]`; `_RpopT` idem; `_JustXfered` = 0.
+
+A contagem vai só até `_ListIndex − 1`; a reconstrução da vida no load lê até `_ListIndex`, inclusive (ver save-ant.md).
+
+**`_HistUpdate` (`1000:9182`)**: com `i = _HistStart`, grava `_H_BPop[i] = _BpopT`, `_H_RPop[i] = _RpopT`, `_H_BFood[i] = _FoodB`, `_H_RFood[i] = _FoodR`, `_H_BHeal[i] = _HealthB`, `_H_RHeal[i] = _HealthR`, `_H_FoodA[i] = _FoodA`, `_H_ADead[i] = _BAntsExpired`, `_H_PDead[i] = _BAntsEaten` e `_H_FDead[i] = _BAntsKilled` (dos contadores de 32 bits, só a palavra baixa). Depois faz `_HistCnt += 1` se < 63 e `_HistStart = (_HistStart + 1) & 63`. O resto da função redesenha o gráfico se a janela 0x1500 estiver aberta (interface). `_ClearHistory` (`1000:8cfc`) zera as dez séries e põe `_HistStart = 63` e `_HistCnt = 0`.
+
+**`_TallyModePop`** (embutido no passo 18): `_ModePopB` = (m2 + m3, m4 + m5, m1, m7, m12, m6), com mN = `_TemBModePop[N]`; `_ModePopR` igual, com `_TemRModePop`. Como `_ClrModePop` zera as contagens no passo 12 e só as formigas processadas nos passos 14–17 contam, um tick sem formigas simuladas deixa `_ModePop*` = 0.
+
+**`_CompactListA/B/R`** (`1020:2a16`/`2a7a`/`2ade`): percorre as vagas 0…`_ListIndex − 1`; cada vaga com T ≠ 0 é copiada (X, Y, M, T, S) para a primeira posição livre à frente; `_ListIndex` diminui do número de vagas com T = 0. As vagas do fim que ficaram para trás **não são apagadas** e continuam no save como lixo.
 
 ### Frequências resumidas
 
@@ -241,6 +263,58 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md).
 3. **Comparação tick a tick com o port.** Use o `.ANT` como "foto" do estado: carregue o mesmo `.ANT` no original e no port, avance o mesmo número de ticks e compare os 307 blocos. Os campos do quintal e do cheiro já ficam estáveis entre ticks; listas e RNG exigem a semente igual (ver `rng.md`).
 4. **Dumps de memória.** `pmemsave` grava memória **física**. No modo 386 avançado, os segmentos de 50 KB não ficam contíguos na RAM física. **Observado** em `re_trabalho/qemu_ram_quick2.bin`: a assinatura `_Dx8/_Dy8` + `_TurnTab` aparece em 0x22F700, mas as listas (`8:23a4…`) não estão no deslocamento esperado a partir dali. Para dumps úteis, resolva a base linear do seletor (LDT do Windows) e use `memsave` (endereço virtual) do QEMU, ou compare só dentro de uma página de 4 KB. Assinaturas para achar os segmentos: `_Dx8+_Dy8` (`00 01 01 01 00 ff ff ff ff ff 00 01 01 01 00 ff`, início do segmento 8) e a tabela de luta (`00 00 00 00 02 00 01 01 02 01 00 00 03 03 00 00 05 02 07 03…`, DGROUP 0x22C6).
 5. **Pausa com movimento.** Pause, clique num destino para a amarela e salve depois de alguns segundos: se `_GameTime` avançou, a exceção da seção 4 está confirmada.
+
+## Implementação no port
+
+Onde está (crate `engine`, módulo `rules`):
+
+- **`rules/estado.rs`: `Estado`.** Guarda todos os 307 blocos do `.ANT` em grupos tipados por assunto, com o símbolo original no comentário de cada campo:
+  - `partida`: `_GameTime`, `_Cycle`, tipo de jogo, pausa, velocidade, fim de jogo, cadáveres...;
+  - `ambiente`: terreno, `_Barrier`, chuva, `_FoodA`, `_NextFeed`, `_YardCycle`, patch, sementes;
+  - `superficie`, `ninho_b` e `ninho_r`: mapa, mapa de saída, vida e lista. Cada lista guarda **todas** as vagas da capacidade, mais o `_ListIndex`;
+  - `feromonios`: os cinco mapas, mais `_PherMapF`;
+  - `preta` e `vermelha` (`Colonia`): saúde, comida, castas, modos, revoada, escavação, buracos, contadores de mortes...;
+  - `amarela` (`_Me*`), `lider_vermelha`, `formigas_leao`, `aranha`, `lagarta_e_bichos`, `menino`, `bichos`, `controles`, `tutorial`, `vistas` e `historico`.
+
+  Campos só de execução: os geradores `s` e `r`, `censo` (`_TemCensus`), `modos_do_tick` (`_TemBModePop`/`_TemRModePop`), `tindex`, `baloes`, `tecla_global` (`_GlobalKey`), `precisa_salvar` e a fila `eventos` (mensagens, músicas e o diálogo de fim de jogo). As regras não chamam áudio nem janela: deixam o pedido na fila.
+  - `Estado::de_save(&JogoSalvo)` lê os blocos pelo nome do símbolo e reconstrói `_LifeA/B/R` como `_DoLoadInitializations` (`core/vida.rs`). Os geradores não estão no save. Por convenção, S começa na semente do patch atual e R no estado inicial do runtime C [hipótese: depois de um load, o original não é reproduzível; ver rng.md].
+  - `Estado::para_save(&LayoutSave)` grava de volta. A ida e volta é **byte a byte** (verificado com `QUICK2.ANT` e `QUICK3.ANT`).
+  - `Estado::de_mundo(&Mundo, s, r, &ConfigSimulacao)` monta o estado de um jogo novo a partir da geração. Aplica os passos de `_NewGame`, `_RandYard`, `_RandWorld` (passo 18), `_InitSimVars`, `_initControls`, `_ClearHistory` e `_CountAnts`.
+  - Rotinas: `contar_formigas` (`_CountAnts`), `resumir_modos` (`_TallyModePop`), `atualizar_historico` (`_HistUpdate`), `ListaFormigas::compactar` (`_CompactList?`) e `adicionar_formiga` (`_AddAntTo?List`, com o mapa de vida).
+- **`rules/tick.rs`: `tick(&mut Estado, &mut dyn Regras)`.** Segue a tabela da §5 na ordem exata. O próprio tick faz os passos 1–5, 12, 13, 18, 22 e 23, o teste do passo 19 e a alimentação periódica (o `_AddFood` é delegado). As sub-rotinas de cada assunto são métodos de seis traits, todos com implementação padrão vazia:
+
+  | Trait | Métodos | Spec |
+  |---|---|---|
+  | `RegrasQuintal` | `simular_quintal` (`_DoSimYard` + `_SimColonies`), `simular_agua` (`_DoWater`) | §6, ninho.md §8 |
+  | `RegrasInimigos` | `simular_formigas_leao`, `mover_aranha`, `simular_lagarta` (`_DoPillar` + `_DoSow`) | inimigos.md |
+  | `RegrasSuperficie` | `simular_superficie` (`_DoAntSimA`), `adicionar_comida` (`_AddFood`), `escolher_estrategia` (`_GetStrategy`), `criar_lider_vermelha` (`_MakeRedInitiator`) | superficie.md |
+  | `RegrasNinho` | `simular_ninho(cor)` (`_DoAntSimB`/`_DoAntSimR`) | ninho.md, ciclo-de-vida.md |
+  | `RegrasAmarela` | `simular_amarela` (`_DoAntSimY`), `mover_amarela` (`_DoAntMoveY`) | formiga-amarela.md |
+  | `RegrasConselhos` | `dar_conselhos` (`_Feedback`) | [em aberto] |
+
+  `Regras` é a soma das seis traits. `RegrasOriginais` é a implementação do jogo. No fim de `tick.rs` há uma linha `impl Regras<Parte> for RegrasOriginais {}` vazia para cada parte.
+
+  **Para plugar uma parte:** em `rules/<assunto>.rs` (por exemplo, `ninho.rs`), escreva `impl RegrasNinho for RegrasOriginais { fn simular_ninho(...) {...} }`. Depois apague a linha vazia correspondente em `tick.rs` e acrescente `pub mod <assunto>;` em `rules/mod.rs`. Tabelas de dados de que as regras precisarem entram como campos de `RegrasOriginais` (hoje: `geracao`, com o seno de `_AddFood`).
+  - Os pontos de feromônio do tick (`_FillHoles*`, `_ColonySmell*`, `_SmoothAlarm`) são funções privadas vazias marcadas com `TODO(feromonios.md)`, a ligar a `rules/feromonios.rs`.
+  - `simulacao_liberada` (pausa, §4) e `Relogio` (atraso contado em mensagens de temporizador e `_SpeedDelayVals`, §2–3) decidem **quando** rodar um tick. A lógica do tick não depende da velocidade.
+- **Dados:** `data/simulacao.json` (`ConfigSimulacao`). Contém `atrasos_velocidade` (`_SpeedDelayVals` = 6, 2, 0, −1) e os valores iniciais de jogo novo que não saem da geração:
+  - triângulos e conjuntos memorizados, `_ModeAuto`/`_CasteAuto`, botões e porcentagens de `_initControls` (`1000:cc84`);
+  - `_GameSpeed` e os avisos de saúde de `_InitSimVars`;
+  - `_NextFeed` = 40, valor estático do executável;
+  - `_OptionStates` e `_HistButtStates` [hipótese: padrão observado no QUICK2/QUICK3];
+  - `_Barrier` 0x50/0x90, gravado por `_OverlayTileSet` (`1010:00f4`).
+
+  Um mod pode sobrescrever o arquivo.
+
+Verificado (`engine/tests/estado_simulacao.rs` e testes de unidade de `estado.rs` e `tick.rs`):
+
+- Os símbolos cobertos pelo `Estado` são exatamente os 307 do layout. A ida e volta é byte a byte com `QUICK2.ANT` e `QUICK3.ANT`.
+- `contar_formigas` sobre o `QUICK2.ANT` e o `QUICK3.ANT` reproduz `_CastePop*[1..5]`, `_BpopT` e `_RpopT` do save. `_CastePop*[0]` sai maior ou igual, por causa dos ovos postos depois da última contagem (tick 64).
+- Um tick com as regras vazias sobre o `QUICK2.ANT` muda só `_GameTime`, `_Cycle` e `_ModePop*` (este porque nenhuma formiga foi contada no tick).
+- Periodicidade e ordem das chamadas, com regras de teste que anotam cada chamada e o `_Cycle`: todo tick, ticks ímpares (lagarta), a cada 64 (alimentação, contagem, histórico), a cada 128 por fase (compactação A/B/R), e a volta do `_Cycle` depois de 0x1000.
+- `de_mundo` com a semente do `QUICK2.ANT` (precisa de `SIMANT_DIR`): controles, opções, velocidade, `_Barrier`, `_NextFeed`, vistas, buracos, rainhas e escavação iguais ao save.
+
+Não verificado: nenhuma parte do tick foi comparada passo a passo com o original, porque as sub-rotinas ainda não existem. O caminho do Full Game em `_CountAnts` (nova colônia vermelha) não tem teste. `de_mundo` não aplica `_InitSimYard` nem `_ResetYellowVars` (os campos ficam zerados).
 
 ## Lacunas
 
