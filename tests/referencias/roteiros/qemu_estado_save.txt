@@ -1,0 +1,24 @@
+# Prova da leitura de memória: salva QUICK3.ANT pelo menu e, com a caixa "Saved correctly" na tela,
+# pausa e grava o estado (todos os blocos do save, lidos da memória). Os dois arquivos têm de ser iguais.
+# Depois deixa a simulação andar e grava o estado de novo, para ver o que mudou.
+# Pré-requisito: snapshot "quick" (roteiro qemu_snapshot_quick.txt).
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_estado_save.txt
+#      python tools/qemu_bancada.py extrair MAXIS/ANTWIN/QUICK3.ANT re_trabalho/QUICK3.ANT --overlay re_trabalho/qemu/c_overlay.qcow2
+snapshot_carregar quick
+esperar 2
+teclas ctrl+a
+esperar 3
+digitar QUICK3
+esperar 1
+teclas ret
+esperar 3
+pausar
+capturar re_trabalho/qs_salvo.png
+estado re_trabalho/estado_quick3_salvo.bin
+continuar
+teclas ret
+esperar 10
+estado re_trabalho/estado_quick3_10s.bin
+capturar re_trabalho/qs_10s.png
+esperar 15
+fim

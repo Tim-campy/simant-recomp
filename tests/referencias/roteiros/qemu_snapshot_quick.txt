@@ -1,0 +1,13 @@
+# Boot até um Quick Game e grava o snapshot "quick" no overlay qcow2 (re_trabalho/qemu/c_overlay.qcow2).
+# Outros roteiros começam com "snapshot_carregar quick" e pulam os ~50 s de boot.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_snapshot_quick.txt
+esperar 35
+teclas spc
+esperar 3
+teclas spc
+esperar 4
+clicar_em 345 228
+esperar 15
+capturar re_trabalho/qs_quick.png
+snapshot_salvar quick
+fim
