@@ -1,0 +1,4 @@
+{
+  "_comentario": "Bancos originais, na ordem de busca. WINGANT = vídeo colorido (Display Mode W); para mono use MWINNT. Ver docs/spec/formatos/simant-cfg.md",
+  "bancos": ["SHARED", "WINGANT", "SOUND"]
+}

@@ -1,0 +1,27 @@
+{
+  "_comentario": "Sequência de abertura. Ordem, posições e duração da tela 'maxis' são [hipótese]; a tela 'titulo' segue _ShowIntro (720 ticks, espaço ou clique). Ver docs/spec/telas/abertura.md",
+  "ms_por_tick": 55,
+  "telas": [
+    {
+      "nome": "maxis",
+      "largura": 640, "altura": 480, "fundo": 0,
+      "bitmaps": [ { "id": 28000, "x": 202, "y": 141 } ],
+      "duracao_ticks": 55,
+      "fechar_com": ["espaco", "clique"]
+    },
+    {
+      "nome": "titulo",
+      "largura": 640, "altura": 480, "fundo": 0,
+      "bitmaps": [ { "id": 2000, "x": 64, "y": 69 }, { "id": 2001, "x": 64, "y": 237 } ],
+      "duracao_ticks": 720,
+      "fechar_com": ["espaco", "clique"]
+    },
+    {
+      "nome": "selecao",
+      "largura": 640, "altura": 480, "fundo": 8,
+      "bitmaps": [ { "id": 2500, "x": 161, "y": 110 } ],
+      "duracao_ticks": 4294967295,
+      "fechar_com": ["clique"]
+    }
+  ]
+}

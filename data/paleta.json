@@ -1,0 +1,7 @@
+{
+  "_comentario": "Paleta padrão de 16 cores do Windows 3.x. [hipótese] confirmada só visualmente; ver docs/spec/formatos/bitmap.md",
+  "cores": [
+    "#000000", "#800000", "#008000", "#808000", "#000080", "#800080", "#008080", "#c0c0c0",
+    "#808080", "#ff0000", "#00ff00", "#ffff00", "#0000ff", "#ff00ff", "#00ffff", "#ffffff"
+  ]
+}

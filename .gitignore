@@ -1,0 +1,19 @@
+# Arquivos do jogo original: fornecidos pelo usuário, protegidos por direitos autorais, nunca versionar
+SimAnt-T/
+
+# Material de engenharia reversa (pseudocódigo, dumps, PNGs extraídos) — fora do port
+re_trabalho/
+.re/
+
+# Dependências baixadas
+vendor/
+referencia/dosbox-x/
+
+# Capturas do original contêm imagens do jogo: ficam só localmente
+tests/referencias/capturas/*
+!tests/referencias/capturas/.gitkeep
+
+# Build
+target/
+__pycache__/
+*.pyc
