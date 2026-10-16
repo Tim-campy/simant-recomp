@@ -88,4 +88,54 @@ fn tela_de_jogo_do_quick2_igual_a_validada() {
     assert_eq!(hash, HASH_TELA_JOGO);
 }
 
+#[test]
+fn navegacao_do_quick2_ao_carregar() {
+    use engine::core::navegacao::{Acao, ConfigNavegacao, Navegacao};
+    let texto = std::fs::read_to_string(raiz().join("data/navegacao.json")).unwrap();
+    let cfg: ConfigNavegacao = serde_json::from_str(&texto).unwrap();
+    assert_eq!(cfg.posicao_inicial, PosicaoVista::AoCarregar);
+    let mut n = Navegacao::do_save(&quick2(), PosicaoVista::AoCarregar, 26, 19).unwrap();
+    assert_eq!((n.plano_mapa, n.vista.x, n.vista.y), (2, 21, 0));
+    // _DoLoadInitializations grava (_MeLocX, _MeLocY) = (34, 9) no ponto do ninho preto.
+    assert_eq!(n.pontos[2], (34, 9));
+    assert!(n.aplicar(Acao::Superficie));
+    assert_eq!(n.vista.plano, Plano::Superficie);
+    assert!(n.aplicar(Acao::NinhoVermelho));
+    assert_eq!(n.vista.plano, Plano::NinhoVermelho);
+}
+
+#[test]
+fn botoes_da_faixa_e_outros_planos_do_quick2() {
+    use engine::core::navegacao::{Acao, ConfigNavegacao};
+    use engine::core::tela_jogo::TelaDeJogo;
+    let Some(r) = recursos() else { return };
+    let cfg: ConfigTelaJogo = r.dados("tela_jogo.json").unwrap();
+    let nav_cfg: ConfigNavegacao = r.dados("navegacao.json").unwrap();
+    let interface = Interface::carregar(&r, cfg.tabela_posicoes).unwrap();
+    let j = quick2();
+    let tela = TelaDeJogo::carregar(&cfg, &r, &interface, &j).unwrap();
+    assert_eq!((tela.largura_vista, tela.altura_vista), (26, 19));
+    // Cada botão configurado existe na faixa e é encontrado pelo clique no seu centro.
+    let id_faixa = interface.moldura.faixa.janela;
+    let faixa = engine::core::telas::carregar_janela(&r, id_faixa).unwrap();
+    let origem = interface.posicionar(id_faixa, &faixa).unwrap().origem;
+    let base = faixa.retangulo();
+    for nome in nav_cfg.botoes_faixa.keys() {
+        let ob = faixa.objetos.iter().find(|o| &o.nome == nome).unwrap_or_else(|| panic!("{nome} não está na faixa"));
+        let x = (ob.retangulo.esq + ob.retangulo.dir) / 2 + origem.0 - base.esq;
+        let y = (ob.retangulo.topo + ob.retangulo.base) / 2 + origem.1 - base.topo;
+        assert!(tela.objetos_da_faixa_em(x as i32, y as i32).contains(&nome.as_str()), "{nome}");
+    }
+    // Os três planos desenham sem pendências.
+    let mut nav = tela.navegacao(&j, PosicaoVista::AoCarregar).unwrap();
+    for a in [Acao::Superficie, Acao::NinhoVermelho, Acao::NinhoPreto] {
+        nav.aplicar(a);
+        let (q, pendentes) = tela.compor(&r, &interface, &nav).unwrap();
+        assert!(pendentes.is_empty(), "{a:?}: {pendentes:?}");
+        assert_eq!((q.largura, q.altura), (640, 442));
+    }
+    assert_eq!(tela.seta_em(430, 125), Some(Acao::LinhaAcima));
+    assert_eq!(tela.seta_em(200, 200), None);
+}
+
 const HASH_TELA_JOGO: &str = "2bdd46f9280642b70c36b1fd5f74aa78efad63dc208760e5b87a3cd19312c1c8";

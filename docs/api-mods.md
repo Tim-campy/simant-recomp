@@ -1,6 +1,6 @@
 # API de mods
 
-Versão da API: **0.2**. Até aqui só há sobrescrita de dados. Scripts Lua ainda não existem.
+Versão da API: **0.3**. Até aqui só há sobrescrita de dados. Scripts Lua ainda não existem.
 
 ## Estrutura
 
@@ -27,6 +27,8 @@ mods/
   - `paleta.json`: as 16 cores;
   - `telas.json`: sequência de abertura (janelas, bitmaps soltos, duração em ticks, gatilhos de fechamento);
   - `interface.json`: geometria da área cliente (faixa, borda das janelas, cores do sistema);
+  - `tela_jogo.json`: geometria da tela de jogo (janela de edição, moldura, botão da faixa de cada plano);
+  - `navegacao.json` (API 0.3): teclas (`teclas`: nome da tecla no SDL, `ctrl`/`shift`/`alt`, `acao`), botões da faixa (`botoes_faixa`: nome do objeto → ação), repetição das setas da barra (`repeticao`) e vista inicial ao abrir um save (`posicao_inicial`: `ao_carregar` ou `salva`). Ações: `linha_acima`, `linha_abaixo`, `linha_esquerda`, `linha_direita`, `pagina_acima`, `pagina_abaixo`, `pagina_esquerda`, `pagina_direita`, `superficie`, `ninho_preto`, `ninho_vermelho`;
   - `jogo.json`: lido direto de `data/`, ainda não sobrescrevível por mod.
 - **Arquivos soltos do jogo:** `arquivos/<nome>` substitui um arquivo da pasta do jogo lido pelo port (hoje, as fontes `font1`–`font4` e `FONTRES.FON`).
 - **Ordem:** os mods são ordenados de modo que cada um venha depois das suas dependências; entre mods independentes, a ordem é alfabética. Se dois mods sobrescrevem a mesma coisa, vale o que vier por último.
@@ -39,6 +41,7 @@ mods/
 |---|---|---|
 | 0.1 | Sobrescrita de objetos por (tipo, id) e de `data/*.json` por nome. | Inicial. |
 | 0.2 | `arquivos/<nome>` para arquivos soltos do jogo; `interface.json` ganhou `fontes.lista`. | Compatível com 0.1; um `interface.json` de mod 0.1 precisa da chave `fontes`. |
+| 0.3 | `navegacao.json` (teclas, botões da faixa e vista inicial da tela de jogo); `tela_jogo.json` listado como sobrescrevível. | Compatível com 0.2: arquivos novos; um mod que não os traz usa os do port. Como o arquivo é trocado inteiro, um `navegacao.json` de mod precisa de todas as chaves. |
 
 ## Planejado
 
