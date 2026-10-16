@@ -32,6 +32,10 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `_MapPlane` | mapa mostrado na janela de edição: 0 quintal (desenha `_MapA`), 1 superfície, 2 ninho preto, 3 ninho vermelho | `_DoCalcTile`, `_SetMapPlane`; [telas/jogo.md](spec/telas/jogo.md) |
 | `_MapPnt` | célula do mapa no canto superior esquerdo da janela de edição (par x, y em `DS:7d2e`/`7d30`) | `FUN_1010_6250`, `_CenterEdit` |
 | `_YMapPnt`, `_AMapPnt`, `_BMapPnt`, `_RMapPnt` | centro lembrado da vista em cada plano (0 a 3) | `_SetMapPlane`, `_DoLoadInitializations` |
+| `_DoEditScroll` | trata `WM_HSCROLL`/`WM_VSCROLL` da janela de edição (linha, página, polegar); não atualiza o ponto lembrado | `MAINWNDPROC`; [telas/jogo.md](spec/telas/jogo.md), "Navegação" |
+| `_SetMapPlane`, `_SetMapPlaneLocation`, `_GotoMapPoint` | troca o plano mostrado e centraliza a vista no ponto lembrado (ou num ponto dado) | `_ProcMapRibbonEvent`, `_ProcMenu` |
+| `_goStep*` | andam a vista com a formiga amarela e atualizam o ponto lembrado | código |
+| `_ScrollUp/Down/Left/Right`, `…S` | funções vazias na versão Windows | código |
 | `_editWidth`, `_editHeight` | tamanho da vista em tiles: `editTileArea` (+1 com faixa) dividido por 16, arredondado para cima | `_win_EditChanged` |
 | `_Me*` (`_MeLocX/Y`, `_MePlane`, `_MeType`, `_MeDir`, `_MeEgg`, `_MeBase`, `_MeMode`) | estado da formiga amarela; com `_MeMode` = 0 ela é gravada como 0xFF na camada de vida | `_SetMyLife`, `_DoCalcTile` |
 | `_TERRAINset` | tileset de chão ativo: 0 quintal (9/10), 1 casa (9/9) | `_OverlayTileSet` |

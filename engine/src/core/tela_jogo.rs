@@ -7,11 +7,12 @@ use serde::Deserialize;
 
 use super::edicao::{desenhar_vista, tiles_para, CenaEdicao, VistaEdicao};
 use super::mapa::{MapaChao, Plano};
+use super::navegacao::{Acao, Navegacao};
 use super::quadro::Quadro;
 use super::telas::{carregar_janela, desenhar_janela_carregada_na_tela, Interface};
-use super::vida::{plano_de, reconstruir, FormigaAmarela};
+use super::vida::{plano_de, reconstruir, CamadasVida, FormigaAmarela};
 use crate::formats::banco::Chave;
-use crate::formats::janela::Retangulo;
+use crate::formats::janela::{Janela, Retangulo};
 use crate::formats::save::JogoSalvo;
 use crate::formats::tiles::{self, Tileset};
 use crate::recursos::Recursos;
@@ -224,71 +225,212 @@ pub fn vista_do_save(jogo: &JogoSalvo, posicao: PosicaoVista, largura: i32, altu
     Ok(v)
 }
 
-/// Monta a tela de jogo: fundo, faixa e janela de edição com chão e vida.
-/// Devolve o quadro e o que ainda não foi reproduzido.
+/// Tela de jogo pronta para ser desenhada várias vezes: layouts, tilesets e vida já carregados do
+/// save. A navegação (plano e vista) fica de fora, em `Navegacao`.
+pub struct TelaDeJogo {
+    pub cfg: ConfigTelaJogo,
+    faixa: Janela,
+    /// Canto do objeto 0 da faixa na área cliente.
+    origem_faixa: (i16, i16),
+    edicao: Janela,
+    /// Tamanho da vista em tiles (`_editWidth`, `_editHeight`).
+    pub largura_vista: i32,
+    pub altura_vista: i32,
+    tiles_chao: Tileset,
+    tiles_vida_superficie: Tileset,
+    tiles_vida_ninho: Tileset,
+    /// Mapas de chão `_MapA`, `_MapB` e `_MapR`.
+    mapas: [Vec<u8>; 3],
+    vida: CamadasVida,
+    amarela: FormigaAmarela,
+    /// O que não foi reproduzido ao carregar (vida fora do mapa, `_MePlane` desconhecido...).
+    pendencias: Vec<String>,
+}
+
+fn indice_do_plano(p: Plano) -> usize {
+    match p {
+        Plano::Superficie => 0,
+        Plano::NinhoPreto => 1,
+        Plano::NinhoVermelho => 2,
+    }
+}
+
+impl TelaDeJogo {
+    pub fn carregar(cfg: &ConfigTelaJogo, recursos: &Recursos, interface: &Interface, jogo: &JogoSalvo) -> Result<TelaDeJogo, String> {
+        let id_faixa = interface.moldura.faixa.janela;
+        let faixa = carregar_janela(recursos, id_faixa)?;
+        let origem_faixa = interface.posicionar(id_faixa, &faixa).ok_or(format!("janela {id_faixa} sem posição"))?.origem;
+        let e = &cfg.edicao;
+        let edicao = carregar_janela(recursos, e.janela)?;
+        let area = area_de_edicao(&edicao, e)?;
+        let ajuste = if interface.moldura.faixa.altura > 0 { e.ajuste_area_com_faixa } else { 0 };
+        let largura_vista = tiles_para((area.dir - area.esq + ajuste) as i32);
+        let altura_vista = tiles_para((area.base - area.topo + ajuste) as i32);
+
+        let rec = reconstruir(jogo)?;
+        let mut pendencias = rec.pendencias;
+        let terreno = jogo.u16("TERRAINset")?;
+        let tiles_chao = tileset(recursos, if terreno == 1 { tiles::ID_CHAO_CASA } else { tiles::ID_CHAO_QUINTAL })?;
+        let amarela = FormigaAmarela::do_save(jogo)?;
+        if plano_de(amarela.plano).is_none() {
+            pendencias.push(format!("_MePlane = {}", amarela.plano));
+        }
+        let mapa = |p: Plano| -> Result<Vec<u8>, String> {
+            let s = bloco_do_mapa(p);
+            let bytes = jogo.bloco(s).ok_or(format!("bloco {s} ausente"))?;
+            MapaChao::new(p, bytes)?;
+            Ok(bytes.to_vec())
+        };
+        Ok(TelaDeJogo {
+            cfg: cfg.clone(),
+            faixa,
+            origem_faixa,
+            edicao,
+            largura_vista,
+            altura_vista,
+            tiles_chao,
+            tiles_vida_superficie: tileset_vida(recursos, &tiles::IDS_VIDA_SUPERFICIE)?,
+            tiles_vida_ninho: tileset_vida(recursos, &tiles::IDS_VIDA_NINHO)?,
+            mapas: [mapa(Plano::Superficie)?, mapa(Plano::NinhoPreto)?, mapa(Plano::NinhoVermelho)?],
+            vida: rec.camadas,
+            amarela,
+            pendencias,
+        })
+    }
+
+    /// Estado de navegação inicial para o save, com a vista conforme `posicao`.
+    pub fn navegacao(&self, jogo: &JogoSalvo, posicao: PosicaoVista) -> Result<Navegacao, String> {
+        Navegacao::do_save(jogo, posicao, self.largura_vista, self.altura_vista)
+    }
+
+    /// Desenha fundo, faixa (com o botão do plano selecionado) e janela de edição com a vista de `nav`.
+    /// Devolve o quadro e o que ainda não foi reproduzido.
+    pub fn compor(&self, recursos: &Recursos, interface: &Interface, nav: &Navegacao) -> Result<(Quadro, Vec<String>), String> {
+        let cfg = &self.cfg;
+        let mut q = Quadro::new(cfg.largura as usize, cfg.altura as usize, cfg.fundo);
+        let id_faixa = interface.moldura.faixa.janela;
+        // _SetMapPlaneLocation: com faixa, seleciona o botão do plano mostrado (e só ele).
+        let mut faixa = self.faixa.clone();
+        for ob in faixa.objetos.iter_mut().filter(|o| cfg.botao_do_plano.values().any(|n| *n == o.nome)) {
+            ob.flags &= !FLAG_SELECIONADO;
+        }
+        if let Some(nome) = cfg.botao_do_plano.get(&nav.plano_mapa.to_string()) {
+            let ob = faixa
+                .objetos
+                .iter_mut()
+                .find(|o| &o.nome == nome)
+                .ok_or(format!("janela {id_faixa}: objeto {nome} não existe"))?;
+            ob.flags |= FLAG_SELECIONADO;
+        }
+        let mut pendentes = desenhar_janela_carregada_na_tela(&mut q, recursos, interface, id_faixa, &faixa)?;
+
+        let e = &cfg.edicao;
+        let area = area_de_edicao(&self.edicao, e)?;
+        let partes = desenhar_moldura(&mut q, &e.moldura);
+        let [ax, ay] = e.area_na_tela;
+        let base = self.edicao.retangulo();
+        let origem = (ax - (area.esq - base.esq), ay - (area.topo - base.topo));
+        pendentes.extend(super::telas::desenhar_objetos(&mut q, recursos, interface, &self.edicao, origem, Some(partes.cliente)));
+        pendentes.extend(self.pendencias.iter().cloned());
+
+        let vista = &nav.vista;
+        let tiles_vida = if vista.plano == Plano::Superficie { &self.tiles_vida_superficie } else { &self.tiles_vida_ninho };
+        let cena = CenaEdicao {
+            chao: MapaChao::new(vista.plano, &self.mapas[indice_do_plano(vista.plano)])?,
+            vida: &self.vida,
+            amarela: self.amarela,
+            tiles_chao: &self.tiles_chao,
+            tiles_vida,
+        };
+        q.recorte = Some(partes.cliente);
+        let r = desenhar_vista(&mut q, vista, &cena, (ax as i32, ay as i32));
+        q.recorte = None;
+        r?;
+        Ok((q, pendentes))
+    }
+
+    /// Nomes dos objetos visíveis da faixa sob o ponto (x, y) da área cliente.
+    pub fn objetos_da_faixa_em(&self, x: i32, y: i32) -> Vec<&str> {
+        let base = self.faixa.retangulo();
+        let (dx, dy) = ((self.origem_faixa.0 - base.esq) as i32, (self.origem_faixa.1 - base.topo) as i32);
+        self.faixa
+            .objetos
+            .iter()
+            .skip(1)
+            .filter(|o| o.visivel() && contem(o.retangulo, x - dx, y - dy))
+            .map(|o| o.nome.as_str())
+            .collect()
+    }
+
+    /// Ação da seta da barra de rolagem da janela de edição sob o ponto (x, y), se houver.
+    pub fn seta_em(&self, x: i32, y: i32) -> Option<Acao> {
+        setas_de_rolagem(&self.cfg.edicao.moldura).into_iter().find(|(r, _)| contem(*r, x, y)).map(|(_, a)| a)
+    }
+}
+
+fn area_de_edicao(janela: &Janela, e: &ConfigEdicao) -> Result<Retangulo, String> {
+    janela
+        .objetos
+        .iter()
+        .find(|o| o.nome == e.area)
+        .map(|o| o.retangulo)
+        .ok_or(format!("janela {}: objeto {} não existe", e.janela, e.area))
+}
+
+fn contem(r: Retangulo, x: i32, y: i32) -> bool {
+    x >= r.esq as i32 && x < r.dir as i32 && y >= r.topo as i32 && y < r.base as i32
+}
+
+/// Botões de seta das barras de rolagem (mesma geometria de `desenhar_moldura`) e a ação de cada um:
+/// `SB_LINEUP`/`SB_LINEDOWN` de `WM_VSCROLL` e `WM_HSCROLL`.
+pub fn setas_de_rolagem(m: &MolduraWindows) -> [(Retangulo, Acao); 4] {
+    let e = ret(m.externo);
+    let (t, h, b) = (m.espessura, m.altura_titulo, m.barra_rolagem);
+    let i = Retangulo { esq: e.esq + t, topo: e.topo + t, dir: e.dir - t, base: e.base - t };
+    let c = Retangulo { esq: i.esq, topo: i.topo + h + 1, dir: i.dir - b, base: i.base - b };
+    let lado = b - 1;
+    let v = Retangulo { esq: c.dir + 1, topo: c.topo, dir: i.dir, base: c.base };
+    let hz = Retangulo { esq: c.esq, topo: c.base + 1, dir: c.dir, base: i.base };
+    [
+        (Retangulo { base: v.topo + lado, ..v }, Acao::LinhaAcima),
+        (Retangulo { topo: v.base - lado, ..v }, Acao::LinhaAbaixo),
+        (Retangulo { dir: hz.esq + lado, ..hz }, Acao::LinhaEsquerda),
+        (Retangulo { esq: hz.dir - lado, ..hz }, Acao::LinhaDireita),
+    ]
+}
+
+/// Monta a tela de jogo do save com a vista de `cfg.edicao.posicao`: fundo, faixa e janela de edição
+/// com chão e vida. Devolve o quadro e o que ainda não foi reproduzido.
 pub fn compor_tela_de_jogo(
     cfg: &ConfigTelaJogo,
     recursos: &Recursos,
     interface: &Interface,
     jogo: &JogoSalvo,
 ) -> Result<(Quadro, Vec<String>), String> {
-    let mut q = Quadro::new(cfg.largura as usize, cfg.altura as usize, cfg.fundo);
-    let id_faixa = interface.moldura.faixa.janela;
-    let mut faixa = carregar_janela(recursos, id_faixa)?;
-    // _SetMapPlaneLocation: com faixa, seleciona o botão do plano mostrado.
-    let plano_mapa = jogo.i16("MapPlane")?;
-    if let Some(nome) = cfg.botao_do_plano.get(&plano_mapa.to_string()) {
-        let ob = faixa
-            .objetos
-            .iter_mut()
-            .find(|o| &o.nome == nome)
-            .ok_or(format!("janela {id_faixa}: objeto {nome} não existe"))?;
-        ob.flags |= FLAG_SELECIONADO;
+    let tela = TelaDeJogo::carregar(cfg, recursos, interface, jogo)?;
+    let nav = tela.navegacao(jogo, cfg.edicao.posicao)?;
+    tela.compor(recursos, interface, &nav)
+}
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test]
+    fn setas_batem_com_a_moldura_medida() {
+        // jogo.md, "Moldura e posição": barra vertical em (424, 158, 16, 304) e horizontal em
+        // (24, 462, 400, 16) na tela, que começa 38 linhas acima da área cliente.
+        let m: MolduraWindows = serde_json::from_str(
+            r#"{"externo": [20, 97, 424, 347], "espessura": 4, "altura_titulo": 18, "barra_rolagem": 16,
+                "cor_linha": 0, "cor_moldura": 8, "cor_titulo": 4, "cor_botao": 8,
+                "cor_relevo_claro": 15, "cor_relevo_escuro": 7, "cor_trilho": 8}"#,
+        )
+        .unwrap();
+        let s = setas_de_rolagem(&m);
+        let r = |a: Acao| s.iter().find(|(_, b)| *b == a).unwrap().0;
+        assert_eq!(r(Acao::LinhaAcima), Retangulo { esq: 425, topo: 120, dir: 440, base: 135 });
+        assert_eq!(r(Acao::LinhaAbaixo), Retangulo { esq: 425, topo: 409, dir: 440, base: 424 });
+        assert_eq!(r(Acao::LinhaEsquerda), Retangulo { esq: 24, topo: 425, dir: 39, base: 440 });
+        assert_eq!(r(Acao::LinhaDireita), Retangulo { esq: 409, topo: 425, dir: 424, base: 440 });
     }
-    let mut pendentes = desenhar_janela_carregada_na_tela(&mut q, recursos, interface, id_faixa, &faixa)?;
-
-    let e = &cfg.edicao;
-    let janela = carregar_janela(recursos, e.janela)?;
-    let area = janela
-        .objetos
-        .iter()
-        .find(|o| o.nome == e.area)
-        .ok_or(format!("janela {}: objeto {} não existe", e.janela, e.area))?
-        .retangulo;
-    let ajuste = if interface.moldura.faixa.altura > 0 { e.ajuste_area_com_faixa } else { 0 };
-    let largura = tiles_para((area.dir - area.esq + ajuste) as i32);
-    let altura = tiles_para((area.base - area.topo + ajuste) as i32);
-    let vista = vista_do_save(jogo, e.posicao, largura, altura)?;
-
-    let partes = desenhar_moldura(&mut q, &e.moldura);
-    let [ax, ay] = e.area_na_tela;
-    let base = janela.retangulo();
-    let origem = (ax - (area.esq - base.esq), ay - (area.topo - base.topo));
-    let objs = super::telas::desenhar_objetos(&mut q, recursos, interface, &janela, origem, Some(partes.cliente));
-    pendentes.extend(objs);
-
-    let rec = reconstruir(jogo)?;
-    pendentes.extend(rec.pendencias);
-    let terreno = jogo.u16("TERRAINset")?;
-    let chao = tileset(recursos, if terreno == 1 { tiles::ID_CHAO_CASA } else { tiles::ID_CHAO_QUINTAL })?;
-    let ids_vida = if vista.plano == Plano::Superficie { tiles::IDS_VIDA_SUPERFICIE } else { tiles::IDS_VIDA_NINHO };
-    let vida = tileset_vida(recursos, &ids_vida)?;
-    let simbolo = bloco_do_mapa(vista.plano);
-    let bytes = jogo.bloco(simbolo).ok_or(format!("bloco {simbolo} ausente"))?;
-    let me = FormigaAmarela::do_save(jogo)?;
-    if plano_de(me.plano).is_none() {
-        pendentes.push(format!("_MePlane = {}", me.plano));
-    }
-    let cena = CenaEdicao {
-        chao: MapaChao::new(vista.plano, bytes)?,
-        vida: &rec.camadas,
-        amarela: me,
-        tiles_chao: &chao,
-        tiles_vida: &vida,
-    };
-    q.recorte = Some(partes.cliente);
-    let r = desenhar_vista(&mut q, &vista, &cena, (ax as i32, ay as i32));
-    q.recorte = None;
-    r?;
-    Ok((q, pendentes))
 }

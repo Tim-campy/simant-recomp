@@ -1,0 +1,28 @@
+{
+  "_comentario": "Navegação na tela de jogo: teclas, botões da faixa e repetição das setas da barra de rolagem. Ver docs/spec/telas/jogo.md, seção 'Navegação'. 'tecla' é o nome da tecla no SDL ('Up', 'Down', 'Left', 'Right', '8', 'PageUp'...); ctrl/shift/alt têm de bater exatamente. Ações: linha_acima, linha_abaixo, linha_esquerda, linha_direita, pagina_acima, pagina_abaixo, pagina_esquerda, pagina_direita, superficie, ninho_preto, ninho_vermelho.",
+  "_posicao_inicial": "ao_carregar = como o original depois de 'Load Game' (_DoLoadInitializations centraliza na formiga amarela); salva = o _MapPnt gravado no save.",
+  "posicao_inicial": "ao_carregar",
+  "teclas": [
+    {"tecla": "Up", "ctrl": true, "acao": "linha_acima", "_fonte": "acelerador Ctrl+VK_UP -> 0xFDA6 (SIMANTW.EXE, ACCELERATORTABLE)"},
+    {"tecla": "Down", "ctrl": true, "acao": "linha_abaixo", "_fonte": "Ctrl+VK_DOWN -> 0xFDA7"},
+    {"tecla": "Left", "ctrl": true, "acao": "linha_esquerda", "_fonte": "Ctrl+VK_LEFT -> 0xFDA8"},
+    {"tecla": "Right", "ctrl": true, "acao": "linha_direita", "_fonte": "Ctrl+VK_RIGHT -> 0xFDA9"},
+    {"tecla": "8", "ctrl": true, "acao": "superficie", "_fonte": "Ctrl+8 -> 0xFD26 -> _ProcMenu 0x26 -> _SetMapPlane(1)"},
+    {"tecla": "9", "ctrl": true, "acao": "ninho_preto", "_fonte": "Ctrl+9 -> 0xFD27 -> _SetMapPlane(2)"},
+    {"tecla": "0", "ctrl": true, "acao": "ninho_vermelho", "_fonte": "Ctrl+0 -> 0xFD28 -> _SetMapPlane(3)"},
+    {"tecla": "Up", "acao": "linha_acima", "_port": "extensão do port: no original, as setas sem Ctrl movem o cursor do mouse 8 pixels (_DoKeyDown)"},
+    {"tecla": "Down", "acao": "linha_abaixo", "_port": "extensão do port"},
+    {"tecla": "Left", "acao": "linha_esquerda", "_port": "extensão do port"},
+    {"tecla": "Right", "acao": "linha_direita", "_port": "extensão do port"},
+    {"tecla": "PageUp", "acao": "pagina_acima", "_port": "extensão do port: no original a página só vem do clique no trilho da barra"},
+    {"tecla": "PageDown", "acao": "pagina_abaixo", "_port": "extensão do port"}
+  ],
+  "_botoes_faixa": "_ProcMapRibbonEvent (1010:c3d4): 0x2203 -> _SetMapPlane(2), 0x2204 -> (3), 0x2205 -> (1). O botão Yard (0x2202) abre a janela do mapa/quintal, que o port ainda não tem.",
+  "botoes_faixa": {
+    "ribToSurface": "superficie",
+    "ribToBNest": "ninho_preto",
+    "ribToRNest": "ninho_vermelho"
+  },
+  "_repeticao": "Escolha do port: o original repete enquanto o botão do mouse fica apertado, na velocidade do redesenho, sem intervalo fixo.",
+  "repeticao": {"atraso_ms": 300, "intervalo_ms": 50}
+}

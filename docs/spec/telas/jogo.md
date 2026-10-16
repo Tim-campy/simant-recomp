@@ -2,7 +2,7 @@
 
 Este documento descreve a tela que aparece durante uma partida: a faixa de ferramentas (janela 34, `mapRibbon`) e a **janela de edição** (janela 0, `editWin`), que mostra o mapa da superfície ou de um ninho com as formigas por cima. As outras janelas abertas numa partida (mapa, controle de castas e de modos) ficam para depois.
 
-Implementação: `engine/src/core/vida.rs` (camada de vida), `engine/src/core/edicao.rs` (vista da janela de edição), `engine/src/core/tela_jogo.rs` (`compor_tela_de_jogo`, moldura do Windows), dados em `data/tela_jogo.json`. Exemplo: `cargo run -p engine --example tela_jogo -- <pasta do jogo> <save .ANT> <pasta de saída> [captura.png]`.
+Implementação: `engine/src/core/vida.rs` (camada de vida), `engine/src/core/edicao.rs` (vista da janela de edição), `engine/src/core/tela_jogo.rs` (`compor_tela_de_jogo`, moldura do Windows), `engine/src/core/navegacao.rs` (rolagem e troca de plano), dados em `data/tela_jogo.json` e `data/navegacao.json`. Executável: `simant --save <save .ANT>` (janela) ou `--exportar-tela-jogo <png>`. Exemplo de comparação: `cargo run -p engine --example tela_jogo -- <pasta do jogo> <save .ANT> <pasta de saída> [captura.png]`.
 
 **Fontes:** pseudocódigo do Ghidra em `re_trabalho/decomp/` (só consulta; nomes do `SIMANTW.SYM`), o `QUICK2.ANT` e a captura `re_trabalho/qi_14_salvo.png`, tirada pela bancada QEMU ([bancada-qemu.md](../../bancada-qemu.md)) na mesma sessão em que o save foi gravado. Legenda: **[código]** = visto no pseudocódigo, com o endereço; **[save]** = visto nos dados; **[medido]** = medido pixel a pixel na captura; **[hipótese]** = não confirmado.
 
@@ -140,6 +140,85 @@ A janela de edição é uma janela do Windows com barra de título, moldura gros
 
 O driver VGA do Windows na QEMU mostra algumas cores com valores diferentes da paleta padrão: índice 1 → (168, 0, 87), 2 → (0, 168, 87), 3 → (168, 168, 87), 4 → (0, 0, 168), 7 → (135, 136, 143), 8 → (192, 199, 200); 0, 9, 11, 12, 14 e 15 saem com os valores padrão; o fundo da aplicação (índice 17 no port) sai (255, 255, 255) [medido]. A comparação, por isso, mapeia cada índice do port para a cor RGB mais frequente da captura nos pixels com esse índice, e conta como igual o pixel cuja cor bate com o mapeamento. É uma diferença da bancada, não do jogo [hipótese].
 
+## Navegação
+
+Como o original muda a vista da janela de edição e o plano mostrado. Implementação: `engine/src/core/navegacao.rs` (estado `Navegacao`, ações, repetição), `TelaDeJogo` em `tela_jogo.rs` (desenho com qualquer vista, cliques na faixa e nas setas das barras), dados em `data/navegacao.json`; o executável (`simant --save`) só traduz teclas e cliques do SDL. Todas as fontes abaixo são o pseudocódigo do Ghidra (`re_trabalho/decomp/`, só consulta) e a tabela de aceleradores lida do `SIMANTW.EXE`; **nada desta seção foi testado no original** ainda.
+
+### Teclado: aceleradores e `_DoKeyDown`
+
+O laço de mensagens de `WINMAIN` (`1000:3fda`) carrega a tabela de aceleradores `ACCELERATORTABLE` (recurso do `SIMANTW.EXE`, deslocamento 500224 no arquivo) e passa cada mensagem por `TranslateAccelerator` [código]. As entradas que importam aqui (flags 0x09 = `FVIRTKEY | FCONTROL`) [dados do executável]:
+
+| Tecla | Comando | Tratado em | Efeito |
+|---|---|---|---|
+| Ctrl+↑ | `0xFDA6` | `MAINWNDPROC`, `WM_COMMAND` com byte alto 0xFD e baixo 0xA0–0xAF | `_DoEditScroll(WM_VSCROLL, SB_LINEUP)` |
+| Ctrl+↓ | `0xFDA7` | idem | `_DoEditScroll(WM_VSCROLL, SB_LINEDOWN)` |
+| Ctrl+← | `0xFDA8` | idem | `_DoEditScroll(WM_HSCROLL, SB_LINEUP)` |
+| Ctrl+→ | `0xFDA9` | idem | `_DoEditScroll(WM_HSCROLL, SB_LINEDOWN)` |
+| Ctrl+8 | `0xFD26` | `_DoMenuEntry` → `_ProcMenu` (`1000:4fc2`), caso 0x26 | `_SetMapPlane(1)` e `_MakeEditOpen` |
+| Ctrl+9 | `0xFD27` | idem, caso 0x27 | `_SetMapPlane(2)` e `_MakeEditOpen` |
+| Ctrl+0 | `0xFD28` | idem, caso 0x28 | `_SetMapPlane(3)` e `_MakeEditOpen` |
+
+- Depois do primeiro passo, os comandos 0xFDA6–0xFDA9 repetem `_DoEditScroll` num laço enquanto `GetAsyncKeyState` diz que Ctrl **e** a seta continuam apertados, sem esperar mensagens [código, `MAINWNDPROC` casos 0xA6–0xA9]. A velocidade, portanto, é a do redesenho.
+- `_MakeEditOpen` (`1010:0e38`) abre a janela de edição se estiver fechada [código].
+- As setas **sem** Ctrl não rolam: `_DoKeyDown` (`1000:0e8c`) move o cursor do mouse 8 pixels (`GetCursorPos`/`SetCursorPos`) [código].
+- Pelo comportamento padrão do Windows, `TranslateAccelerator` só aceita a entrada se Shift e Alt estiverem soltos (as flags não pedem esses modificadores) [hipótese: regra da API, não testada no jogo].
+
+### Barras de rolagem (`_DoEditScroll`, `1010:5c6e`)
+
+`MAINWNDPROC` repassa `WM_HSCROLL` (0x114) e `WM_VSCROLL` (0x115) da janela de edição a `_DoEditScroll`; nos códigos `SB_LINEUP`/`SB_LINEDOWN` (setas da barra), repete enquanto o botão esquerdo do mouse continuar apertado (`GetAsyncKeyState(VK_LBUTTON)`) [código, `MAINWNDPROC` (`1000:2930`), casos 0x114/0x115]. A faixa da barra é a de `_ResetEditScrollRange` (`1010:6086`): de 0 a `64 − _editHeight` na vertical e de 0 a `L − _editWidth` na horizontal, com `L` = 0x40 nos planos 2 e 3 e 0x80 nos outros [código]. Com `p` = `_MapPnt.x` (horizontal) ou `_MapPnt.y` (vertical) [código]:
+
+| Código | Efeito |
+|---|---|
+| 0 `SB_LINEUP` | se `p` > mínimo, `p −= 1`; senão nada |
+| 1 `SB_LINEDOWN` | se `p` < máximo, `p += 1`; senão nada |
+| 2 `SB_PAGEUP` | `p −= _editWidth` (ou `_editHeight`); se passar do mínimo, fica no mínimo |
+| 3 `SB_PAGEDOWN` | `p += _editWidth` (ou `_editHeight`); se passar do máximo, fica no máximo |
+| 4 `SB_THUMBPOSITION` | `p` = posição do polegar |
+| 5 `SB_THUMBTRACK` | idem, só se `_OptionStates ≠ 0` (arrasto ao vivo) |
+| 6 `SB_TOP` / 7 `SB_BOTTOM` | o pseudocódigo grava o mínimo (ou máximo) em **x e y** ao mesmo tempo [código; pode ser leitura errada do Ghidra, em aberto] |
+
+- Nas linhas, o mapa já desenhado é deslocado (`_EditScroll*Asm` ou `_DoEditScrollLine` + `_EditScroll*Color`) e só a faixa nova é desenhada; nos outros códigos, `_UpdateEdit` redesenha com `ScrollWindow` [código]. O resultado na tela é o mesmo: a vista começa em `_MapPnt`.
+- `_DoEditScroll` **não** atualiza o ponto lembrado do plano (`_AMapPnt` etc.) [código]. Quem atualiza são os `_goStep*` (`1030:6efe`ss.), que andam a vista junto com a formiga amarela e gravam `_editWidth / 2 + _MapPnt` [código].
+- Os símbolos `_ScrollUp`, `_ScrollDown`, `_ScrollLeft`, `_ScrollRight`, `_ScrollUpS`, `_ScrollDownS` e `_ScrollRightS` (`1000:96b8`–`96c6`) são funções vazias na versão Windows (só `return`); são chamadas pelos `_goStep*` quando o passo é 1 [código]. Provavelmente restos da versão Mac [hipótese].
+
+### Faixa: botões de plano (`_ProcMapRibbonEvent`, `1010:c3d4`)
+
+Os eventos de objeto chegam por `_DoEvent` (`1000:0bc2`), que despacha pelo byte alto do id (a janela): 0x22 (janela 34, faixa do mapa) vai a `_ProcMapRibbonEvent`, 0x23 (janela 35, faixa do quintal) a `_ProcYardRibbonEvent` [código]. Na faixa 34 [código]:
+
+| Id | Objeto | Efeito |
+|---|---|---|
+| `0x2202` | 2 (botão Yard) | abre a janela do mapa (`_win_Open(0x100)`) se nem ela nem a do quintal estiverem abertas e põe a do quintal na frente (`_MapToYard`) ou a traz ao topo; **não muda a janela de edição** |
+| `0x2203` | `ribToBNest` | `_ClearMapScentButtons`, `_SetMapPlane(2)` |
+| `0x2204` | `ribToRNest` | `_ClearMapScentButtons`, `_SetMapPlane(3)` |
+| `0x2205` | `ribToSurface` | `_ClearMapScentButtons`, `_SetMapPlane(1)` |
+
+A janela do mapa (`_ProcMapEvent`, `1010:c222`) tem botões equivalentes (0x106–0x108 → planos 1 a 3) [código]; ela ainda não existe no port. Não foi estudado em que fase do clique (apertar ou soltar) o evento é gerado [em aberto]; o port age ao apertar.
+
+### Troca de plano (`_SetMapPlane`, `1000:a5ca`; `_SetMapPlaneLocation`, `1000:a386`)
+
+`_SetMapPlane(n)` [código]:
+
+1. se `n = 0`, guarda o plano atual em `_OldMapPlane`; senão invalida o mapa pequeno (`_InvalEuMap`);
+2. `_MapPlane = n`;
+3. lê o ponto lembrado do plano `n` (`_YMapPnt`, `_AMapPnt`, `_BMapPnt` ou `_RMapPnt`);
+4. `_SetMapPlaneLocation(n, ponto)`: repete os passos 1 e 2; no plano ≠ 0, `_CenterEdit(ponto)` (com `_UpdateEdit` se andou) e redesenha o mapa; no plano 0, grava em `_YMapPnt` (`DS:789e`) o par de `DS:7a60` (não identificado); depois `_SetMapModeAnt` e a seleção do botão da faixa (seção "Faixa", acima);
+5. no plano ≠ 0, `_CenterEdit(ponto)` **de novo** e redesenha o mapa.
+
+Consequências:
+
+- A segunda `_CenterEdit` completa o passo que a primeira pode ter perdido no eixo menor (truncamento descrito em "Centralizar").
+- `_CenterEdit` parte do `_MapPnt` do plano anterior, já com os limites do plano novo.
+- Escolher o plano que já está na tela também centraliza: a vista volta ao ponto lembrado, desfazendo a rolagem feita pelas barras (que não atualiza o ponto) [código; não testado no original].
+
+`_GotoMapPoint(n, x, y)` (`1000:a52a`): se `n` é o plano atual e > 0, só `_CenterEdit(x, y)`; senão `_SetMapPlaneLocation(n, x, y)` (troca de plano centralizando em (x, y), sem ler o ponto lembrado) [código]. É usada, por exemplo, por cliques no mapa pequeno; o port ainda não tem quem a chame.
+
+### O que o port faz
+
+- Estado: `Navegacao { plano_mapa, vista, pontos }`, iniciado do save. Com `posicao_inicial: "ao_carregar"` (padrão em `data/navegacao.json`) a vista é a de depois do "Load Game" (seção "Posição ao carregar") e o ponto do plano de `_MePlane` recebe `(_MeLocX, _MeLocY)`, como em `_DoLoadInitializations`; com `"salva"`, ficam os valores gravados.
+- Ações: `linha_*` e `pagina_*` seguem a tabela de `_DoEditScroll` (sem mexer nos pontos lembrados); `superficie`, `ninho_preto` e `ninho_vermelho` seguem `_SetMapPlane(1/2/3)` com as duas centralizações. O resultado é limitado com `_BoundEditPosition` também quando `_CenterEdit` não anda, como faz o desenho (`FUN_1010_16d4`).
+- Entradas ligadas por padrão: os aceleradores do original (Ctrl+setas, Ctrl+8/9/0), os botões `ribToSurface`, `ribToBNest` e `ribToRNest` da faixa e as setas das barras de rolagem (clique, com repetição enquanto o botão fica apertado). **Extensões do port**, marcadas em `data/navegacao.json` e em [divergencias.md](../../divergencias.md): setas sem Ctrl rolam (no original movem o cursor) e PageUp/PageDown rolam uma página na vertical.
+- Ainda não implementado: polegar e trilho das barras (arrasto, página pelo clique no trilho, `SB_TOP/BOTTOM`), botão Yard e plano 0 (janela do mapa/quintal), `_ClearMapScentButtons`, `_GotoMapPoint` e o movimento da vista pela formiga amarela (`_goStep*`), que depende da simulação.
+
 ## Verificação
 
 Exemplo `tela_jogo` com o `QUICK2.ANT` e a captura `qi_14_salvo.png`, tabela de posições 9/0, comparando a área cliente (linhas 38 a 479 da captura) e ignorando o diálogo "Saved correctly" (176 ≤ x < 472, 171 ≤ y < 310 na tela) [medido, 2026-10-16]:
@@ -154,5 +233,7 @@ Exemplo `tela_jogo` com o `QUICK2.ANT` e a captura `qi_14_salvo.png`, tabela de 
 Mapeamento de cores inferido (índice do port → cor da captura) igual ao da seção anterior. Imagens geradas em `re_trabalho/tela_jogo/` (fora do git): `tela_jogo.png` (port), `tela_jogo_640x480_mapeada.png`, `diferencas.png` e recortes ampliados da faixa e das formigas.
 
 O teste `engine/tests/tela_jogo_real.rs` trava o resultado com um SHA-256 dos índices e confere a reconstrução de `_LifeA/B/R` do `QUICK2.ANT` (sem precisar dos bancos do jogo) e a vista salva (22, 0) e ao carregar (21, 0).
+
+Navegação (2026-10-16): testes unitários em `navegacao.rs` e `tela_jogo.rs`; `tela_jogo_real.rs` confere, com o `QUICK2.ANT`, a navegação ao carregar (vista (21, 0), ponto do ninho preto (34, 9)), que os botões de `data/navegacao.json` existem na faixa e são achados pelo clique, e que os três planos desenham sem pendências. O executável exportou as telas do ninho preto (21, 0), da superfície (51, 23) e do ninho vermelho, conferidas a olho, e abriu a janela SDL por 2 s (`--sair-apos-ms`, `--capturar-janela`). **A navegação não foi comparada com o original** (falta capturar a vista depois de Ctrl+setas e da troca de plano na bancada).
 
 **Não verificado contra o original:** a vista ao carregar um save (falta uma captura depois de "Load Game"), a superfície e o ninho vermelho na janela de edição, a formiga amarela rainha (0xFE) e a moldura em outras resoluções (800×600 do DOSBox-X).
