@@ -1,6 +1,6 @@
 # Bancada de testes automática (QEMU + SvarDOS)
 
-Roda o SimAnt original sem janela e sem usar o mouse/teclado do usuário, controlado só pelo protocolo QMP do QEMU. Serve para gerar referências (capturas, jogos salvos, dumps de memória) e, no futuro, para testes de regras contra o original.
+Roda o SimAnt original sem janela e sem usar o mouse/teclado do usuário, controlado só pelo protocolo QMP do QEMU (e pelo gdbstub para escrever na memória). Serve para gerar referências (capturas, jogos salvos, estados da memória) e para testes de regras contra o original.
 
 Decisão e alternativas avaliadas: `docs/decisoes.md` e `reports/Automação de testes Win16 emulado.md`.
 
@@ -8,9 +8,10 @@ Decisão e alternativas avaliadas: `docs/decisoes.md` e `reports/Automação de 
 
 | Peça | Origem | Observação |
 |---|---|---|
-| QEMU 2026-08-11 (`referencia/qemu/`) | qemu.weilnetz.de, instalador oficial para Windows (SHA-512 conferido) | `qemu-system-i386`, aceleração TCG |
+| QEMU 2026-08-11 (`referencia/qemu/`) | qemu.weilnetz.de, instalador oficial para Windows (SHA-512 conferido) | `qemu-system-i386`, aceleração TCG; `qemu-img` para o overlay |
 | SvarDOS 20250427 (kernel EDR-DOS + SvarCOM + HIMEMX) | svardos.org, disquete 1,44 MB | Base do disquete de boot mínimo montado por `tools/qemu_bancada.py` |
 | Disco C: (`re_trabalho/qemu/c.img`, FAT16, 100 MB) | cópia de `SimAnt-T/WINDOWS` e `SimAnt-T/MAXIS` | criado com `IMGMAKE`/`COPY` do DOSBox-X (o `vvfat` do QEMU falha quando o Windows grava) |
+| Overlay (`re_trabalho/qemu/c_overlay.qcow2`) | `qemu-img create -f qcow2 -b c.img -F raw` | criado pelo script quando há snapshots; guarda os snapshots e o que o jogo grava |
 
 Ajustes na **cópia** do Windows for Workgroups 3.11 (a instalação do usuário não é tocada):
 
@@ -22,28 +23,103 @@ Resultado: o WfW 3.11 roda em **modo 386 avançado**, com tela de **640×480 e 1
 ## Uso
 
 ```
-python tools/qemu_bancada.py preparar                 # recria disquete e disco C: (≈1 min)
+python tools/qemu_bancada.py preparar                 # recria disquete e disco C: (≈1 min); apaga o overlay padrão
 python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_salvar_quick.txt
 python tools/fat16_extrair.py re_trabalho/qemu/c.img MAXIS/ANTWIN/QUICK2.ANT tests/referencias/saves/QUICK2.ANT
+
+# com snapshots (disco em overlay qcow2):
+python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_snapshot_quick.txt   # boot + savevm "quick" (≈1 min, uma vez)
+python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_estado_save.txt      # parte do "quick" sem boot
+python tools/qemu_bancada.py extrair MAXIS/ANTWIN/QUICK3.ANT re_trabalho/QUICK3.ANT --overlay re_trabalho/qemu/c_overlay.qcow2
+python tools/estado_diff.py re_trabalho/QUICK3.ANT re_trabalho/estado_quick3_salvo.bin
 ```
 
-Comandos de roteiro: `esperar`, `teclas` (qcodes do QMP, `+` combina), `digitar`, `mouse_canto`, `mover`, `clicar`, `clicar_em X Y`, `capturar ARQ.png`, `memoria INICIO TAMANHO ARQ` (`pmemsave`) e `fim`, que encerra o QEMU com `quit` limpo.
+Opções de `roteiro`: `--overlay ARQ.qcow2` (abre o disco C: por esse overlay; caminho relativo à raiz) e `--mem MB` (RAM da VM, padrão 16). A variável de ambiente `SIMANT_RAIZ` aponta a raiz com `referencia/` e `re_trabalho/` (para rodar o script de um worktree do git); os caminhos de saída dos comandos são relativos a ela. As portas do QMP e do gdbstub são escolhidas livres a cada execução, então duas bancadas podem rodar ao mesmo tempo, desde que não gravem no mesmo disco.
+
+`tools/estado_diff.py A B` compara dois arquivos no formato do `.ANT` (save, `estado` ou dump do port) bloco a bloco, com os nomes do layout e os valores dos blocos de até 4 bytes.
+
+### Comandos de roteiro
+
+| Comando | O que faz |
+|---|---|
+| `esperar SEG` | espera SEG segundos do relógio do host |
+| `teclas T1 T2 ...` | `send-key` com qcodes do QMP (`spc`, `ret`, `esc`, `alt+f`, ...) |
+| `digitar TEXTO` | digita letras, números e espaço |
+| `mouse_canto`, `mover DX DY`, `clicar`, `clicar_em X Y` | mouse relativo (`input-send-event`); com a aceleração desligada, 1 unidade = 1 pixel |
+| `capturar ARQ.png` | `screendump` |
+| `memoria INICIO TAMANHO ARQ` | `pmemsave` (RAM **física**) |
+| `pausar` / `continuar` | `stop` / `cont` do QMP: congela a CPU, o relógio da VM e a simulação |
+| `snapshot_salvar NOME` / `snapshot_carregar NOME` | `savevm` / `loadvm` (HMP) no overlay qcow2 |
+| `ler_variavel NOME ARQ [TAM]` | grava os bytes da variável em ARQ e mostra o valor se tiver até 4 bytes |
+| `escrever_variavel NOME VALOR [TAM]` | escreve VALOR (inteiro little-endian no tamanho da variável, ou `hex:AABB...`) pelo gdbstub e confere relendo |
+| `estado ARQ` | todos os 307 blocos de `data/save_layout.json`, na ordem do save: o arquivo tem o formato exato de um `.ANT` (48.386 bytes) |
+| `fim` | `quit` limpo |
+
+`NOME` pode ser: um símbolo do layout do save (`GameTime`, `MapA`, ...; tamanho = count × tamanho); qualquer variável dos segmentos 8, 9 e 10 do `re_trabalho/symbols.tsv` (com ou sem `_`; exige `TAM`); um endereço `SEG:OFF` em hexadecimal (`10:cbf2`; exige `TAM`); ou um apelido do script: `SementeS` = `10:cbf2` (2 bytes, estado do LFSR) e `SementeR` = `10:ae34` (4 bytes, estado do `rand` do C), ver [spec/regras/rng.md](spec/regras/rng.md).
+
+### Snapshots
+
+O `savevm` exige que todo disco gravável suporte snapshots, e a `c.img` é raw. Por isso, quando o roteiro usa `snapshot_*` (ou quando se passa `--overlay`), o script cria, se não existir, `re_trabalho/qemu/c_overlay.qcow2` (`qemu-img create -f qcow2 -b c.img -F raw`) e abre o disco por ele. O disquete é sempre aberto só leitura (`readonly=on`). O snapshot interno guarda CPU, RAM, dispositivos e o estado do disco **dentro do overlay**.
+
+- A `c.img` não muda nesse modo: os arquivos que o jogo grava ficam no overlay. Para tirá-los: `qemu_bancada.py extrair CAMINHO DESTINO --overlay ARQ` (converte o overlay para raw num diretório temporário e usa `fat16_extrair`).
+- O overlay só vale sobre a `c.img` de onde nasceu: `preparar` apaga o overlay padrão. Se a `c.img` for alterada por um roteiro sem overlay, apague o overlay também.
+- O `loadvm` exige a mesma máquina: um snapshot gravado com `--mem 16` não serve para `--mem 32`.
+- Medido: `savevm` e `loadvm` de 16 MB levam menos de 1 s. O roteiro que parte do snapshot `quick` está no Quick Game no instante 0, contra ~55 s de boot.
+
+## Leitura e escrita da memória do jogo
+
+### O problema
+
+O WfW 3.11 roda em modo 386 avançado: há paginação, e cada segmento do executável NE é um **seletor da LDT** cuja base é um endereço **linear**. Na RAM física (`pmemsave`) os segmentos não são contíguos, e o `_MapA` (8 KB) atravessa páginas: num dump físico feito logo depois do save, os 8 KB do `_MapA` gravado não aparecem inteiros em lugar nenhum.
+
+### A técnica adotada (`Memoria` em `tools/qemu_bancada.py`)
+
+1. **Seletores pela tabela do save.** O `_SaveGame` usa a tabela de `DS(8):0x9570`, com entradas `{u16 count, u16 tamanho, u16 offset, u16 seletor}` ([spec/formatos/save-ant.md](spec/formatos/save-ant.md)). O carregador NE do Windows corrige os ponteiros far com os **seletores reais** dos segmentos 8, 9 e 10. O script faz um `pmemsave` da RAM inteira e procura a assinatura das 6 primeiras entradas (count, tamanho e offset conhecidos; seletor curinga). São 48 bytes, que quase sempre estão numa página só e aparecem contíguos na RAM física. Daí saem os seletores.
+2. **Base linear pela LDT.** `info registers` (HMP) dá a base linear e o limite da LDT (`LDT=...`). O descritor do seletor (8 bytes em `base_LDT + (seletor & ~7)`, lidos com `memsave`) dá a base linear e o limite do segmento.
+3. **Validação.** Pela base linear do segmento 8, lê a tabela inteira (307 entradas) em `0x9570` e confere count, tamanho, offset e a coerência dos seletores. É aí que aparece o seletor do segmento 9, que não está nas 6 primeiras entradas. Só então os seletores são aceitos.
+4. **Leitura:** `memsave` do QMP com endereço linear (`base + offset`), traduzido pela paginação atual da CPU. O `estado` lê cada segmento de uma vez (3 `memsave`), com a VM parada durante a leitura, e monta os blocos na ordem do layout.
+5. **Escrita:** gdbstub do QEMU (`-gdb tcp:127.0.0.1:PORTA`, sempre ligado) e um cliente RSP mínimo em Python: pacote `M endereço,tamanho:hex` (endereço linear) e releitura com `m`. Abrir a conexão para a VM. O script fecha o socket **sem** `D` (o detach retomaria a VM na hora) e restaura pelo QMP o estado anterior (rodando ou pausada). Assim, `pausar` + `escrever_variavel` + `estado` não deixa a simulação andar entre a escrita e a leitura.
+6. A base de cada segmento é relida a cada acesso (segmentos de dados do Win16 podem ser móveis). Os seletores ficam em cache até um `snapshot_carregar`.
+
+Seletores observados (2026-10-16, `-m 16`, no boot e depois do `loadvm`): segmento 8 = `0x1537`, 9 = `0x152f`, 10 (DGROUP) = `0x1527`; tabela no endereço físico `0x246c70`. Valem só para essa configuração: o script sempre procura de novo.
+
+Alternativas descartadas: procurar o conteúdo do `_MapA` na RAM física (atravessa páginas e muda a cada tick); fixar seletores (dependem da ordem de carga e da memória); ler o `DS` do processo pelos registradores (no instante da pausa a CPU raramente está no código do jogo). O HMP não tem comando de escrita em memória, por isso o gdbstub.
 
 ## O que foi verificado (2026-10-16)
 
 | Item | Resultado |
 |---|---|
-| Boot até o jogo | título em cerca de 10 s após iniciar |
+| Boot até o jogo | logotipo do título completo em ~32 s após iniciar (ver abaixo); Quick Game pronto em ~55 s |
 | Teclado (`send-key`) | Espaço fecha o título e o registro; Alt+F abre o menu File; Ctrl+A abre "Save As"; a digitação do nome funciona |
 | Mouse (`input-send-event` relativo) | depois de `mouse_canto`, um movimento de (100, 100) põe a ponta da seta exatamente em (100, 100) |
 | Clique | `clicar_em 345 228` escolhe "Quick Game" no "Select a Game" |
 | Captura (`screendump`) | PNG 640×480, sem janela visível |
 | Memória (`pmemsave`) | dump de 16 MB da RAM física |
 | Jogo salvo | `QUICK2.ANT` com **48.386 bytes**, exatamente o previsto em `spec/formatos/save-ant.md` |
+| Snapshot | `qemu_snapshot_quick.txt` grava `quick`; `qemu_estado_save.txt` e `qemu_semente.txt` partem dele |
+| **`estado` = save, byte a byte** | `qemu_estado_save.txt`: Ctrl+A, `QUICK3`, Enter; com a caixa "Saved correctly" na tela, `pausar` e `estado`. O `QUICK3.ANT` extraído do overlay e o `estado` são **idênticos** nos 48.386 bytes (`estado_diff.py`: "iguais"). O save está em `tests/referencias/saves/QUICK3.ANT` |
+| Leitura em tempo real | ~10,4 s (host) depois, outro `estado` difere em 70 dos 307 blocos: `GameTime` 92 → 154 (`Cycle` e `Scycle2` acompanham), `YardCycle` 91 → 153, `MapA` (13 bytes), listas `Alist*/Blist*/Rlist*`, `BoyX` 188 → 256, `DogX/Y`, `CatOn` 1 → 0, `SpidY` 205 → −1, `HealthB` 95 → 92, `TotalEggsLaidB` 4 → 6, `HistCnt` 1 → 2, entre outros |
+| Escrita | `qemu_semente.txt`: `SementeS` lida 0x8a5e; com a VM pausada, escrita 0x1234, relida 0x1234 e ainda 0x1234 dois segundos depois; ~1 s após `continuar`, vale 0x6acb, que é exatamente o estado do LFSR de [spec/regras/rng.md](spec/regras/rng.md) 230 passos depois de 0x1234 (conferido em Python). `HealthB` escrito 7 com a VM rodando: relido 7, e 7 três segundos depois |
+
+Ritmo (relógio do host, sem determinismo): `GameTime` andou 62 ticks em ~10,4 s, cerca de 6 ticks/s, abaixo dos ~18 ticks/s de um timer de 55 ms [hipótese: TCG lento; medir com `pausar`/`estado` em intervalos fixos].
+
+## Logotipo com a metade superior branca (investigado)
+
+Sintoma (captura antiga `re_trabalho/q30.png`, aos 30 s): no título, a parte de cima do retângulo do logotipo aparece branca e só a de baixo desenhada.
+
+Teste: `qemu_titulo_logo.txt` captura a tela a cada ~1,4 s, de 24 s a 49 s, com `--mem 16` e com `--mem 32`. Sequência observada nos dois casos (com 32 MB, tudo ~1 s depois):
+
+1. janela do título com o retângulo do logotipo todo branco;
+2. área cliente toda preta (o jogo apaga a janela);
+3. retângulo branco de novo;
+4. o bitmap é pintado **de baixo para cima**: numa captura (31,2 s com 16 MB; 32,4 s com 32 MB) as linhas de cima (até y ≈ 270, ou 340) ainda estão brancas e as de baixo já têm a formiga;
+5. a partir de ~32,5 s (16 MB) ou ~33,7 s (32 MB) o logotipo está **completo** e assim fica até o fim (49 s), com a mesma forma do capturado no DOSBox-X.
+
+**Causa:** não é memória, nem a tabela de posições 9/0, nem defeito do driver VGA. É um estado transitório: o bitmap (DIB, guardado de baixo para cima) é desenhado devagar no TCG com o driver VGA de 16 cores (que converte e pontilha as cores), e a captura antiga caiu no meio do desenho. Para capturar o título, espere pelo menos ~35 s após o boot (o `qemu_entrada.txt`, com 35 s, já pega o logotipo completo). As cores diferem das do DOSBox-X (16 cores pontilhadas contra 256 cores), então a comparação pixel a pixel do título continua sendo feita só no DOSBox-X.
 
 ## Cuidados
 
 - O DOS grava com atraso. Antes de encerrar, espere uns 15 s depois de salvar; o `fim` já usa `quit`. O primeiro save (`QUICK1.ANT`) saiu com 0 bytes porque o QEMU foi morto logo depois de salvar.
-- O disco `c.img` é persistente entre execuções. Use `preparar` para voltar ao estado limpo, ou nomes de arquivo novos.
-- A metade superior do logotipo aparece branca no título em 640×480 [em aberto: investigar memória (`-m 16`) ou o carregamento do bitmap 2/2000].
-- Os tempos são do relógio do host (o QEMU não está em modo determinístico). Para determinismo, os próximos passos são `savevm`/`loadvm` e o record/replay por `icount`.
+- O disco `c.img` é persistente entre execuções. Use `preparar` para voltar ao estado limpo, ou nomes de arquivo novos. Com overlay, `snapshot_carregar` também volta o disco ao estado do snapshot.
+- Os tempos são do relógio do host (o QEMU não está em modo determinístico). `pausar` congela a VM para ler um estado coerente, mas o número de ticks entre dois comandos varia de uma execução para outra. Para determinismo, os próximos passos são forçar as sementes (`escrever_variavel SementeS/SementeR`) logo depois de um `snapshot_carregar` com a VM pausada e, se ainda variar, o record/replay por `icount`.
+- `ler_variavel`, `escrever_variavel` e `estado` só funcionam com o jogo carregado (a tabela do save só existe com o `SIMANTW.EXE` na memória). Antes disso, falham com "tabela do save não encontrada".

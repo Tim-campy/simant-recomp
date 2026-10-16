@@ -1,0 +1,24 @@
+# Leitura e escrita de variáveis: força a semente do LFSR (SementeS = DGROUP:cbf2) e a saúde da colônia preta.
+# Pré-requisito: snapshot "quick" (roteiro qemu_snapshot_quick.txt).
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_semente.txt
+snapshot_carregar quick
+esperar 1
+ler_variavel SementeS re_trabalho/var_sementeS_0.bin
+ler_variavel SementeR re_trabalho/var_sementeR_0.bin
+pausar
+escrever_variavel SementeS 0x1234
+ler_variavel SementeS re_trabalho/var_sementeS_1.bin
+esperar 2
+# com a VM parada, o valor não muda
+ler_variavel SementeS re_trabalho/var_sementeS_2.bin
+continuar
+esperar 1
+# a simulação consome o gerador
+ler_variavel SementeS re_trabalho/var_sementeS_3.bin
+# escrita com a VM rodando (o gdbstub para a VM durante a escrita)
+escrever_variavel HealthB 7
+ler_variavel HealthB re_trabalho/var_healthB.bin
+esperar 3
+ler_variavel HealthB re_trabalho/var_healthB_3s.bin
+capturar re_trabalho/qs_healthB.png
+fim

@@ -1,0 +1,34 @@
+# Sequência de capturas do título, a cada ~1 s (investigação da "metade branca" do logotipo).
+# Ver docs/bancada-qemu.md. O tempo de cada captura sai no log.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_titulo_logo.txt [--mem 32]
+esperar 24
+capturar re_trabalho/logo_a.png
+esperar 1
+capturar re_trabalho/logo_b.png
+esperar 1
+capturar re_trabalho/logo_c.png
+esperar 1
+capturar re_trabalho/logo_d.png
+esperar 1
+capturar re_trabalho/logo_e.png
+esperar 1
+capturar re_trabalho/logo_f.png
+esperar 1
+capturar re_trabalho/logo_g.png
+esperar 1
+capturar re_trabalho/logo_h.png
+esperar 1
+capturar re_trabalho/logo_i.png
+esperar 1
+capturar re_trabalho/logo_j.png
+esperar 1
+capturar re_trabalho/logo_k.png
+esperar 1
+capturar re_trabalho/logo_l.png
+esperar 1
+capturar re_trabalho/logo_m.png
+esperar 3
+capturar re_trabalho/logo_n.png
+esperar 5
+capturar re_trabalho/logo_o.png
+fim
