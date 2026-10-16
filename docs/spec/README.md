@@ -33,6 +33,8 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
   - [regras/simulacao-visao-geral.md](regras/simulacao-visao-geral.md): tick (`MYTIMERFUNC`/`_DoAntSim`), ordem e frequência das sub-rotinas, velocidade, pausa, fim de jogo e pontuação.
   - [regras/formigas.md](regras/formigas.md): listas A/B/R, campos X/Y/M/T/S, castas, modos, triângulos de controle e máquina de estados.
   - [regras/feromonios.md](regras/feromonios.md): mapas de cheiro (`_PherMap*`), depósito, decaimento e leitura.
+  - [regras/ninho.md](regras/ninho.md): formigas dentro dos ninhos preto e vermelho (`_DoAntSimB/R`, `_DoNestAntB/R`): despacho por modo, movimento, luta, comida guardada, escavação, mapa de saída, invasoras, água e inundação; diferenças R × B e casos de teste.
+  - [regras/ciclo-de-vida.md](regras/ciclo-de-vida.md): postura, desenvolvimento e eclosão dos ovos (`_SimEggB/R`), rainha (cabeça e cauda, andar, fome), escolha de casta (`_SetCasteProd`, `_CasteTabC`) e casos de teste.
 
 ## Próximos subsistemas a especificar
 
