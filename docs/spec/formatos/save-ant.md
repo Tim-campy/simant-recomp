@@ -351,7 +351,7 @@ Convenção de coordenadas: `x` é a coluna (horizontal) e `y` a linha (vertical
 
 ### Mapas de vida (não salvos)
 
-`_LifeA` (128 × 64), `_LifeB` e `_LifeR` (64 × 64) guardam, por célula, o campo T da formiga que está ali (0 = vazia; 0xFF e 0xFE = formiga amarela) [código: `_DoCalcTile`, `_AddAntToAList`]. **Não estão no save**: `_DoLoadInitializations` (`1010:9dbe`) zera os três e os reconstrói a partir das listas, e depois chama `_SetMyLife` para a formiga amarela se `_MeMode == 0` e `_FullCount` [código].
+`_LifeA` (128 × 64), `_LifeB` e `_LifeR` (64 × 64) guardam, por célula, o campo T da formiga que está ali (0 = vazia; 0xFF e 0xFE = formiga amarela) [código: `_DoCalcTile`, `_AddAntToAList`]. **Não estão no save**: `_DoLoadInitializations` (`1010:9dbe`) zera os três e os reconstrói a partir das listas, percorrendo cada uma de `_ListIndex?` até 0 inclusive (a entrada de menor índice vence quando duas ocupam a mesma célula), e depois chama `_SetMyLife` para a formiga amarela se `_MeMode == 0` e `_FullCount` [código]. Regras completas em [telas/jogo.md](../telas/jogo.md#camada-de-vida).
 
 ### Listas de formigas
 

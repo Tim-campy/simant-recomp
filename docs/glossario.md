@@ -29,7 +29,11 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `win_*` | sistema de janelas próprio do jogo (portado do Mac) | SYM |
 | `displayType` | modo de vídeo escolhido pelo `SIMANT.CFG` | `_ReadConfig` |
 | `_grndTile`, `_lifeTile` | índice do tile de chão e de vida da célula sendo desenhada, calculados por `_DoCalcTile` | código; [formatos/tiles.md](spec/formatos/tiles.md) |
-| `_MapPlane` | mapa mostrado na janela de edição: 0/1 superfície, 2 ninho preto, 3 ninho vermelho | `_DoCalcTile` |
+| `_MapPlane` | mapa mostrado na janela de edição: 0 quintal (desenha `_MapA`), 1 superfície, 2 ninho preto, 3 ninho vermelho | `_DoCalcTile`, `_SetMapPlane`; [telas/jogo.md](spec/telas/jogo.md) |
+| `_MapPnt` | célula do mapa no canto superior esquerdo da janela de edição (par x, y em `DS:7d2e`/`7d30`) | `FUN_1010_6250`, `_CenterEdit` |
+| `_YMapPnt`, `_AMapPnt`, `_BMapPnt`, `_RMapPnt` | centro lembrado da vista em cada plano (0 a 3) | `_SetMapPlane`, `_DoLoadInitializations` |
+| `_editWidth`, `_editHeight` | tamanho da vista em tiles: `editTileArea` (+1 com faixa) dividido por 16, arredondado para cima | `_win_EditChanged` |
+| `_Me*` (`_MeLocX/Y`, `_MePlane`, `_MeType`, `_MeDir`, `_MeEgg`, `_MeBase`, `_MeMode`) | estado da formiga amarela; com `_MeMode` = 0 ela é gravada como 0xFF na camada de vida | `_SetMyLife`, `_DoCalcTile` |
 | `_TERRAINset` | tileset de chão ativo: 0 quintal (9/10), 1 casa (9/9) | `_OverlayTileSet` |
 | `_ELayerMode` | camada de feromônio sobreposta à superfície (−1 = nenhuma, 0–4 = `_PherMapA/BN/BT/RN/RT`) | `_DoCalcTile` |
 | `_LifeA/B/R` | mapa de vida (formigas e outros) por célula, desenhado sobre o chão; não está no save | `_DoCalcTile` |
