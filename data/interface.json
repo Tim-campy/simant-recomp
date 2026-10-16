@@ -1,0 +1,8 @@
+{
+  "_comentario": "Moldura da interface do original, medida na captura do DOSBox-X (tests/referencias/capturas/titulo_800x600.png). Ver docs/spec/formatos/janela.md, seção 'Posicionamento na tela'.",
+  "largura": 800,
+  "altura": 562,
+  "fundo": 17,
+  "faixa": { "janela": 34, "altura": 73, "y_tabela": 17, "fundo": 8 },
+  "borda": { "largura": 5, "cor_externa": 0, "cor": 16, "ajuste_x_contorno": 1 }
+}

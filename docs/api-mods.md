@@ -25,7 +25,8 @@ mods/
 - **Objetos do banco:** `objetos/<tipo>/<id>.bin` substitui o objeto (tipo, id) de qualquer banco original. O conteúdo deve estar **descomprimido**, no formato descrito em `docs/spec/formatos/`. Exemplo: `objetos/2/2000.bin` troca a metade de cima do logotipo (bitmap, ver `bitmap.md`).
 - **Arquivos de dados:** `data/<nome>` substitui o arquivo inteiro de mesmo nome em `data/`. Arquivos disponíveis no marco 1:
   - `paleta.json`: as 16 cores;
-  - `telas.json`: sequência de abertura (bitmaps, posições, duração em ticks, gatilhos de fechamento);
+  - `telas.json`: sequência de abertura (janelas, bitmaps soltos, duração em ticks, gatilhos de fechamento);
+  - `interface.json`: geometria da área cliente (faixa, borda das janelas, cores do sistema);
   - `jogo.json`: lido direto de `data/`, ainda não sobrescrevível por mod.
 - **Ordem:** os mods são ordenados de modo que cada um venha depois das suas dependências; entre mods independentes, a ordem é alfabética. Se dois mods sobrescrevem a mesma coisa, vale o que vier por último.
 - **Erros:** dependência ausente, nome duplicado ou ciclo de dependências impedem o jogo de iniciar, com mensagem de erro.

@@ -13,11 +13,20 @@
 
 ## Conteúdo visual
 
-- **Observado no original (DOSBox-X, 2026-10-16):** a janela `0x300` aparece dentro da janela principal do SimAnt (menu e barra de ferramentas visíveis acima), com moldura azul em volta do logotipo. Ver `tests/referencias/capturas/abertura_titulo_dosbox.png` e `docs/divergencias.md`.
-- **Em aberto:** a composição exata da janela `0x300` vem dos objetos de janela (tipos 0 e 1 do banco), cujo formato ainda não foi decodificado.
-- Bitmaps que provavelmente compõem a abertura [hipótese, pela aparência]: 2/2000 (metade de cima do logotipo SIMANT, 512×168) e 2/2001 (metade de baixo, 512×174, com "© 1991 MAXIS"). Juntos dão 512×342.
-- "Maxis Presents" (2/28000 e 2/28003, 236×197) e "Select a Game" (2/2500, 318×259) existem no banco. A ordem em que aparecem em relação à abertura ainda não foi observada [em aberto: confirmar no DOSBox-X].
+- A janela `0x300` é a janela 3 (`titleWin`), com os objetos `titlePic1` (bitmap 2000) e `titlePic2` (bitmap 2001). Fato visto nos dados; ver [../formatos/janela.md](../formatos/janela.md).
+- **Observado no original (DOSBox-X, 2026-10-16):** ao iniciar `SIMANTW.EXE`, a área cliente mostra a faixa de ferramentas (janela 34) e a janela de título com borda, sem nenhuma tela "Maxis Presents" antes. O port reproduz isso com 99,98% dos pixels iguais (a diferença é o cursor). Captura: `tests/referencias/capturas/titulo_800x600.png`.
+- **Em aberto:** onde entram os bitmaps "Maxis Presents" (2/28000, 2/28003).
+
+## Sequência de inicialização
+
+**Fonte:** `WINMAIN` (`1000:3fda`) chama `_ShowIntro` → `_CustomerIDDialog` → `_NewGame(1)`. Observado no DOSBox-X (2026-10-16), deixando os tempos esgotarem sem tocar em nada (`tools/capturar_original.ps1 -Espera 80`):
+
+1. **Título** (janela 3): até 720 ticks (≈ 39,6 s), ou espaço, ou clique.
+2. **Registro** (janela 30, `picStrWin`, via `_PictureDialog`): "This copy of SimAnt is registered to: [nome omitido] / Customer ID: [número de cliente omitido] / Click here to continue". Fecha depois de 15 × 18 = 270 ticks (≈ 14,9 s), com espaço ou com clique. O nome vem do texto 10/0x83 e de uma string decodificada por `_DecodeString`; o número de 8 dígitos é o que `_ShowIntro` monta (é o *Customer ID*). Captura: `apos_titulo.png`. **No port, os textos ainda não são desenhados** (falta especificar as fontes).
+3. **Select a Game** (janela 2, `scenarioWin`, via `_DoScenario`): fica aberta até haver escolha. Captura: `novo_jogo.png`. O port reproduz com 99,87% de pixels iguais.
+
+Os tempos são aproximados porque o tick é de 55 ms. Nos testes, a soma bate: o "Select a Game" já estava aberto 80 s depois de iniciar o DOSBox-X.
 
 ## No port (marco 1)
 
-A sequência de telas fica em `data/telas.json` (dados, não código): para cada tela, os bitmaps com a posição de cada um, a duração em ticks e as teclas que encerram. A sequência inicial é uma [hipótese] para validar contra o original. Um mod pode trocar bitmaps ou mudar a sequência.
+A sequência fica em `data/telas.json` (dados, não código): para cada tela, as janelas do jogo (e, opcionalmente, bitmaps soltos), a duração em ticks e os gatilhos que a encerram. Hoje só contém a abertura validada. Um mod pode trocar bitmaps ou layouts por (tipo, id), ou mudar a sequência.

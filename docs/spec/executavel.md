@@ -39,7 +39,8 @@ Recursos dentro do EXE: só cursores (`HELPCURSOR`, `MAGCURSOR`, `ROCKCURSOR`, `
 ## Fluxo principal (visto no código, em alto nível)
 
 - `_ReadConfig` (`1008:08f4`) → `_InitGraphics` (`1008:010c`) → `_db_SetDataBase` (abre `SHARED` e o banco gráfico).
-- A simulação avança dentro de `MYTIMERFUNC` (`1000:2440`), callback de `SetTimer`, que chama `_DoAntSim` e depois `_UpdateWindows` e `_UpdateYardMessage`. O intervalo do timer está em `1048:0042`, que vale 0 no arquivo e é preenchido em tempo de execução [em aberto: onde e com que valores, provavelmente o menu de velocidade].
+- A simulação avança dentro de `MYTIMERFUNC` (`1000:2440`), callback de `SetTimer`, que chama `_DoAntSim` e depois `_UpdateWindows` e `_UpdateYardMessage`. O `SetTimer` pede intervalo de 0x11 = 17 ms. No Windows 3.1, o timer tem resolução de 55 ms, então na prática deve disparar a cada tick [hipótese, a medir]. Correção de uma versão anterior deste documento: `1048:0042` **não** é o intervalo, é o segmento do ponteiro da função de callback (`MakeProcInstance` em `WINMAIN`).
+- Sequência de inicialização: ver [telas/abertura.md](telas/abertura.md).
 - As janelas do jogo usam um sistema próprio (`_win_LoadWindow`, `_win_Events`, …) sobre uma única janela Windows. As definições vêm dos objetos de tipo 0 e 1 do banco.
 
 ## Interface de dados

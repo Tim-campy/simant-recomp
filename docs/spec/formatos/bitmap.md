@@ -25,7 +25,9 @@ O conteúdo vem depois de descomprimir, se for o caso (ver [banco-dat-ndx.md](ba
 
 ## Paleta
 
-Os bitmaps 4 bpp parecem corretos com a paleta padrão de 16 cores do Windows (preto, vermelho/verde/amarelo/azul/magenta/ciano escuros, cinza claro, cinza escuro e as versões claras, branco) [hipótese, comparação visual]. O jogo mexe na paleta em `_PatchColorArrays`, `_SetUpPalette` e `_InitPalette`, que ainda não foram analisadas. O magenta claro (índice 13) aparece como fundo de sprites, o que aponta para uma cor-chave de transparência [hipótese].
+**Fato verificado (pixel a pixel contra o DOSBox-X, 2026-10-16):** os índices dos bitmaps 4 bpp seguem a paleta padrão de 16 cores do Windows, **nesta ordem**: 0 preto, 1–6 vermelho/verde/amarelo/azul/magenta/ciano escuros (0x80), **7 cinza escuro (0x808080)**, **8 cinza claro (0xC0C0C0)**, 9–14 as versões claras (0xFF), 15 branco. A primeira versão deste documento trocava 7 e 8; a captura mostrou o erro (ver `docs/divergencias.md`).
+
+Nas capturas, as cores aparecem expandidas pelo DAC VGA de 6 bits (0x80 vira 130 e 0xC0 vira 195). Isso é efeito do emulador, não do jogo. `tools/comparar_captura.py` aplica a mesma conversão. O jogo mexe na paleta em `_PatchColorArrays`, `_SetUpPalette` e `_InitPalette`, que ainda não foram analisadas. O magenta claro (índice 13) aparece como fundo de sprites, o que aponta para uma cor-chave de transparência [hipótese].
 
 ## Em aberto
 

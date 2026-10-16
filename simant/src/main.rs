@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use engine::core::telas::{compor, Evento, Reprodutor, Sequencia};
+use engine::core::telas::{compor, Evento, Interface, Reprodutor, Sequencia};
 use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 use serde::Deserialize;
@@ -16,6 +16,8 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 struct ConfigJogo {
     bancos: Vec<String>,
+    /// Id do objeto tipo 9 com as posições das janelas (docs/spec/formatos/janela.md).
+    tabela_posicoes: u16,
 }
 
 struct Opcoes {
@@ -47,7 +49,7 @@ fn ler_opcoes() -> Result<Opcoes, String> {
 }
 
 fn para_rgb(indices: &[u8], cores: &[[u8; 3]]) -> Vec<u8> {
-    indices.iter().flat_map(|&i| cores[i as usize & 15]).collect()
+    indices.iter().flat_map(|&i| cores.get(i as usize).copied().unwrap_or([255, 0, 255])).collect()
 }
 
 fn salvar_png(caminho: &Path, largura: u32, altura: u32, rgb: &[u8]) -> Result<(), String> {
@@ -59,10 +61,19 @@ fn salvar_png(caminho: &Path, largura: u32, altura: u32, rgb: &[u8]) -> Result<(
     w.write_image_data(rgb).map_err(|e| e.to_string())
 }
 
-fn exportar(seq: &Sequencia, recursos: &Recursos, cores: &[[u8; 3]], dir: &Path) -> Result<(), String> {
+/// Compõe a tela e avisa (uma vez por tela) o que ainda não sabemos desenhar.
+fn compor_rgb(t: &engine::core::telas::Tela, recursos: &Recursos, interface: &Interface, cores: &[[u8; 3]]) -> Result<Vec<u8>, String> {
+    let (quadro, pendentes) = compor(t, recursos, interface)?;
+    if !pendentes.is_empty() {
+        eprintln!("tela {}: não desenhado ainda: {}", t.nome, pendentes.join(", "));
+    }
+    Ok(para_rgb(&quadro.pixels, cores))
+}
+
+fn exportar(seq: &Sequencia, recursos: &Recursos, interface: &Interface, cores: &[[u8; 3]], dir: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     for t in &seq.telas {
-        let rgb = para_rgb(&compor(t, recursos)?, cores);
+        let rgb = compor_rgb(t, recursos, interface, cores)?;
         let caminho = dir.join(format!("{}.png", t.nome));
         salvar_png(&caminho, t.largura, t.altura, &rgb)?;
         println!("{}", caminho.display());
@@ -70,7 +81,7 @@ fn exportar(seq: &Sequencia, recursos: &Recursos, cores: &[[u8; 3]], dir: &Path)
     Ok(())
 }
 
-fn executar(seq: Sequencia, recursos: &Recursos, cores: &[[u8; 3]]) -> Result<(), String> {
+fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &[[u8; 3]]) -> Result<(), String> {
     use sdl2::event::Event;
     use sdl2::keyboard::Keycode;
     use sdl2::pixels::PixelFormatEnum;
@@ -109,7 +120,7 @@ fn executar(seq: Sequencia, recursos: &Recursos, cores: &[[u8; 3]]) -> Result<()
 
         let Some(tela) = rep.atual() else { break };
         if desenhada.as_deref() != Some(tela.nome.as_str()) {
-            let rgb = para_rgb(&compor(tela, recursos)?, cores);
+            let rgb = compor_rgb(tela, recursos, interface, cores)?;
             let mut t = criador
                 .create_texture_static(PixelFormatEnum::RGB24, tela.largura, tela.altura)
                 .map_err(|e| e.to_string())?;
@@ -139,9 +150,10 @@ fn principal() -> Result<(), String> {
     }
     let cores = recursos.dados::<Paleta>("paleta.json")?.rgb()?;
     let seq: Sequencia = recursos.dados("telas.json")?;
+    let interface = Interface::carregar(&recursos, config.tabela_posicoes)?;
     match &o.exportar {
-        Some(dir) => exportar(&seq, &recursos, &cores, dir),
-        None => executar(seq, &recursos, &cores),
+        Some(dir) => exportar(&seq, &recursos, &interface, &cores, dir),
+        None => executar(seq, &recursos, &interface, &cores),
     }
 }
 

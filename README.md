@@ -27,7 +27,7 @@ Opções: `--jogo DIR` (padrão `SimAnt-T/MAXIS/ANTWIN`), `--dados DIR` (padrão
 | `simant/` | executável SDL2 (render e entrada) |
 | `data/` | dados do port (paleta, telas, bancos usados): é o que os mods sobrescrevem |
 | `mods/` | mods instalados (ver `docs/api-mods.md`) |
-| `tools/` | inspetores em Python dos formatos originais |
+| `tools/` | inspetores em Python dos formatos originais; `capturar_original.ps1` e `comparar_captura.py` para comparar o port com o original |
 | `referencia/` | configuração do DOSBox-X para rodar o original |
 | `docs/` | especificação, decisões, glossário, divergências, API de mods |
 | `re_trabalho/` | material de engenharia reversa, fora do controle de versão e fora do port |

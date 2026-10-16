@@ -9,7 +9,7 @@ Jogo: **SimAnt: The Electronic Ant Colony** (Maxis, 1991), versão Windows por "
 - **[hipótese]:** inferência ainda não confirmada.
 - **[em aberto]:** pergunta conhecida, sem resposta ainda.
 
-Nada nesta pasta foi testado ainda **no jogo rodando**: falta um ambiente de referência (ver `docs/decisoes.md`).
+Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original estão em `tests/referencias/README.md`.
 
 ## Índice
 
@@ -19,13 +19,14 @@ Nada nesta pasta foi testado ainda **no jogo rodando**: falta um ambiente de ref
   - [telas/abertura.md](telas/abertura.md): abertura (`_ShowIntro`), implementada no marco 1.
 - Formatos:
   - [formatos/banco-dat-ndx.md](formatos/banco-dat-ndx.md): banco de recursos e compressão LZSS.
-  - [formatos/bitmap.md](formatos/bitmap.md): bitmaps.
+  - [formatos/bitmap.md](formatos/bitmap.md): bitmaps e paleta.
+  - [formatos/janela.md](formatos/janela.md): sistema de janelas (layouts, cores, posições, cálculo e posicionamento na tela).
   - [formatos/simant-cfg.md](formatos/simant-cfg.md): `SIMANT.CFG`.
   - [formatos/save-ant.md](formatos/save-ant.md): jogo salvo e modelo de estado da simulação.
 
 ## Próximos subsistemas a especificar
 
-1. Sistema de janelas (objetos tipo 0 e 1): necessário para a primeira tela.
+1. Fontes (`FONT1`–`FONT4`, `FONTRES.FON`, `_font_*`): necessárias para os textos das janelas (registro, menus).
 2. Mapas de superfície e ninho (`_MapA`, `_MapB`, `_MapR`) e tiles (tipo 9).
 3. Regras da simulação (`SIMANT1_MODULE`, `SIMTWO_MODULE`), uma regra por vez, cada uma com caso de teste contra o original.
 4. Som e música (tipos 5, 18, 20, 50, 51).

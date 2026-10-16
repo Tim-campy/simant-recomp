@@ -2,4 +2,5 @@
 
 pub mod banco;
 pub mod bitmap;
+pub mod janela;
 pub mod lzss;

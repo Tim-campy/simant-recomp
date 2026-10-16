@@ -1,4 +1,5 @@
 {
-  "_comentario": "Bancos originais, na ordem de busca. WINGANT = vídeo colorido (Display Mode W); para mono use MWINNT. Ver docs/spec/formatos/simant-cfg.md",
-  "bancos": ["SHARED", "WINGANT", "SOUND"]
+  "_comentario": "Bancos originais, na ordem de busca. WINGANT = vídeo colorido (Display Mode W); para mono use MWINNT. tabela_posicoes: objeto tipo 9 com a posição das janelas (0 = desktop até 480 linhas, 8 = maior). Ver docs/spec/formatos/simant-cfg.md e janela.md",
+  "bancos": ["SHARED", "WINGANT", "SOUND"],
+  "tabela_posicoes": 8
 }
