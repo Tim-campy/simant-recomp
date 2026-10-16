@@ -6,3 +6,4 @@ pub mod fonte;
 pub mod janela;
 pub mod lzss;
 pub mod save;
+pub mod tiles;

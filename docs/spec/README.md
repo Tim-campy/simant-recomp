@@ -24,6 +24,14 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
   - [formatos/janela.md](formatos/janela.md): sistema de janelas (layouts, cores, posições, cálculo e posicionamento na tela).
   - [formatos/simant-cfg.md](formatos/simant-cfg.md): `SIMANT.CFG`.
   - [formatos/save-ant.md](formatos/save-ant.md): jogo salvo e modelo de estado da simulação.
+- Regras:
+  - [regras/rng.md](regras/rng.md): geradores aleatórios (LFSR `_SRand*` e `rand` do C em `_RRand`), sementes e quem usa cada um.
+  - [regras/geracao-mundo.md](regras/geracao-mundo.md): novo jogo (`_NewGame`, `_RandYard`, `_RandWorld`), patches do quintal e da casa, rainhas, comida e tutorial; verificada contra o `QUICK2.ANT`.
+  - [regras/tiles-valores.md](regras/tiles-valores.md): significado dos valores de `_MapA`, `_MapB` e `_MapR` e das funções de teste de tile.
+- Regras:
+  - [regras/simulacao-visao-geral.md](regras/simulacao-visao-geral.md): tick (`MYTIMERFUNC`/`_DoAntSim`), ordem e frequência das sub-rotinas, velocidade, pausa, fim de jogo e pontuação.
+  - [regras/formigas.md](regras/formigas.md): listas A/B/R, campos X/Y/M/T/S, castas, modos, triângulos de controle e máquina de estados.
+  - [regras/feromonios.md](regras/feromonios.md): mapas de cheiro (`_PherMap*`), depósito, decaimento e leitura.
 
 ## Próximos subsistemas a especificar
 
