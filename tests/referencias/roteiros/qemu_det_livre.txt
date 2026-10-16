@@ -1,0 +1,13 @@
+# Determinismo com corrida livre: como qemu_det_gametime.txt, mas a VM roda 20 s SEM breakpoints (o jogo
+# desenha e drena mensagens no ritmo do relógio do host) antes de parar na entrada com GameTime = 300.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_det_livre.txt
+snapshot_carregar quick
+tick_entrada
+escrever_variavel SementeS 0x1234
+escrever_variavel SementeR 1
+continuar
+esperar 20
+ate_gametime 300
+estado re_trabalho/det/livre300.bin
+extras re_trabalho/det/livre300_extras.json
+fim

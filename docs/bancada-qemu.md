@@ -48,11 +48,17 @@ Opções de `roteiro`: `--overlay ARQ.qcow2` (abre o disco C: por esse overlay; 
 | `mouse_canto`, `mover DX DY`, `clicar`, `clicar_em X Y` | mouse relativo (`input-send-event`); com a aceleração desligada, 1 unidade = 1 pixel |
 | `capturar ARQ.png` | `screendump` |
 | `memoria INICIO TAMANHO ARQ` | `pmemsave` (RAM **física**) |
-| `pausar` / `continuar` | `stop` / `cont` do QMP: congela a CPU, o relógio da VM e a simulação |
+| `pausar` / `continuar` | `stop` / `cont` do QMP: congela a CPU, o relógio da VM e a simulação. No modo tick, `continuar` volta a rodar livre (os breakpoints já estão desligados) |
 | `snapshot_salvar NOME` / `snapshot_carregar NOME` | `savevm` / `loadvm` (HMP) no overlay qcow2 |
 | `ler_variavel NOME ARQ [TAM]` | grava os bytes da variável em ARQ e mostra o valor se tiver até 4 bytes |
 | `escrever_variavel NOME VALOR [TAM]` | escreve VALOR (inteiro little-endian no tamanho da variável, ou `hex:AABB...`) pelo gdbstub e confere relendo |
 | `estado ARQ` | todos os 307 blocos de `data/save_layout.json`, na ordem do save: o arquivo tem o formato exato de um `.ANT` (48.386 bytes) |
+| `extras ARQ.json` | variáveis fora do save capturadas com os vetores de tick (sementes S e R, `_gameCycles`, `_Tindex`, `_GlobalKey`), `GameTime`, `Cycle` e a posição (`entrada`/`saida`/`livre`) |
+| `segmentos PREFIXO` | segmentos de dados 8, 9 e 10 inteiros (até o limite do descritor) em `PREFIXO_seg8.bin` etc. |
+| `tick_entrada` | modo tick: roda até a entrada de `_DoAntSim` (estado **antes** de um tick); não anda se já está lá |
+| `tick_saida` | da entrada até o retorno de `_DoAntSim`: exatamente um tick (estado **depois**) |
+| `ate_gametime N` | para na entrada de `_DoAntSim` com `GameTime` (ainda não somado) ≥ N, tick a tick |
+| `passo_tick DIR` | um tick: `DIR/estado_antes.bin`, `estado_depois.bin`, `vida_antes.bin`, `vida_depois.bin`, `extras.json` |
 | `fim` | `quit` limpo |
 
 `NOME` pode ser: um símbolo do layout do save (`GameTime`, `MapA`, ...; tamanho = count × tamanho); qualquer variável dos segmentos 8, 9 e 10 do `re_trabalho/symbols.tsv` (com ou sem `_`; exige `TAM`); um endereço `SEG:OFF` em hexadecimal (`10:cbf2`; exige `TAM`); ou um apelido do script: `SementeS` = `10:cbf2` (2 bytes, estado do LFSR) e `SementeR` = `10:ae34` (4 bytes, estado do `rand` do C), ver [spec/regras/rng.md](spec/regras/rng.md).
@@ -103,6 +109,17 @@ Alternativas descartadas: procurar o conteúdo do `_MapA` na RAM física (atrave
 
 Ritmo (relógio do host, sem determinismo): `GameTime` andou 62 ticks em ~10,4 s, cerca de 6 ticks/s, abaixo dos ~18 ticks/s de um timer de 55 ms [hipótese: TCG lento; medir com `pausar`/`estado` em intervalos fixos].
 
+## Modo tick (breakpoints do gdbstub)
+
+Para e avança a simulação exatamente um tick por vez. Detalhes, experimentos e protocolo de teste: [spec/regras/testes-tick.md](spec/regras/testes-tick.md).
+
+- **Seletor do código.** `_DoAntSim` está em `1028:0000` (segmento de código 6 do NE). Como os de dados, o seletor só existe em tempo de execução, mas não está na tabela do save: `Memoria.seletor_codigo(6)` procura na LDT os descritores de código presentes com limite igual ao tamanho do segmento no NE e compara os 64 primeiros bytes com o `SIMANTW.EXE`. Observado: `0x1547` (base linear `0x80837500`); os 10 segmentos ficam em `0x156f` (1) … `0x1527` (10), decrescendo de 8 em 8.
+- **Breakpoints em endereço linear** (`Z0`; o QEMU compara com base do CS + EIP): na entrada de `_DoAntSim` e no retorno far lido da pilha na entrada (`1000:2688`, dentro do `MYTIMERFUNC`). Cada um é ligado só durante a corrida até ele.
+- **Sessão persistente.** A conexão com o gdbstub fica aberta; `escrever_variavel` passa a usá-la. Com a VM rodando, o script interrompe pelo gdbstub (byte 0x03) antes de qualquer comando.
+- **Watchpoints de leitura** (`Z3`) em `Depurador.mapear_leituras`: o QEMU informa o início do watchpoint atingido, não o byte lido; por isso as faixas são cortadas em pedaços.
+- **Ritmo:** ~0,45 s por `passo_tick`; `ate_gametime` avança ~3 ticks/s (a VM livre faz ~6).
+- O jogo precisa estar rodando a simulação (não pausado nem minimizado); sem parada em 120 s, o script interrompe e desiste.
+
 ## Logotipo com a metade superior branca (investigado)
 
 Sintoma (captura antiga `re_trabalho/q30.png`, aos 30 s): no título, a parte de cima do retângulo do logotipo aparece branca e só a de baixo desenhada.
@@ -121,5 +138,5 @@ Teste: `qemu_titulo_logo.txt` captura a tela a cada ~1,4 s, de 24 s a 49 s, com 
 
 - O DOS grava com atraso. Antes de encerrar, espere uns 15 s depois de salvar; o `fim` já usa `quit`. O primeiro save (`QUICK1.ANT`) saiu com 0 bytes porque o QEMU foi morto logo depois de salvar.
 - O disco `c.img` é persistente entre execuções. Use `preparar` para voltar ao estado limpo, ou nomes de arquivo novos. Com overlay, `snapshot_carregar` também volta o disco ao estado do snapshot.
-- Os tempos são do relógio do host (o QEMU não está em modo determinístico). `pausar` congela a VM para ler um estado coerente, mas o número de ticks entre dois comandos varia de uma execução para outra. Para determinismo, os próximos passos são forçar as sementes (`escrever_variavel SementeS/SementeR`) logo depois de um `snapshot_carregar` com a VM pausada e, se ainda variar, o record/replay por `icount`.
+- Os tempos são do relógio do host (o QEMU não está em modo determinístico). `pausar` congela a VM para ler um estado coerente, mas o número de ticks entre dois comandos varia de uma execução para outra. Para determinismo, use o modo tick: parando na entrada de `_DoAntSim`, o original é reprodutível tick a tick (exceto `_BirdDelay`), sem precisar de `icount` (ver [spec/regras/testes-tick.md](spec/regras/testes-tick.md)).
 - `ler_variavel`, `escrever_variavel` e `estado` só funcionam com o jogo carregado (a tabela do save só existe com o `SIMANTW.EXE` na memória). Antes disso, falham com "tabela do save não encontrada".

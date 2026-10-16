@@ -32,6 +32,7 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
   - [regras/simulacao-visao-geral.md](regras/simulacao-visao-geral.md): tick (`MYTIMERFUNC`/`_DoAntSim`), ordem e frequência das sub-rotinas, velocidade, pausa, fim de jogo e pontuação.
   - [regras/formigas.md](regras/formigas.md): listas A/B/R, campos X/Y/M/T/S, castas, modos, triângulos de controle e máquina de estados.
   - [regras/feromonios.md](regras/feromonios.md): mapas de cheiro (`_PherMap*`), depósito, decaimento e leitura.
+  - [regras/testes-tick.md](regras/testes-tick.md): determinismo do original na bancada QEMU, vetores "estado antes → depois" de um tick e o que capturar além do save.
 
 ## Próximos subsistemas a especificar
 

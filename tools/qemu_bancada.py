@@ -20,6 +20,13 @@ Comandos de roteiro (um por linha, # = comentário):
     ler_variavel NOME ARQ [TAM] grava em ARQ os bytes da variável global NOME (nome do .SYM, com ou sem '_')
     escrever_variavel NOME VALOR [TAM]  grava VALOR (inteiro little-endian, ou hex:AABB...) via gdbstub
     estado ARQ                  dump de todos os blocos de data/save_layout.json, no formato de um .ANT
+    extras ARQ.json             variáveis fora do save (EXTRAS: sementes S e R, ...), GameTime e posição
+    segmentos PREFIXO           segmentos de dados 8, 9 e 10 inteiros -> PREFIXO_seg8.bin, ...
+  modo tick (gdbstub; a VM fica parada entre os comandos; 'continuar' volta a rodar livre):
+    tick_entrada                roda até a entrada de _DoAntSim (1028:0000); estado ANTES de um tick
+    tick_saida                  da entrada até o retorno de _DoAntSim: exatamente um tick
+    ate_gametime N              para na entrada de _DoAntSim com GameTime (ainda não somado) >= N
+    passo_tick DIR              DIR/estado_antes.bin, DIR/estado_depois.bin, DIR/extras.json de um tick
     fim                         encerra o QEMU
 
 Snapshots: se o roteiro usa snapshot_*, ou se --overlay é dado, o disco C: é aberto por um overlay qcow2
@@ -63,6 +70,7 @@ KERNEL_NOVO = RAIZ / "re_trabalho" / "downloads" / "freedos" / "ke2046_86" / "bi
 QEMU_IMG = RAIZ / "referencia" / "qemu" / "qemu-img.exe"
 OVERLAY_PADRAO = TRAB / "c_overlay.qcow2"
 SIMBOLOS = RAIZ / "re_trabalho" / "symbols.tsv"
+EXE = RAIZ / "SimAnt-T" / "MAXIS" / "ANTWIN" / "SIMANTW.EXE"
 LAYOUT = REPO / "data" / "save_layout.json"
 # Variáveis sem nome no .SYM, identificadas no código (docs/spec/regras/rng.md): nome -> (SEG:OFF, bytes).
 APELIDOS = {
@@ -233,9 +241,8 @@ class Gdb:
         self.s = socket.create_connection(("127.0.0.1", porta), timeout=30)
         self.buf = b""
 
-    def _pacote(self, dados: str) -> str:
-        cs = sum(dados.encode()) & 0xFF
-        self.s.sendall(f"${dados}#{cs:02x}".encode())
+    def _proximo(self):
+        """Próximo pacote recebido (sem o enquadramento $...#cs); confirma com '+'."""
         while True:
             i = self.buf.find(b"$")
             j = self.buf.find(b"#", i) if i >= 0 else -1
@@ -244,7 +251,77 @@ class Gdb:
                 self.buf = self.buf[j + 3:]
                 self.s.sendall(b"+")
                 return resp
-            self.buf += self.s.recv(65536)
+            d = self.s.recv(65536)
+            if not d:
+                raise RuntimeError("gdbstub fechou a conexão")
+            self.buf += d
+
+    @staticmethod
+    def _e_parada(resp):
+        # respostas de parada (T05 breakpoint, T02 quando o QMP 'stop' para a VM, W/X fim); nunca são
+        # resposta de 'm' (hexadecimal), 'M' ou 'Z' (OK, E.., vazio)
+        return resp[:1] in ("T", "S", "W", "X")
+
+    def drenar(self):
+        """Descarta o que chegou sem ser pedido (paradas assíncronas causadas por 'stop' do QMP)."""
+        self.s.settimeout(0.05)
+        try:
+            while True:
+                d = self.s.recv(65536)
+                if not d:
+                    break
+                self.buf += d
+        except (socket.timeout, BlockingIOError):
+            pass
+        finally:
+            self.s.settimeout(30)
+        self.buf = b""
+
+    def _pacote(self, dados: str) -> str:
+        cs = sum(dados.encode()) & 0xFF
+        self.s.sendall(f"${dados}#{cs:02x}".encode())
+        while True:
+            resp = self._proximo()
+            if not self._e_parada(resp):
+                return resp
+
+    def breakpoint(self, endereco, ligar=True):
+        """Breakpoint de software do gdbstub (no TCG não altera a memória) num endereço LINEAR."""
+        r = self._pacote(f"{'Z' if ligar else 'z'}0,{endereco:x},1")
+        if r != "OK":
+            raise RuntimeError(f"gdb: breakpoint {endereco:#x} {'Z' if ligar else 'z'} falhou ({r!r})")
+
+    def interromper(self):
+        """Para a VM pelo gdbstub (byte 0x03) e espera a resposta de parada."""
+        self.drenar()
+        self.s.sendall(b"\x03")
+        while not self._e_parada(self._proximo()):
+            pass
+
+    def watchpoint(self, endereco, n, ligar=True, tipo=3):
+        """Watchpoint do gdbstub (tipo 2 escrita, 3 leitura, 4 acesso) em n bytes a partir de um endereço LINEAR."""
+        r = self._pacote(f"{'Z' if ligar else 'z'}{tipo},{endereco:x},{n:x}")
+        if r != "OK":
+            raise RuntimeError(f"gdb: watchpoint {endereco:#x}+{n} falhou ({r!r})")
+
+    def continuar_ate_parar(self, timeout=120):
+        """'c' e espera a resposta de parada. Devolve o pacote (ex. 'T05thread:01;')."""
+        self.drenar()
+        self.s.sendall(b"$c#63")
+        self.s.settimeout(timeout)
+        try:
+            while True:
+                resp = self._proximo()
+                if self._e_parada(resp):
+                    return resp
+        except socket.timeout:
+            self.s.settimeout(30)
+            self.s.sendall(b"\x03")  # interrompe
+            while not self._e_parada(self._proximo()):
+                pass
+            raise RuntimeError(f"gdb: nenhuma parada em {timeout} s (jogo pausado ou minimizado?)")
+        finally:
+            self.s.settimeout(30)
 
     def ler(self, endereco, n):
         r = self._pacote(f"m{endereco:x},{n:x}")
@@ -300,8 +377,84 @@ class Memoria:
     def __init__(self, q: Qmp, porta_gdb, ram_mb):
         self.q, self.porta_gdb, self.ram = q, porta_gdb, ram_mb << 20
         self.seletores = None
+        self.seletores_codigo = {}
+        self.gdb = None  # sessão persistente do gdbstub (modo tick); None = uma conexão por escrita
         self.layout = carregar_layout()
         self.tmp = Path(tempfile.mkdtemp(prefix="bancada_"))
+
+    def esquecer_seletores(self):
+        """Depois de um loadvm a sessão do Windows restaurada pode ter outros seletores."""
+        self.seletores = None
+        self.seletores_codigo = {}
+
+    def sessao_gdb(self):
+        """Conexão persistente com o gdbstub. Abrir a conexão para a VM (estado 'debug' do QEMU)."""
+        if self.gdb is None:
+            self.gdb = Gdb(self.porta_gdb)
+        elif self.q.rodando():
+            # com a VM rodando (ex.: 'continuar' pelo QMP), o gdbstub só aceita a interrupção (0x03)
+            self.gdb.interromper()
+        return self.gdb
+
+    def registradores(self):
+        """{'CS': (seletor, base), 'SS': ..., 'EIP': v, 'ESP': v} de 'info registers'."""
+        regs = self.q.hmp("info registers")
+        out = {}
+        for nome in ("CS", "SS", "DS", "ES"):
+            m = re.search(nome + r" =([0-9a-f]{4}) ([0-9a-f]{8})", regs)
+            out[nome] = (int(m.group(1), 16), int(m.group(2), 16))
+        for nome in ("EIP", "ESP", "EAX"):
+            out[nome] = int(re.search(nome + r"=([0-9a-f]{8})", regs).group(1), 16)
+        return out
+
+    def seletor_codigo(self, nseg):
+        """Seletor do segmento de CÓDIGO nseg do SIMANTW.EXE (1 = 1000, ..., 6 = 1028, 7 = 1030).
+
+        Os segmentos de código não aparecem na tabela do save. Procuramos na LDT inteira os descritores
+        de código presentes com limite compatível com o tamanho do segmento no NE e comparamos os
+        primeiros 64 bytes da memória com os do arquivo (as relocações mudam poucos bytes)."""
+        if nseg in self.seletores_codigo:
+            return self.seletores_codigo[nseg]
+        exe = EXE.read_bytes()
+        ne = struct.unpack_from("<H", exe, 0x3C)[0]
+        tab, shift = (struct.unpack_from("<H", exe, ne + o)[0] for o in (0x22, 0x32))
+        setor, tam, _flags, _ = struct.unpack_from("<HHHH", exe, ne + tab + (nseg - 1) * 8)
+        tam = tam or 0x10000
+        ref = exe[setor << shift:(setor << shift) + 64]
+        base_ldt, lim_ldt = self.ldt_base()
+        ldt = self.ler_linear(base_ldt, lim_ldt + 1)
+        candidatos = []
+        for i in range(8, len(ldt) - 7, 8):
+            d = ldt[i:i + 8]
+            if not d[5] & 0x80 or (d[5] & 0x18) != 0x18:  # presente e de código
+                continue
+            limite = d[0] | d[1] << 8 | (d[6] & 0x0F) << 16
+            if not tam - 1 <= limite < tam + 0x1000:
+                continue
+            base = d[2] | d[3] << 8 | d[4] << 16 | d[7] << 24
+            try:
+                mem = self.ler_linear(base, 64)
+            except RuntimeError:
+                continue
+            iguais = sum(a == b for a, b in zip(mem, ref))
+            if iguais >= 56:
+                candidatos.append((iguais, i | 7, base))
+        if not candidatos:
+            raise RuntimeError(f"segmento de código {nseg} não encontrado na LDT (descartado?)")
+        candidatos.sort(reverse=True)
+        if len(candidatos) > 1 and candidatos[1][0] == candidatos[0][0]:
+            raise RuntimeError(f"segmento de código {nseg}: candidatos ambíguos {candidatos}")
+        sel = candidatos[0][1]
+        print(f"memória: segmento de código {nseg} = seletor {sel:#06x} (base linear {candidatos[0][2]:#010x}, "
+              f"{candidatos[0][0]}/64 bytes iguais ao arquivo)", flush=True)
+        self.seletores_codigo[nseg] = sel
+        return sel
+
+    def linear_codigo(self, nseg, off):
+        base, _, presente = self.descritor(self.seletor_codigo(nseg))
+        if not presente:
+            raise RuntimeError(f"segmento de código {nseg} não presente")
+        return base + off
 
     def ler_linear(self, endereco, n):
         f = self.tmp / "m.bin"
@@ -417,8 +570,17 @@ class Memoria:
         seg, off, n = self.resolver(nome, tamanho or len(dados))
         if len(dados) != n:
             raise ValueError(f"{nome}: {n} bytes, valor com {len(dados)}")
-        estava = self.q.rodando()
         base, _ = self.base(seg)
+        if self.gdb is not None:  # sessão persistente (modo tick)
+            estava = self.q.rodando()
+            g = self.sessao_gdb()  # interrompe se estava rodando
+            g.escrever(base + off, dados)
+            if g.ler(base + off, n) != dados:
+                raise RuntimeError("escrita não confirmada")
+            if estava:
+                self.q.cmd("cont")
+            return
+        estava = self.q.rodando()
         g = Gdb(self.porta_gdb)  # a conexão para a VM
         try:
             g.escrever(base + off, dados)
@@ -506,117 +668,364 @@ def valor_para_bytes(valor: str, n):
     return (v & ((1 << (8 * n)) - 1)).to_bytes(n, "little")
 
 
+# _DoAntSim @ 1028:0000 = segmento de código 6 do NE, offset 0 (SIMANTW.SYM; docs/spec/regras/simulacao-visao-geral.md)
+DOANTSIM = (6, 0x0000)
+# Variáveis fora do save capturadas junto com cada estado (docs/spec/regras/testes-tick.md, pergunta 3):
+# nome -> (endereço ou símbolo, bytes)
+EXTRAS = {
+    "SementeS": ("SementeS", 2),       # 10:cbf2, estado do LFSR (gerador S)
+    "SementeR": ("SementeR", 4),       # 10:ae34, estado do rand() do C (gerador R)
+    "gameCycles": ("gameCycles", 4),   # 9:9b2c, chamadas do laço do MYTIMERFUNC (fora do tick)
+    "Tindex": ("Tindex", 2),           # 9:9b6a, índice global das listas
+    "GlobalKey": ("GlobalKey", 2),     # 9:7866, última tecla (0xA8 dispara chuva em _DoSimYard)
+}
+# Mapas de ocupação (campo T por célula), fora do save; gravados à parte (vida_antes.bin / vida_depois.bin)
+VIDA = (("LifeA", 8192), ("LifeB", 4096), ("LifeR", 4096))
+
+
+class Depurador:
+    """Execução tick a tick do original pelo gdbstub do QEMU (breakpoints em endereço LINEAR).
+
+    - "entrada": CPU parada na 1ª instrução de _DoAntSim (estado ANTES do tick; GameTime ainda não somado).
+    - "saida": CPU parada no endereço de retorno de _DoAntSim dentro do MYTIMERFUNC (estado DEPOIS do
+      tick, antes de _myServiceSong e _UpdateWindows).
+    O endereço linear de _DoAntSim = base do seletor do segmento de código 6 (achado na LDT) + 0. O de
+    retorno é lido da pilha (far: IP, CS) na entrada. Cada breakpoint é ligado só durante a corrida até
+    ele e desligado ao parar, assim nunca se continua a partir de um breakpoint ativo.
+    """
+
+    def __init__(self, mj: "Memoria"):
+        self.mj = mj
+        self.retorno = None
+
+    def entrada(self):
+        return self.mj.linear_codigo(*DOANTSIM)
+
+    def pc(self):
+        r = self.mj.registradores()
+        return r["CS"][1] + r["EIP"], r
+
+    def onde(self):
+        pc, _ = self.pc()
+        if pc == self.entrada():
+            return "entrada"
+        if self.retorno is not None and pc == self.retorno:
+            return "saida"
+        return "livre"
+
+    def _rodar_ate(self, endereco, timeout):
+        g = self.mj.sessao_gdb()
+        g.breakpoint(endereco)
+        try:
+            r = g.continuar_ate_parar(timeout)
+        finally:
+            g.breakpoint(endereco, False)
+        pc, regs = self.pc()
+        if pc != endereco:
+            raise RuntimeError(f"parada inesperada ({r!r}): pc linear {pc:#x}, esperado {endereco:#x}")
+        return regs
+
+    def ir_entrada(self, timeout=120):
+        """Roda até a próxima entrada de _DoAntSim (não anda se já está nela)."""
+        self.mj.sessao_gdb()  # para a VM se estava rodando
+        if self.onde() != "entrada":
+            self._rodar_ate(self.entrada(), timeout)
+        _, regs = self.pc()
+        _, ss_base = regs["SS"]
+        ip, cs = struct.unpack("<HH", self.mj.ler_linear(ss_base + (regs["ESP"] & 0xFFFF), 4))
+        base, _, _ = self.mj.descritor(cs)
+        self.retorno, self.retorno_far = base + ip, (cs, ip)
+
+    def ir_saida(self, timeout=60):
+        """Da entrada de _DoAntSim até o retorno (exatamente um tick)."""
+        self.ir_entrada()
+        self._rodar_ate(self.retorno, timeout)
+
+    def ate_gametime(self, alvo, timeout=120):
+        """Para na entrada de _DoAntSim com GameTime (antes do incremento) >= alvo."""
+        self.ir_entrada(timeout)
+        while True:
+            gt = int.from_bytes(self.mj.ler_variavel("GameTime"), "little", signed=True)
+            if gt >= alvo:
+                return gt
+            self.ir_saida()
+            self.ir_entrada(timeout)
+
+    def extras(self):
+        out = {}
+        for nome, (var, n) in EXTRAS.items():
+            out[nome] = int.from_bytes(self.mj.ler_variavel(var, n), "little")
+        out["GameTime"] = int.from_bytes(self.mj.ler_variavel("GameTime"), "little", signed=True)
+        out["Cycle"] = int.from_bytes(self.mj.ler_variavel("Cycle"), "little", signed=True)
+        out["posicao"] = self.onde()
+        return out
+
+    def capturar_tick(self, segmentos=False):
+        """Um tick: {nome do arquivo: conteúdo} com estado_antes.bin / estado_depois.bin (layout do save),
+        vida_antes.bin / vida_depois.bin (VIDA), extras.json e, opcionalmente, os segmentos inteiros."""
+        out = {}
+        self.ir_entrada()
+        ex = {}
+        for fase, ir in (("antes", None), ("depois", self.ir_saida)):
+            if ir:
+                ir()
+            out[f"estado_{fase}.bin"] = self.mj.estado()
+            out[f"vida_{fase}.bin"] = self.vida()
+            ex[fase] = self.extras()
+            if segmentos:
+                for seg, d in self.segmentos().items():
+                    out[f"seg{seg}_{fase}.bin"] = d
+        out["extras.json"] = ex
+        return out
+
+    def vida(self):
+        """_LifeA (128x64) + _LifeB (64x64) + _LifeR (64x64): mapas de ocupação fora do save (16.384 bytes)."""
+        return b"".join(self.mj.ler_variavel(n, t) for n, t in VIDA)
+
+    def segmentos(self):
+        """Segmentos de dados 8, 9 e 10 inteiros (até o limite do descritor)."""
+        out = {}
+        for seg in (8, 9, 10):
+            base, limite = self.mj.base(seg)
+            out[seg] = self.mj.ler_linear(base, limite + 1)
+        return out
+
+    def mapear_leituras(self, faixas, simbolos, pedaco=64, maximo=20000):
+        """Roda UM tick (da entrada ao retorno de _DoAntSim) com watchpoints de leitura nas faixas dadas
+        [(seg, ini, fim)] e devolve [(seg, offset, nome, leitor CS:IP)], uma vez por pedaço lido.
+
+        O gdbstub do QEMU informa o INÍCIO do watchpoint atingido, não o byte lido. Por isso as faixas são
+        cortadas nas fronteiras dos símbolos e em pedaços de no máximo `pedaco` bytes, e cada pedaço tem o
+        seu watchpoint: o pedaço atingido identifica a variável. Depois da 1ª leitura o watchpoint do
+        pedaço é desligado. simbolos = {seg: [(offset, nome)]} ordenado."""
+        g = self.mj.sessao_gdb()
+        self.ir_entrada()
+        for nseg in range(1, 8):  # para dizer quem leu (CS:IP -> segmento lógico 1000..1030)
+            try:
+                self.mj.seletor_codigo(nseg)
+            except RuntimeError:
+                pass
+        bases = {seg: self.mj.base(seg)[0] for seg in (8, 9, 10)}
+        pedacos = {}  # endereço linear -> (seg, ini, fim, nome)
+        for seg, i, j in faixas:
+            cortes = sorted({i, j} | {o for o, _ in simbolos.get(seg, []) if i < o < j})
+            for a, b in zip(cortes, cortes[1:]):
+                for c in range(a, b, pedaco):
+                    nome, base_s = "?", 0
+                    for o, n in simbolos.get(seg, []):
+                        if o <= c:
+                            nome, base_s = n, o
+                        else:
+                            break
+                    pedacos[bases[seg] + c] = (seg, c, min(b, c + pedaco), f"{nome}+{c - base_s:#x}")
+        ativos = set()
+        try:
+            for lin, (seg, i, j, _) in pedacos.items():
+                g.watchpoint(lin, j - i)
+                ativos.add(lin)
+            g.breakpoint(self.retorno)
+            lidas = []
+            for _ in range(maximo):
+                r = g.continuar_ate_parar(120)
+                m = re.search(r"(?:r|a)?watch:([0-9a-f]+);", r)
+                if not m:
+                    pc, _ = self.pc()
+                    if pc != self.retorno:
+                        raise RuntimeError(f"parada inesperada {r!r} em {pc:#x}")
+                    break
+                lin = int(m.group(1), 16)
+                if lin not in ativos:
+                    continue
+                seg, i, j, nome = pedacos[lin]
+                regs = self.mj.registradores()
+                leitor = f"{regs['CS'][0]:04x}:{regs['EIP'] & 0xFFFF:04x}"
+                for nseg, sel in self.mj.seletores_codigo.items():
+                    if sel == regs["CS"][0]:
+                        leitor = f"{0x1000 + (nseg - 1) * 8:04x}:{regs['EIP'] & 0xFFFF:04x}"
+                lidas.append((seg, i, nome, leitor))
+                g.watchpoint(lin, j - i, False)
+                ativos.discard(lin)
+            else:
+                raise RuntimeError("leituras demais")
+        finally:
+            for lin in list(ativos):
+                seg, i, j, _ = pedacos[lin]
+                g.watchpoint(lin, j - i, False)
+            try:
+                g.breakpoint(self.retorno, False)
+            except RuntimeError:
+                pass
+        return lidas
+
+    def retomar(self):
+        """Volta a rodar livre (os breakpoints já estão desligados). A sessão gdb continua aberta."""
+        if not self.mj.q.rodando():
+            self.mj.q.cmd("cont")
+
+
+def gravar(destino, dados):
+    destino = caminho_raiz(destino)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(dados, (dict, list)):
+        destino.write_text(json.dumps(dados, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    else:
+        destino.write_bytes(dados)
+    return destino
+
+
+class Bancada:
+    """Uma VM do QEMU com o SimAnt, controlada por QMP (e gdbstub). Usada pelos roteiros e por
+    tools/gerar_vetores_tick.py."""
+
+    def __init__(self, overlay=None, mem=16):
+        if overlay is not None:
+            overlay = caminho_raiz(overlay)
+            garantir_overlay(overlay)
+            disco = f"file={overlay},format=qcow2,if=ide,index=0"
+        else:
+            disco = f"file={IMAGEM_C},format=raw,if=ide,index=0"
+        porta_qmp, porta_gdb = porta_livre(), porta_livre()
+        args = [
+            str(QEMU), "-M", "pc", "-cpu", "486", "-m", str(mem),
+            "-drive", f"file={DISQUETE},format=raw,if=floppy,index=0,readonly=on",
+            "-drive", disco,
+            "-boot", "a", "-vga", "std", "-display", "none",
+            "-qmp", f"tcp:127.0.0.1:{porta_qmp},server,wait=off",
+            "-gdb", f"tcp:127.0.0.1:{porta_gdb}",
+        ]
+        self.proc = subprocess.Popen(args, cwd=RAIZ)
+        self.q = Qmp(porta_qmp)
+        self.mj = Memoria(self.q, porta_gdb, mem)
+        self.dep = Depurador(self.mj)
+        self.t0 = time.time()
+
+    def log(self, msg):
+        print(f"[{time.time() - self.t0:6.1f}s] {msg}", flush=True)
+
+    def fechar(self):
+        if self.proc.poll() is None:
+            try:
+                self.q.cmd("quit")
+                self.proc.wait(timeout=30)
+            except (RuntimeError, OSError, subprocess.TimeoutExpired):
+                pass
+        if self.proc.poll() is None:
+            self.proc.kill()
+
+    def executar(self, linha):
+        """Executa um comando de roteiro. Devolve False em 'fim'."""
+        q, mj, dep, log = self.q, self.mj, self.dep, self.log
+        p = linha.strip().split()
+        if not p or p[0].startswith("#"):
+            return True
+        c, a = p[0], p[1:]
+        if c == "esperar":
+            time.sleep(float(a[0]))
+        elif c == "teclas":
+            for combo in a:
+                q.cmd("send-key", keys=[{"type": "qcode", "data": k} for k in combo.split("+")], **{"hold-time": 150})
+                time.sleep(0.3)
+        elif c == "digitar":
+            for ch in " ".join(a):
+                k = "spc" if ch == " " else ch.lower()
+                keys = ([{"type": "qcode", "data": "shift"}] if ch.isupper() else []) + [{"type": "qcode", "data": k}]
+                q.cmd("send-key", keys=keys, **{"hold-time": 100})
+                time.sleep(0.15)
+        elif c == "mouse_canto":
+            mouse_canto(q)
+        elif c == "mover":
+            mover_rel(q, int(a[0]), int(a[1]))
+        elif c == "clicar_em":
+            # canto superior esquerdo e depois movimento exato (aceleração desligada no WIN.INI)
+            mouse_canto(q)
+            mover_rel(q, int(a[0]), int(a[1]))
+            time.sleep(0.2)
+            clicar(q)
+        elif c == "clicar":
+            clicar(q)
+        elif c == "capturar":
+            ppm = mj.tmp / "tela.ppm"
+            q.cmd("screendump", filename=str(ppm))
+            time.sleep(0.3)
+            w, h = ppm_para_png(ppm, caminho_raiz(a[0]))
+            log(f"capturado {w}x{h} -> {a[0]}")
+        elif c == "memoria":
+            q.cmd("pmemsave", val=int(a[0], 0), size=int(a[1], 0), filename=str(caminho_raiz(a[2])))
+            log(f"memória {a[0]}+{a[1]} -> {a[2]}")
+        elif c == "pausar":
+            q.cmd("stop")
+            log("pausado")
+        elif c == "continuar":
+            dep.retomar()
+            log("continuando")
+        elif c in ("snapshot_salvar", "snapshot_carregar"):
+            cmd = "savevm" if c == "snapshot_salvar" else "loadvm"
+            r = q.hmp(f"{cmd} {a[0]}").strip()
+            if r:
+                raise RuntimeError(f"{cmd} {a[0]}: {r}")
+            mj.esquecer_seletores()
+            dep.retorno = None
+            log(f"{cmd} {a[0]} ok (VM {'rodando' if q.rodando() else 'parada'})")
+        elif c == "ler_variavel":
+            d = mj.ler_variavel(a[0], int(a[2], 0) if len(a) > 2 else None)
+            gravar(a[1], d)
+            extra = (f" = {int.from_bytes(d, 'little', signed=True)} (0x{int.from_bytes(d, 'little'):0{2 * len(d)}x})"
+                     if len(d) <= 4 else "")
+            log(f"{a[0]}: {len(d)} bytes -> {a[1]}{extra}")
+        elif c == "escrever_variavel":
+            tam = int(a[2], 0) if len(a) > 2 else None
+            n = None if a[1].startswith("hex:") else mj.resolver(a[0], tam)[2]
+            dados = valor_para_bytes(a[1], n)
+            mj.escrever_variavel(a[0], dados, tam)
+            log(f"{a[0]} <- {a[1]} (bytes {dados.hex(' ')})")
+        elif c == "estado":
+            d = mj.estado()
+            gravar(a[0], d)
+            log(f"estado: {len(d)} bytes -> {a[0]}")
+        elif c == "tick_entrada":
+            dep.ir_entrada()
+            log(f"entrada de _DoAntSim: {dep.extras()}")
+        elif c == "tick_saida":
+            dep.ir_saida()
+            log(f"retorno de _DoAntSim: {dep.extras()}")
+        elif c == "ate_gametime":
+            gt = dep.ate_gametime(int(a[0], 0))
+            log(f"entrada de _DoAntSim com GameTime = {gt}: {dep.extras()}")
+        elif c == "passo_tick":
+            # DIR/estado_antes.bin, estado_depois.bin, vida_antes.bin, vida_depois.bin, extras.json
+            arqs = dep.capturar_tick()
+            for nome_arq, conteudo in arqs.items():
+                gravar(Path(a[0]) / nome_arq, conteudo)
+            ex_antes, ex_depois = arqs["extras.json"]["antes"], arqs["extras.json"]["depois"]
+            log(f"tick {ex_antes['GameTime']} -> {ex_depois['GameTime']}: S {ex_antes['SementeS']:#06x} -> "
+                f"{ex_depois['SementeS']:#06x} -> {a[0]}")
+        elif c == "extras":
+            gravar(a[0], dep.extras())
+            log(f"extras -> {a[0]}: {dep.extras()}")
+        elif c == "segmentos":
+            for seg, d in dep.segmentos().items():
+                gravar(f"{a[0]}_seg{seg}.bin", d)
+            log(f"segmentos 8, 9, 10 -> {a[0]}_seg*.bin")
+        elif c == "fim":
+            self.fechar()
+            return False
+        else:
+            raise ValueError(f"comando desconhecido: {c}")
+        return True
+
+
 def roteiro(arquivo, overlay=None, mem=16):
     linhas = Path(arquivo).read_text(encoding="utf-8").splitlines()
     usa_snap = any(ln.split()[:1] in (["snapshot_salvar"], ["snapshot_carregar"]) for ln in linhas)
     if usa_snap and overlay is None:
         overlay = OVERLAY_PADRAO
-    if overlay is not None:
-        overlay = caminho_raiz(overlay)
-        garantir_overlay(overlay)
-        disco = f"file={overlay},format=qcow2,if=ide,index=0"
-    else:
-        disco = f"file={IMAGEM_C},format=raw,if=ide,index=0"
-    porta_qmp, porta_gdb = porta_livre(), porta_livre()
-    proc = subprocess.Popen([
-        str(QEMU), "-M", "pc", "-cpu", "486", "-m", str(mem),
-        "-drive", f"file={DISQUETE},format=raw,if=floppy,index=0,readonly=on",
-        "-drive", disco,
-        "-boot", "a", "-vga", "std", "-display", "none",
-        "-qmp", f"tcp:127.0.0.1:{porta_qmp},server,wait=off",
-        "-gdb", f"tcp:127.0.0.1:{porta_gdb}",
-    ], cwd=RAIZ)
+    b = Bancada(overlay, mem)
     try:
-        q = Qmp(porta_qmp)
-        mj = Memoria(q, porta_gdb, mem)
-        t0 = time.time()
-
-        def log(msg):
-            print(f"[{time.time() - t0:6.1f}s] {msg}", flush=True)
-
         for linha in linhas:
-            p = linha.strip().split()
-            if not p or p[0].startswith("#"):
-                continue
-            c, a = p[0], p[1:]
-            if c == "esperar":
-                time.sleep(float(a[0]))
-            elif c == "teclas":
-                for combo in a:
-                    q.cmd("send-key", keys=[{"type": "qcode", "data": k} for k in combo.split("+")], **{"hold-time": 150})
-                    time.sleep(0.3)
-            elif c == "digitar":
-                for ch in " ".join(a):
-                    k = "spc" if ch == " " else ch.lower()
-                    keys = ([{"type": "qcode", "data": "shift"}] if ch.isupper() else []) + [{"type": "qcode", "data": k}]
-                    q.cmd("send-key", keys=keys, **{"hold-time": 100})
-                    time.sleep(0.15)
-            elif c == "mouse_canto":
-                mouse_canto(q)
-            elif c == "mover":
-                mover_rel(q, int(a[0]), int(a[1]))
-            elif c == "clicar_em":
-                # canto superior esquerdo e depois movimento exato (aceleração desligada no WIN.INI)
-                mouse_canto(q)
-                mover_rel(q, int(a[0]), int(a[1]))
-                time.sleep(0.2)
-                clicar(q)
-            elif c == "clicar":
-                clicar(q)
-            elif c == "capturar":
-                ppm = mj.tmp / "tela.ppm"
-                q.cmd("screendump", filename=str(ppm))
-                time.sleep(0.3)
-                w, h = ppm_para_png(ppm, caminho_raiz(a[0]))
-                log(f"capturado {w}x{h} -> {a[0]}")
-            elif c == "memoria":
-                q.cmd("pmemsave", val=int(a[0], 0), size=int(a[1], 0), filename=str(caminho_raiz(a[2])))
-                log(f"memória {a[0]}+{a[1]} -> {a[2]}")
-            elif c == "pausar":
-                q.cmd("stop")
-                log("pausado")
-            elif c == "continuar":
-                q.cmd("cont")
-                log("continuando")
-            elif c in ("snapshot_salvar", "snapshot_carregar"):
-                cmd = "savevm" if c == "snapshot_salvar" else "loadvm"
-                r = q.hmp(f"{cmd} {a[0]}").strip()
-                if r:
-                    raise RuntimeError(f"{cmd} {a[0]}: {r}")
-                mj.seletores = None  # a sessão do Windows restaurada pode ter outros seletores
-                log(f"{cmd} {a[0]} ok")
-            elif c == "ler_variavel":
-                d = mj.ler_variavel(a[0], int(a[2], 0) if len(a) > 2 else None)
-                destino = caminho_raiz(a[1])
-                destino.parent.mkdir(parents=True, exist_ok=True)
-                destino.write_bytes(d)
-                extra = (f" = {int.from_bytes(d, 'little', signed=True)} (0x{int.from_bytes(d, 'little'):0{2 * len(d)}x})"
-                         if len(d) <= 4 else "")
-                log(f"{a[0]}: {len(d)} bytes -> {a[1]}{extra}")
-            elif c == "escrever_variavel":
-                tam = int(a[2], 0) if len(a) > 2 else None
-                n = None if a[1].startswith("hex:") else mj.resolver(a[0], tam)[2]
-                dados = valor_para_bytes(a[1], n)
-                mj.escrever_variavel(a[0], dados, tam)
-                log(f"{a[0]} <- {a[1]} (bytes {dados.hex(' ')})")
-            elif c == "estado":
-                d = mj.estado()
-                destino = caminho_raiz(a[0])
-                destino.parent.mkdir(parents=True, exist_ok=True)
-                destino.write_bytes(d)
-                log(f"estado: {len(d)} bytes -> {a[0]}")
-            elif c == "fim":
-                try:
-                    q.cmd("quit")  # encerra o QEMU de forma limpa (grava o que o host tiver em cache)
-                except (RuntimeError, OSError):
-                    pass
-                proc.wait(timeout=30)
+            if not b.executar(linha):
                 break
-            else:
-                raise ValueError(f"comando desconhecido: {c}")
     finally:
-        if proc.poll() is None:
-            proc.kill()
+        b.fechar()
 
 
 def extrair(caminho_dos, destino, overlay=None):
