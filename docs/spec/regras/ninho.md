@@ -627,11 +627,12 @@ Sem chamador no pseudocódigo (o mesmo código está embutido em outra rotina): 
 
 ## 13. Casos de teste contra o original
 
-Bancada: [../../bancada-qemu.md](../../bancada-qemu.md). Ela salva e carrega jogos, mas ainda não escreve memória, e o estado dos geradores **não** vai para o save (e é perdido no load; ver [rng.md](rng.md#a-semente-está-no-save)). Por isso os casos abaixo são de três tipos: **D** = determinístico (não depende do sorteio), **E** = estatístico (repetir e comparar proporções), **P** = comparação com o port rodando o mesmo `.ANT` com a mesma semente forçada.
+Bancada: [../../bancada-qemu.md](../../bancada-qemu.md#casos-de-teste-injetar-um-save-e-rodar). Ela injeta e carrega saves editados, lê o estado inteiro da memória e escreve variáveis (`escrever_variavel`), mas o estado dos geradores **não** vai para o save (e é perdido no load; ver [rng.md](rng.md#a-semente-está-no-save)). Por isso os casos abaixo são de três tipos: **D** = determinístico (não depende do sorteio), **E** = estatístico (repetir e comparar proporções), **P** = comparação com o port rodando o mesmo `.ANT` com a mesma semente forçada.
 
 ### 13.1 Como montar a entrada
 
-- Partir de `tests/referencias/saves/QUICK2.ANT` (tick 78) e editar blocos com um script (a escrever: `tools/ant_editar.py`, usando `data/save_layout.json`). Carregar no original pelo menu "Load Game", rodar, salvar com outro nome e comparar.
+- Partir de `tests/referencias/saves/QUICK2.ANT` (tick 78) e descrever a edição num caso JSON em `tests/referencias/casos/` (operações de `tools/ant_editar.py`: escalares, células, formigas com `ListIndex`). `tools/caso_ant.py rodar CASO.json` injeta o save num disquete, carrega pelo File > Load, tira a pausa, roda até o `GameTime` alvo, pausa, lê o estado da memória (sem precisar salvar) e confere.
+- O load deixa o jogo **pausado** (`_GamePaused` = 1) e **reconta** `_CastePopB/R`, `_BpopT/_RpopT` pelas listas [observado na bancada, 2026-10-16]: populações não podem ser forçadas pelo arquivo, só pelas listas.
 - **No load o original refaz `_LifeB/R` a partir das listas** (`_DoLoadInitializations` `1010:9dbe`), do índice `_ListIndexB` (inclusive: a vaga logo depois da última também é escrita) até 0. Quando duas formigas estão na mesma célula, a de **menor índice** fica em `Vida`. Zere a vaga `_ListIndexB` para não criar ocupante fantasma.
 - Compare por `_GameTime` (offset 45740), nunca por tempo de relógio.
 
@@ -661,5 +662,5 @@ Bancada: [../../bancada-qemu.md](../../bancada-qemu.md). Ela salva e carrega jog
 - `_YellowFight` e `_DoTroph`: só citados; ficam com a formiga amarela (`formiga-amarela.md`).
 - Gotas e poças da superfície (`_PlaceDrop`, `_InitWater`): só a ordem dos sorteios está aqui; regra completa em `superficie.md`.
 - `_ExitHole` com a lista A cheia: compacta e, se continuar cheia, grava na vaga 1000 (fora da lista) [a conferir na desmontagem].
-- Nenhuma regra deste documento foi ainda testada na bancada; os casos 13.2 dependem de um editor de `.ANT` (a escrever) e de saves de referência com ninhos mais desenvolvidos que o `QUICK2.ANT`.
+- Nenhuma regra deste documento foi ainda testada na bancada. O editor e o executor de casos existem (`tools/ant_editar.py`, `tools/caso_ant.py`; usados nos casos C-01 e C-02 de [ciclo-de-vida.md](ciclo-de-vida.md#observado-no-original)); faltam escrever os JSON dos casos 13.2 e, para alguns, saves de referência com ninhos mais desenvolvidos que o `QUICK2.ANT`.
 - Os "defeitos" marcados ([hipótese]) devem ser confirmados no original antes de decidir se o port os reproduz por padrão (o princípio do projeto é reproduzir; um mod pode corrigir).

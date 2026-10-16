@@ -53,6 +53,8 @@ Opções de `roteiro`: `--overlay ARQ.qcow2` (abre o disco C: por esse overlay; 
 | `ler_variavel NOME ARQ [TAM]` | grava os bytes da variável em ARQ e mostra o valor se tiver até 4 bytes |
 | `escrever_variavel NOME VALOR [TAM]` | escreve VALOR (inteiro little-endian no tamanho da variável, ou `hex:AABB...`) pelo gdbstub e confere relendo |
 | `estado ARQ` | todos os 307 blocos de `data/save_layout.json`, na ordem do save: o arquivo tem o formato exato de um `.ANT` (48.386 bytes) |
+| `disquete ARQ.img` | troca a mídia do drive A: (`blockdev-change-medium` do QMP, só leitura); usado para injetar saves (ver [Casos de teste](#casos-de-teste-injetar-um-save-e-rodar)) |
+| `esperar_variavel NOME ALVO [TIMEOUT]` | consulta NOME (sem sinal) a cada 0,05 s até chegar a ALVO; falha depois de TIMEOUT s (padrão 120). Seguido de `pausar`, para no tick ALVO ou 1 depois |
 | `fim` | `quit` limpo |
 
 `NOME` pode ser: um símbolo do layout do save (`GameTime`, `MapA`, ...; tamanho = count × tamanho); qualquer variável dos segmentos 8, 9 e 10 do `re_trabalho/symbols.tsv` (com ou sem `_`; exige `TAM`); um endereço `SEG:OFF` em hexadecimal (`10:cbf2`; exige `TAM`); ou um apelido do script: `SementeS` = `10:cbf2` (2 bytes, estado do LFSR) e `SementeR` = `10:ae34` (4 bytes, estado do `rand` do C), ver [spec/regras/rng.md](spec/regras/rng.md).
@@ -100,8 +102,47 @@ Alternativas descartadas: procurar o conteúdo do `_MapA` na RAM física (atrave
 | **`estado` = save, byte a byte** | `qemu_estado_save.txt`: Ctrl+A, `QUICK3`, Enter; com a caixa "Saved correctly" na tela, `pausar` e `estado`. O `QUICK3.ANT` extraído do overlay e o `estado` são **idênticos** nos 48.386 bytes (`estado_diff.py`: "iguais"). O save está em `tests/referencias/saves/QUICK3.ANT` |
 | Leitura em tempo real | ~10,4 s (host) depois, outro `estado` difere em 70 dos 307 blocos: `GameTime` 92 → 154 (`Cycle` e `Scycle2` acompanham), `YardCycle` 91 → 153, `MapA` (13 bytes), listas `Alist*/Blist*/Rlist*`, `BoyX` 188 → 256, `DogX/Y`, `CatOn` 1 → 0, `SpidY` 205 → −1, `HealthB` 95 → 92, `TotalEggsLaidB` 4 → 6, `HistCnt` 1 → 2, entre outros |
 | Escrita | `qemu_semente.txt`: `SementeS` lida 0x8a5e; com a VM pausada, escrita 0x1234, relida 0x1234 e ainda 0x1234 dois segundos depois; ~1 s após `continuar`, vale 0x6acb, que é exatamente o estado do LFSR de [spec/regras/rng.md](spec/regras/rng.md) 230 passos depois de 0x1234 (conferido em Python). `HealthB` escrito 7 com a VM rodando: relido 7, e 7 três segundos depois |
+| Injeção e load | `qemu_carregar_save.txt`: disquete trocado depois do `loadvm`, `A:TESTE` carregado pelo File > Load; o estado lido logo depois do load é igual ao `QUICK2.ANT` salvo três blocos (`_GamePaused` e os `_CastePop*` recontados) |
+| Casos de teste | `caso_ant.py rodar` com C-01 e C-02 (`tests/referencias/casos/`): todas as conferências passaram, parando nos ticks 128 e 96 exatos (ver `tests/referencias/README.md`) |
 
 Ritmo (relógio do host, sem determinismo): `GameTime` andou 62 ticks em ~10,4 s, cerca de 6 ticks/s, abaixo dos ~18 ticks/s de um timer de 55 ms [hipótese: TCG lento; medir com `pausar`/`estado` em intervalos fixos].
+
+## Casos de teste: injetar um save e rodar
+
+Ferramentas:
+
+- `tools/ant_editar.py`: lê e grava `.ANT` pelo layout (blocos, escalares, células de mapa, listas de formigas com `ListIndex`, patch em JSON). Testes: `python -m unittest discover -s tools -p "test_*.py"`.
+- `tools/caso_ant.py rodar tests/referencias/casos/ID.json`: monta o `.ANT` do caso, injeta, carrega no original, roda até o `GameTime` alvo, pausa, grava o estado e confere. Saída em `re_trabalho/casos/ID/` (`entrada.ANT`, `carregado.ANT` = estado logo depois do load, `estado.ANT` = estado final, telas `t1`–`t4`, `roteiro.txt`, `resultado.json`). Código de saída 0 se todas as conferências passam.
+- Formato dos casos e das conferências: docstrings dos dois scripts; lista dos casos em `tests/referencias/README.md`.
+
+### Injeção: troca do disquete do A:
+
+O save vai num **disquete FAT12** (cópia do `boot.img` da bancada com o `.ANT` acrescentado por `tools/fat12.py`; `caso_ant.py disquete SAIDA.img ARQ.ANT=NOME.ANT` monta um à mão). Depois do `snapshot_carregar quick`, o comando `disquete` troca a mídia do drive A: e o jogo abre `A:NOME` pelo diálogo de Load.
+
+Por que essa e não as outras opções:
+
+| Opção | Problema |
+|---|---|
+| Gravar o arquivo no C: (FAT16 em Python sobre o raw convertido do overlay, ou `IMGMOUNT`+`COPY` do DOSBox-X) | o `loadvm` volta o disco do overlay ao estado do snapshot, apagando o arquivo; e o DOS/Windows restaurado tem FAT e diretório em cache (`BUFFERS`), incoerentes com um disco mudado por fora. Só serviria com boot completo (~55 s por caso) e com uma conversão qcow2 → raw → qcow2 a cada caso |
+| Segundo drive (`-drive if=floppy,index=1` = B:) | muda a máquina: o snapshot `quick` foi gravado sem o B:, e o DOS que está na RAM do snapshot detectou um drive só no boot [hipótese, não testado: com um drive só, o DOS trata B: como fantasma do A: e pede troca de disquete]; exigiria boot completo |
+| **Trocar a mídia do A:** | não muda a máquina nem o C:; o snapshot continua valendo; o DOS percebe a troca pela linha de troca de disco do controlador. Funcionou na primeira tentativa |
+
+O disquete novo mantém os arquivos do disquete de boot (kernel, `COMMAND.COM`), caso o DOS precise recarregar o interpretador. Cada execução do `caso_ant.py` copia o overlay padrão (com o snapshot `quick`) para `re_trabalho/casos/ID/ov.qcow2`: o overlay padrão e o snapshot não são tocados.
+
+### Carregar um save injetado (passos observados em 2026-10-16)
+
+Roteiro de referência: `tests/referencias/roteiros/qemu_carregar_save.txt`. A partir do snapshot `quick` (Quick Game rodando):
+
+1. `teclas ctrl+l` (File > Load). Aparece a caixa "SimAnt Load: Do you want to save the current ant hill?" (Yes / No / Cancel).
+2. `teclas n` (No). Abre o diálogo comum "Load Ant Hill": campo File Name com o foco, diretório `c:\maxis\antwin`, lista `*.ANT`, drive `c:`.
+3. Digitar `A:NOME` (`digitar A`, `teclas shift+semicolon`, `digitar NOME`; o `digitar` só tem letras, números e espaço). Sem extensão, o diálogo completa `.ANT`. Na primeira tentativa, sem o passo 2, as letras do nome foram tomadas pela caixa do passo 1 (o "N" respondeu No) e o diálogo recebeu só parte do nome ("t.ant": "Cannot find this file").
+4. `teclas ret`. Em ~5 s o jogo está carregado: título da janela = nome do arquivo (`TESTE.ANT`), e o jogo fica **pausado** (barra de mensagem "Game Paused", `_GamePaused` = 1, mesmo com 0 no arquivo).
+5. `teclas shift+0` (Speed > Unpause; o menu Speed mostra Unpause Shift+0, Slow Shift+1, Normal Shift+2, Fast Shift+3, Ultra Shift+4).
+6. `esperar_variavel GameTime ALVO`, `pausar`, `estado ARQ`.
+
+O que o load muda (QUICK2.ANT carregado e lido logo depois, ainda pausado; `estado_diff.py`): só 3 blocos. `_GamePaused` 0 → 1, e `_CastePopB`/`_CastePopR` são **recontados** pelas listas (`[2,2,0,0,0,1]` → `[3,2,0,0,0,1]` e `[3,1,…]` → `[4,1,…]`: os ovos postos depois da última contagem). Consequência para os casos: `_BpopT`/`_RpopT` e `_CastePop*` não podem ser forçados pelo arquivo; mude as listas. O `_GameTime` e o `_Cycle` ficam como no arquivo.
+
+Ritmo medido: do load ao tick alvo, ~6 ticks/s (78 → 96 em ~3 s; 78 → 128 em ~8 s). Com `esperar_variavel` (consulta a cada 0,05 s) seguido de `pausar`, as três execuções pararam exatamente no tick alvo (96, 128 e 90). Uma execução completa de caso leva ~25 s mais o tempo de simulação.
 
 ## Logotipo com a metade superior branca (investigado)
 

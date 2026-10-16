@@ -1,0 +1,37 @@
+# Carrega um save injetado num disquete pelo menu File > Load, a partir do snapshot "quick", tira a pausa
+# e lê o estado. É o procedimento que tools/caso_ant.py gera para cada caso de teste (ver docs/bancada-qemu.md).
+# Preparação (disquete com o QUICK2.ANT como TESTE.ANT e cópia do overlay com o snapshot):
+#   python tools/caso_ant.py disquete re_trabalho/casos/explorar/a.img tests/referencias/saves/QUICK2.ANT=TESTE.ANT
+#   copiar re_trabalho/qemu/c_overlay.qcow2 para re_trabalho/casos/explorar/ov.qcow2
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_carregar_save.txt --overlay re_trabalho/casos/explorar/ov.qcow2
+snapshot_carregar quick
+esperar 2
+# troca o disquete do A: pelo que tem o save
+disquete re_trabalho/casos/explorar/a.img
+esperar 1
+teclas ctrl+l
+esperar 3
+# "SimAnt Load: Do you want to save the current ant hill?" -> No
+capturar re_trabalho/casos/explorar/e1.png
+teclas n
+esperar 3
+# diálogo "Load Ant Hill": foco no File Name; sem extensão, completa .ANT
+digitar A
+teclas shift+semicolon
+digitar TESTE
+esperar 1
+capturar re_trabalho/casos/explorar/e2.png
+teclas ret
+esperar 5
+# carregado e PAUSADO (barra: "Game Paused"; GamePaused = 1)
+capturar re_trabalho/casos/explorar/e3.png
+pausar
+estado re_trabalho/casos/explorar/carregado.ANT
+continuar
+# Speed > Unpause (Shift+0)
+teclas shift+0
+esperar_variavel GameTime 90 60
+pausar
+estado re_trabalho/casos/explorar/rodando.ANT
+capturar re_trabalho/casos/explorar/e4.png
+fim

@@ -17,6 +17,15 @@ Capturas e logs feitos no SimAnt original (DOSBox-X, `referencia/dosbox-x.conf`)
 | Paleta | captura de qualquer tela colorida | cores = paleta padrão do Windows (`data/paleta.json`) | igual, com 7 = cinza escuro e 8 = cinza claro (a especificação tinha trocado) | confirmado, divergência corrigida |
 | Título pixel a pixel | `capturar_original.ps1 -Saida capturas\titulo_800x600.png`; `comparar_captura.py` contra `--exportar-telas` | port igual ao original | 99,98% iguais; diferença só sob o cursor do mouse | confirmado (`engine/tests/telas_reais.rs`) |
 
+## Casos de teste de regras (bancada QEMU)
+
+Cada caso é um JSON em `casos/` (save de partida, patch de `tools/ant_editar.py`, tick alvo, resultado esperado e conferências automáticas). Para rodar: `python tools/caso_ant.py rodar tests/referencias/casos/ID.json` (com `SIMANT_RAIZ` apontando para a raiz com `referencia/` e `re_trabalho/`). Injeção, passos do Load e o que o load muda: [docs/bancada-qemu.md](../../docs/bancada-qemu.md#casos-de-teste-injetar-um-save-e-rodar). O estado final de cada caso observado fica em `saves/` para comparação com o port.
+
+| Caso | Regra | Entrada (patch) | Esperado (pela especificação) | Observado no original | Situação |
+|---|---|---|---|---|---|
+| C-01 (`casos/C-01.json`) | avanço dos ovos com P = 128 ([ciclo-de-vida.md](../../docs/spec/regras/ciclo-de-vida.md#31-ninho-preto-_simeggb-10283ca0)) | `QUICK2.ANT` sem mudanças (tick 78) | no tick 128, todos os ovos pretos de T = 1 a 2 e os vermelhos de 0x81 a 0x82; o posto no próprio tick 128 fica no estágio 1 | 2026-10-16, parado no tick 128: ovos pretos 2–6 com T = 2 e o 7 (posto no 128, em (36, 9)) com T = 1; vermelhos 2–8 com 0x82 e o 9 com 0x81. 9 de 9 conferências. Estado: `saves/C01_T128.ANT` | confirmado |
+| C-02 (`casos/C-02.json`) | período curto P = 32 e eclosão (ciclo-de-vida 3.1) | `QUICK2.ANT`; remove a operária preta da lista A (para `_BpopT` = 2 depois do load); ovo B[2] com T = 7 | no tick 96, B[2] vira `_MakeMe` × 8 + 2 = 0x32 (soldado), M ∈ {1, 2}, S = 0; os outros ovos pretos passam a T = 2; os vermelhos (P = 128) ficam em 0x81 | 2026-10-16, parado no tick 96: `_BpopT` = 2; B[2] = (34, 9) T 0x32 M 2 S 0; ovos B[3..5] T = 2, B[6] (posto no 96) T = 1; vermelhos todos 0x81. 10 de 10 conferências. Numa execução que parou no tick 98, o soldado já estava em (32, 7) com T 0x37 (andou 2 células na diagonal para cima e à esquerda, com M = 2). Estado: `saves/C02_T96.ANT` | confirmado |
+
 ## Como capturar e comparar
 
 ```

@@ -271,9 +271,23 @@ Mesma bancada e mesmo método de [ninho.md](ninho.md#13-casos-de-teste-contra-o-
 | C-11 | ama preta guarda o estágio (4) | operária T 0x12, M 1, S 0, sobre um ovo T = 5 (ovo no índice menor, para ficar em `_LifeB`) | ela vira T 0x0A com S = 5; ao largar, o ovo novo tem T = 5 | D |
 | C-12 | ama vermelha reinicia (4) | operária vermelha T 0x92, M 1, sobre ovo T = 0x86 | ao largar, o ovo tem T = 0x82 | D |
 
+### Observado no original
+
+Bancada QEMU, `tools/caso_ant.py rodar tests/referencias/casos/ID.json` (casos versionados; injeção, load e ritmo em [../../bancada-qemu.md](../../bancada-qemu.md#casos-de-teste-injetar-um-save-e-rodar)). Estados finais em `tests/referencias/saves/`.
+
+| Id | Data | Entrada efetiva | Observado | Resultado |
+|---|---|---|---|---|
+| C-01 | 2026-10-16 | `QUICK2.ANT` sem mudanças; parado no tick 128 | ovos pretos que existiam (B[2..6]) com T = 2; B[7], posto no próprio tick 128 em (36, 9), com T = 1; vermelhos R[2..8] com 0x82 e R[9] (posto no 128) com 0x81 (`C01_T128.ANT`) | **confirmado**: avanço simultâneo no tick 128 com P = 128; o ovo posto no tick não avança nele |
+| C-02 | 2026-10-16 | `QUICK2.ANT` sem a operária preta da superfície (A[0], T = 17), para que o `_BpopT` recontado no load seja 2; ovo B[2] com T = 7; parado no tick 96 | `_BpopT` = 2; B[2] em (34, 9) com T = 0x32, M = 2, S = 0; B[3..5] com T = 2 (incluindo o posto no tick 80); B[6] (posto no tick 96) com T = 1; ovos vermelhos com 0x81 (`C02_T96.ANT`) | **confirmado**: P = 32 com `_BpopT` < 3, eclosão no tick 96 como `_MakeMe` × 8 + 2 (soldado virado para a direita), modo do soldado em {1, 2}; o vermelho mantém P = 128 com `_RpopT` = 2 |
+
+Observações das execuções:
+
+- O load **reconta** `_CastePopB/R` e, com eles, `_BpopT/_RpopT` (no `QUICK2.ANT`, `_CastePopB[0]` 2 → 3: o ovo posto depois da última contagem). Por isso a entrada do C-02 muda a lista A em vez de escrever `_BpopT`. O mesmo vale para C-03 (`_RpopT` = 1 exige tirar a operária vermelha da lista A).
+- Numa execução do C-02 que parou no tick 98, o soldado já estava em (32, 7) com T = 0x37 e M = 2: nos ticks 97 e 98 subiu duas células na diagonal para a saída (direção 7).
+
 ## Lacunas
 
-- Nenhuma regra deste documento foi testada na bancada; a verificação feita é a conta sobre o `QUICK2.ANT` (seções 2 e 5.3), sem script.
+- Testados na bancada: C-01 e C-02 (acima). Os demais casos ainda não; C-04 a C-07 são estatísticos e pedem várias execuções (ou a semente forçada por `escrever_variavel SementeS` logo depois do load).
 - O significado exato da lista 4/1100 por estágio (o índice usado na janela Examine) não foi conferido na interface.
 - `_YellowBirth` e a postura da amarela-rainha: só resumidos (ficam com `formiga-amarela.md`).
 - A fundação de colônias novas no Jogo Completo (`_SimColonies`, `_QueenStorage*`, revoada) não está aqui.

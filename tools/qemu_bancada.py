@@ -20,6 +20,8 @@ Comandos de roteiro (um por linha, # = comentário):
     ler_variavel NOME ARQ [TAM] grava em ARQ os bytes da variável global NOME (nome do .SYM, com ou sem '_')
     escrever_variavel NOME VALOR [TAM]  grava VALOR (inteiro little-endian, ou hex:AABB...) via gdbstub
     estado ARQ                  dump de todos os blocos de data/save_layout.json, no formato de um .ANT
+    disquete ARQ.img            troca a mídia do drive A: (blockdev-change-medium, só leitura); ver tools/caso_ant.py
+    esperar_variavel NOME ALVO [TIMEOUT]  espera (consultando a cada 0,05 s) até NOME (sem sinal) >= ALVO
     fim                         encerra o QEMU
 
 Snapshots: se o roteiro usa snapshot_*, ou se --overlay é dado, o disco C: é aberto por um overlay qcow2
@@ -605,6 +607,22 @@ def roteiro(arquivo, overlay=None, mem=16):
                 destino.parent.mkdir(parents=True, exist_ok=True)
                 destino.write_bytes(d)
                 log(f"estado: {len(d)} bytes -> {a[0]}")
+            elif c == "disquete":
+                # Injeção de arquivos (casos de teste): troca o disquete do A: por outra imagem FAT12. O DOS vê a
+                # troca pela linha de troca de disco; o jogo abre o arquivo por A:NOME.ANT. Ver docs/bancada-qemu.md.
+                q.cmd("blockdev-change-medium", device="floppy0", filename=str(caminho_raiz(a[0])),
+                      format="raw", **{"read-only-mode": "read-only"})
+                log(f"disquete A: <- {a[0]}")
+            elif c == "esperar_variavel":
+                alvo, limite = int(a[1], 0), time.time() + (float(a[2]) if len(a) > 2 else 120)
+                while True:
+                    v = int.from_bytes(mj.ler_variavel(a[0]), "little")
+                    if v >= alvo:
+                        break
+                    if time.time() > limite:
+                        raise RuntimeError(f"esperar_variavel: {a[0]} = {v} < {alvo} no tempo limite")
+                    time.sleep(0.05)
+                log(f"{a[0]} = {v} (alvo {alvo})")
             elif c == "fim":
                 try:
                     q.cmd("quit")  # encerra o QEMU de forma limpa (grava o que o host tiver em cache)
