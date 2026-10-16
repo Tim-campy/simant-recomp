@@ -2,6 +2,17 @@
 
 Formato: data, decisão, motivo, alternativas descartadas.
 
+## 2026-10-16: Simulação = `Estado` único + tick fixo + trait `Regras` por assunto
+
+- **Decisão:** todo o estado da simulação fica num valor `Estado` (`engine/src/rules/estado.rs`), com os 307 blocos do `.ANT` em grupos tipados por assunto e os campos só de execução (geradores S e R, mapas de vida, contagens do tick, fila de eventos). O tick (`engine/src/rules/tick.rs`) é uma função `tick(&mut Estado, &mut dyn Regras)` que segue a ordem e as periodicidades de `_DoAntSim` e faz as partes pequenas e já especificadas (contadores, alimentação, compactação, `_CountAnts`, `_HistUpdate`, resumo de modos). As sub-rotinas grandes são métodos de seis traits (`RegrasQuintal`, `RegrasInimigos`, `RegrasSuperficie`, `RegrasNinho`, `RegrasAmarela`, `RegrasConselhos`), com implementação padrão vazia, somadas em `Regras`. `RegrasOriginais` implementa o jogo, uma trait por arquivo de `rules/`.
+- **Motivo:** a ordem do tick é parte da regra (sorteios na ordem certa), então ela fica num só lugar e testada. As traits separadas permitem que cada assunto seja escrito num arquivo próprio, em paralelo, sem conflito, e que um assunto ainda não escrito simplesmente não faça nada. O estado explícito, sem globais, deixa os testes determinísticos e permite ida e volta byte a byte com o `.ANT`. As regras não tocam em áudio nem em janela: pedem mensagens, músicas e diálogos por `Estado::eventos`.
+- **Impacto nos mods:** a API de scripts ainda não existe, mas a arquitetura define os pontos que serão expostos:
+  - **leitura e escrita do `Estado`** pelos grupos nomeados (`colonia(cor)`, `lista(area)`, `feromonios`, `amarela`...), não por endereços do original. Os nomes dos campos são parte da API e passam a ter nota de compatibilidade quando forem expostos;
+  - **ganchos por sub-rotina do tick**: um mod poderá envolver ou substituir um método de `Regras` (por exemplo, um `RegrasNinho` próprio) mantendo o resto do jogo. A ordem do tick fica fixa e fora do alcance dos mods, para preservar o determinismo;
+  - **eventos**: mensagens e sons pedidos pela simulação passam por `Estado::eventos`, e um mod poderá observar ou acrescentar eventos;
+  - **dados**: velocidades e valores iniciais de jogo novo estão em `data/simulacao.json`, já sobrescrevível por mod.
+- **Descartado:** variáveis globais espelhando a memória do original (difícil de testar e de expor a mods); um único `trait Regras` com todos os métodos e um único `impl` (cada agente ou mod teria de editar o mesmo bloco); despacho por tabela de ponteiros de função montada em tempo de execução (perde a verificação de tipos sem ganho agora; pode ser a forma da API de mods mais tarde).
+
 ## 2026-10-16: Tabelas da geração do mundo em `data/geracao.json`; seno lido do banco
 
 - **Decisão:** as tabelas que a geração do mundo lê do executável (`_Dx8/_Dy8`, bordas do buraco e da formiga-leão, `_SowTab`, formas de pedra) ficam em `data/geracao.json`, gerado por `tools/extrair_geracao.py` a partir do `SIMANTW.EXE`. A tabela de seno, que no original é um objeto do banco (tipo 9 nº 1000), é lida do banco em tempo de execução, como os demais objetos. Os geradores aleatórios (`engine/src/rules/rng.rs`) são valores com estado explícito, passados por parâmetro, sem estado global.

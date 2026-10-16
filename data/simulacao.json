@@ -1,0 +1,30 @@
+{
+  "_comentario": "Simulação: velocidades e valores iniciais de um jogo novo que não saem da geração do mundo. Lido por engine/src/rules/estado.rs (ConfigSimulacao). Ver docs/spec/regras/simulacao-visao-geral.md (seção 'Implementação no port') e formigas.md (triângulos).",
+  "_atrasos_velocidade": "_SpeedDelayVals (8:8616), por _GameSpeed 0 slow, 1 normal, 2 fast, 3 ultra: mensagens de temporizador entre ticks; <= 0 roda em todo laço. Lido do SIMANTW.EXE.",
+  "atrasos_velocidade": [6, 2, 0, -1],
+  "inicial": {
+    "_castas": "_casteLevels [reprodutores, operárias, soldados] e _casteSetLevels (4 conjuntos), padrões do executável (formigas.md §4); conferidos no QUICK2.ANT",
+    "castas": [0, 39321, 26214],
+    "castas_memorizadas": [0, 39321, 26214, 32767, 16383, 16383, 0, 65535, 0, 0, 0, 65535],
+    "_tarefas": "_modeLevels [forragear, cavar, cuidar] e _modeSetLevels; conferidos no QUICK2.ANT e QUICK3.ANT",
+    "tarefas": [39321, 13107, 13107],
+    "tarefas_memorizadas": [39321, 13107, 13107, 65535, 0, 0, 0, 65535, 0, 0, 0, 65535],
+    "castas_ideais": [60, 40, 0, 0],
+    "_automaticos": "_initControls (1000:cc84): _ModeAuto = _CasteAuto = 1, _casteButtonState = _modeButtonState = -1, _ShowPercentCaste = _ShowPercentMode = 1",
+    "modo_automatico": 1,
+    "casta_automatica": 1,
+    "botao_controles": -1,
+    "mostrar_porcentagem": 1,
+    "_velocidade": "_InitSimVars: _GameSpeed = 1 (normal), _MeWarnHealth = _BlkWarnHealth = 30",
+    "velocidade": 1,
+    "aviso_saude": 30,
+    "_proxima_comida": "_NextFeed (8:8a62): valor estático no SIMANTW.EXE = 40; igual no QUICK2/QUICK3",
+    "proxima_comida": 40,
+    "_opcoes": "_OptionStates e _HistButtStates como no QUICK2/QUICK3. [hipótese] são padrões do executável ou do SIMANT.CFG; origem não localizada",
+    "opcoes": [0, 1, 1, 1, 1, 0],
+    "botoes_historico": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+    "_barreira": "_Barrier gravado por _OverlayTileSet (1010:00f4) ao trocar o conjunto de tiles: 0x50 no quintal, 0x90 na casa",
+    "barreira_quintal": 80,
+    "barreira_casa": 144
+  }
+}

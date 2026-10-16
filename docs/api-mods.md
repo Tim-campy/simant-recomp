@@ -27,7 +27,8 @@ mods/
   - `paleta.json`: as 16 cores;
   - `telas.json`: sequência de abertura (janelas, bitmaps soltos, duração em ticks, gatilhos de fechamento);
   - `interface.json`: geometria da área cliente (faixa, borda das janelas, cores do sistema);
-  - `jogo.json`: lido direto de `data/`, ainda não sobrescrevível por mod.
+  - `jogo.json`: lido direto de `data/`, ainda não sobrescrevível por mod;
+  - `simulacao.json`: velocidades do jogo (`atrasos_velocidade`) e valores iniciais de um jogo novo (triângulos de casta e tarefa, opções, `_NextFeed`, `_Barrier`...). Ver `docs/spec/regras/simulacao-visao-geral.md`, "Implementação no port".
 - **Arquivos soltos do jogo:** `arquivos/<nome>` substitui um arquivo da pasta do jogo lido pelo port (hoje, as fontes `font1`–`font4` e `FONTRES.FON`).
 - **Ordem:** os mods são ordenados de modo que cada um venha depois das suas dependências; entre mods independentes, a ordem é alfabética. Se dois mods sobrescrevem a mesma coisa, vale o que vier por último.
 - **Erros:** dependência ausente, nome duplicado ou ciclo de dependências impedem o jogo de iniciar, com mensagem de erro.
@@ -39,6 +40,7 @@ mods/
 |---|---|---|
 | 0.1 | Sobrescrita de objetos por (tipo, id) e de `data/*.json` por nome. | Inicial. |
 | 0.2 | `arquivos/<nome>` para arquivos soltos do jogo; `interface.json` ganhou `fontes.lista`. | Compatível com 0.1; um `interface.json` de mod 0.1 precisa da chave `fontes`. |
+| 0.2 (acréscimo) | Novo arquivo sobrescrevível `data/simulacao.json`. | Compatível: só acrescenta um arquivo. |
 
 ## Planejado
 
