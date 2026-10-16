@@ -1,0 +1,29 @@
+{
+  "_comentario": "Tabelas e constantes das regras de feromônio. dx8/dy8/turn_tab foram extraídas do SIMANTW.EXE por tools/extrair_feromonios.py (endereços no topo do script); turn_tab[atual][alvo] = nova direção. As constantes de 'regras' vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/feromonios.md. Valores em decimal.",
+  "dx8": [0, 1, 1, 1, 0, -1, -1, -1],
+  "dy8": [-1, -1, 0, 1, 1, 1, 0, -1],
+  "turn_tab": [
+    [0, 1, 1, 1, 7, 7, 7, 7],
+    [0, 1, 2, 2, 2, 2, 0, 0],
+    [1, 1, 2, 3, 3, 3, 3, 1],
+    [2, 2, 2, 3, 4, 4, 4, 4],
+    [3, 3, 3, 3, 4, 5, 5, 5],
+    [6, 6, 4, 4, 4, 5, 6, 6],
+    [7, 7, 7, 5, 5, 5, 6, 7],
+    [0, 0, 0, 0, 6, 6, 6, 7]
+  ],
+  "regras": {
+    "limiar_trilha": 8,
+    "limiar_alarme": 9,
+    "teto_alarme_amarela": 200,
+    "valor_buraco": 255,
+    "tile_buraco_fechado": 81
+  },
+  "_origem": {
+    "limiar_trilha": "_ColonySmellBT/RT 1028:9306: abaixo disto a trilha zera; senão perde a metade",
+    "limiar_alarme": "_SmoothAlarm 1028:9380: resultado da suavização abaixo disto vira 0",
+    "teto_alarme_amarela": "_AlarmHere 1028:943c: c = min(c + v, teto)",
+    "valor_buraco": "_FillHolesBN/RN 1028:91de/9244: valor posto na célula do buraco",
+    "tile_buraco_fechado": "_FillHolesBN/RN: se o tile do buraco no _MapA for este, a célula recebe 0"
+  }
+}

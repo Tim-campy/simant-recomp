@@ -254,10 +254,10 @@ _ModeMe (8:8a58) = _ModeTabB[escolhido]       (_ModeTabB 8:89b6 = 2, 4, 1: Forag
 | 5 | 6 6 4 4 4 5 6 6 |
 | 6 | 7 7 7 5 5 5 6 7 |
 | 7 | 0 0 0 0 6 6 6 7 | O passeio aleatório usa `TurnTab[dir][SRand8()]`, o que favorece manter a direção ou girar 45°.
-- **Bordas:** em todas as funções de direção, uma formiga na borda (x = 0 ou 127, y = 0 ou 63) sorteia uma direção que aponta para dentro.
+- **Bordas:** em todas as funções de direção, uma formiga na borda (x = 0 ou 127, y = 0 ou 63) sorteia uma direção que aponta para dentro. `_GetForageDir` usa 3 opções e cantos fixos; `_GetNestDir` e `_GetAlarmDir` usam 5 opções no meio da borda e 3 nos cantos (tabela em [feromonios.md](feromonios.md#4-leitura-escolha-de-direção)).
 - `_GetRandDir` (`1030:0f72`): passeio aleatório.
 - `_GetForageDir` (`1030:0ab0`): olha a trilha da própria cor nas 8 células vizinhas (resolução 2×2) e escolhe a maior. Se nenhuma tiver trilha, faz passeio aleatório. Se a maior for **menor** que a da célula atual, devolve −1 ("fim da trilha"): `_DoForageAnt` então põe a formiga em Bored (7/8) ou sorteia novo modo (1/8).
-- `_GetNestDir` (`1030:0c30`): sobe o gradiente do cheiro de ninho da cor pedida (`_DoAttackAnt` pede a cor inimiga). Sem cheiro na célula: em 3/4 das vezes aponta para o último buraco feito (`_LastNewHoleB/R`, `8:835a`/`8:835e`), senão passeio aleatório. Com cheiro: escolhe o vizinho de maior valor; metade das vezes aplica o giro limitado.
+- `_GetNestDir` (`1030:0c30`): sobe o gradiente do cheiro de ninho da cor pedida (`_DoAttackAnt` pede a cor inimiga). Sem cheiro na célula: em 3/4 das vezes aponta para o último buraco feito (`_LastNewHoleB/R`, `8:835a`/`8:835e`), senão passeio aleatório. Com cheiro: escolhe o vizinho de maior valor e aplica o giro limitado uma vez ou, em metade das vezes (`SRand2` ≠ 0), duas vezes seguidas (até 90°). Detalhes e ordem dos sorteios em [feromonios.md](feromonios.md#4-leitura-escolha-de-direção).
 - `_GetAlarmDir` (`1030:0e54`): sobe o gradiente do alarme (mapa comum às duas cores).
 - `_GetDefendDir` (`1030:1026`): segue a amarela. Se a amarela está no ninho, segue o cheiro de ninho daquela cor; se está caçando a aranha, vai para a aranha; se está perto da posição difusa (`_FuzLocX/Y`), passeia.
 - `_Recruit(n)` (`1030:06d2`): põe em Defense (M = 6, S = 0) até n operárias ou soldados pretos que ainda não estejam nesse modo. Varre a lista A e depois a B, de trás para frente.
