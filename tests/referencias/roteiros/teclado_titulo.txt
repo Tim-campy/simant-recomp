@@ -1,0 +1,7 @@
+# Espaço deve fechar o título antes dos 39,6 s (_ShowIntro).
+esperar 25
+capturar re_trabalho/tecl_03_titulo.png
+teclas espaco
+esperar 3
+capturar re_trabalho/tecl_04_apos_espaco.png
+fim

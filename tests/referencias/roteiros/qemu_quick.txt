@@ -1,0 +1,12 @@
+esperar 35
+teclas spc
+esperar 3
+teclas spc
+esperar 4
+clicar_em 345 228
+esperar 15
+capturar re_trabalho/qi_10_quick.png
+teclas alt+f
+esperar 2
+capturar re_trabalho/qi_11_menu_file.png
+fim

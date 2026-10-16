@@ -1,0 +1,8 @@
+esperar 35
+teclas spc
+esperar 3
+mouse_canto
+mover 100 100
+esperar 1
+capturar re_trabalho/qi_04_mouse_100_sem_acel.png
+fim

@@ -1,0 +1,19 @@
+# Quick Game -> Save As QUICKn.ANT, espera o DOS gravar, dump de memória e encerramento limpo.
+esperar 35
+teclas spc
+esperar 3
+teclas spc
+esperar 4
+clicar_em 345 228
+esperar 15
+teclas ctrl+a
+esperar 3
+digitar QUICK2
+esperar 1
+teclas ret
+esperar 4
+capturar re_trabalho/qi_14_salvo.png
+memoria 0 0x1000000 re_trabalho/qemu_ram_quick2.bin
+teclas ret
+esperar 15
+fim

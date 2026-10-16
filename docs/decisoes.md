@@ -33,6 +33,13 @@ Formato: data, decisão, motivo, alternativas descartadas.
 - **Organização:** workspace Cargo. O crate `engine` reúne `core`, `formats` e `rules`, sem dependência de janela. O crate `simant` é o executável com `render`, `audio` e `input` sobre SDL2. Os módulos seguem a arquitetura do `CLAUDE.md`.
 - **SDL2 no Windows:** sem cmake na máquina, o crate `sdl2` não compila o SDL do fonte (feature `bundled`). Por isso usamos as bibliotecas oficiais pré-compiladas `SDL2-devel-<versão>-VC.zip` (libsdl-org, GitHub), extraídas em `vendor/` (no `.gitignore`). O `SDL2.dll` é copiado ao lado do executável.
 
+## 2026-10-16: Bancada automática: QEMU + QMP sobre SvarDOS
+
+- **Decisão (do usuário, após pesquisa):** testes automáticos contra o original rodam no QEMU (headless), controlado por QMP (`send-key`, `input-send-event`, `screendump`, `pmemsave`), com SvarDOS (kernel EDR-DOS) como DOS. Detalhes em `docs/bancada-qemu.md`.
+- **Motivo:** no DOSBox-X oficial, as teclas injetadas pelo host não chegam ao Windows 3.x, o `AUTOTYPE` só funciona em DOS e o mouse é relativo e exige captura. O QMP injeta teclado e mouse no hardware emulado, captura sem foco e lê a memória.
+- **Descartado:** FreeDOS (kernel 2043 recusa o Windows; o 2046 386 dá "Invalid Opcode"; com o 2046 8086 o WfW volta ao prompt; além disso, o SHARE do FreeDOS tem bug de gravação), forks do DOSBox-X com QMP (teclado pelo buffer do BIOS), Bochs (lento), 86Box (sem API), otvdm (não é fiel). Comparativo completo em `reports/Automação de testes Win16 emulado.md`.
+- **Consequência:** a bancada usa 640×480 (VGA genérico). Para pixel a pixel em 800×600, a referência continua sendo o DOSBox-X.
+
 ## 2026-10-16: Ambiente de referência: DOSBox-X
 
 - **Decisão (do usuário):** DOSBox-X rodando o Windows 3.1 já instalado em `SimAnt-T/`.

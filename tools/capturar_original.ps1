@@ -1,7 +1,7 @@
 # Captura a tela do SimAnt original rodando no DOSBox-X, em escala 1:1 (800x600 do Windows 3.1).
 # Uso: powershell -File tools\capturar_original.ps1 -Saida tests\referencias\capturas\nome.png [-Espera 28]
 # Inicia o DOSBox-X com referencia\dosbox-x.conf, espera, copia a área cliente da janela e encerra.
-param([Parameter(Mandatory)][string]$Saida, [int]$Espera = 28, [string]$Cliques = '', [int]$Intervalo = 4)
+param([Parameter(Mandatory)][string]$Saida, [int]$Espera = 28, [string]$Cliques = '', [int]$Intervalo = 4, [string]$Teclas = '')
 $raiz = Split-Path $PSScriptRoot -Parent
 Set-Location $raiz
 Add-Type -AssemblyName System.Drawing
@@ -36,6 +36,12 @@ foreach ($c in ($Cliques -split ';' | Where-Object { $_ })) {
   [Jan]::SetCursorPos($o.X + [int]$xy[0], $o.Y + [int]$xy[1]) | Out-Null
   Start-Sleep -Milliseconds 300
   [Jan]::mouse_event(0x2, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 120; [Jan]::mouse_event(0x4, 0, 0, 0, [IntPtr]::Zero)
+  Start-Sleep -Seconds $Intervalo
+}
+foreach ($t in ($Teclas -split '\|' | Where-Object { $_ })) {
+  [Jan]::SetForegroundWindow($h) | Out-Null; Start-Sleep -Milliseconds 300
+  Add-Type -AssemblyName System.Windows.Forms
+  [System.Windows.Forms.SendKeys]::SendWait($t)
   Start-Sleep -Seconds $Intervalo
 }
 [Jan]::SetForegroundWindow($h) | Out-Null; Start-Sleep -Milliseconds 500

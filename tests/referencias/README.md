@@ -12,7 +12,7 @@ Capturas e logs feitos no SimAnt original (DOSBox-X, `referencia/dosbox-x.conf`)
 | Ordem das telas | iniciar o jogo e esperar 80 s | Maxis Presents → título → Select a Game [hipótese] | título → registro (Customer ID) → Select a Game; nenhuma tela Maxis. Capturas `titulo_800x600.png`, `apos_titulo.png`, `novo_jogo.png` | confirmado, hipótese corrigida |
 | Fontes Mac pixel a pixel | renderizar "Click here to continue" (font2) e "Customer ID:" (font3) e procurar na captura do registro | blocos idênticos | encontrados exatos em (362,397) e (361,356) de `apos_titulo.png` | confirmado (`fontes_mac_batem_com_o_original`) |
 | Select a Game pixel a pixel | `capturar_original.ps1 -Espera 80` | port igual ao original | 99,87% iguais; diferem o cursor e os botões configuráveis da faixa | confirmado (`engine/tests/telas_reais.rs`) |
-| Tamanho do save | salvar qualquer jogo | arquivo `.ANT` de 48.386 bytes | — | pendente |
+| Tamanho do save | salvar qualquer jogo | arquivo `.ANT` de 48.386 bytes | `QUICK2.ANT` (Quick Game, salvo na bancada QEMU) tem 48.386 bytes | confirmado (`saves/QUICK2.ANT`) |
 | Paleta | captura de qualquer tela colorida | cores = paleta padrão do Windows (`data/paleta.json`) | igual, com 7 = cinza escuro e 8 = cinza claro (a especificação tinha trocado) | confirmado, divergência corrigida |
 | Título pixel a pixel | `capturar_original.ps1 -Saida capturas\titulo_800x600.png`; `comparar_captura.py` contra `--exportar-telas` | port igual ao original | 99,98% iguais; diferença só sob o cursor do mouse | confirmado (`engine/tests/telas_reais.rs`) |
 

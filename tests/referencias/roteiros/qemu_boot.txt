@@ -1,0 +1,8 @@
+# Prova de viabilidade: boot e capturas periódicas.
+esperar 15
+capturar re_trabalho/qemu_15s.png
+esperar 15
+capturar re_trabalho/qemu_30s.png
+esperar 20
+capturar re_trabalho/qemu_50s.png
+fim

@@ -1,0 +1,12 @@
+esperar 35
+capturar re_trabalho/qi_01_titulo.png
+teclas spc
+esperar 3
+capturar re_trabalho/qi_02_apos_espaco.png
+mouse_canto
+esperar 1
+mover 100 100
+esperar 1
+capturar re_trabalho/qi_03_mouse_100.png
+memoria 0 0x1000000 re_trabalho/qemu_ram.bin
+fim

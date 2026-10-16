@@ -1,0 +1,14 @@
+esperar 35
+teclas spc
+esperar 3
+teclas spc
+esperar 4
+clicar_em 185 228
+esperar 12
+teclas spc
+esperar 3
+capturar re_trabalho/qi_08_jogo.png
+teclas alt+f
+esperar 2
+capturar re_trabalho/qi_09_menu_file.png
+fim

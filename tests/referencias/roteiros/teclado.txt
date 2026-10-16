@@ -1,0 +1,9 @@
+# Teste de teclado: no "Select a Game", Esc e depois Alt+F para abrir o menu File.
+esperar 80
+teclas esc
+esperar 2
+capturar re_trabalho/tecl_01_esc.png
+teclas alt+f
+esperar 2
+capturar re_trabalho/tecl_02_menu_file.png
+fim

@@ -6,7 +6,7 @@ O `.ANT` não tem cabeçalho. É a concatenação, em ordem fixa, de 307 blocos 
 - Fato visto no código: `_SaveGame` (`1010:a23e`) percorre a tabela no segmento de dados 8 (`SIMANT_DATA_GROUP`, seletor `1038`), offset `0x9570`, e para cada entrada `{u16 count, u16 tamanho do elemento, ponteiro far}` grava `count × tamanho` bytes com `_lwrite`. A tabela termina na primeira entrada com `count = 0`. `_LoadGame` (`1010:9fa0`) lê de volta com a mesma tabela.
 - Antes de gravar, `_SaveGame` checa o espaço livre em disco e exige 125% da soma dos blocos.
 - A tabela abaixo foi gerada por `tools/save_table.py`, que resolve os segmentos seguindo as cadeias de relocação NE. Os nomes vêm do `SIMANTW.SYM`.
-- **Ainda não verificado:** nenhum `.ANT` real foi gravado e comparado. Para confirmar, salvar um jogo no original e checar que o arquivo tem 48.386 bytes.
+- **Verificado (2026-10-16):** o `QUICK2.ANT`, salvo pelo original na bancada QEMU (`docs/bancada-qemu.md`), tem exatamente 48.386 bytes (`tests/referencias/saves/QUICK2.ANT`).
 
 Esta tabela também é o **modelo de estado da simulação**: tudo o que precisa sobreviver a salvar e carregar está aqui. Legenda dos prefixos (inferida dos nomes): `A` = superfície (quintal), `B` = ninho preto, `R` = ninho vermelho, `Y` = formiga amarela (a controlada pelo jogador), `H_` = séries históricas do gráfico.
 

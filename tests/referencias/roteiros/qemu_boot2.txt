@@ -1,0 +1,11 @@
+esperar 6
+capturar re_trabalho/q06.png
+esperar 4
+capturar re_trabalho/q10.png
+esperar 5
+capturar re_trabalho/q15.png
+esperar 5
+capturar re_trabalho/q20.png
+esperar 10
+capturar re_trabalho/q30.png
+fim

@@ -1,0 +1,7 @@
+# Inicia o original (cópia com mouse absoluto), espera o "Select a Game" e escolhe Tutorial Game.
+esperar 80
+capturar tests/referencias/capturas/auto_01_selecao.png
+clicar 185 228
+esperar 8
+capturar tests/referencias/capturas/auto_02_tutorial.png
+fim

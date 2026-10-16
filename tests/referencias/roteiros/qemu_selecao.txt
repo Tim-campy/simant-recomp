@@ -1,0 +1,7 @@
+esperar 35
+teclas spc
+esperar 3
+teclas spc
+esperar 4
+capturar re_trabalho/qi_05_selecao.png
+fim

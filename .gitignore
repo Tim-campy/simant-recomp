@@ -17,3 +17,5 @@ tests/referencias/capturas/*
 target/
 __pycache__/
 *.pyc
+referencia/qemu/
+research_notes/

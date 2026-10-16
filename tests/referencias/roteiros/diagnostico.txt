@@ -1,0 +1,6 @@
+# Diagnóstico da automação: captura antes e depois de um movimento relativo.
+esperar 80
+capturar re_trabalho/diag_01.png
+mover 300 300
+capturar re_trabalho/diag_02.png
+fim
