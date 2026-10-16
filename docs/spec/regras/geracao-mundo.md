@@ -18,7 +18,7 @@ Convenções:
 - `_HoleMapB[32] = 3` e `_HoleMapR[32] = 118`; rainha vermelha em (41, 11) com T = 0xE2 e a metade em (40, 11) com T = 0xEA, iguais à lista R salva;
 - `_FoodA = 117` (o save tem 117).
 
-Script: `re_trabalho/verifica_geracao_quick2.py` (material de trabalho, fora do git). A geração da **casa** (`_MakeHousePatch`) e o caminho do Full Game ao trocar de patch **não** foram verificados contra o original.
+Script: `re_trabalho/verifica_geracao_quick2.py` (material de trabalho, fora do git). O port reproduz o mesmo resultado em Rust, com mais variáveis conferidas (ver "Implementação no port"). A geração da **casa** (`_MakeHousePatch`) e o caminho do Full Game ao trocar de patch **não** foram verificados contra o original.
 
 ## 1. Escolha do jogo: `_NewGame` e `_DoScenario`
 
@@ -146,7 +146,7 @@ _RedQueens += 1
 
 A rainha preta é igual, com `_DigTileB`, lista B, T = 0x62 e 0x6A, `_BlkQueens += 1`, e com duas diferenças: a deriva lateral só é sorteada de novo quando `Sk(2) = 0` (senão repete a anterior, começando em 0); e grava a posição da câmara também em `_RebornX/_RebornY` (`1040:9fec/9fee`), onde a formiga amarela nasce. Ordem dos sorteios na rainha preta por linha: escava, `Sk(2)`, e só se der 0, `S(3)`.
 
-"Escavar" é `_DigTileB/R(x, y)` (`1020:1fe4`/`21de`): se a célula é terra (0x20–0x2E), vira túnel com valor `Sk(8)` e soma (x, y) nos acumuladores de centro de massa; depois alisa as quatro vizinhas (`_SmoothEdges`, ver [tiles-valores.md](tiles-valores.md)) e atualiza o mapa de saída. Em `_DigTileB`, se `y > 53` e `S(64) = 0`, a célula vira 0x14 nos **dois** ninhos [hipótese: passagem entre os ninhos].
+"Escavar" é `_DigTileB/R(x, y)` (`1020:1fe4`/`21de`): se a célula é terra (0x20–0x2E), vira túnel com valor `Sk(8)` e soma (x, y) nos acumuladores de centro de massa; depois alisa as quatro vizinhas (`_SmoothEdges`, ver [tiles-valores.md](tiles-valores.md)) e atualiza o mapa de saída da célula escavada (`_FixExitMapB/R`, `1020:284e`/`2914`: nas linhas 0 e 1, 0xFF se a célula é abertura 0x18 e 0xFE se não; abaixo, o maior `_ExitMap` das 8 vizinhas menos 1, ou 0 se todas são 0; as vizinhas não são recalculadas). O `_ExitMap` cresce, portanto, como uma distância até a superfície, mas só na ordem em que as células são escavadas. Fato visto no código; verificado no `QUICK2.ANT` (`_ExitMapR` idêntico, `_ExitMapB` igual exceto uma célula mudada pela simulação, ver "Implementação no port"). Em `_DigTileB`, se `y > 53` e `S(64) = 0`, a célula vira 0x14 nos **dois** ninhos [hipótese: passagem entre os ninhos].
 
 ### 3.D Formiga amarela: `_InitYelloAnt` (`1030:6492`)
 
@@ -156,7 +156,7 @@ A rainha preta é igual, com `_DigTileB`, lista B, T = 0x62 e 0x6A, `_BlkQueens 
 - Full Game sem ninho (`_MeNestStarted = 0`): até 100 tentativas de `x = 0x20 + Sk(16) − Sk(16)`, `y = 0x20 + Sk(8) − Sk(8)` (nessa ordem de sorteio), até achar `_MapA < 0x10`; se nenhuma servir, usa (0x40, 0x20). Põe uma rainha alada (`_MeType = 0x40`) no plano 1, direção 2.
 - Demais casos: operária (`_MeType = 0x10`) no plano 2 (ninho preto) em `(_RebornX, _RebornY)`, direção 2.
 
-A formiga amarela marca `_LifeA/B` com 0xFF (cabeça) e 0xFE (segunda célula) em vez de entrar nas listas (`_SetMyLife`, `1020:6536`).
+A formiga amarela marca `_LifeA/B` com 0xFF em vez de entrar nas listas (`_SetMyLife`, `1020:6536`); só quando o tipo é 0x60 (rainha) ela ocupa também a célula atrás (direção oposta) com 0xFE. A operária e a rainha alada do novo jogo ocupam uma célula. No Experimental, `_InitYelloAnt` não chama `_SetMyLife`: nenhuma célula de `_LifeA` é marcada. Se a célula do ninho for terra ou superfície fechada, `_SetLife` a escava (`_DigMyTile`, não especificado); na geração isso não acontece, porque a formiga nasce na câmara da rainha. Fato visto no código.
 
 ### 3.E Comida inicial: `_AddFood(−1, 0)` (`1030:6a58`)
 
@@ -216,7 +216,7 @@ Fato visto no código: `_LionIndex = 0`, `n = min(n, 10)`, `_InitialLions = n`. 
 
 ### 4.3 `_InitPillar` (`1030:4bf8`)
 
-Fato visto no código: zera a lagarta (`_PillarState/X/Y/Seg`, `__PillDir`) e `_PillarMap`. Só no quintal: duas tentativas (índices 2 e 1 das tabelas `_Sow*`): `x = S(128)`, `y = S(64)`; se `_MapA < 0x10`, sorteia `dir = S(8)`, guarda `_SowX/_SowY/_SowDir` e o chão original em `_SowSave`, e grava `_SowTab[dir]` (`1038:8a90` = `72 73 71 70 72 73 71 70`). Sem nova tentativa se a célula não servir. A lagarta não é criada aqui (no `QUICK2.ANT` ela aparece depois, com 0x69–0x6B).
+Fato visto no código: zera a lagarta (`_PillarState/X/Y/Seg`, `__PillDir`) e `_PillarMap`. Só no quintal: coloca dois bichos-de-conta (índices 2 e 1 das tabelas `_Sow*`, nessa ordem): `x = S(128)`, `y = S(64)`; se `_MapA < 0x10`, sorteia `dir = S(8)`, guarda `_SowX/_SowY/_SowDir` e o chão original em `_SowSave`, grava `_SowTab[dir]` (`1038:8a90` = `72 73 71 70 72 73 71 70`) e passa ao índice seguinte. **Se a célula não servir, sorteia de novo para o mesmo índice**, até colocar os dois (fato visto na desmontagem de `1030:4c4e`–`4cd5`: o contador `si` só diminui, `sub si, 2`, depois de gravar; correção de uma versão anterior desta spec, que dizia "sem nova tentativa"; no `QUICK2.ANT` as duas primeiras tentativas serviram, então o save não distingue as duas leituras). A lagarta não é criada aqui (no `QUICK2.ANT` ela aparece depois, com 0x69–0x6B).
 
 ## 5. Patch da casa: `_MakeHousePatch(n)` (`1020:3120`)
 
@@ -261,9 +261,29 @@ Depois `_SpecialTutorialInit`/`_LoadGame` põem o título "Tutorial Game", chama
 - `_InitGrassMap` (`1030:2096`): põe as 3 primeiras palavras de `_GrassMap` em 0 e as 9 seguintes em 0xFFFF. Não tem chamadores no pseudocódigo [em aberto: pode ser chamada por ponteiro].
 - `_InitSpider`: ver 3.2.
 
+## Implementação no port
+
+Onde está:
+
+- `engine/src/rules/rng.rs`: `GeradorS` (LFSR, `_SRand1`, máscaras, `_SGRand`/`_SGIRand`/`_SGSRand`, semente pelo relógio) e `GeradorR` (`rand()` do Microsoft C, `_RRand`, `_SeedRRand`). Estado explícito em cada valor, nada global. Ver [rng.md](rng.md).
+- `engine/src/rules/geracao.rs`: `Mundo::novo_jogo` (`_RandYard`: sementes dos 192 patches com R e geração do patch (11, 8)) e `Mundo::gerar_patch` (`_RandWorld` completo para o quintal: `_InitSpider`, `_MakeYardPatch` com `_AddRocks`, `_InitAntLions`, `_InitPillar` e objetos, linha da superfície, formigas da superfície, `_MakeNewHoleB/R`, `_DigOutBNest/RNest`, `_BuildAntListA`, rainhas, `_InitYelloAnt`, `_AddFood`). Produz `_MapA/B/R`, `_ExitMapB/R`, `_LifeA/B/R`, as listas A/B/R, `_HoleMapB/R`, `_LastNewHole?`, acumuladores de escavação, `_FoodA`, `_LastFoodDrop`, `_LastBlackEgg/_LastRedEgg`, `_RebornX/Y`, formigas-leão, bichos-de-conta, formiga amarela e aranha.
+- Tabelas: `data/geracao.json` (`_Dx8`/`_Dy8`, bordas do buraco e da formiga-leão, `_SowTab`, formas de pedra 5 × 5 e 3 × 3), gerado por `python tools/extrair_geracao.py SIMANTW.EXE --json data/geracao.json` (endereços no topo do script). A tabela de seno é lida do banco em tempo de execução (objeto tipo 9 nº 1000 do `SHARED`). Um mod pode trocar `geracao.json` inteiro (por exemplo, outras formas de pedra) ou o objeto 9/1000.
+
+Verificado (teste `engine/tests/geracao_quick2.rs`, roda com `SIMANT_DIR` apontando para a pasta do jogo; sem ela, avisa e passa sem verificar): com a semente `_YMapSeeds[8 * 12 + 11] = 0x3332` do `QUICK2.ANT`, Quick Game, uma colônia de cada cor, patch (11, 8):
+
+- `_MapB` e `_MapR`: idênticos byte a byte (4.096 de 4.096 cada).
+- `_MapA`: 8.182 de 8.192 células idênticas. As 10 diferenças são exatamente as de bichos que andaram nos 78 ciclos entre a geração e o save, listadas no teste: as duas posições onde a geração pôs os bichos-de-conta, (55, 27) e (37, 10), que no save voltaram ao chão de `_SowSave`; as posições atuais deles no save, (32, 46) e (49, 8) (iguais a `_SowX/_SowY`); a lagarta em (3…7, 58); e um 0x72 em (0, 0) [hipótese: a rotina que move os bichos-de-conta também processa o índice 0 das tabelas `_Sow*`, que é zerado, e desenha um bicho em (0, 0)].
+- `_ExitMapR` idêntico; `_ExitMapB` igual exceto (36, 9), onde a rainha preta foi criada (save 244, geração 0) [hipótese: a simulação recalcula a saída por onde a rainha passa; no save ela já se virou e está com a cabeça em (34, 9)].
+- `_HoleMapB/R`, `_LastNewHoleB/R` (par x, coluna), `_TileTotX/Y?`, `_TilesDug?`, `_TileMassX/Y?`, `_WaterTable`, `_FoodA = 117`, `_LastFoodDrop = (64, 38)`, `_LastRedEgg`, `_RebornX/Y`, `_InitialLions`, `_LionIndex`, `_LionListX/Y`, `_BlkQueens`, `_RedQueens`, `_MePlane/_MeLocX/_MeLocY/_MeType/_MeDir`, `_ListIndexA` e as duas primeiras entradas da lista R: iguais ao save.
+- Lista B: a rainha preta é criada em (36, 9) com T = 0x62 e a metade em (35, 9) com 0x6A; no save ela está virada (0x66 em (34, 9), 0x6E em (35, 9)), e `_LastBlackEgg` já mudou para (36, 9) por causa dos ovos postos. Isso é simulação, não geração.
+
+Não verificado contra o original (implementado conforme o código, sem caso de teste real): `_DigOutBNest/RNest` (só acontece com mais de uma formiga por colônia, em `_XferPatch`), os ramos de Tutorial, Full Game e Experimental de `_InitYelloAnt`/`_RandWorld`, `_AddFood` com parâmetro ≥ 0 e na casa, e `_MakeNewHoleB/R` na casa. A sequência R de `novo_jogo` (192 chamadas a `_RRand`) segue a spec, mas o estado de R no momento do clique não está no save.
+
+Fora do escopo desta implementação (lacunas): `_MakeHousePatch` (devolve erro), `_XferPatch`, feromônios, `_ClearHistory`, `_CountAnts`, `_ResetYellowVars`, vistas (`_MapPnt`, `_AMapPnt`...), `_DigMyTile` (a formiga amarela nascendo em terra devolve erro) e as demais variáveis zeradas por `_RandYard` que não são estado do mapa.
+
 ## Como testar contra o original
 
-1. **Regressão sem emulador (pronto):** `python re_trabalho/verifica_geracao_quick2.py` regera o patch a partir de `_YMapSeeds` do `QUICK2.ANT` e lista as diferenças. O port deve ter um teste equivalente em Rust (entrada: semente 0x3332, `_CurGameType = 1`, patch (11, 8); saída esperada: `_MapB`, `_MapR` e `_MapA` do save, ignorando as células de bichos).
+1. **Regressão sem emulador (pronto):** `python re_trabalho/verifica_geracao_quick2.py` regera o patch a partir de `_YMapSeeds` do `QUICK2.ANT` e lista as diferenças. O equivalente no port é `engine/tests/geracao_quick2.rs` (entrada: semente 0x3332, `_CurGameType = 1`, patch (11, 8); saída esperada: `_MapB`, `_MapR` e `_MapA` do save, com as 10 células de bichos listadas): `SIMANT_DIR=<pasta do jogo> cargo test -p engine --test geracao_quick2`.
 2. **Novos saves na bancada QEMU** ([../../bancada-qemu.md](../../bancada-qemu.md)): gravar saves logo depois de gerar cada tipo de jogo (Tutorial, Full, Experimental), antes de qualquer passo de simulação se possível (pausar logo após o clique), e rodar a mesma comparação. Falta para isso: coordenadas dos botões Full/Experimental/Tutorial no roteiro e um roteiro por tipo.
 3. **Patches da casa e Full Game:** num Full Game, levar a rainha a outro patch (ou carregar um save em patch da casa) e salvar; comparar `_MapA` com a reimplementação de `_MakeHousePatch` usando `_YMapSeeds` do save.
 4. **Dump de memória:** `memoria` da bancada logo após o clique em "Quick Game" permite ler `_YMapSeeds` e os mapas sem passar pelo save, e conferir a sequência R (192 chamadas a `_RRand`).

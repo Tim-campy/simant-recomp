@@ -2,6 +2,13 @@
 
 Formato: data, decisão, motivo, alternativas descartadas.
 
+## 2026-10-16: Tabelas da geração do mundo em `data/geracao.json`; seno lido do banco
+
+- **Decisão:** as tabelas que a geração do mundo lê do executável (`_Dx8/_Dy8`, bordas do buraco e da formiga-leão, `_SowTab`, formas de pedra) ficam em `data/geracao.json`, gerado por `tools/extrair_geracao.py` a partir do `SIMANTW.EXE`. A tabela de seno, que no original é um objeto do banco (tipo 9 nº 1000), é lida do banco em tempo de execução, como os demais objetos. Os geradores aleatórios (`engine/src/rules/rng.rs`) são valores com estado explícito, passados por parâmetro, sem estado global.
+- **Motivo:** dados fora do código (princípio 4) e reprodução exata do original: o teste `engine/tests/geracao_quick2.rs` só é determinístico se cada chamada ao gerador for explícita.
+- **Impacto nos mods:** um mod pode substituir `geracao.json` inteiro (sobrescrita por arquivo, como os demais `data/*.json`) ou o objeto 9/1000. Os valores de tile usados pelas regras (buraco 0x50, comida 0x48, terra 0x2E...) e as quantidades fixas da geração (20/30/100/128 objetos, 200 unidades de comida) continuam como constantes nomeadas no código, documentadas em `docs/spec/regras/tiles-valores.md` e `geracao-mundo.md`; movê-los para dados fica para quando houver API de mods de regras, porque mudá-los sem mudar as regras que os testam quebraria a simulação.
+- **Descartado:** copiar as tabelas para constantes Rust (impede mods); ler o executável em tempo de execução (exigiria o `.EXE` além dos bancos e um parser NE no motor).
+
 ## 2026-10-16: Análise do código com Ghidra headless, fora do REA
 
 - **Decisão:** usar o Ghidra 12.1.4 diretamente (headless, loader NE), com os nomes do `SIMANTW.SYM` aplicados por script.

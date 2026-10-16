@@ -105,6 +105,6 @@ Fato verificado (2026-10-16): com a semente do patch atual lida do `QUICK2.ANT` 
 
 ## Como testar contra o original
 
-1. **Sem emulador (já feito):** rodar `python re_trabalho/verifica_geracao_quick2.py`; ele lê `tests/referencias/saves/QUICK2.ANT`, regera o patch e imprime as diferenças. Serve de teste de regressão para o port: o gerador S do port deve passar no mesmo caso.
+1. **Sem emulador (já feito):** rodar `python re_trabalho/verifica_geracao_quick2.py`; ele lê `tests/referencias/saves/QUICK2.ANT`, regera o patch e imprime as diferenças. No port, o mesmo caso é o teste `engine/tests/geracao_quick2.rs`, e os vetores desta página estão nos testes unitários de `engine/src/rules/rng.rs` (implementação: `GeradorS` e `GeradorR`).
 2. **Semente forçada na bancada QEMU** ([../../bancada-qemu.md](../../bancada-qemu.md)): o comando `memoria` dá dumps da RAM física. Para forçar S, é preciso achar o endereço físico do DGROUP (procurar no dump um padrão conhecido do DGROUP, como a tabela `DGROUP:0x230c = 19 1a 1c 1f 1e 1d 1b 18`) e escrever na palavra `0xcbf2` com o monitor do QEMU (comando HMP `pmemsave`/`xp` para ler; escrita exige `gdbstub` ou um comando novo na bancada) [em aberto: a bancada ainda não tem escrita de memória].
 3. **R:** para testar `_RRand`, gerar dois Quick Games seguidos na mesma sessão e comparar `_YMapSeeds` dos dois saves: a segunda tabela deve ser a continuação da sequência `rand()` da primeira (192 chamadas depois), desde que nada mais tenha chamado `_RRand` entre os dois (chuva, lutas) [hipótese a confirmar].

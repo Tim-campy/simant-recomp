@@ -5,3 +5,4 @@ pub mod core;
 pub mod formats;
 pub mod paleta;
 pub mod recursos;
+pub mod rules;
