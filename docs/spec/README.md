@@ -33,6 +33,9 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
   - [regras/simulacao-visao-geral.md](regras/simulacao-visao-geral.md): tick (`MYTIMERFUNC`/`_DoAntSim`), ordem e frequência das sub-rotinas, velocidade, pausa, fim de jogo e pontuação.
   - [regras/formigas.md](regras/formigas.md): listas A/B/R, campos X/Y/M/T/S, castas, modos, triângulos de controle e máquina de estados.
   - [regras/feromonios.md](regras/feromonios.md): mapas de cheiro (`_PherMap*`), depósito, decaimento e leitura.
+  - [regras/superficie.md](regras/superficie.md): formigas da superfície (`_DoAntSimA` e cada modo), funções de direção, luta, cadáveres, entrada no ninho, comida, estratégia preta/vermelha, recrutamento e formiga vermelha líder.
+  - [regras/inimigos.md](regras/inimigos.md): formiga-leão, aranha (inclusive controlada pelo jogador), lagarta e bicho-de-conta.
+  - [regras/formiga-amarela.md](regras/formiga-amarela.md): formiga amarela (estado `_Me*`, movimento e caminho, ninho, pegar/largar, comer, luta, troca de corpo, recrutamento, morte e reencarnação) e controles do jogador (mouse, teclas, menus, aceleradores, modo Experimental).
   - [regras/ninho.md](regras/ninho.md): formigas dentro dos ninhos preto e vermelho (`_DoAntSimB/R`, `_DoNestAntB/R`): despacho por modo, movimento, luta, comida guardada, escavação, mapa de saída, invasoras, água e inundação; diferenças R × B e casos de teste.
   - [regras/ciclo-de-vida.md](regras/ciclo-de-vida.md): postura, desenvolvimento e eclosão dos ovos (`_SimEggB/R`), rainha (cabeça e cauda, andar, fome), escolha de casta (`_SetCasteProd`, `_CasteTabC`) e casos de teste.
 
