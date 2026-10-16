@@ -122,9 +122,16 @@ pub struct Borda {
     pub ajuste_x_contorno: i16,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct ConfigFontes {
+    /// Índice = byte "fonte" dos objetos (`_font_SetFont`): "ARQUIVO.FON#Nome" ou arquivo FONT do Mac.
+    pub lista: Vec<String>,
+}
+
 /// Moldura da interface (data/interface.json), medida no original.
 #[derive(Clone, Debug, Deserialize)]
 pub struct Moldura {
+    pub fontes: ConfigFontes,
     pub largura: u32,
     pub altura: u32,
     pub fundo: u8,
@@ -137,6 +144,20 @@ pub struct Interface {
     pub cores: Vec<crate::formats::janela::Cor>,
     pub posicoes: Vec<[i16; 4]>,
     pub moldura: Moldura,
+    /// Fontes por índice; None quando o arquivo não existe (como `font5`/`font6` no original).
+    pub fontes: Vec<Option<crate::formats::fonte::Fonte>>,
+}
+
+fn carregar_fonte(recursos: &crate::recursos::Recursos, nome: &str) -> Result<crate::formats::fonte::Fonte, String> {
+    use crate::formats::fonte::{fontes_de_fon, Fonte, FonteMac};
+    match nome.split_once('#') {
+        Some((arquivo, face)) => fontes_de_fon(&recursos.arquivo(arquivo)?)?
+            .into_iter()
+            .find(|f| f.nome == face)
+            .map(Fonte::Fnt)
+            .ok_or(format!("fonte {face} não encontrada em {arquivo}")),
+        None => Ok(Fonte::Mac(FonteMac::decodificar(&recursos.arquivo(nome)?)?)),
+    }
 }
 
 impl Interface {
@@ -147,10 +168,13 @@ impl Interface {
         let cab = recursos.objeto(Chave { tipo: TIPO_LAYOUT, id: ID_CABECALHO_CORES })?;
         let tab = recursos.objeto(Chave { tipo: TIPO_LAYOUT, id: ID_TABELA_CORES })?;
         let pos = recursos.objeto(Chave { tipo: TIPO_POSICOES, id: tabela_posicoes })?;
+        let moldura: Moldura = recursos.dados("interface.json")?;
+        let fontes = moldura.fontes.lista.iter().map(|n| carregar_fonte(recursos, n).ok()).collect();
         Ok(Interface {
             cores: decodificar_cores(&cab, &tab)?,
             posicoes: decodificar_posicoes(&pos)?,
-            moldura: recursos.dados("interface.json")?,
+            moldura,
+            fontes,
         })
     }
 
@@ -228,7 +252,7 @@ pub fn compor(
             }
         };
         q.recorte = g.interno;
-        pendentes.extend(desenhar_janela(&mut q, &janela, g.origem, &interface.cores, &mut bitmap));
+        pendentes.extend(desenhar_janela(&mut q, &janela, g.origem, &interface.cores, &interface.fontes, &mut bitmap));
         q.recorte = None;
         pendentes.extend(faltou);
     }

@@ -20,13 +20,14 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
 - Formatos:
   - [formatos/banco-dat-ndx.md](formatos/banco-dat-ndx.md): banco de recursos e compressão LZSS.
   - [formatos/bitmap.md](formatos/bitmap.md): bitmaps e paleta.
+  - [formatos/fonte.md](formatos/fonte.md): fontes (FONT do Mac e Gaia do `FONTRES.FON`) e posicionamento de texto.
   - [formatos/janela.md](formatos/janela.md): sistema de janelas (layouts, cores, posições, cálculo e posicionamento na tela).
   - [formatos/simant-cfg.md](formatos/simant-cfg.md): `SIMANT.CFG`.
   - [formatos/save-ant.md](formatos/save-ant.md): jogo salvo e modelo de estado da simulação.
 
 ## Próximos subsistemas a especificar
 
-1. Fontes (`FONT1`–`FONT4`, `FONTRES.FON`, `_font_*`): necessárias para os textos das janelas (registro, menus).
+1. Mapa de jogo: tiles (objetos tipo 9, ids 13–20) e mapas de superfície/ninho (`_MapA`, `_MapB`, `_MapR`), para exibir um mapa (marco seguinte do plano).
 2. Mapas de superfície e ninho (`_MapA`, `_MapB`, `_MapR`) e tiles (tipo 9).
 3. Regras da simulação (`SIMANT1_MODULE`, `SIMTWO_MODULE`), uma regra por vez, cada uma com caso de teste contra o original.
 4. Som e música (tipos 5, 18, 20, 50, 51).

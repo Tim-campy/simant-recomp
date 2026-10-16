@@ -3,6 +3,27 @@
   "largura": 800,
   "altura": 562,
   "fundo": 17,
-  "faixa": { "janela": 34, "altura": 73, "y_tabela": 17, "fundo": 8 },
-  "borda": { "largura": 5, "cor_externa": 0, "cor": 16, "ajuste_x_contorno": 1 }
+  "faixa": {
+    "janela": 34,
+    "altura": 73,
+    "y_tabela": 17,
+    "fundo": 8
+  },
+  "borda": {
+    "largura": 5,
+    "cor_externa": 0,
+    "cor": 16,
+    "ajuste_x_contorno": 1
+  },
+  "fontes": {
+    "_comentario": "Índice = byte 'fonte' dos objetos de texto (_font_SetFont). 'FONTRES.FON#Nome' = fonte .FNT pelo nome; demais = arquivo FONT do Mac. Ver docs/spec/formatos/fonte.md",
+    "lista": [
+      "FONTRES.FON#Gaia8x14",
+      "FONTRES.FON#Gaia8x8",
+      "font1",
+      "font2",
+      "font3",
+      "font4"
+    ]
+  }
 }

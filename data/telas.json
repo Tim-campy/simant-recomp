@@ -1,5 +1,5 @@
 {
-  "_comentario": "Sequência observada no DOSBox-X ao iniciar SIMANTW.EXE: título (janela 3, 720 ticks ou espaço/clique, _ShowIntro) -> registro (janela 30, 270 ticks, _CustomerIDDialog; ainda sem texto no port) -> Select a Game (janela 2, _NewGame). Ver docs/spec/telas/abertura.md",
+  "_comentario": "Sequência observada no DOSBox-X ao iniciar SIMANTW.EXE: título (janela 3, 720 ticks ou espaço/clique, _ShowIntro) -> registro (janela 30, _CustomerIDDialog; NÃO incluído: o texto é desenhado por _win_DrawPictureWindow, ainda não especificado) -> Select a Game (janela 2, _NewGame). Ver docs/spec/telas/abertura.md",
   "ms_por_tick": 55,
   "telas": [
     {
@@ -16,25 +16,6 @@
         }
       ],
       "duracao_ticks": 720,
-      "fechar_com": [
-        "espaco",
-        "clique"
-      ]
-    },
-    {
-      "nome": "registro",
-      "largura": 800,
-      "altura": 562,
-      "fundo": 17,
-      "janelas": [
-        {
-          "id": 34
-        },
-        {
-          "id": 30
-        }
-      ],
-      "duracao_ticks": 270,
       "fechar_com": [
         "espaco",
         "clique"

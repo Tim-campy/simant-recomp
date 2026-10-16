@@ -25,6 +25,7 @@ pub struct Mod {
 
 pub struct Recursos {
     bancos: Vec<Banco>,
+    dir_jogo: PathBuf,
     dir_dados: PathBuf,
     /// Em ordem de aplicação: um mod posterior sobrescreve um anterior.
     mods: Vec<Mod>,
@@ -47,7 +48,7 @@ impl Recursos {
             Some(d) if d.is_dir() => carregar_mods(d)?,
             _ => Vec::new(),
         };
-        Ok(Recursos { bancos, dir_dados: dir_dados.to_path_buf(), mods })
+        Ok(Recursos { bancos, dir_jogo: dir_jogo.to_path_buf(), dir_dados: dir_dados.to_path_buf(), mods })
     }
 
     pub fn mods(&self) -> &[Mod] {
@@ -68,6 +69,25 @@ impl Recursos {
             }
         }
         Err(format!("objeto não encontrado: tipo {} id {}", chave.tipo, chave.id))
+    }
+
+    /// Arquivo solto da pasta do jogo (ex.: `font1`, `FONTRES.FON`), sem diferenciar maiúsculas.
+    /// Um mod pode substituí-lo em `arquivos/<nome>`.
+    pub fn arquivo(&self, nome: &str) -> Result<Vec<u8>, String> {
+        for m in self.mods.iter().rev() {
+            let c = m.dir.join("arquivos").join(nome);
+            if c.is_file() {
+                return std::fs::read(&c).map_err(|e| format!("{}: {e}", c.display()));
+            }
+        }
+        let alvo = nome.to_lowercase();
+        let entradas = std::fs::read_dir(&self.dir_jogo).map_err(|e| format!("{}: {e}", self.dir_jogo.display()))?;
+        for e in entradas.flatten() {
+            if e.file_name().to_string_lossy().to_lowercase() == alvo {
+                return std::fs::read(e.path()).map_err(|err| format!("{}: {err}", e.path().display()));
+            }
+        }
+        Err(format!("arquivo do jogo não encontrado: {nome}"))
     }
 
     /// Arquivo de dados JSON do port (`data/<nome>`), sobrescrito por inteiro pelo último mod que o tiver.

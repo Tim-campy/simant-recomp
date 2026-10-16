@@ -2,6 +2,7 @@
 //! Sem dependência de janela do sistema: a camada de render só converte o quadro com a paleta.
 
 use crate::formats::bitmap::Bitmap;
+use crate::formats::fonte::Fonte;
 use crate::formats::janela::{Conteudo, Cor, Janela, Retangulo};
 
 /// Cores do relevo 3D [hipótese: branco e cinza escuro; `_GRectPartialMixedOutline` ainda não analisada].
@@ -73,6 +74,32 @@ impl Quadro {
         }
     }
 
+    /// Texto num retângulo, como `_gr_JustifyStrInRect`: centralizado (0/3), à esquerda (1) ou à
+    /// direita (2), centralizado na vertical, desenhado opaco (tinta em `frente`, fundo em `fundo`).
+    pub fn texto(&mut self, r: Retangulo, fonte: &Fonte, texto: &[u8], alinhamento: u16, frente: u8, fundo: u8) {
+        let img = fonte.imagem(texto);
+        let (l, t, d, b) = (r.esq as i32, r.topo as i32, r.dir as i32, r.base as i32);
+        let w = img.largura as i32;
+        let x = match alinhamento {
+            1 => l + 4,
+            2 => d - w - 4,
+            _ => (l + d - w).div_euclid(2),
+        }
+        .max(l);
+        let y = (t + b - fonte.altura() as i32).div_euclid(2);
+        for j in 0..img.altura {
+            for i in 0..img.largura {
+                let c = if img.bits[j * img.largura + i] { frente } else { fundo };
+                self.ponto(x + i as i32, y + j as i32, c);
+            }
+        }
+        if alinhamento == 3 {
+            let h = fonte.altura() as i16;
+            self.preencher(Retangulo { esq: r.esq, topo: y as i16, dir: x as i16, base: y as i16 + h }, fundo, fundo);
+            self.preencher(Retangulo { esq: (x + w) as i16, topo: y as i16, dir: r.dir, base: y as i16 + h }, fundo, fundo);
+        }
+    }
+
     pub fn bitmap(&mut self, bm: &Bitmap, x: i32, y: i32) {
         for j in 0..bm.altura {
             for i in 0..bm.largura {
@@ -94,6 +121,7 @@ pub fn desenhar_janela(
     janela: &Janela,
     pos: (i16, i16),
     cores: &[Cor],
+    fontes: &[Option<Fonte>],
     carregar_bitmap: &mut dyn FnMut(u16) -> Option<Bitmap>,
 ) -> Vec<String> {
     let base = janela.retangulo();
@@ -122,11 +150,20 @@ pub fn desenhar_janela(
                 }
                 q.relevo(r, *espessura, *invertido);
             }
-            Conteudo::Texto { preencher, .. } => {
+            Conteudo::Texto { fonte, texto, preencher } => {
                 if *preencher {
                     q.preencher(r, cor.fundo, cor.fundo2);
                 }
-                pendentes.push(ob.nome.clone());
+                // _font_SetFont: índices fora de 0..=5 viram 2.
+                let i = if *fonte > 5 { 2 } else { *fonte as usize };
+                match fontes.get(i).and_then(|f| f.as_ref()) {
+                    // Textos com '%' são formatos preenchidos em tempo de execução.
+                    Some(f) if !texto.contains('%') => {
+                        let alinhamento = (ob.flags & 0x180) >> 7;
+                        q.texto(r, f, texto.as_bytes(), alinhamento, cor.frente, cor.fundo);
+                    }
+                    _ => pendentes.push(ob.nome.clone()),
+                }
             }
             Conteudo::Janela | Conteudo::Area | Conteudo::Outro(_) => {}
         }
