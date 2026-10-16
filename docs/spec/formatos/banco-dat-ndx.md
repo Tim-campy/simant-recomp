@@ -82,7 +82,7 @@ Outros valores observados no byte de flags: 0, 1, 5 e 8. O bit 2 (valor 4) e o b
 | 2 | bitmap, ver [bitmap.md](bitmap.md) | `_db_LoadObject(id, 2, 1)` em `GR_MODULE`; imagens renderizadas corretamente |
 | 4 | lista de strings (u16 big-endian com a contagem, seguido de strings Pascal; `\n` literal marca quebra de linha) | dump do `SHARED` 4/1000 ("BackYard View", …) |
 | 6 | menu | `_db_LoadObject(param_1, 6, …)` seguido da mensagem "Couldn't load menu %d" |
-| 9 | tabelas de tiles/padrões (ids 13–20) | `_db_LoadObject(0x10..0x14, 9, 1)` em `ANTEDIT_MODULE` [uso exato em aberto] |
+| 9 | tilesets 16×16 a 4 bpp: chão (ids 9 e 10) e vida (ids 15–20), ver [tiles.md](tiles.md) | `_OverlayTileSet`, `_LoadTiles` |
 | 10 | texto corrido do sistema de informação (ASCII) | dump do `SHARED` 10/150 |
 | 17 | layout de cartão do sistema de informação (big-endian, itens `PICT`/`TEXT`) | dump do `SHARED` 17/127 |
 | 18 | cabeçalho de música (18 bytes) | `_db_LoadObject(x, 0x12, 1)` antes de tocar |

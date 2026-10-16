@@ -24,3 +24,9 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `db_*`, `DB*`, `ch_*` | banco de recursos `.NDX/.DAT` e cache de objetos | SYM; [formatos/banco-dat-ndx.md](spec/formatos/banco-dat-ndx.md) |
 | `win_*` | sistema de janelas próprio do jogo (portado do Mac) | SYM |
 | `displayType` | modo de vídeo escolhido pelo `SIMANT.CFG` | `_ReadConfig` |
+| `_grndTile`, `_lifeTile` | índice do tile de chão e de vida da célula sendo desenhada, calculados por `_DoCalcTile` | código; [formatos/tiles.md](spec/formatos/tiles.md) |
+| `_MapPlane` | mapa mostrado na janela de edição: 0/1 superfície, 2 ninho preto, 3 ninho vermelho | `_DoCalcTile` |
+| `_TERRAINset` | tileset de chão ativo: 0 quintal (9/10), 1 casa (9/9) | `_OverlayTileSet` |
+| `_ELayerMode` | camada de feromônio sobreposta à superfície (−1 = nenhuma, 0–4 = `_PherMapA/BN/BT/RN/RT`) | `_DoCalcTile` |
+| `_LifeA/B/R` | mapa de vida (formigas e outros) por célula, desenhado sobre o chão; não está no save | `_DoCalcTile` |
+| `tilebufover`, `tilebufnest` | buffers de tiles de vida da superfície (9/15–17) e dos ninhos (9/18–20) | `_LoadTiles` |

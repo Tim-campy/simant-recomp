@@ -22,7 +22,7 @@ impl Quadro {
         Quadro { largura, altura, pixels: vec![fundo; largura * altura], recorte: None }
     }
 
-    fn ponto(&mut self, x: i32, y: i32, cor: u8) {
+    pub(crate) fn ponto(&mut self, x: i32, y: i32, cor: u8) {
         if let Some(r) = self.recorte {
             if x < r.esq as i32 || x >= r.dir as i32 || y < r.topo as i32 || y >= r.base as i32 {
                 return;
