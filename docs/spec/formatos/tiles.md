@@ -81,7 +81,7 @@ Cada camada tem 2048 bytes (64 × 32), uma célula para cada 2×2 tiles, também
 
 `FUN_1010_63fe` desconta o deslocamento antes de indexar: −0x100 se `_lifeTile` < 0x200 (buffer `tilebufover`), −0x200 se estiver entre 0x200 e 0x37F (buffer `tilebufnest`) e −0x280 se for ≥ 0x380 (buffer `tilebufover`). A formiga amarela cai, assim, na terceira parte (índices 0x100 a 0x17F) de cada buffer, que na folha de contato é justamente a das formigas amarelas. A célula é desenhada com o chão (`_XferTileColor`) e, por cima, o tile de vida com transparência (`_XferLifeTileColor`). **Fato visto no código.**
 
-**Pendente:** `_LifeA`, `_LifeB` e `_LifeR` não estão no save. São reconstruídos pela simulação a partir das listas de formigas (`_AlistX/Y/...`) [hipótese]. A camada de vida fica para quando essa reconstrução estiver especificada. O port já tem o tileset de vida e a primitiva com transparência.
+`_LifeA`, `_LifeB` e `_LifeR` não estão no save. `_DoLoadInitializations` os reconstrói a partir das listas de formigas e da formiga amarela: ver [telas/jogo.md](../telas/jogo.md), "Camada de vida" [código]. O port desenha a vida na tela de jogo (`core/edicao.rs`), conferida contra a captura.
 
 ## Montagem da imagem (janela de edição)
 

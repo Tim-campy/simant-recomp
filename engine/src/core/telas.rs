@@ -216,47 +216,89 @@ pub fn compor(
     recursos: &crate::recursos::Recursos,
     interface: &Interface,
 ) -> Result<(super::quadro::Quadro, Vec<String>), String> {
-    use super::quadro::{desenhar_janela, Quadro};
+    use super::quadro::Quadro;
     use crate::formats::banco::Chave;
     use crate::formats::bitmap::{Bitmap, TIPO_BITMAP};
-    use crate::formats::janela::{Janela, Retangulo, TIPO_LAYOUT, TIPO_NOMES};
 
-    let carregar = |id: u16| -> Result<Bitmap, String> {
-        Bitmap::decodificar(&recursos.objeto(Chave { tipo: TIPO_BITMAP, id })?)
-    };
-    let m = &interface.moldura;
     let mut q = Quadro::new(tela.largura as usize, tela.altura as usize, tela.fundo);
     for b in &tela.bitmaps {
-        q.bitmap(&carregar(b.id)?, b.x, b.y);
+        q.bitmap(&Bitmap::decodificar(&recursos.objeto(Chave { tipo: TIPO_BITMAP, id: b.id })?)?, b.x, b.y);
     }
     let mut pendentes = Vec::new();
     for j in &tela.janelas {
-        let layout = recursos.objeto(Chave { tipo: TIPO_LAYOUT, id: j.id })?;
-        let nomes = recursos.objeto(Chave { tipo: TIPO_NOMES, id: j.id }).ok();
-        let janela = Janela::decodificar(&layout, nomes.as_deref())?;
-        let g = interface.posicionar(j.id, &janela).ok_or(format!("janela {} sem posição", j.id))?;
-        if j.id == m.faixa.janela {
-            let faixa = Retangulo { esq: 0, topo: 0, dir: tela.largura as i16, base: m.faixa.altura };
-            q.preencher(faixa, m.faixa.fundo, m.faixa.fundo);
-        }
-        if let Some(r) = g.externo {
-            q.preencher(r, m.borda.cor, m.borda.cor);
-            q.contorno(Retangulo { dir: r.dir - 1, base: r.base - 1, ..r }, m.borda.cor_externa);
-        }
-        let mut faltou = Vec::new();
-        let mut bitmap = |id: u16| match carregar(id) {
-            Ok(b) => Some(b),
-            Err(e) => {
-                faltou.push(format!("bitmap {id}: {e}"));
-                None
-            }
-        };
-        q.recorte = g.interno;
-        pendentes.extend(desenhar_janela(&mut q, &janela, g.origem, &interface.cores, &interface.fontes, &mut bitmap));
-        q.recorte = None;
-        pendentes.extend(faltou);
+        pendentes.extend(desenhar_janela_na_tela(&mut q, recursos, interface, j.id)?);
     }
     Ok((q, pendentes))
+}
+
+/// Layout (tipo 0) e nomes (tipo 1) da janela `id`.
+pub fn carregar_janela(recursos: &crate::recursos::Recursos, id: u16) -> Result<crate::formats::janela::Janela, String> {
+    use crate::formats::banco::Chave;
+    use crate::formats::janela::{Janela, TIPO_LAYOUT, TIPO_NOMES};
+    let layout = recursos.objeto(Chave { tipo: TIPO_LAYOUT, id })?;
+    let nomes = recursos.objeto(Chave { tipo: TIPO_NOMES, id }).ok();
+    Janela::decodificar(&layout, nomes.as_deref())
+}
+
+/// Desenha os objetos visíveis da janela com o objeto 0 em `origem` e o recorte `interno`.
+/// Devolve o que não foi desenhado (objetos sem suporte e bitmaps ausentes).
+pub(crate) fn desenhar_objetos(
+    q: &mut super::quadro::Quadro,
+    recursos: &crate::recursos::Recursos,
+    interface: &Interface,
+    janela: &crate::formats::janela::Janela,
+    origem: (i16, i16),
+    interno: Option<crate::formats::janela::Retangulo>,
+) -> Vec<String> {
+    use super::quadro::desenhar_janela;
+    use crate::formats::banco::Chave;
+    use crate::formats::bitmap::{Bitmap, TIPO_BITMAP};
+    let mut faltou = Vec::new();
+    let mut bitmap = |id: u16| match recursos.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d)) {
+        Ok(b) => Some(b),
+        Err(e) => {
+            faltou.push(format!("bitmap {id}: {e}"));
+            None
+        }
+    };
+    q.recorte = interno;
+    let mut pendentes = desenhar_janela(q, janela, origem, &interface.cores, &interface.fontes, &mut bitmap);
+    q.recorte = None;
+    pendentes.extend(faltou);
+    pendentes
+}
+
+/// Desenha a janela `id` na posição da tabela tipo 9, com a moldura medida no DOSBox-X (ou a faixa).
+pub fn desenhar_janela_na_tela(
+    q: &mut super::quadro::Quadro,
+    recursos: &crate::recursos::Recursos,
+    interface: &Interface,
+    id: u16,
+) -> Result<Vec<String>, String> {
+    let janela = carregar_janela(recursos, id)?;
+    desenhar_janela_carregada_na_tela(q, recursos, interface, id, &janela)
+}
+
+/// Como `desenhar_janela_na_tela`, com o layout já carregado (e talvez com objetos selecionados).
+pub fn desenhar_janela_carregada_na_tela(
+    q: &mut super::quadro::Quadro,
+    recursos: &crate::recursos::Recursos,
+    interface: &Interface,
+    id: u16,
+    janela: &crate::formats::janela::Janela,
+) -> Result<Vec<String>, String> {
+    use crate::formats::janela::Retangulo;
+    let m = &interface.moldura;
+    let g = interface.posicionar(id, janela).ok_or(format!("janela {id} sem posição"))?;
+    if id == m.faixa.janela {
+        let faixa = Retangulo { esq: 0, topo: 0, dir: q.largura as i16, base: m.faixa.altura };
+        q.preencher(faixa, m.faixa.fundo, m.faixa.fundo);
+    }
+    if let Some(r) = g.externo {
+        q.preencher(r, m.borda.cor, m.borda.cor);
+        q.contorno(Retangulo { dir: r.dir - 1, base: r.base - 1, ..r }, m.borda.cor_externa);
+    }
+    Ok(desenhar_objetos(q, recursos, interface, janela, g.origem, g.interno))
 }
 
 #[cfg(test)]

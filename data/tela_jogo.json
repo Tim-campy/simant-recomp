@@ -1,0 +1,29 @@
+{
+  "_comentario": "Tela de jogo (faixa + janela de edição) na bancada QEMU, 640x480, tabela de posições 9/0. Coordenadas da área cliente da janela principal (linha 38 da tela em diante). A moldura da janela de edição foi medida em re_trabalho/qi_10_quick.png e qi_14_salvo.png, porque a conta de _win_Open + maximização ainda está em aberto. Ver docs/spec/telas/jogo.md",
+  "largura": 640,
+  "altura": 442,
+  "fundo": 17,
+  "tabela_posicoes": 0,
+  "_botao_do_plano": "_SetMapPlaneLocation (1000:a386) com faixa seleciona 0x2205, 0x2203 ou 0x2204 (janela 34, objetos 5, 3, 4) para _MapPlane 1, 2 e 3; no plano 0 não seleciona nada.",
+  "botao_do_plano": {"1": "ribToSurface", "2": "ribToBNest", "3": "ribToRNest"},
+  "edicao": {
+    "janela": 0,
+    "area": "editTileArea",
+    "ajuste_area_com_faixa": 1,
+    "area_na_tela": [24, 120],
+    "posicao": "salva",
+    "moldura": {
+      "externo": [20, 97, 424, 347],
+      "espessura": 4,
+      "altura_titulo": 18,
+      "barra_rolagem": 16,
+      "cor_linha": 0,
+      "cor_moldura": 8,
+      "cor_titulo": 4,
+      "cor_botao": 8,
+      "cor_relevo_claro": 15,
+      "cor_relevo_escuro": 7,
+      "cor_trilho": 8
+    }
+  }
+}
