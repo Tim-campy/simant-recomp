@@ -8,9 +8,11 @@ O `.ANT` não tem cabeçalho. É a concatenação, em ordem fixa, de 307 blocos 
 - A tabela abaixo foi gerada por `tools/save_table.py`, que resolve os segmentos seguindo as cadeias de relocação NE. Os nomes vêm do `SIMANTW.SYM`.
 - **Verificado (2026-10-16):** o `QUICK2.ANT`, salvo pelo original na bancada QEMU (`docs/bancada-qemu.md`), tem exatamente 48.386 bytes (`tests/referencias/saves/QUICK2.ANT`).
 
-Esta tabela também é o **modelo de estado da simulação**: tudo o que precisa sobreviver a salvar e carregar está aqui. Legenda dos prefixos (inferida dos nomes): `A` = superfície (quintal), `B` = ninho preto, `R` = ninho vermelho, `Y` = formiga amarela (a controlada pelo jogador), `H_` = séries históricas do gráfico.
+Esta tabela também é o **modelo de estado da simulação**: tudo o que precisa sobreviver a salvar e carregar está aqui. Legenda dos prefixos (inferida dos nomes): `A` = superfície (o patch atual), `B` = ninho preto, `R` = ninho vermelho, `Me` = formiga amarela (a controlada pelo jogador), `YMap` = mapa do quintal inteiro (*yard*, ver abaixo), `H_` = séries históricas do gráfico.
 
-Os significados e as dimensões das matrizes, como 128×64 para `_MapA`, ainda precisam ser confirmados no código da simulação [hipótese].
+As dimensões e a indexação das matrizes principais estão na seção [Estruturas principais](#estruturas-principais), abaixo da tabela.
+
+**Dados do port:** a mesma tabela está em `data/save_layout.json` (símbolo sem o `_` inicial, `count`, `tamanho`, `endereco`), gerada com `python tools/save_table.py SIMANTW.EXE SIMANTW.SYM --json data/save_layout.json`. O carregador (`engine/src/formats/save.rs`) lê o layout desse arquivo, não do código. O teste `layout_bate_com_a_tabela_do_executavel` (`engine/tests/save_ant.rs`) confere `count` e `tamanho` contra o executável quando `SIMANT_DIR` aponta para ele.
 
 | # | Offset no arquivo | Bytes | count × tam | Endereço | Símbolo |
 |---|---|---|---|---|---|
@@ -321,5 +323,60 @@ Os significados e as dimensões das matrizes, como 128×64 para `_MapA`, ainda p
 | 304 | 48380 | 2 | 2×1 | `8:8a5a` | `_RevSpider` |
 | 305 | 48382 | 2 | 2×1 | `8:8632` | `_ShowPercentCaste` |
 | 306 | 48384 | 2 | 2×1 | `9:7602` | `_ShowPercentMode` |
+
+## Estruturas principais
+
+Fontes: pseudocódigo do Ghidra em `re_trabalho/decomp/` (fora do git), funções nomeadas pelo `SIMANTW.SYM`, e o `QUICK2.ANT`. Legenda: **[código]** = visto no pseudocódigo, com o endereço da função; **[save]** = observado nos dados do `QUICK2.ANT`; **[hipótese]** = inferência ainda não confirmada.
+
+Convenção de coordenadas: `x` é a coluna (horizontal) e `y` a linha (vertical; nos ninhos, a profundidade). Todos os mapas grandes são guardados **coluna a coluna**: o byte de `(x, y)` fica em `x * altura + y`.
+
+### Mapas de terreno
+
+| Bloco | Dimensão | Índice | Evidência |
+|---|---|---|---|
+| `_MapA` (superfície) | 128 × 64 | `x * 0x40 + y`, `x & 0x7f` | [código] `_DoCalcTile` (`1018:4a6b`), `_DoWater` (`1020:07c6`), `_ExitHole` (`1020:2db6`) |
+| `_MapB` (ninho preto) | 64 × 64 | `x * 0x40 + y`, `x & 0x3f` | [código] `_DoCalcTile`; `_DoWater` percorre `x = 0..63` na linha `y = _WaterTable` com passo `0x40` |
+| `_MapR` (ninho vermelho) | 64 × 64 | igual a `_MapB` | [código] idem |
+| `_ExitMapB`, `_ExitMapR` | 64 × 64 | igual a `_MapB` [hipótese] | [save] 255 em toda a linha `y = 0` e valores 254, 253, … descendo pelo túnel: parece um campo de distância até a saída [hipótese] |
+| `_HoleMapB`, `_HoleMapR` | 64 | por coluna `x` do ninho [hipótese] | [save] único valor não nulo em `x = 32`, a coluna da entrada do túnel |
+
+- `_DoCalcTile` escolhe o mapa pelo plano `_MapPlane`: 0 e 1 usam `_MapA`, 2 usa `_MapB`, 3 usa `_MapR` [código]. Nos ninhos, o tile de chão desenhado é `valor − 0x70` (byte, com estouro) [código].
+- Na superfície, o valor é o próprio tile de chão [código]. `_DoWater` sorteia grama com `_SRand1(0xe)` (0 a 13) e trata 0x74–0x77 como poças que crescem com a chuva [código]; `_ExitHole` só aceita sair em células `< 0x50` [código]. No `QUICK2.ANT` os valores vão de 0 a 114 [save].
+- Inundação dos ninhos (`_DoWater`): quando `_WaterTable` sobe, a linha `y = _WaterTable` vira `'N'` (0x4E) se o valor era `< 0x20`, ou `valor + 0x2F` se não; ao secar, faz o inverso (`'N'` vira `_SRand1(8)`) [código]. Com `_WaterTable = 64` (nenhuma linha inundada) os ninhos do `QUICK2.ANT` têm valores de 0 a 0x2E, e 0x2E (terra maciça [hipótese]) ocupa ~97,5% das células [save].
+- Confirmação da ordem coluna-major com dados: as formigas das listas B e R ficam em células diferentes de 0x2E (túnel escavado), o túnel desce em diagonal de `(32, 0)` até `(36, 9)` e a linha `y = 0` é toda diferente de 0x2E [save; teste `formigas_dos_ninhos_estao_em_tuneis_coluna_major`].
+
+### Mapas de feromônio
+
+`_PherMapA`, `_PherMapBN`, `_PherMapBT`, `_PherMapRN`, `_PherMapRT`: 2048 bytes cada, **64 × 32**, uma célula para cada bloco de 2 × 2 tiles da superfície, índice `(x >> 1) * 0x20 + (y >> 1)` [código: `_DoCalcTile`, que escolhe o mapa por `_ELayerMode` 0 a 4 nessa ordem e desenha `(valor >> 4) − 0x10` quando `valor > 0x10`]. Os cinco usam coordenadas da superfície nessa função; se `BN`/`BT`/`RN`/`RT` também valem dentro dos ninhos não foi visto [hipótese: só superfície].
+
+### Mapas de vida (não salvos)
+
+`_LifeA` (128 × 64), `_LifeB` e `_LifeR` (64 × 64) guardam, por célula, o campo T da formiga que está ali (0 = vazia; 0xFF e 0xFE = formiga amarela) [código: `_DoCalcTile`, `_AddAntToAList`]. **Não estão no save**: `_DoLoadInitializations` (`1010:9dbe`) zera os três e os reconstrói a partir das listas, e depois chama `_SetMyLife` para a formiga amarela se `_MeMode == 0` e `_FullCount` [código].
+
+### Listas de formigas
+
+Cada área tem cinco vetores paralelos de bytes, um elemento por formiga: `X`, `Y`, `M`, `T`, `S`. Capacidade: 1000 em `A`, 500 em `B` e `R` [código: limites em `_AddAntToAList` (`1020:2ef0`), `_AddAntToBList` (`1020:2f4a`), `_AddAntToRList` (`1020:2fa4`)].
+
+- **A lista é da área, não da colônia.** `A` = formigas na superfície; `B` = dentro do ninho preto; `R` = dentro do ninho vermelho. A colônia de cada formiga está no bit 7 de `T`. `_DoNestAntB` (`1028:2dae`) trata formigas vermelhas (`T & 0x80`) dentro da lista B, que invadem o ninho preto [código]; no `QUICK2.ANT` a lista A tem uma operária preta (T = 17) e uma vermelha (T = 150) [save].
+- **Contadores:** `_ListIndexA`, `_ListIndexB`, `_ListIndexR` (salvos) = número de entradas usadas, `0..ListIndex` [código]. `_AddAntTo?List` grava na posição `ListIndex` e incrementa. Uma entrada com `T = 0` é um buraco (formiga morta/removida): `_CompactListA/B/R` (`1020:2a16`/`2a7a`/`2ade`) desloca as entradas seguintes e diminui o contador; `_DoAntSim` (`1028:0000`) chama uma compactação a cada 32 ciclos, alternando A, B, R [código]. `_RemoveFromAList` (`1020:2b42`) remove por deslocamento (`_BlockMove`) e zera a célula em `_LifeA` [código]. `_BuildAntListA` (`1020:3046`) reconstrói a lista A varrendo `_LifeA` (x de 0 a 127, y de 0 a 63) [código].
+- **X, Y:** coordenadas da célula no mapa da área (A: x 0–127, y 0–63; B/R: 0–63) [código: `_AddAntTo?List` também grava `T` em `_Life?[x * 0x40 + y]`].
+- **T (tipo)** [código: `_CountAnts` (`1020:04de`), `_GetFromAlist` (`1020:2ffe`), `_DrownBList` (`1020:2d16`), `_DoCalcTile`]:
+  - bit 7: colônia vermelha (1) ou preta (0);
+  - bits 3–6: classe `k` (0–15). `_CountAnts` conta `T >> 3` (32 contadores, pretos 0–15 e vermelhos 16–31);
+  - bits 0–2: para tipos `< 8` (classe 0), o desenho usa `_MeEgg` em vez de `_MeDir`, logo classe 0 = crias e os bits baixos indicam o estágio [hipótese]; nos adultos, direção 0–7 [hipótese, apoiada por `_lifeTile = T + 0x100` (superfície) ou `T + 0x200` (ninho), em que T seria o índice do sprite].
+  - `_CountAnts` agrupa as classes em `_CastePopB/R[6]`: `[0] = k0`, `[1] = k1+k2+k3+k5`, `[2] = k6+k7+k9`, `[3] = k4`, `[4] = k8`, `[5] = k12`, e faz `_BpopT/_RpopT = soma de [1..5]` (sem as crias) [código]. Se `[5]` passa de não-zero a zero, toca música e mostra o diálogo de fim de colônia, e no jogo rápido (`_CurGameType < 2`) liga `_IsGameOver` e define `_BlackWon` [código], então `k12` = rainha.
+  - Nomes das outras classes [hipótese, a confirmar pelos bitmaps/sprites]: grupo `[1]` operárias, `[2]` soldados, `[3]`/`[4]` reprodutores (machos/fêmeas aladas). `k13` aparece sempre ao lado da rainha (T = 110 em x = 35 com a rainha T = 102 em x = 34; na colônia vermelha 234 ao lado de 226) e não é contado em nenhum grupo: provavelmente a segunda metade do sprite da rainha [hipótese]. `k14` (`T = 0x70 | cor`) é gravado como resultado de luta em `_DoNestAntB` (cadáver? [hipótese]).
+  - `_DrownBList`/`_DrownRList` afogam (M = 0x11) as formigas da linha `y = _WaterTable` com classe 1–11, isto é, nem crias nem rainha [código].
+- **M (modo/tarefa):** índice de 0 a 19 dos contadores por modo (`20` palavras por colônia, zerados a cada ciclo em `_DoAntSim` e somados em `_ModePopB/R[6]`: `[0] = m2+m3`, `[1] = m4+m5`, `[2] = m1`, `[3] = m7`, `[4] = m12`, `[5] = m6`) [código: `_DoNestAntB`, `_DoAntSim`/`_TallyModePop` (`1028:038e`)]. Valores vistos: 2 ao reconstruir a lista A [código: `_BuildAntListA`]; 7 = invadir ninho (`_RaidInB`) [código]; 10 depois de vencer uma luta [código]; 0x11 = afogada [código]; 8 nas crias e 9 na rainha e na sua metade [save]. Nomes dos demais modos [em aberto].
+- **S:** valor auxiliar do modo. `_ExitHole` grava o 5.º argumento só quando M = 6, 0x78 em certos casos e 0 nos demais; `_DoNestAntB` grava ali o resultado de `_GetWinner` [código]. Significado geral [hipótese: alvo/contador do modo].
+- **Defasagem dos contadores** [save + código]: `_CountAnts` só roda a cada 128 ciclos (`_DoAntSim`, ramo `(_Cycle & 0x60) >> 5 == 2`). No `QUICK2.ANT`, `_CastePopB = [2, 2, 0, 0, 0, 1]` mas há 3 ovos pretos na lista B; os índices 1–5 e os totais (`_BpopT = 3`, `_RpopT = 2`) batem com a recontagem das listas mais a formiga amarela (`_MeType = 16`, classe 2, contada quando `_MeMode == 0`) [teste `contadores_de_populacao_batem_com_as_listas`]. A colônia da formiga amarela na contagem depende de `_grndTile + 2`, que não é salvo [código]; no `QUICK2.ANT` ela é preta.
+
+### Quintal (patches) e pontos
+
+- `_YMapPopB`, `_YMapPopR` (192 bytes): população por patch do quintal, **12 × 16**, índice `x * 0x10 + y`, com `(x, y) = _CurYardPnt`; `_SimColonies` (`1030:35f8`) grava ali `min(_BpopT & 0x3ff, 250)` e `min(_RpopT & 0x3ff, 250)` no patch atual [código]. Como `x * 16` vai até 176, `x` vai de 0 a 11 e `y` de 0 a 15; qual eixo é horizontal na tela não foi verificado [hipótese]. No `QUICK2.ANT`, o patch `(11, 8)` (índice 184) tem 3 e 2, iguais a `_BpopT`/`_RpopT` [save].
+- `_YMapSeeds` (192 palavras): semente por patch, índice `y * 12 + x` (ordem trocada em relação a `_YMapPop`), passada a `_RandWorld` (`1030:5ab0`) ao entrar num patch, junto com as populações `_YMapPopB/R` do patch [código: `_XferPatch` (`1000:ab90`)].
+- Blocos `*Pnt` de 4 bytes são **pares de palavras (x, y)**, não inteiros de 32 bits [código: `_DoLoadInitializations` grava `_MeLocX`/`_MeLocY` em `_YMapPnt` (plano 0), `_AMapPnt` (1), `_BMapPnt` (2) ou `_RMapPnt` (3) conforme `_MePlane`]. `_CurYardPnt` = patch atual (no `QUICK2.ANT`, `(11, 8)`).
+- `_GameTime` (4 bytes) é um contador de 32 bits: `_DoAntSim` incrementa a palavra baixa e propaga o vai-um para a alta [código].
+- O prefixo `Y` em `_YMap*` significa quintal (*yard*), não formiga amarela [código: índice pelo patch atual]. O plano 0 de `_MePlane` corresponde à vista do quintal [hipótese].
 
 Impacto no port: o formato de save do port deve ser próprio (versionado e legível, por exemplo JSON com as mesmas chaves). O `.ANT` original entra só como importação, para testes de comparação com o original.

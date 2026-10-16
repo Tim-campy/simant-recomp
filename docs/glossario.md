@@ -8,7 +8,11 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `B` (`_MapB`, `_BlistX`, `_DoAntSimB`) | ninho / colônia **preta** (a do jogador) | SYM (`_PlaceBlackQueen`, `_BlkQueens`) |
 | `R` (`_MapR`, `_RlistX`, `_DoAntSimR`) | ninho / colônia **vermelha** (adversária) | SYM (`_PlaceRedQueen`) |
 | `Y` (`_DoAntSimY`, `_YellowBirth`) | a **formiga amarela**, controlada pelo jogador | SYM; bitmaps "Yellow Health" |
-| `Alist`/`Blist`/`Rlist` + `X`,`Y`,`M`,`T`,`S` | listas paralelas de formigas por área: posição X/Y e três campos [hipótese: M = modo, T = tipo/casta, S = estado] | tabela do save |
+| `Alist`/`Blist`/`Rlist` + `X`,`Y`,`M`,`T`,`S` | listas paralelas de formigas **por área** (superfície, ninho preto, ninho vermelho), de qualquer colônia: posição X/Y, M = modo/tarefa, T = tipo (bit 7 = vermelha, bits 3–6 = classe, 12 = rainha), S = auxiliar do modo [hipótese] | `_AddAntToAList`, `_CountAnts`, `_DoNestAntB`; [formatos/save-ant.md](spec/formatos/save-ant.md#estruturas-principais) |
+| `ListIndexA/B/R` | número de entradas usadas em cada lista | `_AddAntToAList`, `_CompactListA` |
+| `LifeA/B/R` | mapa de ocupação (campo T por célula), reconstruído das listas ao carregar; não é salvo | `_DoLoadInitializations` |
+| `YMap…` (`_YMapPopB`, `_YMapSeeds`, `_YMapPnt`) | mapa do quintal inteiro (*yard*), 12 × 16 patches; não é a formiga amarela | `_SimColonies`, `_XferPatch` |
+| `CastePop`, `ModePop` | populações por grupo de casta e de modo (6 valores cada), recalculadas pela simulação | `_CountAnts`, `_TallyModePop` |
 | `PherMap` (`A`, `BN`, `BT`, `RN`, `RT`) | mapas de feromônio: alarme (A), ninho (N) e trilha (T) por colônia [hipótese, apoiada pela lista de strings 4/1000: "Black Nest Marker Pheromone", "Black Trail…"] | tabela do save, SHARED 4/1000 |
 | `HoleMap`, `ExitMap` | entradas/saídas dos ninhos | tabela do save |
 | `Caste` (`_casteLevels`, `_IdealCaste`) | divisão de castas: operárias, soldados, reprodutores (triângulo de controle) | bitmaps "Workers/Soldiers/Breeders" |

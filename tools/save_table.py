@@ -2,8 +2,11 @@
 
 Cada entrada tem 8 bytes: u16 count, u16 tamanho do elemento, ponteiro far (offset, segmento).
 O segmento só é conhecido após aplicar as relocações NE, por isso seguimos as cadeias de relocação.
-Uso: python tools/save_table.py SIMANTW.EXE SIMANTW.SYM
+Uso: python tools/save_table.py SIMANTW.EXE SIMANTW.SYM [--json data/save_layout.json]
+Sem --json, imprime a tabela de docs/spec/formatos/save-ant.md. Com --json, grava o layout
+(ordem, símbolo sem o '_' inicial, count, tamanho do elemento) lido por engine/src/formats/save.rs.
 """
+import json
 import struct
 import sys
 
@@ -37,17 +40,17 @@ def seg_targets(data, seg):
     return out
 
 
-def main():
-    data = open(sys.argv[1], "rb").read()
+def ler_tabela(exe, sym_path):
+    data = open(exe, "rb").read()
     info = parse_ne(data)
-    sym = parse_sym(open(sys.argv[2], "rb").read())
+    sym = parse_sym(open(sym_path, "rb").read())
     names = {}
     for s in sym["segments"]:
         for x in s["symbols"]:
             names[(s["load_index"], x["offset"])] = x["name"]
     seg = info["segments"][TABLE_SEG - 1]
     tg = seg_targets(data, seg)
-    pos = 0
+    blocos = []
     i = 0
     while True:
         o = seg["file_offset"] + TABLE_OFF + i * 8
@@ -55,10 +58,49 @@ def main():
         if cnt == 0:
             break
         t = tg.get(TABLE_OFF + i * 8 + 4) or tg.get(TABLE_OFF + i * 8 + 6)
-        print(f"{i}\t{pos}\t{cnt * sz}\t{cnt}\t{sz}\t{t}:{off:04x}\t{names.get((t, off), '?')}")
-        pos += cnt * sz
+        blocos.append({"simbolo": names.get((t, off), "?"), "count": cnt, "tamanho": sz, "endereco": f"{t}:{off:04x}"})
         i += 1
-    print(f"# total {pos} bytes, {i} blocos")
+    return blocos
+
+
+def gravar_json(blocos, caminho):
+    total = sum(b["count"] * b["tamanho"] for b in blocos)
+    comentario = (
+        "Layout do jogo salvo .ANT do original: blocos em ordem, cada um com count x tamanho bytes "
+        "(little-endian). Gerado por tools/save_table.py --json a partir da tabela em SIMANTW.EXE "
+        "(segmento 8, offset 0x9570); nomes do SIMANTW.SYM sem o '_' inicial. "
+        "Ver docs/spec/formatos/save-ant.md."
+    )
+    linhas = [
+        "    " + json.dumps({**b, "simbolo": b["simbolo"].lstrip("_")}, ensure_ascii=False) for b in blocos
+    ]
+    with open(caminho, "w", encoding="utf-8", newline="\n") as f:
+        f.write("{\n")
+        f.write(f'  "_comentario": {json.dumps(comentario, ensure_ascii=False)},\n')
+        f.write(f'  "total_bytes": {total},\n')
+        f.write('  "blocos": [\n')
+        f.write(",\n".join(linhas))
+        f.write("\n  ]\n}\n")
+    print(f"{caminho}: {len(blocos)} blocos, {total} bytes")
+
+
+def main():
+    args = sys.argv[1:]
+    saida_json = None
+    if "--json" in args:
+        k = args.index("--json")
+        saida_json = args[k + 1]
+        del args[k:k + 2]
+    blocos = ler_tabela(args[0], args[1])
+    if saida_json is not None:
+        gravar_json(blocos, saida_json)
+        return
+    pos = 0
+    for i, b in enumerate(blocos):
+        n = b["count"] * b["tamanho"]
+        print(f"{i}\t{pos}\t{n}\t{b['count']}\t{b['tamanho']}\t{b['endereco']}\t{b['simbolo']}")
+        pos += n
+    print(f"# total {pos} bytes, {len(blocos)} blocos")
 
 
 if __name__ == "__main__":
