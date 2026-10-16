@@ -1,0 +1,31 @@
+{
+ "id": "C-02",
+ "spec": "docs/spec/regras/ciclo-de-vida.md#31-ninho-preto-_simeggb-10283ca0",
+ "descricao": "Período curto dos ovos pretos (P = 32 com _BpopT < 3) e eclosão de um ovo T = 7 no primeiro tick com _Cycle múltiplo de 32 (tick 96), virando _MakeMe × 8 + 2. O load do original recalcula _BpopT pelas listas (visto: _CastePopB/R mudam no load), então editar só _BpopT não basta: tira-se a operária preta da superfície (lista A, índice 0), e o _BpopT fica 2 (amarela + rainha).",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "C02.ANT",
+ "operacoes": [
+  {"op": "formiga_remover", "lista": "A", "onde": {"T": 17}},
+  {"op": "escrever", "nome": "BpopT", "valor": 2},
+  {"op": "formiga_editar", "lista": "B", "indice": 2, "T": 7}
+ ],
+ "rodar": {"ate_gametime": 96, "timeout": 120},
+ "esperado": [
+  "_BpopT = 2 depois do load e até o tick 127 (_CountAnts só roda com _Cycle mod 128 = 0)",
+  "no tick 96 o ovo do índice 2 (T = 7) eclode: T = _MakeMe × 8 + 2 = 0x32 (soldado virado para a direita, _MakeMe = 6), M = _ModeTabSB[_StrategicModeB][Sk(8)], S = 0",
+  "no mesmo tick os outros ovos pretos (T = 1, índices 3 e 4, e o posto no tick 80, se houve) passam a T = 2; um ovo posto no próprio tick 96 fica com T = 1",
+  "os ovos vermelhos não avançam no tick 96 (_RpopT = 2, P = 128): continuam T = 0x81"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 96},
+  {"nome": "GameTime", "op": "<", "valor": 112},
+  {"nome": "BpopT", "op": "==", "valor": 2},
+  {"formiga": "B", "indice": 2, "campo": "T", "mascara": 248, "op": "==", "valor": 48},
+  {"formiga": "B", "indice": 2, "campo": "M", "op": "em", "valor": [1, 2]},
+  {"formiga": "B", "indice": 2, "campo": "S", "op": "==", "valor": 0},
+  {"formiga": "B", "indice": 3, "campo": "T", "op": "==", "valor": 2},
+  {"formiga": "B", "indice": 4, "campo": "T", "op": "==", "valor": 2},
+  {"contar": "B", "onde": {"T": 1}, "op": "<=", "valor": 1},
+  {"formigas": "R", "onde": {"M": 8}, "campo": "T", "op": "todos==", "valor": 129}
+ ]
+}

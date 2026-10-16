@@ -1,0 +1,24 @@
+{
+ "id": "C-01",
+ "spec": "docs/spec/regras/ciclo-de-vida.md#31-ninho-preto-_simeggb-10283ca0",
+ "descricao": "Avanço dos ovos com o período normal (P = 128): QUICK2.ANT sem mudanças (tick 78, _BpopT = 3, _RpopT = 2). Todos os ovos pretos e vermelhos que já existiam avançam juntos no tick 128.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "C01.ANT",
+ "operacoes": [],
+ "rodar": {"ate_gametime": 128, "timeout": 120},
+ "esperado": [
+  "no tick 128 os ovos pretos dos índices 2, 3 e 4 passam de T = 1 a T = 2, e os vermelhos dos índices 2 a 5 de 0x81 a 0x82",
+  "ovos postos depois do load também avançam, desde que postos antes do tick 128; o posto no próprio tick 128 fica com T = 1 (preto) ou 0x81 (vermelho)"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 128},
+  {"nome": "GameTime", "op": "<", "valor": 144},
+  {"formiga": "B", "indice": 2, "campo": "T", "op": "==", "valor": 2},
+  {"formiga": "B", "indice": 3, "campo": "T", "op": "==", "valor": 2},
+  {"formiga": "B", "indice": 4, "campo": "T", "op": "==", "valor": 2},
+  {"formiga": "R", "indice": 2, "campo": "T", "op": "==", "valor": 130},
+  {"formiga": "R", "indice": 5, "campo": "T", "op": "==", "valor": 130},
+  {"contar": "B", "onde": {"T": 1}, "op": "<=", "valor": 1},
+  {"contar": "R", "onde": {"T": 129}, "op": "<=", "valor": 1}
+ ]
+}
