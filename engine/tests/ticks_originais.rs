@@ -1,11 +1,19 @@
-//! Port × original, um tick por vez, com os vetores de `tests/referencias/ticks/` (ticks 79–83 do
-//! snapshot `quick`). Protocolo e placar: docs/spec/regras/testes-tick.md.
+//! Port × original, um tick por vez, com os vetores de `tests/referencias/ticks/`: os ticks 79–83 do
+//! snapshot `quick` na raiz e os cenários das subpastas listadas em `"cenarios"` do `indice.json` da raiz
+//! (cada uma com o seu `indice.json`). Protocolo e placar: docs/spec/regras/testes-tick.md.
 //!
 //! Desde 2026-10-17 (todas as partes do tick implementadas) o teste exige igualdade TOTAL: os 307
-//! blocos do save, os extras (S, R, `_gameCycles`, `_Tindex`, `_GlobalKey`) e a vida. Para ver o
-//! relatório de uma falha: `cargo run -p engine --example comparar_tick -- tests/referencias/ticks`.
+//! blocos do save, os extras (S, R, `_gameCycles`, `_Tindex`, `_GlobalKey`) e a vida. Exceções, no
+//! `indice.json` de cada cenário, sempre com o motivo:
+//! - `"pendentes"`: {tick: motivo} — vetores em que o port ainda diverge; só se exige que rodem e que a
+//!   ida e volta do save funcione. Quem corrigir a regra tira o tick da lista.
+//! - `"vida_nao_reconstruivel"`: {tick: motivo} — a vida do original não é reconstruível das listas
+//!   (duas ocupantes na mesma célula); não se confere a reconstrução, só a vida depois do tick.
+//!
+//! Para ver o relatório de uma falha:
+//! `cargo run -p engine --example comparar_tick -- tests/referencias/ticks[/CENÁRIO]`.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use engine::formats::save::LayoutSave;
 use engine::rules::tick::RegrasOriginais;
@@ -15,39 +23,61 @@ fn raiz() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
-fn relatorios() -> Vec<RelatorioTick> {
+fn ler_indice(dir: &Path) -> serde_json::Value {
+    serde_json::from_str(&std::fs::read_to_string(dir.join("indice.json")).unwrap()).unwrap()
+}
+
+/// Um vetor comparado: (cenário/tick, relatório, motivo de pendência, motivo de vida não reconstruível).
+type Caso = (String, RelatorioTick, Option<String>, Option<String>);
+
+fn casos() -> Vec<Caso> {
     let layout = LayoutSave::carregar(&raiz().join("data/save_layout.json")).unwrap();
-    let dir = raiz().join("tests/referencias/ticks");
-    let indice: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(dir.join("indice.json")).unwrap()).unwrap();
-    let ticks = indice["ticks"].as_array().expect("indice.json sem \"ticks\"");
-    assert!(!ticks.is_empty());
-    ticks
-        .iter()
-        .map(|t| {
-            let v = VetorTick::ler(&dir.join(t.as_str().unwrap()), &layout).unwrap();
-            comparar_tick(&v, &layout, &mut RegrasOriginais::default()).unwrap()
-        })
-        .collect()
+    let base = raiz().join("tests/referencias/ticks");
+    let indice_raiz = ler_indice(&base);
+    let mut dirs = vec![(String::new(), base.clone())];
+    for c in indice_raiz["cenarios"].as_array().into_iter().flatten() {
+        let c = c.as_str().unwrap();
+        dirs.push((format!("{c}/"), base.join(c)));
+    }
+    let mut out = Vec::new();
+    for (prefixo, dir) in dirs {
+        let indice = ler_indice(&dir);
+        let motivo = |chave: &str, t: &str| indice[chave][t].as_str().map(str::to_owned);
+        let ticks = indice["ticks"].as_array().expect("indice.json sem \"ticks\"");
+        assert!(!ticks.is_empty(), "{}: sem ticks", dir.display());
+        for t in ticks {
+            let t = t.as_str().unwrap();
+            let v = VetorTick::ler(&dir.join(t), &layout).unwrap();
+            let r = comparar_tick(&v, &layout, &mut RegrasOriginais::default()).unwrap();
+            out.push((format!("{prefixo}{t}"), r, motivo("pendentes", t), motivo("vida_nao_reconstruivel", t)));
+        }
+    }
+    out
 }
 
 #[test]
 fn ticks_do_original() {
     let mut falhas = Vec::new();
-    for r in relatorios() {
-        println!("{}", r.placar());
-        assert!(r.ida_e_volta.is_empty(), "{}: ida e volta do save falhou em {:?}", r.nome, r.ida_e_volta);
-        // A reconstrução da vida a partir das listas bate com o original (conferido nos 5 vetores).
-        assert!(r.vida_reconstruida.is_empty(), "{}: vida reconstruída ≠ vida_antes", r.nome);
-        assert!(r.vida_reconstruida_depois.is_empty(), "{}: vida reconstruída ≠ vida_depois", r.nome);
+    for (nome, r, pendente, vida_irreconstruivel) in casos() {
+        println!("{nome}: {}", r.placar());
+        assert!(r.ida_e_volta.is_empty(), "{nome}: ida e volta do save falhou em {:?}", r.ida_e_volta);
+        if vida_irreconstruivel.is_none() {
+            // A reconstrução da vida a partir das listas bate com o original.
+            assert!(r.vida_reconstruida.is_empty(), "{nome}: vida reconstruída ≠ vida_antes");
+            assert!(r.vida_reconstruida_depois.is_empty(), "{nome}: vida reconstruída ≠ vida_depois");
+        }
+        if let Some(m) = pendente {
+            println!("  pendente: {m}");
+            continue;
+        }
         for b in r.diferentes() {
-            falhas.push(format!("{} {}: {:?}", r.nome, b.simbolo, b.detalhes));
+            falhas.push(format!("{nome} {}: {:?}", b.simbolo, b.detalhes));
         }
         for x in r.extras.iter().filter(|x| x.original != x.port) {
-            falhas.push(format!("{} {}: original {}, port {}", r.nome, x.nome, x.original, x.port));
+            falhas.push(format!("{nome} {}: original {}, port {}", x.nome, x.original, x.port));
         }
         if !r.vida.is_empty() {
-            falhas.push(format!("{}: {} células de vida diferentes", r.nome, r.vida.len()));
+            falhas.push(format!("{nome}: {} células de vida diferentes", r.vida.len()));
         }
     }
     assert!(falhas.is_empty(), "port difere do original:\n{}", falhas.join("\n"));

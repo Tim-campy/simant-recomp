@@ -1,0 +1,22 @@
+{
+ "antes": {
+  "SementeS": 49939,
+  "SementeR": 3157109968,
+  "gameCycles": 270152,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 1889,
+  "Cycle": 1889,
+  "posicao": "entrada"
+ },
+ "depois": {
+  "SementeS": 65021,
+  "SementeR": 4092909651,
+  "gameCycles": 270152,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 1890,
+  "Cycle": 1890,
+  "posicao": "saida"
+ }
+}

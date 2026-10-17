@@ -1,0 +1,63 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "snapshot": "quick",
+ "semente_s_forcada": null,
+ "semente_r_forcada": null,
+ "alvo": null,
+ "alvos": null,
+ "preparar": "tests/referencias/roteiros/tick_amarela_ordem.txt",
+ "descricao": "Formiga amarela andando no ninho preto: clique simples na célula (32, 1) (ordem ir, _MeCmd = 0) logo antes de gravar 5 ticks consecutivos",
+ "livre_segundos": null,
+ "primeira_entrada": {
+  "SementeS": 27421,
+  "SementeR": 1405178453,
+  "gameCycles": 10379,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 79,
+  "Cycle": 79,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "seletor_codigo_6": "0x1547",
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_000085",
+  "tick_000086",
+  "tick_000087",
+  "tick_000088",
+  "tick_000089"
+ ],
+ "vida_nao_reconstruivel": {
+  "tick_000086": "depois do tick, LifeB (34, 7): original 0, reconstruído 104. A amarela passou pela célula da rainha preta (Blist 1, T 104) e, ao sair, zerou a célula, apagando a marca da rainha",
+  "tick_000087": "antes: LifeB (34, 7) original 0, reconstruído 104 (ver tick 86); depois: LifeB (34, 6) original 0, reconstruído 96, o mesmo efeito na outra metade da rainha (Blist 0, T 96)",
+  "tick_000088": "antes: LifeB (34, 6) original 0, reconstruído 96 (ver tick 87)"
+ }
+}
