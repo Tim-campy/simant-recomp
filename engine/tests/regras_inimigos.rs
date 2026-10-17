@@ -966,7 +966,8 @@ fn vetores_de_tick_do_original() {
     let mut nomes: Vec<PathBuf> = lista
         .filter_map(|d| d.ok())
         .map(|d| d.path())
-        .filter(|p| p.is_dir())
+        // só os vetores da raiz (79–83); as subpastas de cenário não têm extras.json no topo
+        .filter(|p| p.join("extras.json").exists())
         .collect();
     nomes.sort();
     for p in nomes {

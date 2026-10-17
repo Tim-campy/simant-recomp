@@ -55,7 +55,7 @@ Opções de `roteiro`: `--overlay ARQ.qcow2` (abre o disco C: por esse overlay; 
 | `estado ARQ` | todos os 307 blocos de `data/save_layout.json`, na ordem do save: o arquivo tem o formato exato de um `.ANT` (48.386 bytes) |
 | `disquete ARQ.img` | troca a mídia do drive A: (`blockdev-change-medium` do QMP, só leitura); usado para injetar saves (ver [Casos de teste](#casos-de-teste-injetar-um-save-e-rodar)) |
 | `esperar_variavel NOME ALVO [TIMEOUT]` | consulta NOME (sem sinal) a cada 0,05 s até chegar a ALVO; falha depois de TIMEOUT s (padrão 120). Seguido de `pausar`, para no tick ALVO ou 1 depois |
-| `extras ARQ.json` | variáveis fora do save capturadas com os vetores de tick (sementes S e R, `_gameCycles`, `_Tindex`, `_GlobalKey`), `GameTime`, `Cycle` e a posição (`entrada`/`saida`/`livre`) |
+| `extras ARQ.json` | variáveis fora do save capturadas com os vetores de tick (sementes S e R, `_gameCycles`, `_Tindex`, `_GlobalKey`), `GameTime`, `Cycle` e a posição (`entrada`/`saida`/`livre`). O relógio do Mac (`_MacTickCount`, função) só é capturado por `passo_tick`/`gerar_vetores_tick.py`, com breakpoints dentro do tick |
 | `segmentos PREFIXO` | segmentos de dados 8, 9 e 10 inteiros (até o limite do descritor) em `PREFIXO_seg8.bin` etc. |
 | `tick_entrada` | modo tick: roda até a entrada de `_DoAntSim` (estado **antes** de um tick); não anda se já está lá |
 | `tick_saida` | da entrada até o retorno de `_DoAntSim`: exatamente um tick (estado **depois**) |
