@@ -575,7 +575,9 @@ mod testes {
         let mut e = Estado::vazio();
         e.partida.fim_de_jogo = 1;
         tick(&mut e, &mut RegrasOriginais::default());
-        assert_eq!(e.retirar_eventos(), vec![Evento::DialogoFimDeJogo]);
+        // O cachorro do estado vazio pode latir (Evento::Som); só o diálogo interessa aqui.
+        let ev: Vec<Evento> = e.retirar_eventos().into_iter().filter(|x| !matches!(x, Evento::Som(_))).collect();
+        assert_eq!(ev, vec![Evento::DialogoFimDeJogo]);
     }
 
     #[test]

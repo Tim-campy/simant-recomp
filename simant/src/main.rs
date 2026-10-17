@@ -332,7 +332,7 @@ impl Sessao<'_> {
             match *ev {
                 EventoRegras::Mensagem(id) => println!("[tick {t}] mensagem {id} (SHARED tipo 4)"),
                 EventoRegras::Musica(id) => println!("[tick {t}] música {id}"),
-                EventoRegras::Som(id) => println!("[tick {t}] som {id}"),
+                EventoRegras::Som(_) | EventoRegras::TemaDoNinho => {} // tocados por som::Audio
                 EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
                 EventoRegras::CentralizarNaAmarela => {}
             }

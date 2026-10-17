@@ -106,6 +106,17 @@ pub struct TabelasSuperficie {
     /// Chance em 10 de a formiga da célula vencer (`10:22d6`), [classe a][classe b].
     pub matriz_luta: [[u8; 4]; 4],
     pub regras: RegrasSuperficieDados,
+    #[serde(default)]
+    pub sons: SonsSuperficie,
+}
+
+/// Ids dos efeitos sonoros (objetos tipo 5 do banco SOUND, `_myBeginSound`) pedidos por esta parte
+/// (docs/spec/regras/som.md). Seção opcional no JSON: um id ausente não toca (mods anteriores à API 0.7).
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct SonsSuperficie {
+    /// `_AddFood(n, 1)`: comida nova no quintal (0x20).
+    pub comida_nova: Option<u16>,
 }
 
 impl TabelasSuperficie {
@@ -163,6 +174,10 @@ impl RegrasSuperficie for RegrasOriginais {
     fn adicionar_comida(&mut self, e: &mut Estado, quantidade: i32, som: bool) {
         // Sem a tabela de seno (que vem do banco do jogo), não há como espalhar a comida.
         // [decisão do port] nada acontece; com os arquivos do jogo, `geracao` está preenchido.
+        // O som (0x20) vem antes, como no original.
+        if som {
+            e.pedir_som(self.superficie.sons.comida_nova);
+        }
         if let Some(g) = &self.geracao {
             adicionar_comida(e, g, quantidade, som);
         }
@@ -271,8 +286,8 @@ fn pegar_comida(e: &mut Estado, x: i32, y: i32) {
 /// (200 unidades em torno de (64, 8…55)). Ordem: centro (`S128`, `S64`, ou `S1(48)`), raio
 /// `S8()`, e por unidade `S256()` e `S1(raio)`.
 ///
-/// [lacuna] `som = true` toca o efeito 0x20 (`_myBeginSound`); ainda não há evento de efeito
-/// sonoro no `Estado`, então nada é pedido à interface.
+/// `som = true` toca o efeito 0x20: o pedido (`Evento::Som`) é feito por `RegrasSuperficie::adicionar_comida`,
+/// que tem as tabelas da superfície.
 pub fn adicionar_comida(e: &mut Estado, g: &TabelasGeracao, quantidade: i32, _som: bool) {
     let (cx, cy, n) = if quantidade < 0 {
         (0x40, e.s.rand1(0x30) + 8, 200)

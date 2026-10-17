@@ -126,6 +126,9 @@ pub struct Audio<'a> {
     musica_ligada: bool,
     efeitos_ligados: bool,
     foco: bool,
+    /// `_TryAntTheme`: último tema (relógio de parede) e posição no ciclo.
+    ultimo_tema: Option<std::time::Instant>,
+    proximo_tema: usize,
 }
 
 impl<'a> Audio<'a> {
@@ -139,6 +142,8 @@ impl<'a> Audio<'a> {
             musica_ligada: true,
             efeitos_ligados: true,
             foco: true,
+            ultimo_tema: None,
+            proximo_tema: 0,
         };
         if opcoes.desligado {
             return a;
@@ -232,8 +237,19 @@ impl<'a> Audio<'a> {
             match ev {
                 Evento::Musica(id) => self.musica(*id),
                 Evento::Som(id) => self.efeito(*id),
+                Evento::TemaDoNinho => self.tema_do_ninho(std::time::Instant::now()),
                 _ => {}
             }
+        }
+    }
+
+    /// `_TryAntTheme`: toca o próximo tema do ciclo se já passou o intervalo desde o último.
+    fn tema_do_ninho(&mut self, agora: std::time::Instant) {
+        let Some(tema) = self.cfg.as_ref().and_then(|c| c.tema_ninho.clone()) else { return };
+        if let Some((id, quando)) = proximo_tema(&tema, self.ultimo_tema, self.proximo_tema, agora) {
+            self.ultimo_tema = Some(quando);
+            self.proximo_tema += 1;
+            self.musica(id);
         }
     }
 
@@ -253,6 +269,20 @@ impl<'a> Audio<'a> {
             d.lock().0.parar_musica();
         }
     }
+}
+
+/// Decide o tema do ninho: `Some((id, agora))` se é hora (primeira vez ou intervalo vencido).
+pub fn proximo_tema(
+    tema: &config::TemaNinho,
+    ultimo: Option<std::time::Instant>,
+    indice: usize,
+    agora: std::time::Instant,
+) -> Option<(u16, std::time::Instant)> {
+    if tema.musicas.is_empty() {
+        return None;
+    }
+    let vencido = ultimo.is_none_or(|u| agora.duration_since(u).as_millis() as u64 >= tema.intervalo_ms);
+    vencido.then(|| (tema.musicas[indice % tema.musicas.len()], agora))
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -325,6 +355,18 @@ mod testes {
             return None;
         }
         Some(Recursos::abrir(&jogo, &["SOUND".to_string()], &raiz.join("data"), None).unwrap())
+    }
+
+    #[test]
+    fn tema_do_ninho_cicla_e_espera_o_intervalo() {
+        let tema = config::TemaNinho { musicas: vec![10004, 10005, 10003], intervalo_ms: 396_000 };
+        let t0 = std::time::Instant::now();
+        assert_eq!(proximo_tema(&tema, None, 0, t0), Some((10004, t0)));
+        let t1 = t0 + std::time::Duration::from_secs(100);
+        assert_eq!(proximo_tema(&tema, Some(t0), 1, t1), None);
+        let t2 = t0 + std::time::Duration::from_secs(396);
+        assert_eq!(proximo_tema(&tema, Some(t0), 1, t2), Some((10005, t2)));
+        assert_eq!(proximo_tema(&tema, None, 5, t2).map(|x| x.0), Some(10003));
     }
 
     #[test]

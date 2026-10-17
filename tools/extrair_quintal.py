@@ -39,6 +39,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("tools", 1)[0] + "tools")
 from ne_info import parse_ne  # noqa: E402
+from sons_regras import SONS  # noqa: E402
 
 SEG8 = 8
 DGROUP = 10
@@ -257,6 +258,7 @@ def extrair(data):
             "licoes": licoes(),
         },
         "_origem": {k: o for k, (_, o) in REGRAS.items()},
+        "sons": SONS["quintal"],
     }
     return t
 

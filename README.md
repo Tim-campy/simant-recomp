@@ -28,7 +28,7 @@ Opções: `--jogo DIR` (padrão: `SIMANT_DIR` ou `SimAnt-T/MAXIS/ANTWIN`), `--da
 
 ### Como jogar
 
-`--save ARQ.ANT` ou `--novo-jogo` abre a tela de jogo (faixa e janela de edição) com a simulação rodando: você é a **formiga amarela**. Ainda não há menus, diálogos nem textos de mensagem (as mensagens aparecem no terminal), nem as janelas de mapa, castas e história. As músicas pedidas pelas regras tocam (os efeitos sonoros ainda não são pedidos pelas regras). Partes das regras ainda faltam (ver `docs/spec/`).
+`--save ARQ.ANT` ou `--novo-jogo` abre a tela de jogo (faixa e janela de edição) com a simulação rodando: você é a **formiga amarela**. Ainda não há menus, diálogos nem textos de mensagem (as mensagens aparecem no terminal), nem as janelas de mapa, castas e história. As músicas e os efeitos sonoros pedidos pelas regras tocam (os de menus e diálogos ainda não, ver `docs/spec/regras/som.md`). Partes das regras ainda faltam (ver `docs/spec/`).
 
 - **Clique** numa célula do mapa: a amarela vai até lá. **Duplo clique**: age (numa formiga de outra cor, ataca; da mesma cor, pede comida; em comida/pedrinha, pega ou larga; no ninho, cava). Clique direito funciona igual. **Espaço/Insert** (e **Delete**) clicam onde está o cursor; duas vezes seguidas, duplo clique.
 - Clicar no buraco do ninho leva a amarela para dentro; no ninho, clicar na linha de cima a leva para fora.
