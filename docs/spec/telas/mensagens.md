@@ -92,6 +92,18 @@ Com a fonte 4 (`_font_SetFont(4)`, arquivo `font3`, altura H = 14), `n` linhas, 
 
 O port fecha com o clique esquerdo dentro da área cliente, com Espaço (`tecla_continuar`) ou pelo prazo; o clique fora só escreve "(bip)" (sem som).
 
+### 3.5 A simulação com o quadro aberto
+
+Quais caixas param a simulação (desmontagem, 2026-10-18) [código]:
+
+- `_PictStrnDialog` (`1000:615a`) chama `_StopSimulation` antes de abrir e `_RestartSimulation` depois de fechar — **sempre**, venha de dentro do tick (lição do tutorial `_GiveLesson`, morte da amarela, conselhos de `_Feedback`) ou de fora (os quadros do `_FullCount` no Load). `_StopSimulation` (`1000:0000`) faz `KillTimer` e descarta os `WM_TIMER` pendentes na primeira chamada; as chamadas se aninham por um contador (`DGROUP:0x44`), e só a última `_RestartSimulation` refaz o `SetTimer` (17 ms).
+- `_EndGameDialog` (GAME OVER) e as caixas dos comandos de arquivo também matam o temporizador (`KillTimer` no `_ProcMenu`, comandos 0xE/5/6) e o refazem no fim.
+- `MYTIMERFUNC` só chama `_DoAntSim` com a trava `DGROUP:0x2f4` em 0; ela fica em 1 durante todo o `_DoAntSim` (o único chamador). Uma caixa aberta **dentro do tick**, portanto, nunca deixa outro tick rodar, mesmo que o temporizador volte.
+- Exceção: o `WM_ACTIVATEAPP` (mensagem 0x1C em `MAINWNDPROC`, `1000:2930`) refaz o temporizador sem olhar o contador do `_StopSimulation` (170 ms ao perder o foco, 17 ms ao ganhar). Com uma caixa aberta **fora** do tick (Load), trocar o foco da aplicação faria a simulação andar com a caixa na tela [código; não observado].
+- Na bancada: no Load do C-10 o `GameTime` ficou em 78 com os quadros 10010/10011 abertos (sem troca de foco), o que bate com o código. O vetor `tutorial/23` (`GameTime` 23 → 40 "com a caixa aberta") contradiz a trava: como a caixa fecha sozinha em 270 unidades (≈ 14,85 s) e o script da bancada só clica depois de 15 s sem ver o retorno de `_DoAntSim`, a explicação mais provável é que o tick de entrada voltou (`GameTime` 24) depois do prazo e a leitura veio ticks mais tarde [hipótese a conferir: gravar o vetor de novo fechando a caixa antes do prazo].
+
+**Port:** com um aviso modal na tela (`Avisos::tem_modal`), `Partida::avancar` não gera mensagens de temporizador (`_StopSimulation`) e, se a caixa abriu no meio de um lote, descarta as mensagens pendentes; o tick que pediu a caixa termina inteiro antes dela (as regras não esperam a resposta). A troca de foco não reinicia a simulação com uma caixa aberta (a exceção acima não é modelada).
+
 ## 4. Fim de jogo (`_EndGameDialog`, `1000:6602`)
 
 1. Com **Music** ligado (`_OptionStates[1]`), toca 0x2718 (pretas venceram, `_BlackWon` ≠ 0) ou 0x271a; quando a música acaba, toca uma de 0x2713 + `_SRand2(...)` [código; o port só registra a primeira música, sem som].
