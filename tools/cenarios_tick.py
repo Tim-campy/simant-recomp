@@ -673,6 +673,55 @@ def cenario_exp_ctrl(c: Sessao, saida, n):
     return []
 
 
+def cenario_teclas(c: Sessao, saida, n):
+    """TECLAS="ctrl+y ..." (variável de ambiente): aperta as teclas, espera 2 s e grava n ticks. Para medir
+    o que o DESENHO consome entre os ticks: compare o S de `depois` de um tick com o de `antes` do
+    seguinte (ver `entre_ticks`)."""
+    import os
+    teclas = os.environ.get("TECLAS", "").split()
+    if teclas:
+        c.teclas(*teclas)
+    time.sleep(2)
+    c.entrada()
+    tela(c, saida, "inicio")
+    return c.gravar(saida, n)
+
+
+def passo_s(s):
+    """Um passo do gerador S (LFSR de Galois, rng.md)."""
+    vai = s & 0x8000
+    s = (s << 1) & 0xFFFF
+    return s ^ 0x1BF5 if vai else s
+
+
+def passos_s(a, b, limite=5000):
+    """Quantos passos do gerador S levam de a a b (None se mais que `limite`)."""
+    for k in range(limite + 1):
+        if a == b:
+            return k
+        a = passo_s(a)
+    return None
+
+
+def passos_r(a, b, limite=5000):
+    for k in range(limite + 1):
+        if a == b:
+            return k
+        a = (a * 0x343FD + 0x269EC3) & 0xFFFFFFFF
+    return None
+
+
+def entre_ticks(bruto):
+    """Sorteios de S e R entre o fim de um tick e o começo do seguinte (o que a interface sorteou no
+    intervalo: desenho, temporizador)."""
+    ds = sorted(Path(bruto).glob("tick_*"))
+    for a, b in zip(ds, ds[1:]):
+        xa = json.loads((a / "extras.json").read_text(encoding="utf-8"))["depois"]
+        xb = json.loads((b / "extras.json").read_text(encoding="utf-8"))["antes"]
+        print(f"{a.name} -> {b.name}: S {passos_s(xa['SementeS'], xb['SementeS'])} passos, "
+              f"R {passos_r(xa['SementeR'], xb['SementeR'])} passos")
+
+
 def cenario_explorar(c: Sessao, saida, n):
     """Exploração da tela: CLIQUES = "x,y;x,y;..." (variável de ambiente); captura depois de cada um."""
     import os
@@ -754,6 +803,8 @@ def main():
     g.add_argument("--descricao", default="")
     e = sub.add_parser("eventos")
     e.add_argument("bruto")
+    t = sub.add_parser("entre")
+    t.add_argument("bruto")
     s = sub.add_parser("selecionar")
     s.add_argument("bruto")
     s.add_argument("destino")
@@ -762,6 +813,8 @@ def main():
     a = ap.parse_args()
     if a.cmd == "eventos":
         return eventos(a.bruto)
+    if a.cmd == "entre":
+        return entre_ticks(a.bruto)
     if a.cmd == "selecionar":
         return selecionar(a.bruto, a.destino, a.faixas, a.descricao)
     c = Sessao(a.overlay, a.snapshot)
