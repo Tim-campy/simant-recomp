@@ -1,0 +1,18 @@
+{
+  "_comentario": "Info / Top Card (janela 5; telas/info.md): cartão inicial 128; recursos do cartão: corpo tipo 17 (PICT/TEXT, big-endian), título tipo 19, textos tipo 10 e estilos tipo 21 (styl do Mac). Fontes do texto normal e dos trechos destacados (índices de interface.json) [hipótese: as fontes 2 e 5 de _PopUpInfoWindow]. Histórico de 16 cartões (anel em DGROUP a434).",
+  "janela": 5,
+  "objeto_area": "infoArea",
+  "carta_inicial": 128,
+  "tipo_corpo": 17,
+  "tipo_titulo": 19,
+  "tipo_texto": 10,
+  "tipo_estilo": 21,
+  "fonte_texto": 2,
+  "fonte_destaque": 5,
+  "cor_texto": 0,
+  "cor_fundo": 15,
+  "tamanho_historico": 16,
+  "inverter_mono": true,
+  "deslocamento_texto": [1, 4],
+  "margem_direita": 0
+}

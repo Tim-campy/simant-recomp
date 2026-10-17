@@ -87,3 +87,74 @@ fn janela_do_quintal_desenha_os_quatro_modos() {
         }
     }
 }
+
+/// Balão do menino (`_DrawSimKid` + `_MakeBalloon`): com `_BoyMessOn` aparece acima do menino, com o
+/// contorno preto e o fundo branco das peças; sem ele, nada muda.
+#[test]
+fn balao_do_menino_aparece_acima_dele() {
+    let Some(r) = recursos() else { return };
+    let interface = Interface::carregar(&r, 0).unwrap();
+    let d = DesenhoQuintal::carregar(ConfigQuintalMapa::carregar(&r).unwrap(), &r, &interface).unwrap();
+    let fonte = interface.fontes.get(d.cfg.balao_menino.fonte).and_then(|f| f.as_ref());
+    assert!(fonte.is_some(), "fonte do balão");
+    let mut e = Estado::vazio();
+    e.vistas.modo_quintal = 0;
+    e.menino.presente = 1;
+    e.menino.quadro = 0;
+    e.menino.x = 0xB4;
+    e.menino.y = 0x49;
+    let mut sem = Quadro::new(640, 442, 17);
+    d.desenhar_janela(&mut sem, &e);
+    let mut com = Quadro::new(640, 442, 17);
+    d.desenhar_janela(&mut com, &e);
+    d.desenhar_balao_do_menino(&mut com, &e, fonte);
+    assert_eq!(sem.pixels, com.pixels, "sem _BoyMessOn não há balão");
+    e.menino.mensagem_ligada = 1;
+    e.menino.mensagem_offset = 0;
+    d.desenhar_balao_do_menino(&mut com, &e, fonte);
+    let (ox, oy) = d.cfg.origem();
+    let mudados: Vec<(i32, i32)> = (0..442)
+        .flat_map(|y| (0..640).map(move |x| (x, y)))
+        .filter(|&(x, y)| sem.pixels[(y * 640 + x) as usize] != com.pixels[(y * 640 + x) as usize])
+        .collect();
+    assert!(!mudados.is_empty());
+    // Tudo acima do pé do menino e à direita do canto dele.
+    assert!(mudados.iter().all(|&(x, y)| y < oy + 0x49 + 8 && x >= ox + 0xB4 - 16), "{:?}", mudados.first());
+}
+
+/// Examine (`_MagnifyMenu`): canto uma célula à direita e uma acima, virando para dentro da tela, e
+/// os textos das listas 1100–1103 (QUICK2: a rainha em (35, 9) do ninho preto).
+#[test]
+fn examine_canto_e_textos() {
+    use engine::core::exame::JanelaExame;
+    use engine::formats::save::{JogoSalvo, LayoutSave};
+    let Some(r) = recursos() else { return };
+    let j = JanelaExame::carregar(&r).unwrap();
+    assert_eq!(j.canto((13, 9), (24, 60), (640, 442)), (14 * 16 + 24, 8 * 16 + 60));
+    // Perto da direita e da base: vai para a esquerda e para cima a própria largura/altura.
+    let (x, y) = j.canto((38, 24), (24, 60), (640, 442));
+    assert_eq!((x, y), (39 * 16 + 24 - 92, 23 * 16 + 60 - 87));
+    let layout = LayoutSave::carregar(&raiz().join("data/save_layout.json")).unwrap();
+    let jogo = JogoSalvo::abrir(&layout, &raiz().join("tests/referencias/saves/QUICK2.ANT")).unwrap();
+    let e = Estado::de_save(&jogo).unwrap();
+    let ex = engine::rules::experimental::examinar(&e, 2, 35, 9).unwrap();
+    let t: Vec<String> = j.textos(&ex).iter().map(|l| String::from_utf8_lossy(l).into_owned()).collect();
+    assert_eq!(t, ["Queen", "Egg Laying", "Nothing"]);
+}
+
+#[test]
+fn info_cartao_128_tem_as_figuras() {
+    use engine::core::info::{Carta, ConfigInfo, Registro};
+    use engine::formats::banco::Chave;
+    use engine::formats::bitmap::{Bitmap, TIPO_BITMAP};
+    let Some(r) = recursos() else { return };
+    let cfg: ConfigInfo = r.dados("info.json").unwrap();
+    let c = Carta::ler(&r, &cfg, 128).unwrap();
+    assert_eq!(c.titulo, "Top Card");
+    let figuras: Vec<u16> = c.registros.iter().filter_map(|x| if let Registro::Figura { bitmap, .. } = x { Some(*bitmap) } else { None }).collect();
+    assert_eq!(figuras, [21005, 151, 150]);
+    for id in figuras {
+        let b = r.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d));
+        assert!(b.is_ok(), "bitmap {id}: {:?}", b.err());
+    }
+}

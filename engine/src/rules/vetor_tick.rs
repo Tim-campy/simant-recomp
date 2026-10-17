@@ -773,6 +773,16 @@ pub fn rodar_sequencia(dir: &Path, layout: &LayoutSave, regras: &mut dyn Regras)
     let desenho = indice["desenho_quintal"].as_i64().map(|m| m as i16);
     let mut primeiro_desenho_diferente = None;
     let mut passos_desenho = (0u64, 0u64);
+    // A cadência é a mesma da partida ao vivo (`core::partida` → `desenho::redesenho_do_timer`):
+    // aplicação ativa, quintal aberto na frente, a janela de edição atrás sem a aranha.
+    let janelas = super::desenho::JanelasDesenho {
+        ativa: true,
+        quintal_aberto: true,
+        quintal_na_frente: true,
+        edicao_aberta: true,
+        ..Default::default()
+    };
+    let mut contadores = super::desenho::ContadoresRedesenho::default();
     for (k, (antes, depois)) in extras.iter().enumerate() {
         e.ciclos_jogo = antes.game_cycles;
         e.relogio_mac = antes.relogio_mac;
@@ -802,7 +812,8 @@ pub fn rodar_sequencia(dir: &Path, layout: &LayoutSave, regras: &mut dyn Regras)
             pontos.push(PontoSequencia { ticks: k + 1, blocos, vida: comparar_vida(&vida_original, &vida_do_estado(&e)) });
         }
         if let (Some(m), Some((proximo, _))) = (desenho, extras.get(k + 1)) {
-            passos_desenho.0 += u64::from(super::desenho::desenhar_quintal(&mut e, m));
+            e.vistas.modo_quintal = m;
+            passos_desenho.0 += u64::from(super::desenho::redesenho_do_timer(&mut e, &janelas, &mut contadores));
             passos_desenho.1 += u64::from(passos_entre(depois.semente_s, proximo.semente_s).unwrap_or(u32::MAX));
             if primeiro_desenho_diferente.is_none() && e.s.semente() != proximo.semente_s {
                 primeiro_desenho_diferente = Some(k + 1);

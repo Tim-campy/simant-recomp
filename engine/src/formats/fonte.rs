@@ -21,10 +21,24 @@ impl Fonte {
         }
     }
 
+    /// Linha de base, contada do topo da célula (`dfAscent` do `.FNT`; no FONT do Mac, a altura
+    /// menos um quarto [hipótese: só usada para sublinhar mnemônicos nos diálogos]).
+    pub fn ascendente(&self) -> usize {
+        match self {
+            Fonte::Mac(f) => (f.altura_retangulo - 1) * 3 / 4,
+            Fonte::Fnt(f) => f.ascendente,
+        }
+    }
+
+    /// Negrito simulado (só `.FNT`).
+    pub fn negrito(&self) -> bool {
+        matches!(self, Fonte::Fnt(f) if f.negrito)
+    }
+
     pub fn largura_texto(&self, texto: &[u8]) -> usize {
         match self {
             Fonte::Mac(f) => texto.iter().map(|&c| f.avanco(c)).sum(),
-            Fonte::Fnt(f) => texto.iter().map(|&c| f.glifo(c).0).sum(),
+            Fonte::Fnt(f) => texto.iter().map(|&c| f.avanco(c)).sum(),
         }
     }
 
@@ -135,11 +149,15 @@ impl FonteMac {
 pub struct Fnt {
     pub nome: String,
     pub altura: usize,
+    pub ascendente: usize,
     primeiro: u8,
     ultimo: u8,
     padrao: u8,
     tabela: Vec<(usize, usize)>,
     dados: Vec<u8>,
+    /// Negrito simulado do GDI (fonte de peso 400 pedida em negrito): cada glifo desenhado de novo
+    /// um pixel à direita, avanço + 1 [medido nos diálogos comuns do Windows 3.1, telas/arquivos.md].
+    pub negrito: bool,
 }
 
 impl Fnt {
@@ -149,6 +167,7 @@ impl Fnt {
             return Err(format!(".FNT versão {versao:#x} não suportada"));
         }
         let altura = le16(d, 88)? as usize;
+        let ascendente = le16(d, 74)? as usize;
         let (primeiro, ultimo) = (*d.get(95).ok_or("FNT")?, *d.get(96).ok_or("FNT")?);
         let padrao = *d.get(97).ok_or("FNT")?;
         let face = le32(d, 105)? as usize;
@@ -157,7 +176,17 @@ impl Fnt {
         let tabela = (0..n)
             .map(|i| Ok((le16(d, 118 + i * 4)? as usize, le16(d, 120 + i * 4)? as usize)))
             .collect::<Result<Vec<_>, String>>()?;
-        Ok(Fnt { nome: String::from_utf8_lossy(&nome).into_owned(), altura, primeiro, ultimo, padrao, tabela, dados: d.to_vec() })
+        Ok(Fnt {
+            nome: String::from_utf8_lossy(&nome).into_owned(),
+            altura,
+            ascendente,
+            primeiro,
+            ultimo,
+            padrao,
+            tabela,
+            dados: d.to_vec(),
+            negrito: false,
+        })
     }
 
     /// (largura, offset) do glifo; fora da faixa usa o caractere padrão.
@@ -166,8 +195,12 @@ impl Fnt {
         self.tabela[(c - self.primeiro) as usize]
     }
 
+    fn avanco(&self, c: u8) -> usize {
+        self.glifo(c).0 + usize::from(self.negrito)
+    }
+
     fn imagem(&self, texto: &[u8]) -> ImagemTexto {
-        let largura: usize = texto.iter().map(|&c| self.glifo(c).0).sum();
+        let largura: usize = texto.iter().map(|&c| self.avanco(c)).sum();
         let mut bits = vec![false; largura * self.altura];
         let mut pena = 0;
         for &c in texto {
@@ -177,10 +210,13 @@ impl Fnt {
                     let b = self.dados.get(off + (x / 8) * self.altura + y).copied().unwrap_or(0);
                     if b & (0x80 >> (x % 8)) != 0 {
                         bits[y * largura + pena + x] = true;
+                        if self.negrito {
+                            bits[y * largura + pena + x + 1] = true;
+                        }
                     }
                 }
             }
-            pena += w;
+            pena += self.avanco(c);
         }
         ImagemTexto { largura, altura: self.altura, bits }
     }

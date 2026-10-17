@@ -20,13 +20,21 @@ pub(crate) fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool, o: &Opcoes
     if let Some(a) = s.partida.cfg.acao_da_tecla(ev) {
         let janela = match a {
             AcaoPartida::Salvar | AcaoPartida::SalvarComo => {
-                salvar_e_avisar(s, a == AcaoPartida::SalvarComo, o);
+                s.salvar_com_dialogo(a == AcaoPartida::SalvarComo, o.salvar.as_deref());
+                return None;
+            }
+            AcaoPartida::Carregar => {
+                s.abrir_load();
                 return None;
             }
             AcaoPartida::JanelaEdicao => Some(None),
             AcaoPartida::JanelaComportamento => Some(Some(Controle::Tarefas)),
             AcaoPartida::JanelaCastas => Some(Some(Controle::Castas)),
             AcaoPartida::JanelaHistorico => Some(Some(Controle::Historico)),
+            AcaoPartida::JanelaInfo => {
+                s.abrir_info();
+                return None;
+            }
             _ => None,
         };
         if let Some(j) = janela {
@@ -53,14 +61,6 @@ pub(crate) fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool, o: &Opcoes
         }
     }
     s.partida.cfg.botao_da_tecla(nome)
-}
-
-/// Salva e escreve o resultado ("%s Saved correctly", `_PopMsg`, no original uma caixa de mensagem).
-pub(crate) fn salvar_e_avisar(s: &mut Sessao, como: bool, o: &Opcoes) {
-    match s.salvar(como, o.salvar.as_deref()) {
-        Ok(p) => println!("{} Saved correctly", p.display()),
-        Err(e) => eprintln!("erro ao salvar: {e}"),
-    }
 }
 
 /// Entrada com um aviso modal na tela (`_PictureDialog`, `_EndGameDialog`): só o clique no
@@ -112,6 +112,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
     let mut ultima_tecla_clique: Option<(BotaoTeclado, Instant)> = None;
     let mut situacao = String::new();
     let mut faixa = None;
+    let mut minimizada = false;
     let inicio = Instant::now();
     let mut antes = inicio;
     println!("partida: {} (Shift+0 pausa, Shift+1..4 velocidade, Ctrl+G AutoTrack)", s.situacao());
@@ -119,11 +120,49 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
     loop {
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
+            if s.exame.is_some() {
+                // _MagnifyMenu: a janela fica enquanto o botão (ou Espaço/Insert/Delete) estiver
+                // apertado; o laço do original não trata mensagens (a simulação não anda).
+                let solta = matches!(ev, Event::MouseButtonUp { .. } | Event::KeyUp { .. });
+                if solta || matches!(ev, Event::Quit { .. }) {
+                    s.exame = None;
+                    redesenhar = true;
+                }
+                if matches!(ev, Event::Quit { .. }) {
+                    return Ok(());
+                }
+                continue;
+            }
+            if s.dialogo.is_some() && !matches!(ev, Event::Window { .. }) {
+                // Diálogo do Windows aberto: modal, recebe toda a entrada.
+                let r = match ev {
+                    Event::Quit { .. } => return Ok(()),
+                    Event::MouseMotion { x, y, .. } => {
+                        cursor = (x, y);
+                        continue;
+                    }
+                    Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => s.clicar_no_dialogo(x, y, clicks >= 2),
+                    Event::KeyDown { keycode: Some(k), .. } => s.tecla_no_dialogo(&k.name()),
+                    Event::TextInput { text, .. } => {
+                        s.digitar_no_dialogo(&text);
+                        arquivos::RespostaDialogo::Nada
+                    }
+                    _ => continue,
+                };
+                if let arquivos::RespostaDialogo::Carregar(p) = r {
+                    match arquivos::carregar(&s, &p, o) {
+                        Ok(nova) => s = nova,
+                        Err(e) => eprintln!("erro no Load: {e}"),
+                    }
+                }
+                redesenhar = true;
+                continue;
+            }
             if s.partida.avisos.tem_modal() && !matches!(ev, Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } | Event::Window { .. }) {
                 if let Event::MouseMotion { x, y, .. } = ev {
                     cursor = (x, y);
                 }
-                if let Some(Modal::FimDeJogo { .. }) = tratar_modal(&mut s, &ev) {
+                if tratar_modal(&mut s, &ev).is_some_and(|m| m.abre_selecao_de_jogo()) {
                     // _EndGameDialog → _NewGame(0): abre o "Select a Game" (simant/src/modos.rs).
                     println!("fim de jogo: Select a Game");
                     s.modos.escolhendo = true;
@@ -142,6 +181,11 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     audio.foco(false);
                 }
                 Event::Window { win_event: WindowEvent::Exposed, .. } => redesenhar = true,
+                Event::Window { win_event: WindowEvent::Minimized, .. } => minimizada = true,
+                Event::Window { win_event: WindowEvent::Restored | WindowEvent::Maximized, .. } => {
+                    minimizada = false;
+                    redesenhar = true;
+                }
                 Event::MouseMotion { x, y, mousestate, .. } => {
                     cursor = (x, y);
                     if let Some((m, _)) = &mut s.menu {
@@ -159,6 +203,13 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     match modos::tecla(&mut s, &ev) {
                         modos::Resposta::Seguir => {}
                         modos::Resposta::Tratada => {
+                            redesenhar = true;
+                            continue;
+                        }
+                        modos::Resposta::NovoJogo(e) if e.tipo_jogo().is_none() => {
+                            // "Load Game" do Select a Game: o File → Load.
+                            s.modos.escolhendo = false;
+                            s.abrir_load();
                             redesenhar = true;
                             continue;
                         }
@@ -184,6 +235,10 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                         redesenhar = true;
                         continue;
                     }
+                    if s.botao_de_cheiro_em(x, y) {
+                        redesenhar = true;
+                        continue;
+                    }
                     if let Some(i) = s.marcador_em(x, y) {
                         s.partida.marcador(i, ctrl_apertado(&eventos));
                         continue;
@@ -191,6 +246,13 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     match modos::clique(&mut s, x, y, clicks >= 2, ctrl_apertado(&eventos)) {
                         modos::Resposta::Seguir => {}
                         modos::Resposta::Tratada => {
+                            redesenhar = true;
+                            continue;
+                        }
+                        modos::Resposta::NovoJogo(e) if e.tipo_jogo().is_none() => {
+                            // "Load Game" do Select a Game: o File → Load.
+                            s.modos.escolhendo = false;
+                            s.abrir_load();
                             redesenhar = true;
                             continue;
                         }
@@ -208,7 +270,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     if let Some(f) = s.botao_usuario_em(x, y) {
                         match s.botao_usuario(f) {
                             RespostaBotao::Feito => println!("botão {f}: {}", s.situacao()),
-                            RespostaBotao::Salvar => salvar_e_avisar(&mut s, false, o),
+                            RespostaBotao::Salvar => s.salvar_com_dialogo(false, o.salvar.as_deref()),
                             RespostaBotao::NaoImplementado(n) => println!("botão {n}: janela ainda não implementada"),
                         }
                     } else if let Some(a) = s.acao_do_clique(x, y) {
@@ -262,7 +324,8 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
             }
         }
         // Com o "Select a Game" aberto (Ctrl+N), a simulação fica parada (_SetPause(1) em _NewGame).
-        if !s.modos.escolhendo {
+        s.atualizar_janelas_desenho(minimizada);
+        if !s.modos.escolhendo && s.dialogo.is_none() && s.exame.is_none() {
             s.partida.avancar(ms);
         }
         let pedidos = s.registrar_eventos();

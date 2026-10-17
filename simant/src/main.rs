@@ -15,6 +15,7 @@
 //! sai (--salvar grava o .ANT do estado no fim). Na janela, Ctrl+S salva no arquivo da partida e
 //! Ctrl+A ("Save As") num nome novo (o de --salvar, ou SALVO01.ANT, SALVO02.ANT… na pasta atual).
 
+mod arquivos;
 mod jogo;
 mod opcoes;
 mod sessao;
@@ -45,7 +46,7 @@ use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 use engine::rules::amarela::{Modificadores, RespostaTecla, TabelasAmarela};
 use engine::rules::estado::{ConfigSimulacao, Estado, Evento as EventoRegras};
-use engine::rules::geracao::{Mundo, TabelasGeracao, TipoJogo};
+use engine::rules::geracao::{TabelasGeracao, TipoJogo};
 use engine::rules::rng::{GeradorR, GeradorS};
 use engine::rules::tick::RegrasOriginais;
 use serde::Deserialize;
@@ -232,7 +233,15 @@ fn principal() -> Result<(), String> {
         }
     }
     let origem = match (&o.save, o.novo_jogo) {
-        (Some(save), _) => Some(Origem::Save(save)),
+        (Some(save), _) => {
+            // _initStuff semeia S e R com o relógio; o Load do começo do programa roda _RandYard
+            // com o _CurGameType inicial, 0 [hipótese: segmento 9 zerado no carregamento].
+            let n = semente(&o);
+            let mut s = GeradorS::new(0);
+            let mut r = GeradorR::default();
+            r.semear_com_ticks(&mut s, n, n);
+            Some(Origem::Save(save, r, TipoJogo::Tutorial))
+        }
         (None, true) => {
             let n = semente(&o);
             println!("{:?} com semente {n}", o.tipo);
@@ -242,7 +251,7 @@ fn principal() -> Result<(), String> {
     };
     if let Some(origem) = origem {
         let nome = match &origem {
-            Origem::Save(save) => save.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+            Origem::Save(save, ..) => save.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
             Origem::Novo(_, tipo) => format!("{tipo:?}"),
         };
         let mut s = Sessao::abrir(&recursos, &o.dados, origem, cores)?;
@@ -254,10 +263,31 @@ fn principal() -> Result<(), String> {
             let a = *a.get(m as usize).ok_or("--quintal: modo 0 a 3")?;
             s.modos.janela.aplicar(a, &mut s.partida.estado);
         }
+        if let Some(m) = o.janela_mapa {
+            s.abrir_mapa();
+            match m {
+                2 => {
+                    s.partida.navegar(Acao::NinhoPreto);
+                }
+                3 => {
+                    s.partida.navegar(Acao::NinhoVermelho);
+                }
+                4..=8 => s.partida.botao_de_cheiro(m),
+                _ => {}
+            }
+        }
+        s.partida.mostrar_trilhas = o.trilhas;
+        if o.trilhas {
+            // Trilhas: a primeira geração é a base; os ticks seguintes acumulam.
+            s.quadro_rgb()?;
+        }
         if let Some(n) = o.ticks {
             let antes = s.partida.estado.partida.tempo;
             for _ in 0..n {
                 s.partida.rodar_tick();
+                if o.janela_mapa.is_some() {
+                    s.mapa.atualizar(&s.partida.estado, s.partida.mostrar_trilhas);
+                }
             }
             s.registrar_eventos();
             println!("{n} ticks: GameTime {antes} -> {}", s.partida.estado.partida.tempo);
@@ -280,6 +310,27 @@ fn principal() -> Result<(), String> {
             }
             Some(_) => return Err("--menu amarela@X,Y ou icones@OBJETO".into()),
             None => {}
+        }
+        match o.dialogo.as_deref() {
+            Some("load") => s.dialogo = Some(arquivos::Dialogo::Load(s.dialogo_arquivo(false))),
+            Some("salvar_como") => s.dialogo = Some(arquivos::Dialogo::SalvarComo(s.dialogo_arquivo(true))),
+            Some("pergunta") => {
+                s.partida.estado.precisa_salvar = true;
+                s.abrir_load();
+            }
+            Some("salvo") => {
+                let m = engine::core::dialogos::CaixaMensagem::salvo(&s.dialogos_cfg, "QUICK1.ANT");
+                s.dialogo = Some(arquivos::Dialogo::Salvo(m, false));
+            }
+            Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como ou salvo")),
+            None => {}
+        }
+        if let Some((x, y)) = o.examinar {
+            let plano = i32::from(s.partida.nav.plano_mapa);
+            match engine::rules::experimental::examinar(&s.partida.estado, plano, x, y) {
+                Some(ex) => s.abrir_exame(ex),
+                None => println!("Examine ({x}, {y}): célula sem vida"),
+            }
         }
         for _ in 0..o.fechar_avisos {
             s.partida.fechar_modal();

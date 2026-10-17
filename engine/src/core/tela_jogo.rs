@@ -53,6 +53,11 @@ pub struct MolduraWindows {
     pub cor_relevo_claro: u8,
     pub cor_relevo_escuro: u8,
     pub cor_trilho: u8,
+    /// Fontes (índices de interface.json) do texto do título, a primeira que existir, e a cor dele.
+    #[serde(default)]
+    pub fontes_titulo: Vec<usize>,
+    #[serde(default)]
+    pub cor_texto_titulo: u8,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -144,6 +149,17 @@ pub fn desenhar_moldura(q: &mut Quadro, m: &MolduraWindows) -> PartesMoldura {
     q.preencher(Retangulo { dir: i.esq + h, ..titulo }, m.cor_botao, m.cor_botao);
     linha_v(q, i.esq + h, titulo.topo, titulo.base, k);
     botao(q, Retangulo { esq: i.dir - h, ..titulo }, m);
+    // Desenhos medidos (j00): seta do botão de maximizar (triângulo de 4 linhas) e o traço do menu
+    // de sistema (retângulo 7 × 3 com sombra), como nas janelas de controle.
+    let (ax, ay) = (i32::from(i.dir - h) + 8, i32::from(titulo.topo) + 6);
+    for k in 0..4 {
+        linha_h(q, (ax - k) as i16, (ax + k + 1) as i16, (ay + k) as i16, m.cor_linha);
+    }
+    let (cx, cy) = (i.esq + 6, titulo.topo + 7);
+    q.preencher(Retangulo { esq: cx + 1, topo: cy + 3, dir: cx + 8, base: cy + 4 }, m.cor_relevo_escuro, m.cor_relevo_escuro);
+    q.preencher(Retangulo { esq: cx + 7, topo: cy + 1, dir: cx + 8, base: cy + 4 }, m.cor_relevo_escuro, m.cor_relevo_escuro);
+    q.contorno(Retangulo { esq: cx, topo: cy, dir: cx + 6, base: cy + 2 }, m.cor_linha);
+    q.preencher(Retangulo { esq: cx + 1, topo: cy + 1, dir: cx + 6, base: cy + 2 }, m.cor_relevo_claro, m.cor_relevo_claro);
     linha_v(q, i.dir - h - 1, titulo.topo, titulo.base, k);
     linha_h(q, i.esq, i.dir, titulo.base, k);
     // Barras de rolagem: linha preta, botões nas pontas e trilho; canto entre as duas.
@@ -233,6 +249,8 @@ pub struct TelaDeJogo {
     pub cfg: ConfigTelaJogo,
     /// Bitmaps trocados em botões da faixa (`_win_SetButtonBitmaps`): nome, selecionado, normal.
     pub bitmaps_da_faixa: Vec<(String, u16, u16)>,
+    /// Texto do título da janela de edição (`_SetEditWinTitle`: o nome do arquivo ou "SimAnt - …").
+    pub titulo: String,
     /// Botões da faixa com o estado "selecionado" ligado ou desligado pelo jogo (`_UpdateUserButtons`).
     pub selecao_da_faixa: Vec<(String, bool)>,
     faixa: Janela,
@@ -306,6 +324,7 @@ impl TelaDeJogo {
             amarela,
             pendencias,
             bitmaps_da_faixa: Vec::new(),
+            titulo: String::new(),
             selecao_da_faixa: Vec::new(),
         })
     }
@@ -402,6 +421,15 @@ impl TelaDeJogo {
         let e = &cfg.edicao;
         let area = area_de_edicao(&self.edicao, e)?;
         let partes = desenhar_moldura(&mut q, &e.moldura);
+        let m = &e.moldura;
+        if let Some(f) = m.fontes_titulo.iter().find_map(|&i| interface.fontes.get(i).and_then(|f| f.as_ref())) {
+            // Centrado entre a caixa do menu de sistema e o botão de maximizar.
+            let h = m.altura_titulo;
+            let r = Retangulo { esq: partes.titulo.esq + h + 1, dir: partes.titulo.dir - h - 1, ..partes.titulo };
+            let antes = q.recorte.replace(r);
+            q.texto(r, f, self.titulo.as_bytes(), 0, m.cor_texto_titulo, m.cor_titulo);
+            q.recorte = antes;
+        }
         let [ax, ay] = e.area_na_tela;
         let base = self.edicao.retangulo();
         let origem = (ax - (area.esq - base.esq), ay - (area.topo - base.topo));

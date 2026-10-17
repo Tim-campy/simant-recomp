@@ -140,6 +140,14 @@ pub enum Modal {
     FimDeJogo { tipo_jogo: i16, pretas_venceram: bool, pontos: i64 },
 }
 
+impl Modal {
+    /// Fechado este aviso, a interface abre o "Select a Game": `_EndGameDialog` termina com
+    /// `_NewGame(0)` (telas/abertura.md, mensagens.md).
+    pub fn abre_selecao_de_jogo(&self) -> bool {
+        matches!(self, Modal::FimDeJogo { .. })
+    }
+}
+
 /// Mensagens da faixa e fila de avisos modais.
 #[derive(Clone, Debug)]
 pub struct Avisos {

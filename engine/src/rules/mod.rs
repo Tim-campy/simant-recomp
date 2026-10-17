@@ -11,6 +11,7 @@ pub mod experimental;
 pub mod feromonios;
 pub mod geracao;
 pub mod inimigos;
+pub mod misterio;
 pub mod ninho;
 pub mod quintal;
 pub mod rng;

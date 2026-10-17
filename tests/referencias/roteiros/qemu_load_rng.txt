@@ -1,0 +1,43 @@
+# Geradores S e R antes e depois do File > Load (_LoadGame → _RandYard, docs/spec/telas/arquivos.md).
+# Pré-requisitos: re_trabalho/load/ov.qcow2 = cópia do overlay com o snapshot "quick";
+# re_trabalho/load/a.img = disquete com PORT50.ANT.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_load_rng.txt --overlay re_trabalho/load/ov.qcow2
+snapshot_carregar quick
+esperar 2
+disquete re_trabalho/load/a.img
+esperar 1
+# Pausa (Shift+0): sem ticks, nada consome R entre a leitura e o Load.
+teclas shift+0
+esperar 2
+teclas ctrl+l
+esperar 3
+capturar re_trabalho/load/l1_salvar_atual.png
+teclas n
+esperar 3
+capturar re_trabalho/load/l2_dialogo.png
+digitar A
+teclas shift+semicolon
+digitar PORT50
+esperar 1
+pausar
+ler_variavel SementeR re_trabalho/load/r_antes.bin
+ler_variavel SementeS re_trabalho/load/s_antes.bin
+ler_variavel CurGameType re_trabalho/load/tipo_antes.bin
+ler_variavel GameTime re_trabalho/load/tempo_antes.bin
+continuar
+teclas ret
+esperar 5
+pausar
+ler_variavel SementeR re_trabalho/load/r_depois.bin
+ler_variavel SementeS re_trabalho/load/s_depois.bin
+ler_variavel GameTime re_trabalho/load/tempo_depois.bin
+estado re_trabalho/load/carregado.ANT
+capturar re_trabalho/load/l3_carregado.png
+# Save As (Ctrl+A): o diálogo comum com a lista.
+continuar
+teclas ctrl+a
+esperar 3
+capturar re_trabalho/load/l4_saveas.png
+teclas esc
+esperar 2
+fim

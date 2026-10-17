@@ -38,6 +38,14 @@ pub(crate) struct Opcoes {
     pub(crate) menu: Option<String>,
     /// Sem janela: Ctrl+clique no marcador N (1–7) antes de exportar.
     pub(crate) marcar: Option<usize>,
+    /// Sem janela: abre um diálogo antes de exportar (load, pergunta, salvar_como, salvo).
+    pub(crate) dialogo: Option<String>,
+    /// Sem janela: abre a janela do mapa antes de exportar, no `_MapMode` dado (1 a 8).
+    pub(crate) janela_mapa: Option<i16>,
+    /// Sem janela: liga as trilhas (`_showTrails`) antes dos `--ticks`.
+    pub(crate) trilhas: bool,
+    /// Sem janela: Examine na célula X,Y do plano atual antes de exportar.
+    pub(crate) examinar: Option<(i32, i32)>,
     pub(crate) som: som::OpcoesSom,
 }
 
@@ -72,6 +80,10 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         botoes: Vec::new(),
         menu: None,
         marcar: None,
+        dialogo: None,
+        janela_mapa: None,
+        trilhas: false,
+        examinar: None,
         som: som::OpcoesSom::default(),
     };
     let mut args = std::env::args().skip(1);
@@ -101,6 +113,14 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
             }
             "--salvar" => o.salvar = Some(valor()?.into()),
             "--menu" => o.menu = Some(valor()?),
+            "--dialogo" => o.dialogo = Some(valor()?),
+            "--janela-mapa" => o.janela_mapa = Some(valor()?.parse().ok().filter(|m| (1..=8).contains(m)).ok_or(format!("{a}: modo 1 a 8"))?),
+            "--trilhas" => o.trilhas = true,
+            "--examinar" => {
+                let v = valor()?;
+                let (x, y) = v.split_once(',').ok_or("--examinar X,Y")?;
+                o.examinar = Some((x.parse().map_err(|_| "--examinar: x")?, y.parse().map_err(|_| "--examinar: y")?));
+            }
             "--marcar" => o.marcar = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
             "--botoes" => {
                 o.botoes = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| format!("{a}: número inválido"))).collect::<Result<_, _>>()?

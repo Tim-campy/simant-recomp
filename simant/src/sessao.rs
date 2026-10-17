@@ -4,7 +4,9 @@ use super::*;
 
 /// De onde vem a partida.
 pub(crate) enum Origem<'o> {
-    Save(&'o Path),
+    /// File → Load: o arquivo, o gerador R da sessão antes do Load e o `_CurGameType` de antes
+    /// (`_LoadGame` roda `_RandYard` com eles antes de ler os blocos; telas/arquivos.md).
+    Save(&'o Path, GeradorR, TipoJogo),
     /// Jogo novo gerado pelo port com a semente dada.
     Novo(u32, TipoJogo),
 }
@@ -32,6 +34,16 @@ pub(crate) struct Sessao<'a> {
     pub(crate) menu: Option<(MenuAberto, AlvoMenu)>,
     /// Clique simples no mapa esperando o fim da espera de `_processEdit`: instante, ponto, célula.
     pub(crate) clique_pendente: Option<(Instant, i32, i32, (i32, i32))>,
+    /// Diálogos do Windows (data/dialogos.json) e o aberto agora (simant/src/arquivos.rs).
+    pub(crate) dialogos_cfg: engine::core::dialogos::ConfigDialogos,
+    pub(crate) dialogo: Option<arquivos::Dialogo>,
+    /// Janela do mapa (core/janela_mapa.rs): buffer das células e trilhas.
+    pub(crate) mapa: engine::core::janela_mapa::JanelaMapa,
+    /// Examine (janela 29) e o exame aberto agora, com o canto da janela.
+    pub(crate) janela_exame: engine::core::exame::JanelaExame,
+    pub(crate) exame: Option<(engine::rules::experimental::Exame, (i32, i32))>,
+    /// Janela Info (core/info.rs): cartão atual e histórico.
+    pub(crate) info: engine::core::info::JanelaInfo,
 }
 
 /// Para quem vai a escolha do menu aberto.
@@ -53,26 +65,31 @@ impl Sessao<'_> {
         let layout = LayoutSave::carregar(&dados.join("save_layout.json"))?;
         let geracao = TabelasGeracao::carregar(recursos)?;
         let (jogo, estado) = match origem {
-            Origem::Save(save) => {
+            Origem::Save(save, r, tipo) => {
                 let jogo = JogoSalvo::abrir(&layout, save)?;
-                let estado = Estado::de_save(&jogo)?;
+                let mut estado = Estado::de_save(&jogo)?;
+                let (s, r) = engine::core::carregar::geradores_depois_do_load(r, tipo, &geracao)?;
+                estado.s = s;
+                estado.r = r;
                 (jogo, estado)
             }
             Origem::Novo(semente, tipo) => {
-                // _initStuff: _SeedSRand e _SeedRRand com o relógio; o port usa a semente nas duas
-                // leituras do relógio. Depois _NewGame → _RandYard (geracao-mundo.md).
-                let mut s = GeradorS::new(0);
-                let mut r = GeradorR::default();
-                r.semear_com_ticks(&mut s, semente, semente);
-                let m = Mundo::novo_jogo(tipo, &mut r, &mut s, &geracao)?;
-                let mut estado = Estado::de_mundo(&m, s, r, &cfg_sim)?;
-                // _RandYard passo 3: _InitSimYard (menino, cachorro...), que Estado::de_mundo não faz.
                 let quintal = RegrasOriginais::carregar_sem_banco(recursos)?.quintal;
-                engine::rules::quintal::iniciar_quintal(&mut estado, &quintal);
+                let estado = engine::core::carregar::estado_de_jogo_novo(tipo, semente, &geracao, &cfg_sim, &quintal)?;
                 (estado.para_save(&layout)?, estado)
             }
         };
         let mut tela = TelaDeJogo::carregar(&cfg, recursos, &interface, &jogo)?;
+        // _SetEditWinTitle: no Load, o nome do arquivo (em maiúsculas, como o diálogo devolve); num
+        // jogo novo, "SimAnt - " e o nome do tipo (lista 4/1001) [medido no Quick Game].
+        tela.titulo = match origem {
+            Origem::Save(p, ..) => p.file_name().map(|n| n.to_string_lossy().to_uppercase()).unwrap_or_default(),
+            Origem::Novo(_, tipo) => {
+                let nomes = avisos::linhas_do_texto(recursos, 1001);
+                let nome = nomes.get(tipo as usize).map(|l| l.iter().map(|&b| b as char).collect::<String>()).unwrap_or_default();
+                format!("SimAnt - {nome}")
+            }
+        };
         tela.atualizar(&estado);
         // Jogo novo: _NewGame faz _SetMapPlane(_MePlane) e _CenterEdit na amarela, o mesmo que a
         // posição "ao carregar"; um save segue data/navegacao.json.
@@ -83,17 +100,21 @@ impl Sessao<'_> {
         let cfg_avisos: ConfigAvisos = recursos.dados(avisos::ARQUIVO_CONFIG)?;
         let mut partida =
             Partida::nova(estado, nav, regras, TabelasAmarela::carregar(recursos)?, cfg_sim, cfg_partida, cfg_avisos);
-        if matches!(origem, Origem::Save(_)) {
+        if matches!(origem, Origem::Save(..)) {
             // File → Load: _FullCount e o jogo pausado (mensagens.md §6).
             partida.ao_carregar();
         }
         let arquivo = match origem {
-            Origem::Save(p) => Some(p.to_path_buf()),
+            Origem::Save(p, ..) => Some(p.to_path_buf()),
             Origem::Novo(..) => None,
         };
         let modos = modos::Modos::carregar(recursos, &interface)?;
         let janelas = JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?, &interface);
         let menus_cfg: ConfigMenus = recursos.dados(menus::ARQUIVO_CONFIG)?;
+        let dialogos_cfg = recursos.dados(engine::core::dialogos::ARQUIVO_CONFIG)?;
+        let mapa = engine::core::janela_mapa::JanelaMapa::carregar(recursos)?;
+        let janela_exame = engine::core::exame::JanelaExame::carregar(recursos)?;
+        let info = engine::core::info::JanelaInfo::new(recursos.dados(engine::core::info::ARQUIVO_CONFIG)?);
         Ok(Sessao {
             recursos,
             interface,
@@ -109,6 +130,12 @@ impl Sessao<'_> {
             menus_cfg,
             menu: None,
             clique_pendente: None,
+            dialogos_cfg,
+            dialogo: None,
+            mapa,
+            janela_exame,
+            exame: None,
+            info,
         })
     }
 
@@ -136,13 +163,44 @@ impl Sessao<'_> {
             self.tela.bitmaps_da_faixa.push((nome.clone(), s, n));
             self.tela.selecao_da_faixa.push((nome, ligado.unwrap_or(false)));
         }
+        // Botões de cheiro: o do _MapMode atual fica selecionado (grupo 1 da faixa).
+        let modo = self.partida.estado.vistas.modo_mapa;
+        for (nome, &n) in &self.mapa.cfg.botoes_cheiro {
+            self.tela.selecao_da_faixa.push((nome.clone(), n == modo));
+        }
+        if self.janelas.pilha.contains(&Some(Controle::Info)) {
+            self.info.carregar(self.recursos);
+        }
+        if self.janelas.pilha.contains(&Some(Controle::Mapa)) {
+            self.mapa.atualizar(&self.partida.estado, self.partida.mostrar_trilhas);
+        }
         // Janelas de controle: as que estão antes da de edição na pilha ficam atrás dela.
         let edicao = self.janelas.pilha.iter().position(|j| j.is_none()).unwrap_or(self.janelas.pilha.len());
         let (atras, frente) = self.janelas.pilha.split_at(edicao);
         let (recursos, interface, estado, janelas) = (self.recursos, &self.interface, &self.partida.estado, &self.janelas);
+        let (mapa, nav, trilhas, info) = (&self.mapa, &self.partida.nav, self.partida.mostrar_trilhas, &self.info);
         let desenhar = |q: &mut Quadro, lista: &[Option<Controle>]| -> Result<Vec<String>, String> {
             let mut p = Vec::new();
             for c in lista.iter().flatten() {
+                if *c == Controle::Info {
+                    let g = janelas.geometria(recursos, *c)?;
+                    let ativa = janelas.ativa() == Some(*c);
+                    let titulo = info.carta.as_ref().map(|k| k.titulo.clone()).unwrap_or_default();
+                    janelas::desenhar_moldura_com_titulo(q, interface, &janelas.cfg, &g, &titulo, ativa);
+                    if let Some(area) = janelas.area_do_info(recursos) {
+                        info.desenhar(q, recursos, interface, area);
+                    }
+                    continue;
+                }
+                if *c == Controle::Mapa {
+                    let g = janelas.geometria(recursos, *c)?;
+                    let ativa = janelas.ativa() == Some(*c);
+                    janelas::desenhar_moldura_com_titulo(q, interface, &janelas.cfg, &g, &mapa.titulo(estado), ativa);
+                    if let Some(area) = janelas.area_do_mapa(recursos) {
+                        mapa.desenhar(q, area, estado, nav, trilhas);
+                    }
+                    continue;
+                }
                 p.extend(janelas.desenhar(q, recursos, interface, estado, *c)?);
             }
             Ok(p)
@@ -158,6 +216,10 @@ impl Sessao<'_> {
         if let Some((m, _)) = &self.menu {
             pendentes.extend(m.desenhar(&mut q, self.recursos, &self.interface)?);
         }
+        if let Some((ex, canto)) = &self.exame {
+            self.janela_exame.desenhar(&mut q, self.recursos, &self.interface, ex, *canto);
+        }
+        self.desenhar_dialogo(&mut q);
         if !pendentes.is_empty() {
             eprintln!("tela de jogo: não desenhado ainda: {}", pendentes.join(", "));
         }
@@ -171,6 +233,7 @@ impl Sessao<'_> {
             0 => self.janelas.trazer_para_frente(Some(Controle::Tarefas)),
             1 => self.janelas.trazer_para_frente(Some(Controle::Castas)),
             2 => self.janelas.trazer_para_frente(Some(Controle::Historico)),
+            3 => self.abrir_info(),
             15 => {
                 // _GotoMyAnt depois de abrir a janela de edição e trazê-la para a frente.
                 self.janelas.trazer_para_frente(None);
@@ -190,13 +253,59 @@ impl Sessao<'_> {
     /// Clique esquerdo nas janelas de controle (Caste/Behavior); `true` se foi tratado.
     pub(crate) fn clicar_nas_janelas(&mut self, x: i32, y: i32) -> bool {
         let edicao = self.tela.retangulo_da_edicao();
-        match self.janelas.clicar(self.recursos, &mut self.partida.estado, edicao, x, y) {
+        let r = match self.janelas.clicar(self.recursos, &mut self.partida.estado, edicao, x, y) {
             Ok(t) => t,
             Err(e) => {
                 eprintln!("janelas: {e}");
                 false
             }
+        };
+        self.centralizar_pelo_mapa();
+        if let Some((x, y)) = self.janelas.clique_info.take() {
+            if let Some(a) = self.janelas.area_do_info(self.recursos) {
+                if self.info.clicar(x - i32::from(a.esq), y - i32::from(a.topo)) {
+                    println!("info: cartão {}", self.info.atual);
+                }
+            }
         }
+        r
+    }
+
+    /// `_OpenInfoWindow`: com a janela fechada, volta ao cartão inicial; sempre a traz para a frente.
+    pub(crate) fn abrir_info(&mut self) {
+        if !self.janelas.pilha.contains(&Some(Controle::Info)) {
+            self.info.reiniciar();
+        }
+        self.janelas.trazer_para_frente(Some(Controle::Info));
+    }
+
+    /// `_MapAreaEvent`: o clique ou o arrasto na área do mapa centraliza a vista de edição na célula.
+    pub(crate) fn centralizar_pelo_mapa(&mut self) {
+        let Some((x, y)) = self.janelas.clique_mapa.take() else { return };
+        let Some(area) = self.janelas.area_do_mapa(self.recursos) else { return };
+        if let Some((cx, cy)) = self.mapa.celula_em(area, &self.partida.estado, x, y) {
+            if self.partida.nav.vista.centralizar(cx, cy) {
+                self.partida.processar_eventos_do_estado();
+            }
+        }
+    }
+
+    /// Botão de cheiro da faixa sob (x, y): muda o `_MapMode` (`_ProcMapRibbonEvent`).
+    pub(crate) fn botao_de_cheiro_em(&mut self, x: i32, y: i32) -> bool {
+        let objetos = self.tela.objetos_da_faixa_em(x, y);
+        let Some(n) = objetos.iter().find_map(|o| self.mapa.cfg.botoes_cheiro.get(*o).copied()) else { return false };
+        self.partida.botao_de_cheiro(n);
+        println!("mapa: modo {}", self.partida.estado.vistas.modo_mapa);
+        true
+    }
+
+    /// Window -> Map (`_OpenMapYard`): com o quintal fechado, abre o mapa (ou o traz para a
+    /// frente) na superfície, como `_YardToMap`.
+    pub(crate) fn abrir_mapa(&mut self) {
+        if !self.janelas.pilha.contains(&Some(Controle::Mapa)) && self.partida.nav.plano_mapa != 1 {
+            self.partida.navegar(Acao::Superficie);
+        }
+        self.janelas.trazer_para_frente(Some(Controle::Mapa));
     }
 
     /// Botão configurável da faixa sob (x, y): a função dele (`_DoUserButton`).
@@ -273,9 +382,28 @@ impl Sessao<'_> {
         println!("clique simples em ({cx}, {cy}), plano {}{}: {r:?}", self.partida.nav.plano_mapa, if segurando { " segurando" } else { "" });
         match r {
             RespostaClique::MenuAmarela => self.abrir_menu_da_amarela(x, y),
-            RespostaClique::Examinar => println!("Examine (_MagnifyMenu): a janela 29 ainda não existe no port"),
+            RespostaClique::Examinar => {
+                let plano = i32::from(self.partida.nav.plano_mapa);
+                if let Some(ex) = engine::rules::experimental::examinar(&self.partida.estado, plano, cx, cy) {
+                    self.abrir_exame(ex);
+                }
+            }
             _ => {}
         }
+    }
+
+    /// `_MagnifyMenu`: abre a janela 29 junto da célula examinada; fica aberta enquanto o botão
+    /// estiver apertado (a interface fecha ao soltar) e a simulação não anda.
+    pub(crate) fn abrir_exame(&mut self, ex: engine::rules::experimental::Exame) {
+        let v = &self.partida.nav.vista;
+        let celula = ((ex.x - v.x).rem_euclid(128), ex.y - v.y);
+        let [ax, ay] = self.tela.cfg.edicao.area_na_tela;
+        let tela = (self.tela.cfg.largura as i32, self.tela.cfg.altura as i32);
+        let canto = self.janela_exame.canto(celula, (i32::from(ax), i32::from(ay)), tela);
+        let textos = self.janela_exame.textos(&ex);
+        let t: Vec<String> = textos.iter().map(|l| l.iter().map(|&b| b as char).collect()).collect();
+        println!("Examine ({}, {}): {}", ex.x, ex.y, t.join(" / "));
+        self.exame = Some((ex, canto));
     }
 
     /// Ação do clique esquerdo em (x, y) da área cliente: seta da barra de rolagem ou botão da faixa.
@@ -313,6 +441,22 @@ impl Sessao<'_> {
             }
         }
         eventos
+    }
+
+    /// Diz à partida quais janelas estão abertas e na frente (sorteios do desenho depois de cada
+    /// tick, `rules::desenho`): a de edição está na frente se nenhuma janela de controle está acima
+    /// dela e o quintal não está na frente [hipótese: a ordem entre o quintal e as de controle não é
+    /// modelada].
+    pub(crate) fn atualizar_janelas_desenho(&mut self, minimizada: bool) {
+        let quintal_aberto = self.modos.janela.aberta;
+        let quintal_na_frente = quintal_aberto && self.modos.janela.na_frente;
+        let edicao_no_topo = self.janelas.pilha.last().is_none_or(|j| j.is_none());
+        let j = &mut self.partida.janelas_desenho;
+        j.minimizada = minimizada;
+        j.quintal_aberto = quintal_aberto;
+        j.quintal_na_frente = quintal_na_frente;
+        j.edicao_aberta = true;
+        j.edicao_na_frente = edicao_no_topo && !quintal_na_frente;
     }
 
     /// Velocidade e pausa, para o título da janela.

@@ -1,8 +1,13 @@
 //! Estados e temporização, sem janela nem áudio.
 
 pub mod avisos;
+pub mod carregar;
+pub mod dialogos;
 pub mod edicao;
+pub mod exame;
 pub mod historico;
+pub mod info;
+pub mod janela_mapa;
 pub mod janelas;
 pub mod mapa;
 pub mod menus;

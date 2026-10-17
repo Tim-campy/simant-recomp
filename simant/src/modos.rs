@@ -57,14 +57,17 @@ pub fn desenhar(s: &Sessao, q: &mut Quadro) -> Result<Vec<String>, String> {
     let mut pendentes = Vec::new();
     if m.janela.aberta {
         pendentes.extend(m.quintal.desenhar_faixa(q, s.recursos, &s.interface, &s.partida.estado));
+        let fonte_balao = s.interface.fontes.get(m.quintal.cfg.balao_menino.fonte).and_then(|f| f.as_ref());
         if m.janela.na_frente {
             m.quintal.desenhar_janela(q, &s.partida.estado);
+            m.quintal.desenhar_balao_do_menino(q, &s.partida.estado, fonte_balao);
         } else {
             // Atrás da janela de edição: só a parte fora dela aparece.
             let [x, y, w, h] = s.tela.cfg.edicao.moldura.externo;
             let edicao = Retangulo { esq: x, topo: y, dir: x + w, base: y + h };
             let guardado = q.pixels.clone();
             m.quintal.desenhar_janela(q, &s.partida.estado);
+            m.quintal.desenhar_balao_do_menino(q, &s.partida.estado, fonte_balao);
             for yy in edicao.topo.max(0) as usize..(edicao.base.max(0) as usize).min(q.altura) {
                 for xx in edicao.esq.max(0) as usize..(edicao.dir.max(0) as usize).min(q.largura) {
                     let i = yy * q.largura + xx;
@@ -118,6 +121,12 @@ pub fn tecla(s: &mut Sessao, ev: &EventoNav) -> Resposta {
         return Resposta::Tratada;
     }
     if let Some(a) = m.quintal.cfg.acao_da_tecla(ev) {
+        if a == quintal_mapa::AcaoQuintal::Abrir && !m.janela.aberta {
+            // _OpenMapYard: sem o quintal aberto, Ctrl+M abre a janela do mapa (_YardToMap).
+            s.abrir_mapa();
+            println!("mapa aberto (modo {})", s.partida.estado.vistas.modo_mapa);
+            return Resposta::Tratada;
+        }
         m.janela.aplicar(a, &mut s.partida.estado);
         println!("quintal: {a:?} (modo {})", s.partida.estado.vistas.modo_quintal);
         return Resposta::Tratada;
@@ -145,7 +154,7 @@ fn tratar_efeitos(s: &mut Sessao, efeitos: Vec<Efeito>) {
             Efeito::Som { id, .. } => s.partida.estado.eventos.push(Evento::Som(id)),
             Efeito::Musica(id) => s.partida.estado.eventos.push(Evento::Musica(id)),
             Efeito::Aviso { lista, indice } => println!("aviso: texto {indice} da lista {lista}"),
-            Efeito::Examinar(x) => println!("examinar: {x:?}"),
+            Efeito::Examinar(x) => s.abrir_exame(x),
         }
     }
     s.partida.processar_eventos_do_estado();

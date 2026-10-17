@@ -29,6 +29,12 @@ pub enum Controle {
     Tarefas,
     /// History (`_OpenHistoryWindow`, janela 21): gráficos do histórico (core/historico.rs).
     Historico,
+    /// Mapa (`_OpenMapWindow`, janela 1): desenhado por core/janela_mapa.rs; aqui só a pilha, a
+    /// geometria e o clique na área (`clique_mapa`).
+    Mapa,
+    /// Info (`_OpenInfoWindow`, janela 5): desenhada por core/info.rs; aqui a pilha, a geometria e
+    /// o clique na área (`clique_info`).
+    Info,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -57,13 +63,16 @@ pub struct ConfigJanelas {
     /// 640×480: 2 linhas abaixo].
     pub ajuste_posicao: [i16; 2],
     pub altura_titulo: i16,
-    pub fonte_titulo: usize,
+    pub fonte_titulo: Vec<usize>,
     /// Cores do título: [fundo, texto] da janela ativa e da inativa (índices da paleta).
     pub titulo_ativo: [u8; 2],
     pub titulo_inativo: [u8; 2],
     pub cor_linha: u8,
     pub cor_fundo: u8,
     pub cor_caixa_sistema: u8,
+    /// Traço do menu de sistema: miolo e sombra.
+    pub cor_traco: u8,
+    pub cor_sombra: u8,
     /// Botão do triângulo (`_knobSize`, bitmap 0x578).
     pub bitmap_botao: u16,
     /// Índice transparente do botão (como o 13 dos tiles de vida).
@@ -75,13 +84,28 @@ pub struct ConfigJanelas {
     pub cor_contorno_barra: u8,
     pub cor_fundo_grafico: u8,
     pub historico: ConfigHistorico,
+    /// Janela do mapa (layout 1) e o objeto da área (`mapTileArea`).
+    pub mapa: ConfigJanelaMapa,
+    /// Janela Info (layout 5) e o objeto da área (`infoArea`).
+    pub info: ConfigJanelaMapa,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ConfigJanelaMapa {
+    pub janela: u16,
+    pub objeto_area: String,
+    /// Ajuste da janela (somado ao `ajuste_posicao` comum) e da área [medido].
+    #[serde(default)]
+    pub ajuste: [i16; 2],
+    #[serde(default)]
+    pub ajuste_area: [i16; 2],
 }
 
 impl ConfigJanelas {
     /// Configuração da janela de controle (a History não tem: devolve a de castas, nunca usada).
     pub fn de(&self, c: Controle) -> &ConfigControle {
         match c {
-            Controle::Castas | Controle::Historico => &self.castas,
+            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => &self.castas,
             Controle::Tarefas => &self.tarefas,
         }
     }
@@ -90,6 +114,8 @@ impl ConfigJanelas {
     pub fn id(&self, c: Controle) -> u16 {
         match c {
             Controle::Historico => self.historico.janela,
+            Controle::Mapa => self.mapa.janela,
+            Controle::Info => self.info.janela,
             _ => self.de(c).janela,
         }
     }
@@ -113,11 +139,16 @@ pub struct JanelasControle {
     faixa: i16,
     /// Estado da janela History.
     pub historico: JanelaHistorico,
+    /// Último clique (ou arrasto) na área da janela do mapa, em coordenadas da área cliente; a
+    /// interface o converte em célula e centraliza a vista (`_MapAreaEvent`).
+    pub clique_mapa: Option<(i32, i32)>,
+    /// Último clique na área da janela Info (`_ProcInfoEvent`).
+    pub clique_info: Option<(i32, i32)>,
 }
 
 fn indice(c: Controle) -> usize {
     match c {
-        Controle::Castas | Controle::Historico => 0,
+        Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => 0,
         Controle::Tarefas => 1,
     }
 }
@@ -153,6 +184,8 @@ impl JanelasControle {
             conjunto: [0, 0],
             porcentagem: [true, true],
             arrastando: None,
+            clique_mapa: None,
+            clique_info: None,
             posicoes: interface.posicoes.clone(),
             faixa: interface.moldura.faixa.altura,
         }
@@ -178,7 +211,9 @@ impl JanelasControle {
 
     fn geometria_de(&self, j: &Janela, id: u16) -> GeometriaControle {
         let pos = self.posicoes.get(id as usize).copied().unwrap_or([0; 4]);
-        geometria_janela(j, pos, self.faixa, self.cfg.altura_titulo, self.cfg.ajuste_posicao)
+        let [ax, ay] = self.cfg.ajuste_posicao;
+        let [bx, by] = [&self.cfg.mapa, &self.cfg.info].iter().find(|c| c.janela == id).map_or([0, 0], |c| c.ajuste);
+        geometria_janela(j, pos, self.faixa, self.cfg.altura_titulo, [ax + bx, ay + by])
     }
 
     /// Retângulo de um objeto da janela na área cliente; com `mais_um`, o pixel a mais à direita e
@@ -217,7 +252,16 @@ impl JanelasControle {
                 continue;
             }
             self.trazer_para_frente(Some(c));
-            if c == Controle::Historico {
+            if c == Controle::Info {
+                if Self::objeto(&janela, &g, &self.cfg.info.objeto_area, false).is_some_and(|(r, _)| contem(r, x, y)) {
+                    self.clique_info = Some((x, y));
+                }
+            } else if c == Controle::Mapa {
+                if Self::objeto(&janela, &g, &self.cfg.mapa.objeto_area, true).is_some_and(|(r, _)| contem(r, x, y)) {
+                    self.clique_mapa = Some((x, y));
+                    self.arrastando = Some(c);
+                }
+            } else if c == Controle::Historico {
                 self.historico.clicar(&janela, &g, x, y);
             } else {
                 self.clique_na_janela(&janela, &g, c, e, x, y);
@@ -277,7 +321,7 @@ impl JanelasControle {
 
     fn auto_mut<'e>(&self, e: &'e mut Estado, c: Controle) -> &'e mut i16 {
         match c {
-            Controle::Castas | Controle::Historico => &mut e.controles.casta_automatica,
+            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => &mut e.controles.casta_automatica,
             Controle::Tarefas => &mut e.controles.modo_automatico,
         }
     }
@@ -300,6 +344,11 @@ impl JanelasControle {
     /// Movimento do mouse com o botão apertado: continua o arrasto no triângulo.
     pub fn mover(&mut self, recursos: &Recursos, e: &mut Estado, x: i32, y: i32) -> Result<bool, String> {
         let Some(c) = self.arrastando else { return Ok(false) };
+        if c == Controle::Mapa {
+            // _MapAreaEvent: arrastar no mapa move a vista de edição.
+            self.clique_mapa = Some((x, y));
+            return Ok(true);
+        }
         let j = carregar_janela(recursos, self.cfg.de(c).janela)?;
         let g = self.geometria_de(&j, self.cfg.de(c).janela);
         self.arrastar(&j, &g, c, e, x, y);
@@ -313,7 +362,28 @@ impl JanelasControle {
 
     /// Desenha a janela `c` (moldura com título, objetos do layout, botão do triângulo, níveis e
     /// barras). `ativa` = título da janela ativa.
+    /// Retângulo da área do mapa (objeto `mapTileArea`, com o pixel a mais) na área cliente.
+    pub fn area_do_mapa(&self, recursos: &Recursos) -> Option<Retangulo> {
+        let id = self.cfg.mapa.janela;
+        let j = carregar_janela(recursos, id).ok()?;
+        let g = self.geometria_de(&j, id);
+        Self::objeto(&j, &g, &self.cfg.mapa.objeto_area, true).map(|(r, _)| r)
+    }
+
+    /// Retângulo da área do cartão (objeto `infoArea`) na área cliente.
+    pub fn area_do_info(&self, recursos: &Recursos) -> Option<Retangulo> {
+        let id = self.cfg.info.janela;
+        let j = carregar_janela(recursos, id).ok()?;
+        let g = self.geometria_de(&j, id);
+        let [dx, dy] = self.cfg.info.ajuste_area;
+        Self::objeto(&j, &g, &self.cfg.info.objeto_area, false).map(|(r, _)| Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy })
+    }
+
     pub fn desenhar(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, e: &Estado, c: Controle) -> Result<Vec<String>, String> {
+        if c == Controle::Mapa || c == Controle::Info {
+            // Desenhada pela interface com core/janela_mapa.rs (precisa da navegação e do buffer).
+            return Ok(Vec::new());
+        }
         if c == Controle::Historico {
             return self.desenhar_historico(q, recursos, interface, e);
         }
@@ -324,7 +394,7 @@ impl JanelasControle {
         let ativa = self.ativa() == Some(c);
         // Estado dos botões Auto/Manual e do conjunto (grupos 3 e 4 do layout).
         let auto = match c {
-            Controle::Castas | Controle::Historico => e.controles.casta_automatica != 0,
+            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => e.controles.casta_automatica != 0,
             Controle::Tarefas => e.controles.modo_automatico != 0,
         };
         for o in janela.objetos.iter_mut() {
@@ -352,7 +422,7 @@ impl JanelasControle {
         pendentes.retain(|p| !p.ends_with("Title"));
         // Botão do triângulo.
         let niveis = match c {
-            Controle::Castas | Controle::Historico => e.controles.castas,
+            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => e.controles.castas,
             Controle::Tarefas => e.controles.tarefas,
         };
         // O botão bate com as capturas (j01, j02) usando o retângulo do triângulo com 1 pixel a menos
@@ -374,7 +444,7 @@ impl JanelasControle {
         }
         // Níveis e barras (_DrawControlLevels).
         let total = match c {
-            Controle::Castas | Controle::Historico => i32::from(e.preta.castas[0]),
+            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => i32::from(e.preta.castas[0]),
             Controle::Tarefas => e.preta.modos[..3].iter().map(|&v| i32::from(v)).sum(),
         };
         let cor = |i: u8| interface.cores.get(i as usize).copied().unwrap_or(Cor { frente: 0, fundo: 15, fundo2: 15 });
@@ -465,11 +535,16 @@ pub fn desenhar_moldura_com_titulo(q: &mut Quadro, interface: &Interface, jc: &C
     let caixa = Retangulo { dir: g.titulo.esq + h, ..g.titulo };
     q.preencher(g.titulo, fundo, fundo);
     q.preencher(caixa, jc.cor_caixa_sistema, jc.cor_caixa_sistema);
-    let traco = Retangulo { esq: caixa.esq + 3, topo: caixa.topo + 8, dir: caixa.dir - 3, base: caixa.topo + 10 };
-    q.preencher(traco, jc.cor_linha, jc.cor_linha);
+    // Traço do menu de sistema do Windows 3.1 [medido em j01]: retângulo 7 × 3 de contorno preto e
+    // miolo branco, com sombra cinza escura à direita e embaixo.
+    let (cx, cy) = (caixa.esq + 6, caixa.topo + 7);
+    q.preencher(Retangulo { esq: cx + 1, topo: cy + 3, dir: cx + 8, base: cy + 4 }, jc.cor_sombra, jc.cor_sombra);
+    q.preencher(Retangulo { esq: cx + 7, topo: cy + 1, dir: cx + 8, base: cy + 4 }, jc.cor_sombra, jc.cor_sombra);
+    q.contorno(Retangulo { esq: cx, topo: cy, dir: cx + 6, base: cy + 2 }, jc.cor_linha);
+    q.preencher(Retangulo { esq: cx + 1, topo: cy + 1, dir: cx + 6, base: cy + 2 }, jc.cor_traco, jc.cor_traco);
     q.preencher(Retangulo { esq: caixa.dir, dir: caixa.dir + 1, ..g.titulo }, jc.cor_linha, jc.cor_linha);
     q.preencher(Retangulo { topo: g.titulo.base, base: g.titulo.base + 1, ..g.externo }, jc.cor_linha, jc.cor_linha);
-    if let Some(Some(f)) = interface.fontes.get(jc.fonte_titulo) {
+    if let Some(f) = jc.fonte_titulo.iter().find_map(|&i| interface.fontes.get(i).and_then(|f| f.as_ref())) {
         let r = Retangulo { esq: caixa.dir + 1, ..g.titulo };
         q.texto(r, f, titulo.as_bytes(), 0, texto, fundo);
     }
@@ -483,7 +558,7 @@ fn ret(x0: i32, y0: i32, x1: i32, y1: i32) -> Retangulo {
 fn niveis_e_conjuntos(e: &mut Estado, c: Controle) -> (&mut [u16; 3], &mut [u16; 12]) {
     let k = &mut e.controles;
     match c {
-        Controle::Castas | Controle::Historico => (&mut k.castas, &mut k.castas_memorizadas),
+        Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => (&mut k.castas, &mut k.castas_memorizadas),
         Controle::Tarefas => (&mut k.tarefas, &mut k.tarefas_memorizadas),
     }
 }

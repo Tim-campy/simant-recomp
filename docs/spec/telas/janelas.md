@@ -66,7 +66,15 @@ Ver mensagens.md §7. O port começa a espera ao apertar (`Partida::iniciar_espe
 
 ### 4.3 Examine (`_MagnifyMenu`, `1010:6b4c`)
 
-Só com vida na célula: abre a janela 29 com a formiga ampliada enquanto o botão fica apertado e não dá ordem [código]. **O port não desenha a janela 29** (lacuna); a captura j11 (célula vazia) confirma que sem vida não há janela e o clique vira ordem.
+Chamado por `_processEdit` (depois da espera do clique simples, botão ainda apertado, Shift solto, célula que não é a amarela) com `_MapPlane`, e pela ferramenta 0 do Experimental [código]:
+
+1. Lê a vida da célula (`_LifeA` nos planos 0 e 1, `_LifeB` no 2, `_LifeR` no 3); 0 → devolve −1 e não abre nada (o clique vira ordem; a captura j11, célula vazia, confirma).
+2. Canto da janela: uma célula à direita e uma acima da clicada, `((x − _MapPnt.x) + 1)·_tileWidth + _editTileRect.left`, `((y − _MapPnt.y) − 1)·_tileHeight + _editTileRect.top`; se passa da base da janela principal, sobe a própria altura (sem passar do topo); se passa da direita, vai a própria largura para a esquerda (sem passar da esquerda).
+3. Abre a janela 29 (`examineWin`, 92 × 87: bitmap 4510 de fundo — com os rótulos "Behavior" e "Carrying" — e os textos `examStr1..3`) e fica num laço **sem tratar mensagens** enquanto `_ButtonHeld` (botão esquerdo, Espaço, Insert, ou o direito/Delete; pelo menos ~2 unidades de `_TickCount`): a simulação não anda. Ao soltar, fecha e devolve o byte de vida; a ordem não é dada.
+4. Textos (`_win_DrawExamineWindow` `1010:69c0`, fonte 2), com `g = (vida & 0x78) >> 3`: linha 1, `_EggStr[vida & 7]` (lista 1100) se g = 0, senão `_CasteStr[g]` (1101); linha 2, `_ModeStr[M]` (1102), M da formiga achada na lista do plano (0, "Bored", se não achou); linha 3, `_LoadStr[g]` (1103).
+5. Sem sorteios [código]. Plano 0: a linha 2 usa uma variável não inicializada no original; o port usa a lista A. A amarela (0xFE/0xFF) dá g = 15, talvez além do fim de `_CasteStr` [hipótese].
+
+**Port:** `core/exame.rs` (`JanelaExame`: canto, textos e desenho; `data/exame.json`), `rules::experimental::examinar` (vida, grupo, estágio, modo); a interface abre a janela no fim da espera do clique (ou com a ferramenta 0 do Experimental) e a fecha ao soltar o botão ou a tecla; a simulação fica parada enquanto ela está aberta. Sem janela: `simant --save … --examinar X,Y --exportar-tela-jogo …`. Alinhamento e cor dos textos [hipótese: centrados no objeto, tinta preta]; sem captura do original com a janela aberta.
 
 ### 4.4 Menu de ícones (Ctrl+clique num botão configurável)
 
@@ -79,10 +87,10 @@ Os botões de alternar (4 trilhas, 5 pausa, 7 Music, 9 Sound Effects, 10 Silly, 
 
 ## 6. O que não foi feito
 
-- Info (função 3, Window → Info): o sistema de cartões ("Top Card", hipertexto dos objetos 10/17/19) — lacuna grande.
-- Trilhas (função 4): só o estado do botão; a janela do mapa não existe.
-- Mystery (função 8, `_MysteryButton`): sorteia (`_RRand(15)`) entre colocar formigas, matar algumas, comida, buracos, invencibilidade, aranha ao contrário, quadros 10022/10024… — exige `_AddRedAnts`/`_KillSomeAnts` que as regras ainda não têm.
-- Examine (janela 29), o clique no gráfico do History (valores), WinHelp.
+- Info (função 3, Window → Info): feito em [info.md](info.md), sem os popups de definição e os links do texto.
+- Trilhas (função 4): feitas com a janela do mapa ([mapa.md](mapa.md)).
+- Mystery (função 8, `_MysteryButton`): sorteia (`_RRand(15)`) entre colocar formigas, matar algumas, comida, buracos, invencibilidade, aranha ao contrário, quadros 10022/10024… — implementado em `rules/misterio.rs` ([../regras/misterio.md](../regras/misterio.md)).
+- O clique no gráfico do History (valores), WinHelp.
 
 ## 7. Verificação (2026-10-18)
 

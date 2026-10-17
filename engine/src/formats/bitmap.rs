@@ -29,8 +29,13 @@ impl Bitmap {
         let mono = formato == FORMATO_MONO;
         let bpp = if mono { 1 } else { 4 };
         let planar = formato == FORMATO_PLANAR;
-        let stride = if planar { 4 * bytes_por_linha(largura, 1) } else { bytes_por_linha(largura, bpp) };
+        let mut stride = if planar { 4 * bytes_por_linha(largura, 1) } else { bytes_por_linha(largura, bpp) };
         let dados = &d[CABECALHO..];
+        // Algumas figuras mono dos cartões do Info (ex.: SHARED 2/150, 102 × 116 com 1508 bytes) têm
+        // linhas alinhadas a byte, não a 32 bits [medido nos dados].
+        if mono && dados.len() < stride * altura && dados.len() >= largura.div_ceil(8) * altura {
+            stride = largura.div_ceil(8);
+        }
         if dados.len() < stride * altura {
             return Err(format!(
                 "bitmap {largura}x{altura}: esperava {} bytes de pixels, há {}",

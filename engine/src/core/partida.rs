@@ -24,6 +24,7 @@ use crate::rules::amarela::{
     clicar_no_mapa, comando, tecla_de_comando, ControleJogador, Modificadores, RespostaClique, RespostaTecla,
     TabelasAmarela,
 };
+use crate::rules::desenho::{self, ContadoresRedesenho, JanelasDesenho};
 use crate::rules::estado::{ConfigSimulacao, Estado, Evento};
 use crate::rules::tick::{tick, Regras, RegrasOriginais, Relogio};
 
@@ -63,12 +64,16 @@ pub enum AcaoPartida {
     /// File → Save (5, Ctrl+S) e Save As (6, Ctrl+A): tratados pela interface (arquivo).
     Salvar,
     SalvarComo,
+    /// File → Load (`_LoadGame`): pergunta, diálogo e nova sessão, a cargo da interface.
+    Carregar,
     /// Window → Edit/Behavior/Caste/History (0x11, 0x13–0x15; Ctrl+E/B/C/H): abre ou traz para a
     /// frente, a cargo da interface.
     JanelaEdicao,
     JanelaComportamento,
     JanelaCastas,
     JanelaHistorico,
+    /// Window → Info (0x16): a cargo da interface (Ctrl+I é extensão do port).
+    JanelaInfo,
 }
 
 /// Resultado de um botão configurável da faixa (`_DoUserButton`, `1000:04c4`).
@@ -216,8 +221,17 @@ pub struct Partida {
     pub marcadores: [Option<(i16, i32, i32)>; 7],
     /// Função de cada botão configurável da faixa (`1048:0012`), trocada pelo menu de ícones.
     pub funcoes_botoes: Vec<u16>,
-    /// `_showTrails` (botão 4): trilhas de cheiro na janela do mapa.
+    /// `_showTrails` (botão 4): trilhas na janela do mapa — os rastros das formigas acumulados, não
+    /// o feromônio (telas/mapa.md §2.6).
     pub mostrar_trilhas: bool,
+    /// Janelas abertas/na frente e minimizada, atualizadas pela interface: decidem os sorteios do
+    /// desenho depois de cada tick (`rules::desenho`, rng.md "Sorteios do desenho"). `ativa` vem do
+    /// foco (`definir_foco`) e `aranha_visivel` é calculado no tick com a vista.
+    pub janelas_desenho: JanelasDesenho,
+    /// Contadores de `MYTIMERFUNC`/`_UpdateWindows` (fora do save).
+    pub contadores_redesenho: ContadoresRedesenho,
+    /// Efeito do último Mystery (para a interface escrever).
+    pub ultimo_misterio: Option<crate::rules::misterio::EfeitoMisterio>,
 }
 
 impl Partida {
@@ -254,6 +268,9 @@ impl Partida {
             marcadores: [None; 7],
             funcoes_botoes: Vec::new(),
             mostrar_trilhas: false,
+            janelas_desenho: JanelasDesenho { ativa: true, edicao_aberta: true, edicao_na_frente: true, ..Default::default() },
+            contadores_redesenho: ContadoresRedesenho::default(),
+            ultimo_misterio: None,
         };
         p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
         p.vistas_para_estado();
@@ -338,6 +355,10 @@ impl Partida {
         // 17 ms) [hipótese; o original soma 1 por volta do laço, ver jogo.md "Simulação ao vivo"].
         // Zero significa "sem relógio do laço" para `quintal::Relogios`: pula o 0 na volta.
         self.estado.ciclos_jogo = self.estado.ciclos_jogo.wrapping_add(1).max(1);
+        // Minimizado: o ícone animado sorteia SRand1(7) a cada chamada, se não pausado nem no fim.
+        if self.janelas_desenho.minimizada && self.estado.partida.pausado == 0 && self.estado.partida.fim_de_jogo == 0 {
+            self.estado.s.rand1(7);
+        }
         self.relogio.contar_mensagem();
         let voltas = self.indice_velocidade(&self.cfg.relogio.iteracoes_por_mensagem.clone(), 1).max(1);
         let mut ticks = 0;
@@ -360,6 +381,11 @@ impl Partida {
         self.vistas_do_estado();
         self.tratar_eventos();
         self.conselho_na_faixa();
+        // _UpdateWindows: os sorteios do desenho (quintal com chuva/enxame, palpos da aranha).
+        let v = &self.nav.vista;
+        let aranha = desenho::aranha_visivel(&self.estado, self.nav.plano_mapa, v.x, v.y, v.largura, v.altura);
+        let janelas = JanelasDesenho { ativa: self.ativo, aranha_visivel: aranha, ..self.janelas_desenho };
+        desenho::redesenho_do_timer(&mut self.estado, &janelas, &mut self.contadores_redesenho);
         // _UpdateWindows: em fast/ultra o mapa só é redesenhado a cada 2/4 ticks; sem foco, a cada 8.
         self.contador_mapa = self.contador_mapa.wrapping_add(1);
         self.quadros += 1;
@@ -395,6 +421,11 @@ impl Partida {
         let e = &mut self.estado;
         let n = &self.nav;
         let par = |(x, y): (i32, i32)| (x as i16, y as i16);
+        // _SetMapPlane termina com _SetMapModeAnt(_MapPlane): trocar de plano volta ao mapa simples
+        // dele (telas/mapa.md); no mesmo plano, o modo de feromônio escolhido fica.
+        if e.vistas.plano != n.plano_mapa {
+            e.vistas.modo_mapa = n.plano_mapa;
+        }
         e.vistas.plano = n.plano_mapa;
         e.vistas.ponto = (n.vista.x as i16, n.vista.y as i16);
         e.vistas.ponto_quintal = par(n.pontos[0]);
@@ -513,6 +544,8 @@ impl Partida {
     /// logo no Load, caso C-10), `_SetDefaultWindPrompt(1)` e `_PauseGame(1)`: o jogo carregado
     /// fica pausado com "Game Paused" (bancada-qemu.md, "Carregar um save injetado").
     pub fn ao_carregar(&mut self) {
+        // _LoadGame: _TimeTemp = 300 (fora do save; os geradores já vêm de carregar::geradores_depois_do_load).
+        self.regras.memoria_tutor.tempo_limite = super::carregar::TEMPO_TUTOR_DEPOIS_DO_LOAD;
         self.vistas_para_estado();
         self.estado.contar_formigas();
         self.tratar_eventos();
@@ -563,10 +596,12 @@ impl Partida {
             AcaoPartida::AutoTrack => p.opcoes[0] = if p.opcoes[0] == 0 { 1 } else { 0 },
             AcaoPartida::Salvar
             | AcaoPartida::SalvarComo
+            | AcaoPartida::Carregar
             | AcaoPartida::JanelaEdicao
             | AcaoPartida::JanelaComportamento
             | AcaoPartida::JanelaCastas
-            | AcaoPartida::JanelaHistorico => {}
+            | AcaoPartida::JanelaHistorico
+            | AcaoPartida::JanelaInfo => {}
         }
         self.redesenhar = true;
     }
@@ -605,6 +640,19 @@ impl Partida {
             .collect()
     }
 
+    /// Botão de cheiro da faixa (`ribBNestScent`… → `_SetMapModeAnt(n)`, n de 4 a 8): os feromônios
+    /// só existem na superfície (antes, `_SetMapPlane(1)`); o mesmo botão de novo volta ao mapa
+    /// simples. [o original também grava `_ELayerMode` para a janela de edição; o port não.]
+    pub fn botao_de_cheiro(&mut self, n: i16) {
+        if self.nav.plano_mapa != 1 {
+            self.navegar(Acao::Superficie);
+        }
+        self.vistas_para_estado();
+        let e = &mut self.estado;
+        e.vistas.modo_mapa = super::janela_mapa::modo_do_botao_de_cheiro(e.vistas.modo_mapa, n);
+        self.redesenhar = true;
+    }
+
     /// Clique simples num botão configurável da faixa (`_DoUserButton`, sem segurar o botão).
     pub fn botao_usuario(&mut self, funcao: u16) -> RespostaBotao {
         let p = &mut self.estado.partida;
@@ -622,7 +670,7 @@ impl Partida {
             }
             7 => alternar(&mut p.opcoes[1]),
             4 => {
-                // _showTrails: as trilhas só aparecem na janela do mapa, que o port ainda não tem.
+                // _showTrails: rastros acumulados na janela do mapa (core/janela_mapa.rs).
                 self.mostrar_trilhas = !self.mostrar_trilhas;
             }
             9 => alternar(&mut p.opcoes[2]),
@@ -632,6 +680,13 @@ impl Partida {
             13 => alternar(&mut p.opcoes[4]),
             14 => return RespostaBotao::Salvar,
             15 => self.ir_para_amarela(),
+            8 => {
+                // _MysteryButton: fora do tick, sorteio de R e efeito (rules/misterio.rs).
+                self.vistas_para_estado();
+                let efeito = crate::rules::misterio::botao_misterio(&mut self.estado, &mut self.regras, &self.tabelas_amarela);
+                self.ultimo_misterio = Some(efeito);
+                self.processar_eventos_do_estado();
+            }
             outro => return RespostaBotao::NaoImplementado(outro),
         }
         self.redesenhar = true;
@@ -767,7 +822,7 @@ mod testes {
     fn nav() -> Navegacao {
         Navegacao {
             plano_mapa: 2,
-            vista: VistaEdicao { plano: Plano::NinhoPreto, x: 0, y: 0, largura: 26, altura: 19 },
+            vista: VistaEdicao { plano: Plano::NinhoPreto, x: 0, y: 0, largura: 25, altura: 19 },
             pontos: [(0, 0); 4],
         }
     }
@@ -780,6 +835,64 @@ mod testes {
         e.partida.ferramenta = -1;
         e.amarela.plano = 2;
         Partida::nova(e, nav(), RegrasOriginais::default(), TabelasAmarela::padrao().clone(), cfg_sim(), cfg(), cfg_avisos())
+    }
+
+    #[test]
+    fn sorteios_do_desenho_depois_do_tick_seguem_as_janelas() {
+        // Chuva com o quintal (Yard) aberto na frente: depois do tick, 14 gotas = 28 sorteios de S
+        // (rules::desenho); com o quintal fechado, nada. A diferença entre as duas partidas é
+        // exatamente o desenho do quintal sobre o estado de depois do tick.
+        let nova = |aberto: bool| {
+            let mut p = partida(1);
+            p.estado.ambiente.chovendo = 1;
+            p.estado.ambiente.chuva_contagem = 100;
+            p.estado.s = crate::rules::rng::GeradorS::new(0x1234);
+            p.estado.vistas.modo_mapa = 1;
+            p.janelas_desenho.quintal_aberto = aberto;
+            p.janelas_desenho.quintal_na_frente = aberto;
+            p
+        };
+        let (mut fechado, mut aberto) = (nova(false), nova(true));
+        fechado.rodar_tick();
+        aberto.rodar_tick();
+        let mut esperado = fechado.estado.clone();
+        let passos = desenho::desenhar_quintal(&mut esperado, 0);
+        assert_eq!(passos, 28);
+        assert_eq!(aberto.estado.s, esperado.s);
+        assert_ne!(aberto.estado.s, fechado.estado.s);
+        // Inativa: só 1 tick em 8 chega a _UpdateWindows (`_UDcntr` conta só esses); os contadores
+        // ficam na Partida, fora do save.
+        let mut inativa = nova(true);
+        inativa.definir_foco(false);
+        for _ in 0..16 {
+            inativa.rodar_tick();
+        }
+        assert_eq!(inativa.contadores_redesenho.ticks, 16);
+        assert_eq!(inativa.contadores_redesenho.chamadas, 2);
+    }
+
+    #[test]
+    fn minimizada_sorteia_o_icone_a_cada_mensagem() {
+        // Minimizada: SRand1(7) antes do laço do temporizador (e nenhum desenho depois do tick).
+        let semente = crate::rules::rng::GeradorS::new(0x1234);
+        let mut a = partida(1);
+        a.estado.s = semente;
+        a.janelas_desenho.minimizada = true;
+        let mut b = partida(1);
+        b.estado.s = semente;
+        b.estado.s.rand1(7);
+        a.mensagem_de_timer();
+        b.mensagem_de_timer();
+        assert_eq!(a.estado.s, b.estado.s);
+        assert_ne!(a.estado.s, semente);
+        // Pausada: o ícone não anima.
+        let mut c = partida(1);
+        c.estado.partida.pausado = 1;
+        c.janelas_desenho.minimizada = true;
+        c.estado.s = semente;
+        let s = c.estado.s;
+        c.mensagem_de_timer();
+        assert_eq!(c.estado.s, s);
     }
 
     #[test]
@@ -924,9 +1037,9 @@ mod testes {
             tick(&mut p.estado, &mut r);
             p.tratar_eventos();
         }
-        // _CenterEdit em (43, 30) com 26 × 19: canto (30, 21).
-        assert_eq!((p.nav.vista.x, p.nav.vista.y), (30, 21));
-        assert_eq!(p.estado.vistas.ponto, (30, 21));
+        // _CenterEdit em (43, 30) com 25 × 19 (_editWidth da bancada): canto (31, 21).
+        assert_eq!((p.nav.vista.x, p.nav.vista.y), (31, 21));
+        assert_eq!(p.estado.vistas.ponto, (31, 21));
         assert_eq!(
             p.retirar_eventos(),
             vec![Evento::Musica(7), Evento::DialogoFimDeJogo, Evento::Musica(7), Evento::Musica(7)]
@@ -943,8 +1056,9 @@ mod testes {
         p.tratar_eventos();
         assert_eq!(p.nav.plano_mapa, 1);
         assert_eq!(p.nav.vista.plano, Plano::Superficie);
-        // dx = 87, dy = 1: a fração 65536/87 truncada nunca liga o bit 16; y não anda (jogo.md).
-        assert_eq!((p.nav.vista.x, p.nav.vista.y), (87, 0));
+        // dx = 88, dy = 1 (meia largura 12): a fração 65536/88 truncada nunca liga o bit 16; y não
+        // anda (jogo.md).
+        assert_eq!((p.nav.vista.x, p.nav.vista.y), (88, 0));
         assert_eq!(p.estado.vistas.plano, 1);
     }
 }

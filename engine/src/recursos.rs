@@ -106,6 +106,11 @@ impl Recursos {
 fn achar_sem_caixa(base: &Path, nome: &str) -> Option<PathBuf> {
     let mut atual = base.to_path_buf();
     for parte in nome.split('/').filter(|p| !p.is_empty()) {
+        // `..` sobe uma pasta (ex.: a fonte do sistema do Windows, `../../WINDOWS/SYSTEM/VGASYS.FON`).
+        if parte == ".." {
+            atual.push("..");
+            continue;
+        }
         let alvo = parte.to_lowercase();
         let entrada = std::fs::read_dir(&atual)
             .ok()?

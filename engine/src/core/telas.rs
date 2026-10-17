@@ -151,11 +151,26 @@ pub struct Interface {
 fn carregar_fonte(recursos: &crate::recursos::Recursos, nome: &str) -> Result<crate::formats::fonte::Fonte, String> {
     use crate::formats::fonte::{fontes_de_fon, Fonte, FonteMac};
     match nome.split_once('#') {
-        Some((arquivo, face)) => fontes_de_fon(&recursos.arquivo(arquivo)?)?
-            .into_iter()
-            .find(|f| f.nome == face)
-            .map(Fonte::Fnt)
-            .ok_or(format!("fonte {face} não encontrada em {arquivo}")),
+        // "ARQUIVO.FON#Nome", com "@altura" para escolher o tamanho e "+negrito" para o negrito
+        // simulado (docs/spec/formatos/fonte.md).
+        Some((arquivo, face)) => {
+            let (face, negrito) = match face.strip_suffix("+negrito") {
+                Some(f) => (f, true),
+                None => (face, false),
+            };
+            let (face, altura) = match face.split_once('@') {
+                Some((f, a)) => (f, Some(a.parse::<usize>().map_err(|_| format!("fonte {nome}: altura inválida"))?)),
+                None => (face, None),
+            };
+            fontes_de_fon(&recursos.arquivo(arquivo)?)?
+                .into_iter()
+                .find(|f| f.nome == face && altura.is_none_or(|a| f.altura == a))
+                .map(|mut f| {
+                    f.negrito = negrito;
+                    Fonte::Fnt(f)
+                })
+                .ok_or(format!("fonte {face} não encontrada em {arquivo}"))
+        }
         None => Ok(Fonte::Mac(FonteMac::decodificar(&recursos.arquivo(nome)?)?)),
     }
 }

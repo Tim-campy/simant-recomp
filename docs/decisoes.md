@@ -2,6 +2,12 @@
 
 Formato: data, decisão, motivo, alternativas descartadas.
 
+## 2026-10-18: Fontes do Windows para títulos e diálogos: as da instalação do usuário
+
+- **Decisão:** os títulos das janelas e os diálogos do Windows (caixa de mensagem, diálogo de arquivo) usam as fontes do próprio Windows 3.1 que acompanha o jogo do usuário: `WINDOWS/SYSTEM/VGASYS.FON` (System) e `WINDOWS/SYSTEM/SSERIFE.FON` (MS Sans Serif 8, em negrito simulado como o GDI faz), lidas em tempo de execução pela lista de fontes de `data/interface.json` (índices 6 e 7). Nada delas é versionado. Sem os arquivos, cai na fonte 0 do jogo (`Gaia8x14`).
+- **Motivo:** o pedido era imitar a fonte do sistema; as fontes estão na instalação que o usuário já fornece (como `FONTRES.FON`), o parser `.FON` já existia, e o resultado bate 100% com as capturas nos títulos.
+- **Descartado:** extrair a fonte da imagem `c.img` da bancada (só serviria como referência local e não chegaria ao usuário) e desenhar uma fonte bitmap própria equivalente (trabalho grande e sempre aproximado).
+
 ## 2026-10-17: Áudio: SDL2 + sintetizador MIDI em Rust (`rustysynth` com SoundFont, ou sintetizador simples)
 
 - **Decisão:** o executável toca o áudio por um único dispositivo SDL2 (`AudioCallback`, estéreo `f32`), com um mixer próprio (`simant/src/som/mixer.rs`) que soma uma música e um efeito. Os efeitos tipo 5 são decodificados por `engine::formats::som` e reamostrados de 4096 Hz para a taxa do dispositivo. As músicas (`SOUND\*.MID`) são lidas por `engine::formats::midi` e tocadas por um sequenciador próprio que entrega as mensagens de canal a um sintetizador: o **`rustysynth`** (Rust puro, licença MIT) quando há uma SoundFont `.sf2` (`--soundfont`, `SIMANT_SOUNDFONT` ou `soundfont` em `data/som.json`), senão um **sintetizador simples próprio** (ondas básicas por família General MIDI, ruído e seno com queda para a percussão).

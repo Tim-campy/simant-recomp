@@ -107,6 +107,18 @@ pub fn desenhar_palpos(e: &mut Estado) -> u32 {
     1
 }
 
+/// `_PreDrawSpider` (`1010:1c18`): a aranha aparece na janela de edição se `_SpidOn` ≠ 0, o plano do
+/// mapa é 0 ou 1 e a posição dela (em 1/16 de célula) está dentro da vista de `largura` × `altura`
+/// células com o canto em (`x`, `y`), bordas incluídas. [O original compara em pixels da tela; com
+/// tiles de 12 pixels arredonda `SpidX·3/4`, o que pode mudar a borda em 1/16 de célula.]
+pub fn aranha_visivel(e: &Estado, plano: i16, x: i32, y: i32, largura: i32, altura: i32) -> bool {
+    let (sx, sy) = (i32::from(e.aranha.x), i32::from(e.aranha.y));
+    e.aranha.ligada != 0
+        && (plano == 0 || plano == 1)
+        && (16 * x..=16 * (x + largura)).contains(&sx)
+        && (16 * y..=16 * (y + altura)).contains(&sy)
+}
+
 /// O que a interface diz sobre as janelas no momento do redesenho.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct JanelasDesenho {
