@@ -12,7 +12,6 @@ use super::amarela::{self, TabelasAmarela};
 use super::estado::Estado;
 use super::quintal::Relogios;
 use super::tick::{RegrasConselhos, RegrasOriginais};
-use crate::formats::save::{Formiga, Lista};
 
 /// O que a lição faz ao ser dada (conselhos.md §3, "Ações").
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -313,23 +312,9 @@ pub fn licao_concluida(
     }
 }
 
-/// `_AddBlackAnts(n)` (`1030:6c5a`, geracao-mundo.md): pretas novas na superfície, x de 0 a 63, y de 16 a 47.
-fn adicionar_formigas_pretas(e: &mut Estado, mut n: i32) {
-    for x in 0..64 {
-        for y in 16..48 {
-            let livre = e.superficie.mapa.em(x, y).unwrap_or(0xFF) < 0x50 && e.superficie.vida.em(x, y) == Some(0);
-            if !livre {
-                continue;
-            }
-            let (base, modo) = if (0..=3).contains(&e.s.rand1(10)) { (0x30, 2) } else { (0x10, 4) };
-            let tipo = (e.s.mascara(8) + base) as u8;
-            e.adicionar_formiga(Lista::A, Formiga { x: x as u8, y: y as u8, modo, tipo, s: 0 });
-            n -= 1;
-            if n < 1 || e.superficie.lista.indice > 999 {
-                return;
-            }
-        }
-    }
+/// `_AddBlackAnts(n)` (`1030:6c5a`, geracao-mundo.md): pretas novas na superfície ([`misterio::adicionar_formigas`]).
+fn adicionar_formigas_pretas(e: &mut Estado, n: i32) {
+    super::misterio::adicionar_formigas(e, super::geracao::Cor::Preta, n);
 }
 
 #[cfg(test)]

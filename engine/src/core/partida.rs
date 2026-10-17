@@ -227,6 +227,8 @@ pub struct Partida {
     pub janelas_desenho: JanelasDesenho,
     /// Contadores de `MYTIMERFUNC`/`_UpdateWindows` (fora do save).
     pub contadores_redesenho: ContadoresRedesenho,
+    /// Efeito do último Mystery (para a interface escrever).
+    pub ultimo_misterio: Option<crate::rules::misterio::EfeitoMisterio>,
 }
 
 impl Partida {
@@ -265,6 +267,7 @@ impl Partida {
             mostrar_trilhas: false,
             janelas_desenho: JanelasDesenho { ativa: true, edicao_aberta: true, edicao_na_frente: true, ..Default::default() },
             contadores_redesenho: ContadoresRedesenho::default(),
+            ultimo_misterio: None,
         };
         p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
         p.vistas_para_estado();
@@ -655,6 +658,13 @@ impl Partida {
             13 => alternar(&mut p.opcoes[4]),
             14 => return RespostaBotao::Salvar,
             15 => self.ir_para_amarela(),
+            8 => {
+                // _MysteryButton: fora do tick, sorteio de R e efeito (rules/misterio.rs).
+                self.vistas_para_estado();
+                let efeito = crate::rules::misterio::botao_misterio(&mut self.estado, &mut self.regras, &self.tabelas_amarela);
+                self.ultimo_misterio = Some(efeito);
+                self.processar_eventos_do_estado();
+            }
             outro => return RespostaBotao::NaoImplementado(outro),
         }
         self.redesenhar = true;
