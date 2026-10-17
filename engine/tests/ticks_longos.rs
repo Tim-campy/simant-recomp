@@ -29,6 +29,12 @@ fn sequencias_longas_do_original() {
         if let Some(k) = r.primeiro_sorteio_diferente {
             falhas.push(format!("{nome}: S ou R diferem depois do tick {k}"));
         }
+        if let Some(k) = r.primeiro_desenho_diferente {
+            falhas.push(format!("{nome}: S difere depois do desenho que segue o tick {k}"));
+        }
+        if r.passos_desenho != (0, 0) {
+            println!("{nome}: desenho entre os ticks: {} passos de S no port, {} no original", r.passos_desenho.0, r.passos_desenho.1);
+        }
         for p in &r.pontos {
             for b in &p.blocos {
                 falhas.push(format!("{nome} depois de {} ticks: {} {:?}", p.ticks, b.simbolo, b.detalhes));

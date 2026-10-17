@@ -716,6 +716,11 @@ pub struct RelatorioSequencia {
     pub ticks: usize,
     /// Primeiro tick (1 = o primeiro) em que S ou R do port diferem do original depois do tick.
     pub primeiro_sorteio_diferente: Option<usize>,
+    /// Com desenho (`indice.json["desenho_quintal"]`): primeiro intervalo (1 = depois do primeiro
+    /// tick) em que S depois do desenho do port difere do S do original no começo do tick seguinte.
+    pub primeiro_desenho_diferente: Option<usize>,
+    /// Passos de S do desenho do port e do original, somados em toda a sequência.
+    pub passos_desenho: (u64, u64),
     pub pontos: Vec<PontoSequencia>,
 }
 
@@ -743,6 +748,15 @@ pub fn rodar_sequencia(dir: &Path, layout: &LayoutSave, regras: &mut dyn Regras)
     let mut e = montar_entrada(&v, layout)?.estado;
     let mut primeiro_sorteio_diferente = None;
     let mut pontos = Vec::new();
+    // `indice.json["desenho_quintal"]` = modo da Yard View aberta na frente durante a gravação: entre os
+    // ticks o port faz o desenho dela (`desenho::desenhar_quintal`), como `_UpdateWindows` no original.
+    let indice: serde_json::Value = std::fs::read_to_string(dir.join("indice.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default();
+    let desenho = indice["desenho_quintal"].as_i64().map(|m| m as i16);
+    let mut primeiro_desenho_diferente = None;
+    let mut passos_desenho = (0u64, 0u64);
     for (k, (antes, depois)) in extras.iter().enumerate() {
         e.ciclos_jogo = antes.game_cycles;
         e.relogio_mac = antes.relogio_mac;
@@ -771,8 +785,33 @@ pub fn rodar_sequencia(dir: &Path, layout: &LayoutSave, regras: &mut dyn Regras)
             }
             pontos.push(PontoSequencia { ticks: k + 1, blocos, vida: comparar_vida(&vida_original, &vida_do_estado(&e)) });
         }
+        if let (Some(m), Some((proximo, _))) = (desenho, extras.get(k + 1)) {
+            passos_desenho.0 += u64::from(super::desenho::desenhar_quintal(&mut e, m));
+            passos_desenho.1 += u64::from(passos_entre(depois.semente_s, proximo.semente_s).unwrap_or(u32::MAX));
+            if primeiro_desenho_diferente.is_none() && e.s.semente() != proximo.semente_s {
+                primeiro_desenho_diferente = Some(k + 1);
+            }
+        }
     }
-    Ok(RelatorioSequencia { ticks: extras.len(), primeiro_sorteio_diferente, pontos })
+    Ok(RelatorioSequencia {
+        ticks: extras.len(),
+        primeiro_sorteio_diferente,
+        primeiro_desenho_diferente,
+        passos_desenho,
+        pontos,
+    })
+}
+
+/// Passos do gerador S de `a` até `b` (até 10.000), para contar o que o desenho sorteou.
+fn passos_entre(a: u16, b: u16) -> Option<u32> {
+    let mut s = super::rng::GeradorS::new(a);
+    (0..=10_000).find(|_| {
+        let igual = s.semente() == b;
+        if !igual {
+            s.passo();
+        }
+        igual
+    })
 }
 
 #[cfg(test)]
