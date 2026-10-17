@@ -309,11 +309,16 @@ pub fn normalizar_atrasos(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
     let r = &t.regras;
     let max_mac = r.gato_atraso.max(r.gato_atraso_fugiu).max(r.latido_atraso + r.latido_sorteio as i32) as i64;
     let max_ciclos = r.passaro_atraso.max(r.passaro_atraso_saiu) as i64;
+    // Com um relógio de verdade (o do Mac no jogo ao vivo, ou o `_gameCycles`/relógio de um vetor do
+    // original), o original compara os atrasos como estão, mesmo vindos de outra sessão (vetores
+    // `tutorial`: `_CatDelay` 4712 do arquivo do tutorial com o relógio em ~3300 fica intacto). A
+    // normalização fica só para o relógio sintético (sem nenhum dos dois).
+    let mac_real = e.relogio_mac.is_some() || e.ciclos_jogo != 0;
     let b = &mut e.bichos;
-    if b.gato_atraso as i64 > rel.mac + max_mac {
+    if !mac_real && b.gato_atraso as i64 > rel.mac + max_mac {
         b.gato_atraso = rel.mac as i32;
     }
-    if b.cachorro_atraso_latido as i64 > rel.mac + max_mac {
+    if !mac_real && b.cachorro_atraso_latido as i64 > rel.mac + max_mac {
         b.cachorro_atraso_latido = rel.mac as i32;
     }
     if b.passaro_atraso as i64 > rel.ciclos + max_ciclos {

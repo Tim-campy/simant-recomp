@@ -138,8 +138,8 @@ class Sessao:
                 self.log(f"tick {gt} parado ({err}); tela em re_trabalho/cen/dialogo_{gt}_{k}.png e Enter")
                 self.b.executar(f"capturar re_trabalho/cen/dialogo_{gt}_{k}.png")
                 dep.retomar()
-                # caixa de morte da amarela: "Click here to continue" no centro da janela de edição
-                self.b.executar("clicar_em 320 330")
+                # caixa de morte da amarela: "Click here to continue": (320, 310) cai dentro das caixas vistas (morte, GAME OVER, Tutorial)
+                self.b.executar("clicar_em 320 310")
                 time.sleep(1)
                 self.b.executar("teclas ret")
                 time.sleep(2)
@@ -268,6 +268,22 @@ def cenario_longo(c: Sessao, saida, n):
     """n ticks consecutivos em formato compacto (estado a cada 50); ver Sessao.gravar_longo."""
     c.entrada()
     return c.gravar_longo(saida, n, 50)
+
+
+def cenario_longo_full(c: Sessao, saida, n):
+    """Sequência longa com interface no Jogo Completo (snapshot full): na entrada do 1º tick, chuva
+    pedida (_GlobalKey = 0xA8) e enxames (_SwarmCntB = 5, _QueenStorageB = 3, _SwarmCntR = 2,
+    _QueenStorageR = 4); Ctrl+Y deixa a Yard View na frente, e o desenho dela sorteia S entre os ticks
+    (chuva e enxame). Grava como `longo`, com o estado a cada 100 ticks."""
+    c.entrada()
+    for nome, v in (("SwarmCntB", 5), ("QueenStorageB", 3), ("SwarmCntR", 2), ("QueenStorageR", 4)):
+        c.escrever(nome, v)
+    c.escrever("GlobalKey", 0xA8, 2)
+    c.dep.retomar()
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    c.entrada()
+    return c.gravar_longo(saida, n, 100)
 
 
 def cenario_fast(c: Sessao, saida, n):
@@ -478,7 +494,7 @@ def clicar_tela(c: Sessao, x, y, duplo=False):
 def dispensar(c: Sessao):
     """Fecha uma caixa de mensagem ("Click here to continue")."""
     c.dep.retomar()
-    c.b.executar("clicar_em 320 330")
+    c.b.executar("clicar_em 320 310")
     time.sleep(1)
 
 
@@ -745,6 +761,65 @@ def entre_ticks(bruto):
         mud = [n for n in sa.ordem if sa.bytes_bloco(n) != sb.bytes_bloco(n)]
         print(f"{a.name} -> {b.name}: S {passos_s(xa['SementeS'], xb['SementeS'])} passos, "
               f"R {passos_r(xa['SementeR'], xb['SementeR'])} passos; blocos do save mudados: {mud}")
+
+
+def cenario_exp_ctrl2(c: Sessao, saida, n):
+    """Experimental pausado: no ninho preto (Ctrl+9) cavar, Ctrl+cavar (enche), Ctrl+encher (cava) e
+    arrasto de cavar; na superfície (Ctrl+8) cheiro de alarme com clique curto e com o botão parado
+    ~2 s, e Ctrl+cheiro. Cada passo grava o plano e as células; quantas vezes o cheiro foi aplicado com
+    o botão parado depende do ritmo do redesenho (o port descobre o número no teste)."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    if n == 1:  # --ticks 1: ninho preto (a vista muda antes do estado de antes)
+        c.teclas("ctrl+9")
+        time.sleep(2)
+        passos = [
+            {"f": 2, "sub": 0, "pontos": [[28, 5]], "ctrl": False},
+            {"f": 2, "sub": 0, "pontos": [[28, 5]], "ctrl": True},
+            {"f": 2, "sub": 1, "pontos": [[29, 5]], "ctrl": True},
+            {"f": 2, "sub": 0, "pontos": [[24, 7], [25, 7], [26, 7], [27, 7]], "ctrl": False},
+        ]
+    else:  # superfície: cheiro
+        passos = [
+            {"f": 5, "sub": 4, "pontos": [[60, 30]], "ctrl": False},
+            {"f": 5, "sub": 4, "pontos": [[66, 30]], "ctrl": False, "segurar": 2.0},
+            {"f": 5, "sub": 4, "pontos": [[60, 30]], "ctrl": True},
+        ]
+    antes = fotografar(c, saida, "antes")
+    for p in passos:
+        c.mj.sessao_gdb()
+        s = c.save()
+        mx, my = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2)
+        p["plano"] = s.ler("MapPlane")
+        p["mappnt"] = [mx, my]
+        pix = lambda x, y: (MAPA_X0 + (x - mx) * TILE + 8, MAPA_Y0 + (y - my) * TILE + 8)
+        c.escrever("CurExpTool", p["f"], 2)
+        c.mj.escrever_variavel(f"8:{0x8600 + p['f']:x}", bytes([p["sub"]]), 1)
+        c.dep.retomar()
+        x0, y0 = pix(*p["pontos"][0])
+        qb.mouse_canto(c.q)
+        qb.mover_rel(c.q, x0, y0)
+        time.sleep(0.3)
+        if p["ctrl"]:
+            tecla_ctrl(c, True)
+        c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": True, "button": "left"}}])
+        time.sleep(p.get("segurar", 0.1))
+        ant = (x0, y0)
+        for q in p["pontos"][1:]:
+            xy = pix(*q)
+            qb.mover_rel(c.q, xy[0] - ant[0], xy[1] - ant[1])
+            ant = xy
+            time.sleep(0.5)
+        c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": False, "button": "left"}}])
+        time.sleep(0.3)
+        if p["ctrl"]:
+            tecla_ctrl(c, False)
+        time.sleep(1)
+        c.log(f"passo {p}")
+    tela(c, saida, "depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"exp": passos})
+    return []
 
 
 def cenario_explorar(c: Sessao, saida, n):

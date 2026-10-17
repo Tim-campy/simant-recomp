@@ -22,6 +22,7 @@ pub fn desenhar_quintal(e: &mut Estado, modo_quintal: i16) -> u32 {
     if modo_quintal > 1 {
         return 0;
     }
+    desenhar_menino(e, modo_quintal);
     let mut passos = 0;
     if e.ambiente.chovendo != 0 {
         for _ in 0..GOTAS_POR_QUADRO {
@@ -31,6 +32,22 @@ pub fn desenhar_quintal(e: &mut Estado, modo_quintal: i16) -> u32 {
         }
     }
     passos + desenhar_enxame(e)
+}
+
+/// `_DrawSimKid` (`1010:af14`), chamado por `_Draw_SimYard` quando o menino aparece (modo 1, ou
+/// `_BoyHere` ≠ 0, e `_BoyFrame` ≥ 0): sem pausa, se o relógio do Mac passou de `_BoyMsgCnt`, o balão
+/// do menino acaba (`_BoyMessOn = 0`). Sem sorteio. O relógio é o do tick que acabou de rodar
+/// (`Estado::relogio_mac`); sem ele, nada.
+pub fn desenhar_menino(e: &mut Estado, modo_quintal: i16) {
+    let m = &e.menino;
+    if (modo_quintal == 0 && m.presente == 0) || m.quadro < 0 || e.partida.pausado != 0 {
+        return;
+    }
+    if let Some(agora) = e.relogio_mac {
+        if agora > e.menino.boy_msg_cnt as u32 {
+            e.menino.mensagem_ligada = 0;
+        }
+    }
 }
 
 /// `_DrawSwarm` (`1010:bb0e`): com `_MapMode` = 0, grava o centro do enxame na tela do quintal

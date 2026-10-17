@@ -197,7 +197,10 @@ Observação da bancada: a vista do Experimental novo começou em `_MapPnt` = (5
 
 A vista do Experimental novo em `_MapPnt` = (52, 23) (seção acima) fecha com `_editWidth` = 25 na bancada (0x40 − 12 = 52), o mesmo que a centralização da amarela nos vetores de tick (testes-tick.md).
 
-**Não verificado no original:** Ctrl em cavar/encher e no cheiro, cheiro (a repetição parada depende do ritmo do redesenho), formiga em ninho, inseticida sobre a aranha e a formiga-leão.
+- **Ctrl em cavar/encher** (`exp_ninho`, ninho preto pela vista Ctrl+9): cavar (28, 5), Ctrl+cavar na mesma célula (enche), Ctrl+encher em (29, 5) (cava) e arrasto de cavar de (24, 7) a (27, 7): 307/307 com o mesmo S.
+- **Cheiro** (`exp_cheiro`, superfície): alarme com clique curto em (60, 30), com o botão parado ~2 s em (66, 30) e Ctrl+alarme em (60, 30): 307/307 com **6 voltas paradas** no segundo (o passo `parado` do vetor; ~3 voltas por segundo na bancada, o ritmo do redesenho).
+
+**Não verificado no original:** formiga em ninho, inseticida sobre a aranha e a formiga-leão.
 
 ## 10. Lacunas e divergências
 

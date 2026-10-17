@@ -1,0 +1,16 @@
+# Snapshot "tut": boot, "Select a Game" -> Tutorial Game (ícone em (180, 225) na tela 640x480) e grava.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_snapshot_tut.txt --overlay re_trabalho/qemu/ov_tut.qcow2
+esperar 50
+teclas spc
+esperar 6
+teclas spc
+esperar 10
+mouse_canto
+mover 180 225
+esperar 2
+clicar
+esperar 15
+capturar re_trabalho/cen/tut_inicio.png
+snapshot_salvar tut
+esperar 2
+fim
