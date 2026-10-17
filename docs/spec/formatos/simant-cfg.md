@@ -35,7 +35,7 @@ Os prefixos vêm da tabela de ponteiros far em `1048:b92b` usada por `_InitGraph
 
 ## `Sound Mode`
 
-O valor vai para `_musicDevice`. O significado de cada número ainda não foi levantado. Os candidatos estão em `_MusicInit`, `_snd_Install`, `_IsMMMidiAvail` e `_IsMMWaveAvail` (`GR_MODULE`) [em aberto].
+O valor vai para `_musicDevice`, mas nenhuma função lê essa variável no pseudocódigo: a saída de áudio é escolhida por `_snd_Install`, que testa `MMSYSTEM.DLL`, `SNDBLST.DLL` e `DSOUND.DLL` (ver [som.md](som.md)). No Windows, o "Sound Mode" não tem efeito [visto no código; herança das versões DOS]. As opções Music e Sound Effects vêm do `WIN.INI` (seção `[SimAnt]`), ver [regras/som.md](../regras/som.md).
 
 ## Port
 

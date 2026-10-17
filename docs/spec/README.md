@@ -25,6 +25,7 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
   - [formatos/janela.md](formatos/janela.md): sistema de janelas (layouts, cores, posições, cálculo e posicionamento na tela).
   - [formatos/simant-cfg.md](formatos/simant-cfg.md): `SIMANT.CFG`.
   - [formatos/save-ant.md](formatos/save-ant.md): jogo salvo e modelo de estado da simulação.
+  - [formatos/som.md](formatos/som.md): efeitos (tipo 5, tipo 51), cabeçalhos de música (tipo 18), MIDI (`SOUND\*.MID`, tipos 20 e 50) e as saídas de áudio do original.
 - Regras:
   - [regras/rng.md](regras/rng.md): geradores aleatórios (LFSR `_SRand*` e `rand` do C em `_RRand`), sementes e quem usa cada um.
   - [regras/geracao-mundo.md](regras/geracao-mundo.md): novo jogo (`_NewGame`, `_RandYard`, `_RandWorld`), patches do quintal e da casa, rainhas, comida e tutorial; verificada contra o `QUICK2.ANT`.
@@ -40,6 +41,7 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
   - [regras/ciclo-de-vida.md](regras/ciclo-de-vida.md): postura, desenvolvimento e eclosão dos ovos (`_SimEggB/R`), rainha (cabeça e cauda, andar, fome), escolha de casta (`_SetCasteProd`, `_CasteTabC`) e casos de teste.
   - [regras/testes-tick.md](regras/testes-tick.md): determinismo do original na bancada QEMU, vetores "estado antes → depois" de um tick e o que capturar além do save.
   - [regras/quintal.md](regras/quintal.md): quintal (`_DoSimYard`): menino dentro e fora de casa, cortador, pé e inseticida, gato, cachorro, pássaro, chuva e água, colônias do quintal 12 × 16 (`_SimColonies`, revoada, migração) e fim do Jogo Completo; casos Q-01 e Q-02 confirmados no original.
+  - [regras/som.md](regras/som.md): funções de som, opções Music/Sound Effects, preempção e catálogo de quem toca cada música e efeito.
   - [regras/conselhos.md](regras/conselhos.md): `_Feedback`: mensagens de conselho (lista 4/1020) e tutorial (`_GiveLesson`/`_LessonDone`, lições 4/11000…11112).
 
 ## Próximos subsistemas a especificar
@@ -47,4 +49,4 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
 1. Mapa de jogo: tiles (objetos tipo 9, ids 13–20) e mapas de superfície/ninho (`_MapA`, `_MapB`, `_MapR`), para exibir um mapa (marco seguinte do plano).
 2. Mapas de superfície e ninho (`_MapA`, `_MapB`, `_MapR`) e tiles (tipo 9).
 3. Regras da simulação (`SIMANT1_MODULE`, `SIMTWO_MODULE`), uma regra por vez, cada uma com caso de teste contra o original.
-4. Som e música (tipos 5, 18, 20, 50, 51).
+4. ~~Som e música~~: especificados em formatos/som.md e regras/som.md; falta as regras emitirem `Evento::Som`.

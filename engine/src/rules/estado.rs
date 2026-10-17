@@ -967,8 +967,11 @@ grupo_do_save! {
 pub enum Evento {
     /// Texto de SHARED tipo 4 (`_PictStrnDialog`), pelo id decimal (ex.: 10010).
     Mensagem(u16),
-    /// Música/efeito (`_myBeginSong`), pelo id do original.
+    /// Música (`_myBeginSong`), pelo id do cabeçalho tipo 18 do banco SOUND.
     Musica(u16),
+    /// Efeito sonoro (`_myBeginSound`), pelo id do objeto tipo 5 do banco SOUND
+    /// (catálogo em docs/spec/regras/som.md).
+    Som(u16),
     /// `_EndGameDialog(0)`: pedido a cada tick enquanto `_IsGameOver` ≠ 0.
     DialogoFimDeJogo,
     /// `_GotoMyAnt` (`1000:a764`): levar a vista da janela de edição até a formiga amarela

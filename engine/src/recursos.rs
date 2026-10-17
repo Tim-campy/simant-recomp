@@ -71,23 +71,19 @@ impl Recursos {
         Err(format!("objeto não encontrado: tipo {} id {}", chave.tipo, chave.id))
     }
 
-    /// Arquivo solto da pasta do jogo (ex.: `font1`, `FONTRES.FON`), sem diferenciar maiúsculas.
+    /// Arquivo solto da pasta do jogo (ex.: `font1`, `FONTRES.FON`, `sound/antthme1.mid`), sem
+    /// diferenciar maiúsculas em nenhuma parte do caminho (separador `/`).
     /// Um mod pode substituí-lo em `arquivos/<nome>`.
     pub fn arquivo(&self, nome: &str) -> Result<Vec<u8>, String> {
         for m in self.mods.iter().rev() {
-            let c = m.dir.join("arquivos").join(nome);
-            if c.is_file() {
+            if let Some(c) = achar_sem_caixa(&m.dir.join("arquivos"), nome) {
                 return std::fs::read(&c).map_err(|e| format!("{}: {e}", c.display()));
             }
         }
-        let alvo = nome.to_lowercase();
-        let entradas = std::fs::read_dir(&self.dir_jogo).map_err(|e| format!("{}: {e}", self.dir_jogo.display()))?;
-        for e in entradas.flatten() {
-            if e.file_name().to_string_lossy().to_lowercase() == alvo {
-                return std::fs::read(e.path()).map_err(|err| format!("{}: {err}", e.path().display()));
-            }
+        match achar_sem_caixa(&self.dir_jogo, nome) {
+            Some(c) => std::fs::read(&c).map_err(|e| format!("{}: {e}", c.display())),
+            None => Err(format!("arquivo do jogo não encontrado: {nome}")),
         }
-        Err(format!("arquivo do jogo não encontrado: {nome}"))
     }
 
     /// Arquivo de dados JSON do port (`data/<nome>`), sobrescrito por inteiro pelo último mod que o tiver.
@@ -103,6 +99,21 @@ impl Recursos {
         let texto = std::fs::read_to_string(&caminho).map_err(|e| format!("{}: {e}", caminho.display()))?;
         serde_json::from_str(&texto).map_err(|e| format!("{}: {e}", caminho.display()))
     }
+}
+
+/// Caminho `base/<nome>` com cada parte de `nome` (separada por `/`) achada sem diferenciar
+/// maiúsculas; `None` se alguma parte não existe ou se o resultado não é um arquivo.
+fn achar_sem_caixa(base: &Path, nome: &str) -> Option<PathBuf> {
+    let mut atual = base.to_path_buf();
+    for parte in nome.split('/').filter(|p| !p.is_empty()) {
+        let alvo = parte.to_lowercase();
+        let entrada = std::fs::read_dir(&atual)
+            .ok()?
+            .flatten()
+            .find(|e| e.file_name().to_string_lossy().to_lowercase() == alvo)?;
+        atual = entrada.path();
+    }
+    atual.is_file().then_some(atual)
 }
 
 /// Lê todos os subdiretórios com `mod.json` e ordena por dependências (e por nome, para ser determinístico).
