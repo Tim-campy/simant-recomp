@@ -966,7 +966,7 @@ fn vetores_de_tick_do_original() {
     let mut nomes: Vec<PathBuf> = lista
         .filter_map(|d| d.ok())
         .map(|d| d.path())
-        .filter(|p| p.is_dir())
+        .filter(|p| p.join("estado_antes.bin").is_file())
         .collect();
     nomes.sort();
     for p in nomes {
