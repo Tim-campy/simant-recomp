@@ -27,6 +27,19 @@
 
 Os tempos são aproximados porque o tick é de 55 ms. Nos testes, a soma bate: o "Select a Game" já estava aberto 80 s depois de iniciar o DOSBox-X.
 
+## Escolha do jogo (`_DoScenario` `1000:5998`, `_NewGame` `1000:d6dc`)
+
+**Fonte:** pseudocódigo [código], nomes do objeto 1/2 do `SHARED` [dados] e cliques na bancada QEMU [verificado].
+
+- `_DoScenario` abre a janela 2, espera um evento de objeto e devolve o id do objeto; `GetAsyncKeyState(VK_RETURN)` devolve 0x203 (Full Game); `_DialogAbort` devolve 0x205 [código].
+- `_NewGame` converte: `scenTutorial` 0x206 → `_CurGameType` 0, `scenQuickGame` 0x202 → 1, `scenFullGame` 0x203 → 2, `scenExperimental` 0x204 → 3; `scenLoad` 0x207 → `_LoadGame` (se falhar, mostra a caixa de novo); `scenCancel` 0x205 → devolve −1 sem mudar nada [código]. Depois, `_RandYard` e as janelas do jogo ([../regras/geracao-mundo.md](../regras/geracao-mundo.md) §1–2).
+- O mesmo diálogo volta durante a partida por File → New Game (**Ctrl+N**, `_ProcMenu` caso 3) e ao fechar o diálogo de fim de jogo (`_EndGameDialog` → `_NewGame(0)`), com a simulação pausada (`_SetPause(1)`) [código].
+- Na bancada (640×480): Quick Game em (345, 228), Tutorial em (185, 228), Full Game em (280, 290) na tela; o Full Game começa na superfície com a rainha alada e a faixa diz "You need to dig a nest" (`re_trabalho/modos/full_inicio.png`) [verificado].
+
+**No port:** `engine/src/core/selecao.rs` (`SelecaoDeJogo`: objeto sob o clique → `Escolha`), dados em `data/modos.json` (objeto → escolha, Enter → Full Game, tecla do New Game). Na abertura, a tela `selecao` de `telas.json` não fecha mais com qualquer clique: só um botão (ou Enter) escolhe, e o jogo do tipo escolhido começa (`simant/src/modos.rs`). Na partida, Ctrl+N desenha a janela 2 por cima da tela de jogo (posição da tabela 9/0) e pausa a simulação até a escolha. `--tipo tutorial|rapido|completo|experimental` começa direto um jogo do tipo. Load Game ainda não existe (aviso no terminal) e Cancel na abertura fecha o port (divergencias.md).
+
+**Verificado:** o teste `engine/tests/modos_reais.rs` confere que, na tabela de posições 0, os pontos clicados na bancada caem nos botões certos (Quick, Tutorial, Full, Experimental, Load) e que o centro de cada botão devolve a própria escolha.
+
 ## No port (marco 1)
 
 A sequência fica em `data/telas.json` (dados, não código): para cada tela, as janelas do jogo (e, opcionalmente, bitmaps soltos), a duração em ticks e os gatilhos que a encerram. Hoje só contém a abertura validada. Um mod pode trocar bitmaps ou layouts por (tipo, id), ou mudar a sequência.

@@ -1,0 +1,539 @@
+{
+ "_comentario": "Janela do quintal (25) e faixa 35. Gerado por tools/extrair_quintal_mapa.py; ver docs/spec/telas/quintal.md. Coordenadas: 'externo' e 'cliente' na área cliente da janela principal da tela de jogo (tela 640x480 menos 38 linhas); posições de bitmaps e de patches relativas ao canto da área cliente da janela 25.",
+ "janela": 25,
+ "faixa": 35,
+ "_origem_externo": "medido em re_trabalho/modos/full_yard.png: contorno de (119,137) a (631,413) na tela",
+ "externo": [
+  119,
+  99,
+  513,
+  277
+ ],
+ "altura_titulo": 18,
+ "cor_linha": 0,
+ "cor_titulo": 4,
+ "cor_botao": 8,
+ "cor_fundo": 7,
+ "titulos": [
+  "Yard View",
+  "House View",
+  "Strategic View",
+  "Graphic View"
+ ],
+ "_origem_titulos": "lista de textos 4/1000 do SHARED, itens 9..12 (_SetMapTitle 1000:953c); o port ainda não desenha o título",
+ "origem_patches": [
+  0,
+  0
+ ],
+ "_origem_origem_patches": "_mapTileRect = canto da área cliente; medido: cursor do patch (11,8) em (517,304) na tela",
+ "patch": {
+  "colunas": 12,
+  "linhas": 16,
+  "passo_x": 28,
+  "passo_y": 10,
+  "inclinacao": -10
+ },
+ "poligono_cursor": [
+  [
+   169,
+   67
+  ],
+  [
+   192,
+   67
+  ],
+  [
+   185,
+   74
+  ],
+  [
+   162,
+   74
+  ]
+ ],
+ "poligono_colonia": [
+  [
+   169,
+   67
+  ],
+  [
+   193,
+   67
+  ],
+  [
+   186,
+   74
+  ],
+  [
+   162,
+   74
+  ]
+ ],
+ "ajuste_cursor_modos_0_1": -1,
+ "modos": [
+  {
+   "bitmaps": [
+    {
+     "id": 7000,
+     "x": 0,
+     "y": 2
+    },
+    {
+     "id": 7002,
+     "x": 278,
+     "y": 2
+    }
+   ],
+   "conteudo": "bichos",
+   "mostra_menino_dentro": false
+  },
+  {
+   "bitmaps": [
+    {
+     "id": 7001,
+     "x": 0,
+     "y": 2
+    },
+    {
+     "id": 7002,
+     "x": 278,
+     "y": 2
+    }
+   ],
+   "conteudo": "bichos",
+   "mostra_menino_dentro": true
+  },
+  {
+   "bitmaps": [
+    {
+     "id": 7020,
+     "x": 0,
+     "y": 66
+    }
+   ],
+   "conteudo": "colonias",
+   "mostra_menino_dentro": false
+  },
+  {
+   "bitmaps": [
+    {
+     "id": 7020,
+     "x": 0,
+     "y": 66
+    }
+   ],
+   "conteudo": "barras",
+   "mostra_menino_dentro": false
+  }
+ ],
+ "_origem_modos": "_SetYardMode 1000:9f94 (buffer) e _win_DrawYardWindow 1010:a9e0; posições medidas (7000 em (120,159), 7002 em (398,159), 7020 em (120,223))",
+ "rodape": {
+  "id": 7010,
+  "x": -1,
+  "y": 227
+ },
+ "cores_colonia": {
+  "preta": 0,
+  "ambas": 8,
+  "vermelha": 9
+ },
+ "_origem_cores_colonia": "_DrawSimColonies 1010:bea4 (tabelas 1048:1982/198a, cores convertidas em tempo de execução); medidas em yard_strat2.png",
+ "barras": {
+  "x_preta": 168,
+  "x_vermelha": 180,
+  "largura": 9,
+  "base_y": 71,
+  "cor_preta": 0,
+  "cor_vermelha": 9
+ },
+ "_origem_barras": "_DrawColonyBars 1010:bf9c (0xa8, +0xc..+0x15, 0x47); altura (pop + 3) >> 2",
+ "cursor": [
+  {
+   "contorno": 13,
+   "preenchimento": null
+  },
+  {
+   "contorno": 13,
+   "preenchimento": null
+  },
+  {
+   "contorno": 7,
+   "preenchimento": 8
+  },
+  {
+   "contorno": 7,
+   "preenchimento": 8
+  }
+ ],
+ "_origem_cursor": "medido: modos 0/1 contorno magenta (full_yard.png); modos 2/3 cinza claro com contorno cinza escuro (yard_strat.png)",
+ "transparente": 13,
+ "sprites": {
+  "menino": {
+   "base": 8000,
+   "deslocamentos": {
+    "0": [
+     3,
+     2
+    ],
+    "1": [
+     3,
+     0
+    ],
+    "2": [
+     1,
+     2
+    ],
+    "3": [
+     0,
+     3
+    ],
+    "4": [
+     3,
+     2
+    ],
+    "5": [
+     0,
+     3
+    ],
+    "6": [
+     1,
+     2
+    ],
+    "7": [
+     4,
+     0
+    ],
+    "8": [
+     4,
+     2
+    ],
+    "9": [
+     3,
+     3
+    ],
+    "10": [
+     7,
+     2
+    ],
+    "11": [
+     2,
+     3
+    ],
+    "20": [
+     4,
+     0
+    ],
+    "21": [
+     5,
+     2
+    ],
+    "22": [
+     4,
+     0
+    ],
+    "23": [
+     6,
+     2
+    ],
+    "100": [
+     0,
+     1
+    ],
+    "101": [
+     3,
+     0
+    ],
+    "102": [
+     2,
+     1
+    ],
+    "103": [
+     1,
+     1
+    ],
+    "104": [
+     5,
+     0
+    ],
+    "105": [
+     0,
+     1
+    ],
+    "106": [
+     0,
+     1
+    ],
+    "107": [
+     0,
+     0
+    ],
+    "108": [
+     0,
+     1
+    ],
+    "109": [
+     0,
+     1
+    ],
+    "110": [
+     0,
+     0
+    ],
+    "111": [
+     0,
+     1
+    ]
+   }
+  },
+  "cachorro": {
+   "base": 8500,
+   "deslocamentos": {
+    "0": [
+     1,
+     0
+    ],
+    "1": [
+     0,
+     1
+    ],
+    "2": [
+     1,
+     0
+    ],
+    "3": [
+     2,
+     1
+    ],
+    "4": [
+     0,
+     2
+    ],
+    "5": [
+     1,
+     1
+    ],
+    "6": [
+     2,
+     2
+    ],
+    "7": [
+     2,
+     0
+    ],
+    "8": [
+     2,
+     0
+    ],
+    "9": [
+     1,
+     1
+    ],
+    "10": [
+     0,
+     2
+    ],
+    "11": [
+     1,
+     1
+    ],
+    "100": [
+     2,
+     1
+    ],
+    "101": [
+     0,
+     1
+    ],
+    "102": [
+     2,
+     3
+    ],
+    "103": [
+     0,
+     3
+    ]
+   }
+  },
+  "gato": {
+   "base": 1300,
+   "deslocamentos": {
+    "10": [
+     -10,
+     -21
+    ],
+    "11": [
+     -9,
+     -19
+    ],
+    "12": [
+     -10,
+     -18
+    ],
+    "13": [
+     -10,
+     0
+    ],
+    "14": [
+     -21,
+     0
+    ],
+    "15": [
+     -19,
+     2
+    ],
+    "16": [
+     -18,
+     4
+    ],
+    "17": [
+     0,
+     6
+    ],
+    "18": [
+     0,
+     8
+    ],
+    "19": [
+     2,
+     10
+    ],
+    "20": [
+     0,
+     0
+    ],
+    "21": [
+     2,
+     -16
+    ],
+    "22": [
+     4,
+     -23
+    ],
+    "23": [
+     6,
+     -24
+    ],
+    "24": [
+     8,
+     -22
+    ],
+    "25": [
+     10,
+     -18
+    ],
+    "26": [
+     12,
+     -10
+    ],
+    "27": [
+     14,
+     -10
+    ],
+    "28": [
+     16,
+     -4
+    ],
+    "29": [
+     18,
+     -2
+    ]
+   }
+  },
+  "passaro": {
+   "base": 1250,
+   "deslocamentos": {
+    "0": [
+     -10,
+     -3
+    ],
+    "1": [
+     -9,
+     -1
+    ]
+   }
+  },
+  "cortador": {
+   "base": 8800,
+   "parado": [
+    98,
+    181
+   ],
+   "direita": [
+    19,
+    15
+   ],
+   "esquerda": [
+    -15,
+    15
+   ]
+  },
+  "placa": {
+   "id": 1260,
+   "x": 170,
+   "y": 186
+  },
+  "chuva": {
+   "id": 7005,
+   "gotas": 14,
+   "x_min": 50,
+   "x_faixa": 400,
+   "y_faixa": 150
+  }
+ },
+ "_origem_sprites": "_Draw_SimYard 1010:b462, _DrawSimKid 1010:af14, _DrawDog 1010:b110, _DrawSimCat 1010:b200, _DrawSimBird 1010:b196, _DrawMower, _DrawRain 1010:ba9e",
+ "botao_abrir": "ribToYard",
+ "botoes_faixa": {
+  "ribPatch": "fechar",
+  "ribHouse": "alternar_casa",
+  "ribStrat": "modo_estrategico",
+  "ribGraphic": "modo_grafico",
+  "ribPlace": "colocar_rainha",
+  "ribAuto": "rainhas_automatico",
+  "ribManual": "rainhas_manual"
+ },
+ "botao_do_modo": [
+  "ribHouse",
+  "ribHouse",
+  "ribStrat",
+  "ribGraphic"
+ ],
+ "botoes_rainhas": [
+  "ribAuto",
+  "ribManual"
+ ],
+ "teclas": [
+  {
+   "tecla": "Y",
+   "ctrl": true,
+   "acao": "modo_quintal"
+  },
+  {
+   "tecla": "5",
+   "ctrl": true,
+   "acao": "modo_casa"
+  },
+  {
+   "tecla": "6",
+   "ctrl": true,
+   "acao": "modo_estrategico"
+  },
+  {
+   "tecla": "7",
+   "ctrl": true,
+   "acao": "modo_grafico"
+  },
+  {
+   "tecla": "M",
+   "ctrl": true,
+   "acao": "abrir"
+  }
+ ],
+ "dados_faixa": {
+  "fonte": 0,
+  "rainhas": "ribQueens",
+  "colonias_pretas": "ribBlackCols",
+  "colonias_vermelhas": "ribRedCols"
+ },
+ "_origem_dados_faixa": "_DrawYardData 1010:acd8: _font_SetFont(3) [a lista de fontes do port numera diferente: medido, o índice 0 (Gaia8x14) bate 98,5% em full_yard.png], _QueenStorageB em 0x231a, _ColonyTotalBlack/Red em 0x231d/0x231e",
+ "_origem_teclas": "ACCELERATORTABLE do SIMANTW.EXE: Ctrl+Y/5/6/7 = comandos 0xFD21-0xFD24 (_ProcMenu: modo 0-3 e abre o quintal), Ctrl+M = 0xFD12 (_OpenMapYard)"
+}

@@ -13,11 +13,13 @@ Reimplementação moderna do **SimAnt** (Maxis, 1991, versão Windows 3.x) em Ru
 
 ```
 cargo test                                         # parsers, regras e mods (testes com arquivos reais se presentes)
-cargo run -p simant                                # abertura: Espaço/clique avança, Esc sai
+cargo run -p simant                                # abertura e "Select a Game": o botão escolhido começa o jogo, Esc sai
 cargo run -p simant -- --exportar-telas saida/     # grava cada tela da sequência em PNG
 cargo run -p simant -- --save tests/referencias/saves/QUICK2.ANT                        # joga a partida do save
 cargo run -p simant -- --novo-jogo                                                       # Quick Game novo (semente do relógio)
 cargo run -p simant -- --novo-jogo --semente 1234                                        # Quick Game reproduzível
+cargo run -p simant -- --tipo completo --semente 1234                                    # Full Game (também tutorial, rapido, experimental)
+cargo run -p simant -- --tipo completo --quintal 2 --exportar-tela-jogo q.png            # tela com a janela do quintal no modo 2
 cargo run -p simant -- --save QUICK2.ANT --exportar-tela-jogo saida/jogo.png            # tela em PNG, sem janela
 cargo run -p simant -- --save QUICK2.ANT --acoes superficie,linha_direita --exportar-tela-jogo s.png
 cargo run -p simant -- --save QUICK2.ANT --ticks 50 --exportar-tela-jogo s.png          # 50 ticks sem janela
@@ -29,7 +31,7 @@ Opções: `--jogo DIR` (padrão: `SIMANT_DIR` ou `SimAnt-T/MAXIS/ANTWIN`), `--da
 
 ### Como jogar
 
-`--save ARQ.ANT` ou `--novo-jogo` abre a tela de jogo (faixa e janela de edição) com a simulação rodando: você é a **formiga amarela**. Os avisos do jogo aparecem como no original: a mensagem da faixa ("Game Paused", conselhos, velocidade) e os quadros de mensagem e de fim de jogo, que param a simulação até um clique no quadro (ou Espaço; o quadro de mensagem também fecha sozinho em ~15 s). Ao fechar o fim de jogo começa um Quick Game novo. As músicas e os efeitos sonoros pedidos pelas regras tocam (os de menus e diálogos ainda não, ver `docs/spec/regras/som.md`). Ainda não há menus nem as janelas de mapa, castas e história. Partes das regras ainda faltam (ver `docs/spec/`).
+`--save ARQ.ANT` ou `--novo-jogo` abre a tela de jogo (faixa e janela de edição) com a simulação rodando: você é a **formiga amarela**. Os avisos do jogo aparecem como no original: a mensagem da faixa ("Game Paused", conselhos, velocidade) e os quadros de mensagem e de fim de jogo, que param a simulação até um clique no quadro (ou Espaço; o quadro de mensagem também fecha sozinho em ~15 s). Ao fechar o fim de jogo (ou com **Ctrl+N**, File → New Game) aparece o "Select a Game". As músicas e os efeitos sonoros pedidos pelas regras tocam (os de menus e diálogos ainda não, ver `docs/spec/regras/som.md`). Ainda não há menus nem as janelas de mapa, castas e história. Partes das regras ainda faltam (ver `docs/spec/`).
 
 - **Clique** numa célula do mapa: a amarela vai até lá. **Duplo clique**: age (numa formiga de outra cor, ataca; da mesma cor, pede comida; em comida/pedrinha, pega ou larga; no ninho, cava). Clique direito funciona igual. **Espaço/Insert** (e **Delete**) clicam onde está o cursor; duas vezes seguidas, duplo clique.
 - Clicar no buraco do ninho leva a amarela para dentro; no ninho, clicar na linha de cima a leva para fora.
@@ -38,6 +40,13 @@ Opções: `--jogo DIR` (padrão: `SIMANT_DIR` ou `SimAnt-T/MAXIS/ANTWIN`), `--da
 - Botões da segunda linha da faixa (como no original): ir até a amarela, pausa, **velocidade** (cicla e mostra "Game speed now …"), música e balões; os que abririam janelas ainda não fazem nada.
 - **Ctrl+S** salva no arquivo da partida (o do `--save`); **Ctrl+A** salva com outro nome (o de `--salvar`, ou `SALVO01.ANT`, `SALVO02.ANT`… na pasta atual). O `.ANT` gravado é aceito pelo SimAnt original.
 - As teclas da partida ficam em `data/partida.json` e os avisos em `data/mensagens.json` (sobrescrevíveis por mod).
+
+Modos de jogo (ver `docs/spec/telas/abertura.md`, `quintal.md` e `experimental.md`):
+
+- **Select a Game**: Tutorial, Quick Game, Full Game ou Experimental (Enter = Full Game, como no original). Load Game ainda não existe.
+- **Quintal** (Yard View): botão *Yard* da faixa ou **Ctrl+M**; **Ctrl+Y / Ctrl+5 / Ctrl+6 / Ctrl+7** abrem nos modos quintal, casa por dentro, estratégico (cor das colônias) e gráfico (barras). Na faixa do quintal: *House*, *Strat*, *Graphic*, *Patch* (fecha), *Place* (o próximo clique num patch a até 3 do atual coloca uma rainha guardada), *Automatic/Manual*. Clique num patch escolhe; **duplo clique troca de patch** (só no Full Game e onde há colônia preta, como no original): o patch novo é gerado da semente dele, inclusive os 38 patches da casa.
+- **Experimental**: o botão de ferramentas da faixa (ao lado do *?*) abre o menu: info, barreira (muro/pedrinha), cavar/encher, formiga preta/vermelha, comida (1/20), cheiro (5 tipos), inseticida (spray/jato) e "Start Game". Clique e arraste no mapa aplicam a ferramenta; com **Ctrl**, muro, cavar, comida e cheiro fazem o contrário. No Quick Game, o mesmo botão passa a partida para o Experimental.
+- **Tutorial**: jogo tipo 0 (sem aranha); as lições saem como mensagens (`rules/conselhos.rs`).
 
 Navegação na tela de jogo:
 
