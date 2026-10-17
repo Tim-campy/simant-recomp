@@ -507,6 +507,30 @@ def cenario_xfer(c: Sessao, saida, n):
     return []
 
 
+def cenario_place(c: Sessao, saida, n):
+    """_PlaceQueenInYard: Jogo Completo pausado, _QueenStorageB = 2, Ctrl+Y, botão PLACE da faixa 35
+    (360, 60) e um clique no patch (9, 7) (dentro do alcance) ou, com --ticks 2, (5, 8) (fora)."""
+    alvo = (9, 7) if n != 2 else (5, 8)
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    c.escrever("QueenStorageB", 2)
+    c.dep.retomar()
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    antes = fotografar(c, saida, "antes")
+    tela(c, saida, "1_yard")
+    clicar_tela(c, 360, 60)
+    time.sleep(2)
+    tela(c, saida, "2_place")
+    clicar_tela(c, *pixel_patch(*alvo))
+    time.sleep(3)
+    tela(c, saida, "3_depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"place": alvo})
+    return []
+
+
 def gravar_acao(saida, antes, depois, acao):
     """extras.json no formato dos vetores de tick (comparável com vetor_tick::comparar_com)."""
     (Path(saida) / "extras.json").write_text(json.dumps({"antes": antes, "depois": depois, "acao": acao}, indent=1) + "\n",

@@ -606,6 +606,9 @@ pub fn aplicar_acao(
         return Ok(format!("{:?}", super::troca_patch::trocar_patch(e, tab, cfg)?));
     }
     if let Some((x, y)) = par("place") {
+        // No original o clique que encerra o PLACE também chega a `_YardArea`: `_YMapPnt` = patch
+        // clicado, dentro ou fora do alcance (bancada, acoes/place e place_fora).
+        e.vistas.ponto_quintal = (x, y);
         return Ok(format!("{:?}", super::troca_patch::colocar_rainha(e, x, y)));
     }
     Err(format!("ação desconhecida: {acao}"))
