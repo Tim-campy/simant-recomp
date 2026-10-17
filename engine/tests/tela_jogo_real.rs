@@ -138,7 +138,8 @@ fn botoes_da_faixa_e_outros_planos_do_quick2() {
     assert_eq!(tela.seta_em(200, 200), None);
 }
 
-const HASH_TELA_JOGO: &str = "2bdd46f9280642b70c36b1fd5f74aa78efad63dc208760e5b87a3cd19312c1c8";
+// Atualizado em 2026-10-18: traço do menu de sistema e seta de maximizar na moldura (medidos em j00).
+const HASH_TELA_JOGO: &str = "aaf5079f898bdb9859f3f144f9a8f6728ce5383b3c24c0cc17a7c423604d8798";
 
 /// Janelas de controle (janelas.md): o clique no triângulo do Caste Control (na frente) muda
 /// `_casteLevels`, passa para Manual e recalcula `_IdealCaste`; Auto e os conjuntos.

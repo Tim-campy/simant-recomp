@@ -24,7 +24,9 @@
       "cor_botao": 8,
       "cor_relevo_claro": 15,
       "cor_relevo_escuro": 7,
-      "cor_trilho": 8
+      "cor_trilho": 8,
+      "fontes_titulo": [6, 0],
+      "cor_texto_titulo": 15
     }
   }
 }

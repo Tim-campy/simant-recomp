@@ -57,13 +57,16 @@ pub struct ConfigJanelas {
     /// 640×480: 2 linhas abaixo].
     pub ajuste_posicao: [i16; 2],
     pub altura_titulo: i16,
-    pub fonte_titulo: usize,
+    pub fonte_titulo: Vec<usize>,
     /// Cores do título: [fundo, texto] da janela ativa e da inativa (índices da paleta).
     pub titulo_ativo: [u8; 2],
     pub titulo_inativo: [u8; 2],
     pub cor_linha: u8,
     pub cor_fundo: u8,
     pub cor_caixa_sistema: u8,
+    /// Traço do menu de sistema: miolo e sombra.
+    pub cor_traco: u8,
+    pub cor_sombra: u8,
     /// Botão do triângulo (`_knobSize`, bitmap 0x578).
     pub bitmap_botao: u16,
     /// Índice transparente do botão (como o 13 dos tiles de vida).
@@ -465,11 +468,16 @@ pub fn desenhar_moldura_com_titulo(q: &mut Quadro, interface: &Interface, jc: &C
     let caixa = Retangulo { dir: g.titulo.esq + h, ..g.titulo };
     q.preencher(g.titulo, fundo, fundo);
     q.preencher(caixa, jc.cor_caixa_sistema, jc.cor_caixa_sistema);
-    let traco = Retangulo { esq: caixa.esq + 3, topo: caixa.topo + 8, dir: caixa.dir - 3, base: caixa.topo + 10 };
-    q.preencher(traco, jc.cor_linha, jc.cor_linha);
+    // Traço do menu de sistema do Windows 3.1 [medido em j01]: retângulo 7 × 3 de contorno preto e
+    // miolo branco, com sombra cinza escura à direita e embaixo.
+    let (cx, cy) = (caixa.esq + 6, caixa.topo + 7);
+    q.preencher(Retangulo { esq: cx + 1, topo: cy + 3, dir: cx + 8, base: cy + 4 }, jc.cor_sombra, jc.cor_sombra);
+    q.preencher(Retangulo { esq: cx + 7, topo: cy + 1, dir: cx + 8, base: cy + 4 }, jc.cor_sombra, jc.cor_sombra);
+    q.contorno(Retangulo { esq: cx, topo: cy, dir: cx + 6, base: cy + 2 }, jc.cor_linha);
+    q.preencher(Retangulo { esq: cx + 1, topo: cy + 1, dir: cx + 6, base: cy + 2 }, jc.cor_traco, jc.cor_traco);
     q.preencher(Retangulo { esq: caixa.dir, dir: caixa.dir + 1, ..g.titulo }, jc.cor_linha, jc.cor_linha);
     q.preencher(Retangulo { topo: g.titulo.base, base: g.titulo.base + 1, ..g.externo }, jc.cor_linha, jc.cor_linha);
-    if let Some(Some(f)) = interface.fontes.get(jc.fonte_titulo) {
+    if let Some(f) = jc.fonte_titulo.iter().find_map(|&i| interface.fontes.get(i).and_then(|f| f.as_ref())) {
         let r = Retangulo { esq: caixa.dir + 1, ..g.titulo };
         q.texto(r, f, titulo.as_bytes(), 0, texto, fundo);
     }

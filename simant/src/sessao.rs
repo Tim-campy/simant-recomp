@@ -78,6 +78,16 @@ impl Sessao<'_> {
             }
         };
         let mut tela = TelaDeJogo::carregar(&cfg, recursos, &interface, &jogo)?;
+        // _SetEditWinTitle: no Load, o nome do arquivo (em maiúsculas, como o diálogo devolve); num
+        // jogo novo, "SimAnt - " e o nome do tipo (lista 4/1001) [medido no Quick Game].
+        tela.titulo = match origem {
+            Origem::Save(p, ..) => p.file_name().map(|n| n.to_string_lossy().to_uppercase()).unwrap_or_default(),
+            Origem::Novo(_, tipo) => {
+                let nomes = avisos::linhas_do_texto(recursos, 1001);
+                let nome = nomes.get(tipo as usize).map(|l| l.iter().map(|&b| b as char).collect::<String>()).unwrap_or_default();
+                format!("SimAnt - {nome}")
+            }
+        };
         tela.atualizar(&estado);
         // Jogo novo: _NewGame faz _SetMapPlane(_MePlane) e _CenterEdit na amarela, o mesmo que a
         // posição "ao carregar"; um save segue data/navegacao.json.
