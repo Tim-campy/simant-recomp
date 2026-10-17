@@ -60,9 +60,9 @@ fn vista_do_quick2_salva_e_ao_carregar() {
     let j = quick2();
     let salva = vista_do_save(&j, PosicaoVista::Salva, 26, 19).unwrap();
     assert_eq!((salva.plano, salva.x, salva.y), (Plano::NinhoPreto, 22, 0));
-    // Ao carregar, centraliza em (_MeLocX, _MeLocY) = (34, 9): x = 34 − 26/2 = 21 [hipótese, jogo.md].
-    let carregada = vista_do_save(&j, PosicaoVista::AoCarregar, 26, 19).unwrap();
-    assert_eq!((carregada.x, carregada.y), (21, 0));
+    // Ao carregar, centraliza em (_MeLocX, _MeLocY) = (34, 9): x = 34 − 25/2 = 22 (bancada, jogo.md).
+    let carregada = vista_do_save(&j, PosicaoVista::AoCarregar, 25, 19).unwrap();
+    assert_eq!((carregada.x, carregada.y), (22, 0));
 }
 
 #[test]
@@ -94,8 +94,8 @@ fn navegacao_do_quick2_ao_carregar() {
     let texto = std::fs::read_to_string(raiz().join("data/navegacao.json")).unwrap();
     let cfg: ConfigNavegacao = serde_json::from_str(&texto).unwrap();
     assert_eq!(cfg.posicao_inicial, PosicaoVista::AoCarregar);
-    let mut n = Navegacao::do_save(&quick2(), PosicaoVista::AoCarregar, 26, 19).unwrap();
-    assert_eq!((n.plano_mapa, n.vista.x, n.vista.y), (2, 21, 0));
+    let mut n = Navegacao::do_save(&quick2(), PosicaoVista::AoCarregar, 25, 19).unwrap();
+    assert_eq!((n.plano_mapa, n.vista.x, n.vista.y), (2, 22, 0));
     // _DoLoadInitializations grava (_MeLocX, _MeLocY) = (34, 9) no ponto do ninho preto.
     assert_eq!(n.pontos[2], (34, 9));
     assert!(n.aplicar(Acao::Superficie));
@@ -114,7 +114,7 @@ fn botoes_da_faixa_e_outros_planos_do_quick2() {
     let interface = Interface::carregar(&r, cfg.tabela_posicoes).unwrap();
     let j = quick2();
     let tela = TelaDeJogo::carregar(&cfg, &r, &interface, &j).unwrap();
-    assert_eq!((tela.largura_vista, tela.altura_vista), (26, 19));
+    assert_eq!((tela.largura_vista, tela.altura_vista), (25, 19));
     // Cada botão configurado existe na faixa e é encontrado pelo clique no seu centro.
     let id_faixa = interface.moldura.faixa.janela;
     let faixa = engine::core::telas::carregar_janela(&r, id_faixa).unwrap();
@@ -139,3 +139,35 @@ fn botoes_da_faixa_e_outros_planos_do_quick2() {
 }
 
 const HASH_TELA_JOGO: &str = "2bdd46f9280642b70c36b1fd5f74aa78efad63dc208760e5b87a3cd19312c1c8";
+
+/// Janelas de controle (janelas.md): o clique no triângulo do Caste Control (na frente) muda
+/// `_casteLevels`, passa para Manual e recalcula `_IdealCaste`; Auto e os conjuntos.
+#[test]
+fn janela_de_castas_muda_os_niveis() {
+    use engine::core::janelas::{Controle, JanelasControle};
+    use engine::rules::estado::Estado;
+    let Some(r) = recursos() else { return };
+    let mut e = Estado::de_save(&quick2()).unwrap();
+    let cfg: ConfigTelaJogo = r.dados("tela_jogo.json").unwrap();
+    let interface = Interface::carregar(&r, cfg.tabela_posicoes).unwrap();
+    let mut j = JanelasControle::new(r.dados("janelas.json").unwrap(), &interface);
+    j.trazer_para_frente(Some(Controle::Castas));
+    let edicao = engine::formats::janela::Retangulo { esq: 20, topo: 97, dir: 444, base: 444 };
+    // Ápice do triângulo (casteTriangle (392, 342) no layout, deslocamento (0, −52)): reprodutores 100%.
+    assert!(j.clicar(&r, &mut e, edicao, 447, 290).unwrap());
+    assert!(j.soltar());
+    assert_eq!(e.controles.castas[0], 0xFFFF);
+    assert_eq!(e.controles.casta_automatica, 0);
+    assert_eq!(e.controles.castas_ideais, [0, 0, 50, 50]);
+    assert_eq!(e.controles.castas_memorizadas[..3], [0xFFFF, 0, 0]);
+    // Set 2 (348, 359)–(391, 373): guarda o atual no conjunto 0 e carrega o 1.
+    assert!(j.clicar(&r, &mut e, edicao, 360, 359 - 52 + 5).unwrap());
+    assert_eq!(j.conjunto[0], 1);
+    assert_eq!(e.controles.castas[..], e.controles.castas_memorizadas[3..6]);
+    // Auto (348, 309)–(390, 323).
+    assert!(j.clicar(&r, &mut e, edicao, 360, 309 - 52 + 5).unwrap());
+    assert_eq!(e.controles.casta_automatica, 1);
+    // Fora das janelas e dentro da de edição: é da janela de edição, que vem para a frente.
+    assert!(!j.clicar(&r, &mut e, edicao, 100, 200).unwrap());
+    assert_eq!(j.ativa(), None);
+}

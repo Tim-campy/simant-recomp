@@ -369,7 +369,9 @@ fn t9_estrategia_vermelha_malvada_e_revoada() {
     assert_eq!(e.vermelha.modo_estrategico, 0);
     assert_eq!(e.lider_vermelha.malvadeza, s.rand1(100) as i16 + 30);
     assert_eq!(e.vermelha.revoada, 200);
-    assert_eq!(e.retirar_eventos(), vec![engine::rules::estado::Evento::Musica(0x2B0A)]);
+    use engine::rules::estado::{Evento, MensagemFaixa};
+    let ataque = MensagemFaixa { lista: 1020, indice: 5, duracao: 120, importante: false };
+    assert_eq!(e.retirar_eventos(), vec![Evento::Musica(0x2B0A), Evento::MensagemFaixa(ataque)]);
     let m = e.lider_vermelha.malvadeza;
     escolher_estrategia(&mut e, t);
     assert_eq!((e.vermelha.modo_estrategico, e.lider_vermelha.malvadeza), (0, m - 1));

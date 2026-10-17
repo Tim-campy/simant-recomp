@@ -980,6 +980,19 @@ pub enum Evento {
     /// `_GotoMyAnt` (`1000:a764`): levar a vista da janela de edição até a formiga amarela
     /// (AutoTrack, Home, Backspace, clique na própria amarela, ordem impossível...).
     CentralizarNaAmarela,
+    /// `_EditMessage(texto, duração, importante)`: mensagem da faixa (telas/mensagens.md §2).
+    MensagemFaixa(MensagemFaixa),
+}
+
+/// Pedido de mensagem na faixa: string `indice` da lista SHARED 4/`lista`, com a duração do
+/// original (prazo = duração × 3 / 2 unidades de `_TickCount`) e o "importante" de `_EditMessage`.
+/// Vem dos arquivos de dados das regras.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+pub struct MensagemFaixa {
+    pub lista: u16,
+    pub indice: u8,
+    pub duracao: u16,
+    pub importante: bool,
 }
 
 /// Contadores de balões de fala zerados no começo do tick (simulacao-visao-geral.md §5, passo 3).

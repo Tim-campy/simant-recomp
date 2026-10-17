@@ -12,6 +12,9 @@ Comandos de roteiro (um por linha, # = comentário):
     mover DX DY                 movimento relativo (em mickeys; com aceleração desligada, 1 = 1 pixel)
     clicar                      clique esquerdo
     clicar_em X Y               leva o cursor a (X, Y) da tela emulada (canto + movimento exato) e clica
+    ir_para X Y                 só leva o cursor a (X, Y)
+    apertar / soltar            segura / solta o botão esquerdo do mouse
+    apertar_tecla K / soltar_tecla K   segura / solta a tecla K (qcode do QMP: ctrl, shift...)
     capturar ARQUIVO.png        screendump da tela emulada
     memoria INICIO TAMANHO ARQ  pmemsave (endereço físico)
     pausar / continuar          para / retoma a CPU emulada (QMP stop / cont)
@@ -990,6 +993,20 @@ class Bancada:
             clicar(q)
         elif c == "clicar":
             clicar(q)
+        elif c == "ir_para":
+            # só posiciona o cursor em (X, Y), sem clicar
+            mouse_canto(q)
+            mover_rel(q, int(a[0]), int(a[1]))
+            time.sleep(0.2)
+        elif c in ("apertar", "soltar"):
+            # botão esquerdo do mouse segurado / solto (menus de "segurar o botão")
+            q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": c == "apertar", "button": "left"}}])
+            time.sleep(0.15)
+        elif c in ("apertar_tecla", "soltar_tecla"):
+            # tecla (qcode do QMP, ex.: ctrl, shift) segurada / solta, para Ctrl+clique
+            q.cmd("input-send-event", events=[{"type": "key", "data": {
+                "down": c == "apertar_tecla", "key": {"type": "qcode", "data": a[0]}}}])
+            time.sleep(0.15)
         elif c == "capturar":
             ppm = mj.tmp / "tela.ppm"
             q.cmd("screendump", filename=str(ppm))

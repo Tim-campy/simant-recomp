@@ -16,6 +16,7 @@ O conteúdo vem depois de descomprimir, se for o caso (ver [banco-dat-ndx.md](ba
 
 - **4 bpp (formato 0x84):** dois pixels por byte, nibble alto primeiro. Cada linha ocupa `((w·4 + 31) / 32) · 4` bytes (alinhamento de 4 bytes, como num DIB do Windows). As linhas estão de **baixo para cima**.
 - **1 bpp (formato 0x01):** oito pixels por byte, bit mais significativo primeiro, com o mesmo alinhamento de 4 bytes. As linhas estão de **cima para baixo**. No `SHARED`, o campo de tamanho declara o tamanho já convertido para 4 bpp (por exemplo, 9632 bytes para um bitmap de 2408), o que indica que o jogo converte esses bitmaps mono para cor ao carregar (`_ConvertMonoBitmap`).
+- **Planar (formato 0x04):** visto só no menu de ícones (2/7200, 187 × 166). Cada linha, de **cima para baixo**, tem os 4 planos de 1 bit em sequência, cada um com o tamanho de uma linha de 1 bpp (alinhada a 4 bytes); o plano k é o bit k do índice de cor [medido: bate com a captura do menu (janelas.md §4.4)].
 
 **Fonte:**
 - Fato verificado: `tools`/`re_trabalho/sheet.py` renderizou corretamente 352 bitmaps do `WINGANT` (telas "About", "Select a Game", controles de casta, quintal, sprites) e bitmaps do `MWINNT`. Cada um deles bate com o tamanho calculado.

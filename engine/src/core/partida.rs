@@ -21,7 +21,8 @@ use serde::Deserialize;
 use super::avisos::{Avisos, ConfigAvisos, Modal};
 use super::navegacao::{Acao, Evento as EventoTecla, Navegacao};
 use crate::rules::amarela::{
-    clicar_no_mapa, tecla_de_comando, ControleJogador, Modificadores, RespostaClique, RespostaTecla, TabelasAmarela,
+    clicar_no_mapa, comando, tecla_de_comando, ControleJogador, Modificadores, RespostaClique, RespostaTecla,
+    TabelasAmarela,
 };
 use crate::rules::estado::{ConfigSimulacao, Estado, Evento};
 use crate::rules::tick::{tick, Regras, RegrasOriginais, Relogio};
@@ -62,6 +63,12 @@ pub enum AcaoPartida {
     /// File → Save (5, Ctrl+S) e Save As (6, Ctrl+A): tratados pela interface (arquivo).
     Salvar,
     SalvarComo,
+    /// Window → Edit/Behavior/Caste/History (0x11, 0x13–0x15; Ctrl+E/B/C/H): abre ou traz para a
+    /// frente, a cargo da interface.
+    JanelaEdicao,
+    JanelaComportamento,
+    JanelaCastas,
+    JanelaHistorico,
 }
 
 /// Resultado de um botão configurável da faixa (`_DoUserButton`, `1000:04c4`).
@@ -75,11 +82,23 @@ pub enum RespostaBotao {
     NaoImplementado(u16),
 }
 
+/// Marcadores da faixa (`ribBM1`–`7`, `_DoBookMark`): objetos e bitmaps do marcador posto
+/// (`base + índice`, selecionado e normal), som de erro.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct ConfigMarcadores {
+    pub objetos: Vec<String>,
+    pub bitmap_posto: [u16; 2],
+    pub som_vazio: u16,
+}
+
 /// Botões configuráveis da faixa (`ribUserDef1A`–`1H`) e a função de cada um.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct BotoesUsuario {
     pub objetos: Vec<String>,
     pub funcoes: Vec<u16>,
+    /// `_SetUserButton`: bitmaps da função f = base + f (0x3889, 0x3857).
+    pub bitmap_selecionado: u16,
+    pub bitmap_normal: u16,
 }
 
 /// Tecla → ação de partida (mesmas regras de `navegacao::Atalho`).
@@ -117,6 +136,7 @@ pub struct ConfigPartida {
     /// Espera de `_processEdit` no clique simples, em unidades de `_TickCount` (6).
     pub espera_clique_simples_tickcount: u64,
     pub botoes_usuario: BotoesUsuario,
+    pub marcadores: ConfigMarcadores,
 }
 
 impl ConfigPartida {
@@ -190,6 +210,14 @@ pub struct Partida {
 
     /// Tempo real em que a simulação fica parada pela espera do clique simples (ms).
     bloqueio_ms: u64,
+    /// `_PauseGame(1)` do Load que espera os quadros abertos no `_FullCount` fecharem.
+    pausar_ao_fechar: bool,
+    /// `_BookMarks` (`8:8aa0`, fora do save): plano e canto da vista de cada marcador.
+    pub marcadores: [Option<(i16, i32, i32)>; 7],
+    /// Função de cada botão configurável da faixa (`1048:0012`), trocada pelo menu de ícones.
+    pub funcoes_botoes: Vec<u16>,
+    /// `_showTrails` (botão 4): trilhas de cheiro na janela do mapa.
+    pub mostrar_trilhas: bool,
 }
 
 impl Partida {
@@ -222,7 +250,12 @@ impl Partida {
             avisos: Avisos::new(cfg_avisos),
 
             bloqueio_ms: 0,
+            pausar_ao_fechar: false,
+            marcadores: [None; 7],
+            funcoes_botoes: Vec::new(),
+            mostrar_trilhas: false,
         };
+        p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
         p.vistas_para_estado();
         p
     }
@@ -263,6 +296,7 @@ impl Partida {
         self.ms_total += ms;
         if self.avisos.passar_tempo(self.agora()).is_some() {
             self.redesenhar = true;
+            self.depois_de_fechar();
         }
         if self.avisos.tem_modal() {
             self.resto_ms = 0;
@@ -403,6 +437,14 @@ impl Partida {
                         self.avisos.receber_fim_de_jogo(&self.estado, agora);
                     }
                 }
+                Evento::MensagemFaixa(m) => {
+                    use super::avisos::TextoFaixa;
+                    let agora = self.agora();
+                    let opcao = self.estado.partida.opcoes[4] != 0;
+                    let texto = TextoFaixa::Lista { lista: m.lista, indice: m.indice as usize };
+                    self.avisos.editar(Some(texto), Some(u32::from(m.duracao)), m.importante, opcao, agora);
+                    self.redesenhar = true;
+                }
                 Evento::Mensagem(id) => {
                     let licoes = &self.regras.quintal.conselhos.licoes;
                     self.avisos.receber_mensagem(id, self.estado.partida.opcoes[3] != 0, licoes);
@@ -464,13 +506,43 @@ impl Partida {
         self.redesenhar = true;
     }
 
+    /// O que o File → Load faz depois de ler os blocos (`_LoadGame` `1010:9fa0` e
+    /// `_DoLoadInitializations` `1010:9dbe`), além da reconstrução da vida e da vista (já feitas
+    /// por `Estado::de_save` e `Navegacao::do_save`): `_FullCount` (`_CountAnts` + `_Feedback`),
+    /// que recenseia as castas e já detecta a rainha que sumiu (quadros 10010/10011 e fim de jogo
+    /// logo no Load, caso C-10), `_SetDefaultWindPrompt(1)` e `_PauseGame(1)`: o jogo carregado
+    /// fica pausado com "Game Paused" (bancada-qemu.md, "Carregar um save injetado").
+    pub fn ao_carregar(&mut self) {
+        self.vistas_para_estado();
+        self.estado.contar_formigas();
+        self.tratar_eventos();
+        self.conselho_na_faixa();
+        // Os quadros do _FullCount são modais: a pausa só vem depois que eles fecham (bancada: com o
+        // quadro na tela, a faixa ainda está vazia).
+        if self.avisos.tem_modal() {
+            self.pausar_ao_fechar = true;
+        } else {
+            self.definir_pausa(true);
+        }
+    }
+
+    /// O que espera os avisos modais fecharem (a pausa do Load).
+    fn depois_de_fechar(&mut self) {
+        if self.pausar_ao_fechar && !self.avisos.tem_modal() {
+            self.pausar_ao_fechar = false;
+            self.definir_pausa(true);
+        }
+    }
+
     // --- avisos modais -------------------------------------------------------------------------
 
     /// Fecha o aviso modal da frente (clique na área do quadro, Espaço, clique no fim de jogo) e
     /// devolve qual era. Depois do fim de jogo, o original chama `_NewGame(0)`: a interface decide.
     pub fn fechar_modal(&mut self) -> Option<Modal> {
         self.redesenhar = true;
-        self.avisos.fechar_modal()
+        let m = self.avisos.fechar_modal();
+        self.depois_de_fechar();
+        m
     }
 
     // --- entradas do jogador -------------------------------------------------------------------
@@ -489,9 +561,48 @@ impl Partida {
             AcaoPartida::VelocidadeRapida => p.velocidade = 2,
             AcaoPartida::VelocidadeUltra => p.velocidade = 3,
             AcaoPartida::AutoTrack => p.opcoes[0] = if p.opcoes[0] == 0 { 1 } else { 0 },
-            AcaoPartida::Salvar | AcaoPartida::SalvarComo => {}
+            AcaoPartida::Salvar
+            | AcaoPartida::SalvarComo
+            | AcaoPartida::JanelaEdicao
+            | AcaoPartida::JanelaComportamento
+            | AcaoPartida::JanelaCastas
+            | AcaoPartida::JanelaHistorico => {}
         }
         self.redesenhar = true;
+    }
+
+    /// Marcador `i` da faixa (`_DoBookMark`, `1000:08a6`). Com Ctrl, guarda o plano e o canto da
+    /// vista e avisa "Bookmark has been placed."; sem Ctrl, vai até ele (`_GotoMapPoint` no centro
+    /// da vista guardada) ou, se vazio, som de erro e "Bookmark has not been placed.".
+    pub fn marcador(&mut self, i: usize, ctrl: bool) {
+        let Some(slot) = self.marcadores.get(i).copied() else { return };
+        let agora = self.agora();
+        let f = self.avisos.cfg.faixa.clone();
+        if ctrl {
+            let v = &self.nav.vista;
+            self.marcadores[i] = Some((self.nav.plano_mapa, v.x, v.y));
+            self.avisos.mensagem_literal(&f.marcador_posto, f.duracao_botao, agora);
+        } else if let Some((plano, x, y)) = slot {
+            let (w, h) = (self.nav.vista.largura, self.nav.vista.altura);
+            self.nav.ir_para_amarela(plano, w / 2 + x, h / 2 + y);
+            self.vistas_para_estado();
+        } else {
+            self.eventos.push_back(Evento::Som(self.cfg.marcadores.som_vazio));
+            self.avisos.mensagem_literal(&f.marcador_ausente, f.duracao_botao, agora);
+        }
+        self.redesenhar = true;
+    }
+
+    /// Bitmaps (selecionado, normal) dos marcadores postos, pelo nome do objeto da faixa.
+    pub fn bitmaps_dos_marcadores(&self) -> Vec<(String, u16, u16)> {
+        let c = &self.cfg.marcadores;
+        self.marcadores
+            .iter()
+            .zip(&c.objetos)
+            .enumerate()
+            .filter(|(_, (m, _))| m.is_some())
+            .map(|(i, (_, nome))| (nome.clone(), c.bitmap_posto[0] + i as u16, c.bitmap_posto[1] + i as u16))
+            .collect()
     }
 
     /// Clique simples num botão configurável da faixa (`_DoUserButton`, sem segurar o botão).
@@ -510,6 +621,10 @@ impl Partida {
                 self.avisos.mensagem_de_velocidade(v, agora);
             }
             7 => alternar(&mut p.opcoes[1]),
+            4 => {
+                // _showTrails: as trilhas só aparecem na janela do mapa, que o port ainda não tem.
+                self.mostrar_trilhas = !self.mostrar_trilhas;
+            }
             9 => alternar(&mut p.opcoes[2]),
             10 => alternar(&mut p.opcoes[5]),
             11 => alternar(&mut p.opcoes[0]),
@@ -545,6 +660,77 @@ impl Partida {
         self.tratar_eventos();
         self.redesenhar = true;
         r
+    }
+
+    /// Começa a espera do clique simples (`_processEdit`): a simulação para por
+    /// `espera_clique_simples_tickcount`; a decisão (ordem, menu da amarela, Examine) vem depois,
+    /// por [`Partida::clicar_depois_da_espera`].
+    pub fn iniciar_espera_do_clique(&mut self) {
+        self.bloqueio_ms = self.cfg.espera_clique_simples_tickcount * self.avisos.cfg.ms_por_tickcount;
+    }
+
+    /// Fim da espera do clique simples: `segurando` = botão ainda apertado e Shift solto.
+    pub fn clicar_depois_da_espera(&mut self, x: i32, y: i32, segurando: bool) -> RespostaClique {
+        self.vistas_para_estado();
+        let plano = i32::from(self.nav.plano_mapa);
+        let r =
+            clicar_no_mapa(&mut self.estado, &self.tabelas_amarela, &mut self.controle, plano, x, y, false, segurando);
+        self.tratar_eventos();
+        self.redesenhar = true;
+        r
+    }
+
+    /// `_YellowCommand(c)` escolhido no menu da amarela (código 0 = Help, não reproduzido).
+    pub fn comando_amarela(&mut self, c: u8) -> bool {
+        if c == 0 {
+            return false;
+        }
+        self.vistas_para_estado();
+        let ok = comando(&mut self.estado, &self.tabelas_amarela, &mut self.controle, c);
+        self.tratar_eventos();
+        self.redesenhar = true;
+        ok
+    }
+
+    /// Função do botão configurável com esse nome de objeto.
+    pub fn funcao_do_botao(&self, objeto: &str) -> Option<u16> {
+        let b = &self.cfg.botoes_usuario;
+        b.objetos.iter().position(|o| o == objeto).and_then(|i| self.funcoes_botoes.get(i).copied())
+    }
+
+    /// Menu de ícones: troca a função do botão (`_SetUserButton`).
+    pub fn definir_funcao_do_botao(&mut self, objeto: &str, f: u16) {
+        if let Some(i) = self.cfg.botoes_usuario.objetos.iter().position(|o| o == objeto) {
+            if let Some(v) = self.funcoes_botoes.get_mut(i) {
+                *v = f;
+                self.redesenhar = true;
+            }
+        }
+    }
+
+    /// Estado desenhado dos botões configuráveis (`_SetUserButton`/`_UpdateUserButtons`): nome,
+    /// bitmaps (selecionado, normal) da função e, nos botões de alternar, se estão ligados.
+    pub fn estado_dos_botoes(&self) -> Vec<(String, u16, u16, Option<bool>)> {
+        let b = &self.cfg.botoes_usuario;
+        let p = &self.estado.partida;
+        b.objetos
+            .iter()
+            .zip(&self.funcoes_botoes)
+            .map(|(nome, &f)| {
+                let ligado = match f {
+                    4 => Some(self.mostrar_trilhas),
+                    5 => Some(p.pausado != 0),
+                    7 => Some(p.opcoes[1] != 0),
+                    9 => Some(p.opcoes[2] != 0),
+                    10 => Some(p.opcoes[5] != 0),
+                    11 => Some(p.opcoes[0] != 0),
+                    12 => Some(p.opcoes[3] != 0),
+                    13 => Some(p.opcoes[4] != 0),
+                    _ => None,
+                };
+                (nome.clone(), b.bitmap_selecionado + f, b.bitmap_normal + f, ligado)
+            })
+            .collect()
     }
 
     /// Tecla de comando da amarela (`_YellowCommandKey`), com o código de tecla virtual do Windows.

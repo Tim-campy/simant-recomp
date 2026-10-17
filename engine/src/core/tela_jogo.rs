@@ -231,6 +231,10 @@ pub fn vista_do_save(jogo: &JogoSalvo, posicao: PosicaoVista, largura: i32, altu
 /// save. A navegação (plano e vista) fica de fora, em `Navegacao`.
 pub struct TelaDeJogo {
     pub cfg: ConfigTelaJogo,
+    /// Bitmaps trocados em botões da faixa (`_win_SetButtonBitmaps`): nome, selecionado, normal.
+    pub bitmaps_da_faixa: Vec<(String, u16, u16)>,
+    /// Botões da faixa com o estado "selecionado" ligado ou desligado pelo jogo (`_UpdateUserButtons`).
+    pub selecao_da_faixa: Vec<(String, bool)>,
     faixa: Janela,
     /// Canto do objeto 0 da faixa na área cliente.
     origem_faixa: (i16, i16),
@@ -301,6 +305,8 @@ impl TelaDeJogo {
             vida: rec.camadas,
             amarela,
             pendencias,
+            bitmaps_da_faixa: Vec::new(),
+            selecao_da_faixa: Vec::new(),
         })
     }
 
@@ -348,11 +354,37 @@ impl TelaDeJogo {
     /// Desenha fundo, faixa (com o botão do plano selecionado) e janela de edição com a vista de `nav`.
     /// Devolve o quadro e o que ainda não foi reproduzido.
     pub fn compor(&self, recursos: &Recursos, interface: &Interface, nav: &Navegacao) -> Result<(Quadro, Vec<String>), String> {
+        self.compor_com(recursos, interface, nav, &mut |_| Ok(Vec::new()))
+    }
+
+    /// Como `compor`, desenhando com `atras` o que fica entre a faixa e a janela de edição (as
+    /// janelas de controle que estão atrás dela).
+    pub fn compor_com(
+        &self,
+        recursos: &Recursos,
+        interface: &Interface,
+        nav: &Navegacao,
+        atras: &mut dyn FnMut(&mut Quadro) -> Result<Vec<String>, String>,
+    ) -> Result<(Quadro, Vec<String>), String> {
         let cfg = &self.cfg;
         let mut q = Quadro::new(cfg.largura as usize, cfg.altura as usize, cfg.fundo);
         let id_faixa = interface.moldura.faixa.janela;
         // _SetMapPlaneLocation: com faixa, seleciona o botão do plano mostrado (e só ele).
         let mut faixa = self.faixa.clone();
+        for ob in faixa.objetos.iter_mut() {
+            if let Some((_, s, n)) = self.bitmaps_da_faixa.iter().find(|(nome, _, _)| *nome == ob.nome) {
+                if let crate::formats::janela::Conteudo::BotaoBitmap { selecionado, normal } = &mut ob.conteudo {
+                    (*selecionado, *normal) = (*s, *n);
+                }
+            }
+            if let Some((_, sel)) = self.selecao_da_faixa.iter().find(|(nome, _)| *nome == ob.nome) {
+                if *sel {
+                    ob.flags |= FLAG_SELECIONADO;
+                } else {
+                    ob.flags &= !FLAG_SELECIONADO;
+                }
+            }
+        }
         for ob in faixa.objetos.iter_mut().filter(|o| cfg.botao_do_plano.values().any(|n| *n == o.nome)) {
             ob.flags &= !FLAG_SELECIONADO;
         }
@@ -365,6 +397,7 @@ impl TelaDeJogo {
             ob.flags |= FLAG_SELECIONADO;
         }
         let mut pendentes = desenhar_janela_carregada_na_tela(&mut q, recursos, interface, id_faixa, &faixa)?;
+        pendentes.extend(atras(&mut q)?);
 
         let e = &cfg.edicao;
         let area = area_de_edicao(&self.edicao, e)?;
@@ -405,6 +438,11 @@ impl TelaDeJogo {
     }
 
     /// Retângulo (na área cliente) e cor do objeto `nome` da faixa.
+    /// Contorno externo da janela de edição (área cliente).
+    pub fn retangulo_da_edicao(&self) -> Retangulo {
+        ret(self.cfg.edicao.moldura.externo)
+    }
+
     pub fn objeto_da_faixa(&self, nome: &str) -> Option<(Retangulo, u8)> {
         let base = self.faixa.retangulo();
         let (dx, dy) = (self.origem_faixa.0 - base.esq, self.origem_faixa.1 - base.topo);
