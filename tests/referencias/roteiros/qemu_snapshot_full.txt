@@ -1,0 +1,18 @@
+# Snapshot "full": boot, "Select a Game" -> Full Game (ícone em (265, 300) na tela 640x480), espera
+# _CurGameType = 2 e grava o snapshot. Base: qemu_experimental_e01.txt (mover o mouse antes do clique).
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_snapshot_full.txt --overlay re_trabalho/qemu/ov_full.qcow2
+esperar 50
+teclas spc
+esperar 6
+teclas spc
+esperar 10
+mouse_canto
+mover 265 300
+esperar 2
+clicar
+esperar_variavel CurGameType 2 60
+esperar 10
+capturar re_trabalho/cen/full_inicio.png
+snapshot_salvar full
+esperar 2
+fim

@@ -1,0 +1,57 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "full",
+ "descricao": "Jogo Completo (snapshot full: boot, Select a Game -> Full Game, CurGameType = 2), início do jogo sem intervenção; o 31 cai na fase 1 de _DoSmells (Cycle 32)",
+ "passos": [],
+ "primeira_entrada": {
+  "SementeS": 60730,
+  "SementeR": 2578188780,
+  "gameCycles": 271,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 17,
+  "Cycle": 17,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_000031",
+  "tick_000032",
+  "tick_000033",
+  "tick_000034",
+  "tick_000035"
+ ],
+ "selecao": [
+  "31-35"
+ ],
+ "pendentes": {}
+}

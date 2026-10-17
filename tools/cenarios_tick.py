@@ -107,7 +107,7 @@ class Sessao:
         for _ in range(n):
             arqs = self.dep.capturar_tick()
             gt = arqs["extras.json"]["antes"]["GameTime"]
-            pasta = Path(saida) / f"tick_{gt:06d}"
+            pasta = Path(saida).resolve() / f"tick_{gt:06d}"
             for nome_arq, conteudo in arqs.items():
                 qb.gravar(pasta / nome_arq, conteudo)
             nomes.append(pasta.name)
@@ -115,6 +115,29 @@ class Sessao:
             if parar and parar(Save(arqs["estado_depois.bin"])):
                 break
         return nomes
+
+    def gravar_longo(self, saida, n, a_cada):
+        """Sequência longa compacta: estado e vida na entrada do 1º tick (inicio/), os extras de cada tick
+        (extras.json, uma lista) e o estado e a vida depois de cada `a_cada` ticks (depois_NNNN/)."""
+        saida = Path(saida).resolve()  # absoluto: qb.gravar resolve relativos no SIMANT_RAIZ
+        self.dep.ir_entrada()
+        qb.gravar(saida / "inicio" / "estado.bin", self.mj.estado())
+        qb.gravar(saida / "inicio" / "vida.bin", self.dep.vida())
+        lista = []
+        for k in range(1, n + 1):
+            antes = self.dep.extras()
+            relogio = []
+            self.dep.ir_saida(relogio=relogio)
+            depois = self.dep.extras()
+            antes["MacTickCount"] = relogio[0] if relogio else None
+            lista.append({"antes": antes, "depois": depois, "MacTickCount_lidos": relogio})
+            if k % a_cada == 0 or k == n:
+                qb.gravar(saida / f"depois_{k:04d}" / "estado.bin", self.mj.estado())
+                qb.gravar(saida / f"depois_{k:04d}" / "vida.bin", self.dep.vida())
+                self.b.log(f"{k} ticks (GameTime {depois['GameTime']})")
+            self.dep.ir_entrada()
+        (saida / "extras.json").write_text(json.dumps(lista, separators=(",", ":")) + "\n", encoding="utf-8")
+        return [f"{len(lista)} ticks a partir de GameTime {lista[0]['antes']['GameTime']}"]
 
     def indice(self, saida, ticks, snapshot, descricao):
         ind = {
@@ -181,6 +204,12 @@ def cenario_menino(c: Sessao, saida, n):
 def cenario_livre(c: Sessao, saida, n):
     c.entrada()
     return c.gravar(saida, n)
+
+
+def cenario_longo(c: Sessao, saida, n):
+    """n ticks consecutivos em formato compacto (estado a cada 50); ver Sessao.gravar_longo."""
+    c.entrada()
+    return c.gravar_longo(saida, n, 50)
 
 
 def cenario_fast(c: Sessao, saida, n):
@@ -253,6 +282,34 @@ def cenario_luta(c: Sessao, saida, n):
     c.log(f"buraco preto {buracos[0]}; vermelha alvo em {alvo}")
     c.clicar_celula(*alvo, duplo=True)
     return c.gravar(saida, n, parar=lambda d: d.ler("MeMoveMe") == 0)
+
+
+def cenario_luta_soldado(c: Sessao, saida, n):
+    """Como `luta`, mas com a amarela posta como soldado (_MeType = 0x30) e o alvo uma operária vermelha
+    (grupo 2): classe de luta 1 contra 0, para gravar uma vitória."""
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    gt = c.dep.ate_gametime((c.ler("Cycle") // 128 + 1) * 128)
+    c.log(f"esperou até GameTime {gt}")
+    c.escrever("MeType", 0x30)
+    s = c.save()
+    buracos = [(x, y) for x in range(64) for y in range(64) if s.celula("MapA", x, y) == 0x50]
+    verms = [(f["X"], f["Y"]) for _, f in formigas(s, "A") if f["T"] & 0x80 and (f["T"] & 0x78) >> 3 == 2]
+    alvo = perto(verms, *buracos[0])
+    c.log(f"buraco preto {buracos[0]}; operária vermelha alvo em {alvo}")
+    c.clicar_celula(*alvo, duplo=True)
+    return c.gravar(saida, n, parar=lambda d: d.ler("MeMoveMe") == 0)
+
+
+def cenario_inseticida(c: Sessao, saida, n):
+    """Menino dentro de casa parado no nó 32 ((_BoyX, _BoyY) = (45, 166) → patch (0, 12)) com
+    _CurYardPnt = (0, 12): pisada e inseticida em todo tick (quintal.md §4). No Jogo Completo, com a
+    amarela na superfície, cada tick tem chance 1/4 de _YellowDeath(9)."""
+    c.entrada()
+    for nome, v in (("NodeNum", 32), ("NodeCnt", 0), ("CurYardPnt", 12 << 16)):
+        c.escrever(nome, v)
+    return c.gravar(saida, n)
 
 
 # ------------------------------------------------------------------------------------------------
