@@ -55,6 +55,9 @@ pub struct Extras {
     /// Relógio do Mac (`_MacTickCount`) devolvido na primeira chamada dentro do tick; `None` se o tick
     /// não o leu ou se o vetor é anterior à captura (só existe em `antes`).
     pub relogio_mac: Option<u32>,
+    /// `_TimeTemp` (`9:9b10`, 32 bits, fora do save): prazo ou marco da lição do tutorial; `None` em
+    /// vetores anteriores à captura.
+    pub time_temp: Option<i32>,
 }
 
 #[derive(Deserialize)]
@@ -70,6 +73,8 @@ struct ExtrasJson {
     cycle: i64,
     #[serde(rename = "MacTickCount", default)]
     mac_tick_count: Option<i64>,
+    #[serde(rename = "TimeTemp", default)]
+    time_temp: Option<i64>,
 }
 
 impl From<ExtrasJson> for Extras {
@@ -84,6 +89,7 @@ impl From<ExtrasJson> for Extras {
             game_time: j.game_time as u32,
             cycle: j.cycle as i16,
             relogio_mac: j.mac_tick_count.map(|v| v as u32),
+            time_temp: j.time_temp.map(|v| v as i32),
         }
     }
 }
@@ -455,6 +461,16 @@ fn centralizar_edicao(ponto: (i16, i16), x: i32, y: i32, plano: i16) -> (i32, i3
     }
     let largura = if plano == 1 { 128 } else { 64 };
     (px.clamp(0, largura - w), py.clamp(0, 64 - h))
+}
+
+/// `RegrasOriginais` para rodar um vetor: com a memória do tutorial (`_TimeTemp`) do vetor, quando
+/// gravada (ela fica nas regras, não no `Estado`).
+pub fn regras_do_vetor(v: &VetorTick) -> super::tick::RegrasOriginais {
+    let mut r = super::tick::RegrasOriginais::default();
+    if let Some(t) = v.extras_antes.time_temp {
+        r.memoria_tutor.tempo_limite = i64::from(t);
+    }
+    r
 }
 
 pub fn comparar_tick(v: &VetorTick, layout: &LayoutSave, regras: &mut dyn Regras) -> Result<RelatorioTick, String> {

@@ -1,0 +1,68 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "tut",
+ "descricao": "Tutorial (snapshot tut: boot, Select a Game -> Tutorial Game), sem intervenção: lição 1 concluída e lição 2 pedida (15); lição 3 dada no 23 com a caixa modal dentro do tick (pendente: ticks aninhados); lição 3 esperando o marco de escavação (_TimeTemp = 15, 46-47). Com _TimeTemp gravado em extras.json",
+ "passos": [
+  "tick 23 parado (gdb: nenhuma parada em 15 s (jogo pausado ou minimizado?)); tela em re_trabalho/cen/dialogo_23_0.png e Enter"
+ ],
+ "primeira_entrada": {
+  "SementeS": 1800,
+  "SementeR": 423223480,
+  "gameCycles": 992,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 8,
+  "Cycle": 8,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ]
+ },
+ "ticks": [
+  "tick_000014",
+  "tick_000015",
+  "tick_000023",
+  "tick_000046",
+  "tick_000047"
+ ],
+ "selecao": [
+  "14-15",
+  "23",
+  "46-47"
+ ],
+ "pendentes": {
+  "tick_000023": "caixa modal dentro do tick com ticks aninhados: _Feedback -> _GiveLesson(3) abre a lição com _PictStrnDialog (captura re_trabalho/cen/dialogo_23_0.png, \"In SimAnt you are the yellow ant...\"); enquanto a caixa está aberta o temporizador continua e o _DoAntSim roda de novo dentro dela (GameTime 23 -> 40 no retorno do tick de entrada) [hipótese: MYTIMERFUNC reentrante pelo laço modal]. O port faz um tick e pede a mensagem (Evento::Mensagem); o resto é da interface"
+ }
+}

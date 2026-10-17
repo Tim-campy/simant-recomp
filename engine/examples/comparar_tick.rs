@@ -5,8 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use engine::formats::save::LayoutSave;
-use engine::rules::tick::RegrasOriginais;
-use engine::rules::vetor_tick::{comparar_tick, VetorTick};
+use engine::rules::vetor_tick::{comparar_tick, regras_do_vetor, VetorTick};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -35,7 +34,7 @@ fn main() {
     let mut placar = Vec::new();
     for d in &dirs {
         let v = VetorTick::ler(d, &layout).unwrap_or_else(|e| panic!("{}: {e}", d.display()));
-        let r = comparar_tick(&v, &layout, &mut RegrasOriginais::default()).expect("comparar");
+        let r = comparar_tick(&v, &layout, &mut regras_do_vetor(&v)).expect("comparar");
         println!("{r}");
         placar.push(r.placar());
     }

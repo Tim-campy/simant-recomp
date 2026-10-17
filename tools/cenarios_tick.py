@@ -138,8 +138,8 @@ class Sessao:
                 self.log(f"tick {gt} parado ({err}); tela em re_trabalho/cen/dialogo_{gt}_{k}.png e Enter")
                 self.b.executar(f"capturar re_trabalho/cen/dialogo_{gt}_{k}.png")
                 dep.retomar()
-                # caixa de morte da amarela: "Click here to continue" no centro da janela de edição
-                self.b.executar("clicar_em 320 330")
+                # caixa de morte da amarela: "Click here to continue": (320, 310) cai dentro das caixas vistas (morte, GAME OVER, Tutorial)
+                self.b.executar("clicar_em 320 310")
                 time.sleep(1)
                 self.b.executar("teclas ret")
                 time.sleep(2)
@@ -494,7 +494,7 @@ def clicar_tela(c: Sessao, x, y, duplo=False):
 def dispensar(c: Sessao):
     """Fecha uma caixa de mensagem ("Click here to continue")."""
     c.dep.retomar()
-    c.b.executar("clicar_em 320 330")
+    c.b.executar("clicar_em 320 310")
     time.sleep(1)
 
 
