@@ -1,0 +1,22 @@
+{
+ "id": "I-01",
+ "spec": "docs/spec/regras/inimigos.md#32-_dopillar-10304cdc-só-em-ticks-ímpares-e-só-no-quintal",
+ "descricao": "Lagarta andando (sem sorteio fora da criação): QUICK2.ANT sem mudanças (tick 78; cabeça em (7, 58), direção 1, _PillarSeg = 1). A cabeça avança uma célula a cada 5 ticks ímpares (10 ticks). Independe do gerador S, desde que nenhuma formiga chegue perto.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "I01.ANT",
+ "operacoes": [],
+ "rodar": {"ate_gametime": 140, "timeout": 120},
+ "esperado": [
+  "tick 79: _PillarSeg 1 -> 0, a cabeça vai para (8, 58), _PillarSeg = 5; depois uma célula a cada 10 ticks (ticks 89, 99, 109, 119, 129, 139)",
+  "no tick 140: cabeça em (14, 58) com 0x6B; corpo 0x69/0x6A atrás; _PillarState = 1; o chão de (3..8, 58) reposto"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 140},
+  {"nome": "GameTime", "op": "<", "valor": 149},
+  {"nome": "PillarState", "op": "==", "valor": 1},
+  {"nome": "PillarY", "op": "==", "valor": 58},
+  {"nome": "PillarX", "op": "==", "valor": 14},
+  {"nome": "PillDir", "op": "==", "valor": 1},
+  {"celula": "MapA", "x": 14, "y": 58, "op": "==", "valor": 107}
+ ]
+}

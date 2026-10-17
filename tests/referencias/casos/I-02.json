@@ -1,0 +1,26 @@
+{
+ "id": "I-02",
+ "spec": "docs/spec/regras/inimigos.md#13-_doantlions-103043fa-todo-tick",
+ "descricao": "Formiga-leão come a formiga posta no centro da armadilha: QUICK2.ANT com uma operária preta (T = 0x10, M = 2) acrescentada à lista A em (71, 19), o centro da formiga-leão 0. No primeiro tick a formiga-leão (que roda antes das formigas) a pega: estado 1 com S = 50; o estado 1 dura de 53 a 78 ticks (os quadros sorteados com 3 atrasam), o estado 2 mais 5; no tick 200 ela já voltou a esperar e contou a refeição. O momento exato depende do gerador; o resultado no tick 200, não.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "I02.ANT",
+ "operacoes": [
+  {"op": "formiga_adicionar", "lista": "A", "X": 71, "Y": 19, "M": 2, "T": 16, "S": 0}
+ ],
+ "rodar": {"ate_gametime": 200, "timeout": 150},
+ "esperado": [
+  "a formiga de (71, 19) some da lista A; _BAntsEaten >= 1",
+  "_LionListM[0] = 0, _LionListT[0] = 0, centro (71, 19) = 0x38, _AntsEatenByLions = 1"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 200},
+  {"nome": "GameTime", "op": "<", "valor": 215},
+  {"nome": "LionIndex", "op": "==", "valor": 2},
+  {"nome": "LionListM", "indice": 0, "op": "==", "valor": 0},
+  {"nome": "LionListT", "indice": 0, "op": "==", "valor": 0},
+  {"nome": "AntsEatenByLions", "op": "==", "valor": 1},
+  {"nome": "BAntsEaten", "op": ">=", "valor": 1},
+  {"contar": "A", "onde": {"X": 71, "Y": 19}, "op": "==", "valor": 0},
+  {"celula": "MapA", "x": 71, "y": 19, "op": "==", "valor": 56}
+ ]
+}

@@ -1,0 +1,22 @@
+{
+ "id": "I-03",
+ "spec": "docs/spec/regras/inimigos.md#25-estados",
+ "descricao": "Aranha em agonia vira comida: QUICK2.ANT com a aranha em (100, 10) (SpidX = 1608, SpidY = 168, centro da célula, chão 0x07), _SMode = 5 e _DeathCnt = 40. Em 40 ticks a agonia acaba: _SpidOn = 0 e três _DropFoodA na célula (0x07 -> 0x48 -> 0x49 -> 0x4A). Os sorteios S1(1000)/S1(2)/S1(3) só mudam o quadro das pernas. Depois disso a aranha pode reaparecer (S1(300)), então só se confere _DeathCnt e a célula.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "I03.ANT",
+ "operacoes": [
+  {"op": "escrever", "nome": "SpidX", "valor": 1608},
+  {"op": "escrever", "nome": "SpidY", "valor": 168},
+  {"op": "escrever", "nome": "SMode", "valor": 5},
+  {"op": "escrever", "nome": "DeathCnt", "valor": 40}
+ ],
+ "rodar": {"ate_gametime": 130, "timeout": 120},
+ "esperado": [
+  "tick 118: _DeathCnt chega a 0, _SpidOn = 0, _SMode = 0; MapA(100, 10) = 0x4A; _FoodA + 3"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 130},
+  {"nome": "DeathCnt", "op": "==", "valor": 0},
+  {"celula": "MapA", "x": 100, "y": 10, "op": "==", "valor": 74}
+ ]
+}
