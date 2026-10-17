@@ -215,6 +215,32 @@ fn marcadores_da_faixa() {
     assert!((p.nav.vista.y - vista.2).abs() <= 1);
 }
 
+/// Botões configuráveis: bitmaps e estado de `_SetUserButton`/`_UpdateUserButtons`; o menu de
+/// ícones troca a função; o menu da amarela manda `_YellowCommand` e segurar o botão na amarela
+/// pede o menu.
+#[test]
+fn botoes_da_faixa_e_menu_da_amarela() {
+    use engine::rules::amarela::RespostaClique;
+    let mut p = partida();
+    let b = p.estado_dos_botoes();
+    // 1G = pausa (5): bitmaps 14473 + 5 / 14423 + 5, desligada; 1A = ir até a amarela (15), sem estado.
+    assert_eq!(b[6], ("ribUserDef1G".to_string(), 14478, 14428, Some(false)));
+    assert_eq!(b[0].3, None);
+    p.botao_usuario(5);
+    assert_eq!(p.estado_dos_botoes()[6].3, Some(true));
+    p.definir_funcao_do_botao("ribUserDef1A", 11);
+    assert_eq!(p.funcao_do_botao("ribUserDef1A"), Some(11));
+    assert_eq!(p.estado_dos_botoes()[0], ("ribUserDef1A".to_string(), 14484, 14434, Some(false)));
+    // Segurando o botão na própria amarela: menu; o item "Recruit 5" (código 1) recruta.
+    let (x, y) = (p.estado.amarela.x as i32, p.estado.amarela.y as i32);
+    p.iniciar_espera_do_clique();
+    assert_eq!(p.clicar_depois_da_espera(x, y, true), RespostaClique::MenuAmarela);
+    let antes = p.estado.preta.modos[5];
+    assert!(p.comando_amarela(1));
+    assert!(p.estado.preta.modos[5] >= antes);
+    assert!(!p.comando_amarela(0), "Help não faz nada no port");
+}
+
 #[test]
 fn ordem_de_andar_pelo_clique() {
     // Clique simples numa célula vizinha da amarela dá a ordem de ir (`_MeMoveMe` = 1).

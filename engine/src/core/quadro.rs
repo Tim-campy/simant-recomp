@@ -100,6 +100,21 @@ impl Quadro {
         }
     }
 
+    /// Inverte as cores do retângulo (`_GRectInv`: na paleta de 16 cores, índice XOR 15).
+    pub fn inverter(&mut self, r: Retangulo) {
+        for y in r.topo as i32..r.base as i32 {
+            for x in r.esq as i32..r.dir as i32 {
+                if x >= 0 && y >= 0 && (x as usize) < self.largura && (y as usize) < self.altura {
+                    let i = y as usize * self.largura + x as usize;
+                    let c = self.pixels[i];
+                    if c < 16 {
+                        self.ponto(x, y, c ^ 15);
+                    }
+                }
+            }
+        }
+    }
+
     /// Bitmap com um índice transparente (objetos animados, como o botão do triângulo).
     pub fn bitmap_transparente(&mut self, bm: &Bitmap, x: i32, y: i32, transparente: u8) {
         for j in 0..bm.altura {

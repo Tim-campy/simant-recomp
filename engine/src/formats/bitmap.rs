@@ -3,6 +3,8 @@
 pub const TIPO_BITMAP: u8 = 2;
 const CABECALHO: usize = 12;
 const FORMATO_MONO: u8 = 0x01;
+/// 4 planos de 1 bit por linha (sem o bit 0x80): o menu de ícones (2/7200) [medido].
+const FORMATO_PLANAR: u8 = 0x04;
 
 /// Imagem indexada: um índice de paleta por pixel, linhas de cima para baixo.
 #[derive(Clone, Debug)]
@@ -26,7 +28,8 @@ impl Bitmap {
         let altura = u16::from_le_bytes([d[10], d[11]]) as usize;
         let mono = formato == FORMATO_MONO;
         let bpp = if mono { 1 } else { 4 };
-        let stride = bytes_por_linha(largura, bpp);
+        let planar = formato == FORMATO_PLANAR;
+        let stride = if planar { 4 * bytes_por_linha(largura, 1) } else { bytes_por_linha(largura, bpp) };
         let dados = &d[CABECALHO..];
         if dados.len() < stride * altura {
             return Err(format!(
@@ -36,6 +39,24 @@ impl Bitmap {
             ));
         }
         let mut pixels = vec![0u8; largura * altura];
+        if planar {
+            // Cada linha (de cima para baixo) tem os 4 planos, um após o outro, cada um com a largura
+            // de uma linha de 1 bpp; o plano k é o bit k do índice [medido contra a captura j07].
+            let plano = bytes_por_linha(largura, 1);
+            for y in 0..altura {
+                let linha = &dados[y * stride..(y + 1) * stride];
+                for x in 0..largura {
+                    let mut v = 0u8;
+                    for k in 0..4 {
+                        if linha[k * plano + x / 8] & (0x80 >> (x % 8)) != 0 {
+                            v |= 1 << k;
+                        }
+                    }
+                    pixels[y * largura + x] = v;
+                }
+            }
+            return Ok(Bitmap { largura, altura, pixels });
+        }
         for y in 0..altura {
             // 4 bpp está de baixo para cima; 1 bpp, de cima para baixo.
             let linha_origem = if mono { y } else { altura - 1 - y };
@@ -73,6 +94,15 @@ mod testes {
         d.extend_from_slice(&[0x45, 0x60, 0, 0]); // linha de cima: 4 5 6
         let b = Bitmap::decodificar(&d).unwrap();
         assert_eq!(b.pixels, vec![4, 5, 6, 1, 2, 3]);
+    }
+
+    #[test]
+    fn planar_quatro_planos_por_linha() {
+        // 2x1, formato 0x04: planos de 4 bytes (linha de 1 bpp alinhada); pixel 0 = 0b0101, 1 = 0b1010.
+        let mut d = cabecalho(0x04, 2, 1);
+        d.extend_from_slice(&[0x80, 0, 0, 0, 0x40, 0, 0, 0, 0x80, 0, 0, 0, 0x40, 0, 0, 0]);
+        let b = Bitmap::decodificar(&d).unwrap();
+        assert_eq!(b.pixels, vec![5, 10]);
     }
 
     #[test]

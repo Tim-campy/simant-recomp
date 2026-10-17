@@ -21,7 +21,8 @@ use serde::Deserialize;
 use super::avisos::{Avisos, ConfigAvisos, Modal};
 use super::navegacao::{Acao, Evento as EventoTecla, Navegacao};
 use crate::rules::amarela::{
-    clicar_no_mapa, tecla_de_comando, ControleJogador, Modificadores, RespostaClique, RespostaTecla, TabelasAmarela,
+    clicar_no_mapa, comando, tecla_de_comando, ControleJogador, Modificadores, RespostaClique, RespostaTecla,
+    TabelasAmarela,
 };
 use crate::rules::estado::{ConfigSimulacao, Estado, Evento};
 use crate::rules::tick::{tick, Regras, RegrasOriginais, Relogio};
@@ -89,6 +90,9 @@ pub struct ConfigMarcadores {
 pub struct BotoesUsuario {
     pub objetos: Vec<String>,
     pub funcoes: Vec<u16>,
+    /// `_SetUserButton`: bitmaps da função f = base + f (0x3889, 0x3857).
+    pub bitmap_selecionado: u16,
+    pub bitmap_normal: u16,
 }
 
 /// Tecla → ação de partida (mesmas regras de `navegacao::Atalho`).
@@ -204,6 +208,8 @@ pub struct Partida {
     pausar_ao_fechar: bool,
     /// `_BookMarks` (`8:8aa0`, fora do save): plano e canto da vista de cada marcador.
     pub marcadores: [Option<(i16, i32, i32)>; 7],
+    /// Função de cada botão configurável da faixa (`1048:0012`), trocada pelo menu de ícones.
+    pub funcoes_botoes: Vec<u16>,
 }
 
 impl Partida {
@@ -238,7 +244,9 @@ impl Partida {
             bloqueio_ms: 0,
             pausar_ao_fechar: false,
             marcadores: [None; 7],
+            funcoes_botoes: Vec::new(),
         };
+        p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
         p.vistas_para_estado();
         p
     }
@@ -634,6 +642,77 @@ impl Partida {
         self.tratar_eventos();
         self.redesenhar = true;
         r
+    }
+
+    /// Começa a espera do clique simples (`_processEdit`): a simulação para por
+    /// `espera_clique_simples_tickcount`; a decisão (ordem, menu da amarela, Examine) vem depois,
+    /// por [`Partida::clicar_depois_da_espera`].
+    pub fn iniciar_espera_do_clique(&mut self) {
+        self.bloqueio_ms = self.cfg.espera_clique_simples_tickcount * self.avisos.cfg.ms_por_tickcount;
+    }
+
+    /// Fim da espera do clique simples: `segurando` = botão ainda apertado e Shift solto.
+    pub fn clicar_depois_da_espera(&mut self, x: i32, y: i32, segurando: bool) -> RespostaClique {
+        self.vistas_para_estado();
+        let plano = i32::from(self.nav.plano_mapa);
+        let r =
+            clicar_no_mapa(&mut self.estado, &self.tabelas_amarela, &mut self.controle, plano, x, y, false, segurando);
+        self.tratar_eventos();
+        self.redesenhar = true;
+        r
+    }
+
+    /// `_YellowCommand(c)` escolhido no menu da amarela (código 0 = Help, não reproduzido).
+    pub fn comando_amarela(&mut self, c: u8) -> bool {
+        if c == 0 {
+            return false;
+        }
+        self.vistas_para_estado();
+        let ok = comando(&mut self.estado, &self.tabelas_amarela, &mut self.controle, c);
+        self.tratar_eventos();
+        self.redesenhar = true;
+        ok
+    }
+
+    /// Função do botão configurável com esse nome de objeto.
+    pub fn funcao_do_botao(&self, objeto: &str) -> Option<u16> {
+        let b = &self.cfg.botoes_usuario;
+        b.objetos.iter().position(|o| o == objeto).and_then(|i| self.funcoes_botoes.get(i).copied())
+    }
+
+    /// Menu de ícones: troca a função do botão (`_SetUserButton`).
+    pub fn definir_funcao_do_botao(&mut self, objeto: &str, f: u16) {
+        if let Some(i) = self.cfg.botoes_usuario.objetos.iter().position(|o| o == objeto) {
+            if let Some(v) = self.funcoes_botoes.get_mut(i) {
+                *v = f;
+                self.redesenhar = true;
+            }
+        }
+    }
+
+    /// Estado desenhado dos botões configuráveis (`_SetUserButton`/`_UpdateUserButtons`): nome,
+    /// bitmaps (selecionado, normal) da função e, nos botões de alternar, se estão ligados.
+    pub fn estado_dos_botoes(&self) -> Vec<(String, u16, u16, Option<bool>)> {
+        let b = &self.cfg.botoes_usuario;
+        let p = &self.estado.partida;
+        b.objetos
+            .iter()
+            .zip(&self.funcoes_botoes)
+            .map(|(nome, &f)| {
+                let ligado = match f {
+                    4 => Some(false), // trilhas do mapa: a janela do mapa ainda não existe
+                    5 => Some(p.pausado != 0),
+                    7 => Some(p.opcoes[1] != 0),
+                    9 => Some(p.opcoes[2] != 0),
+                    10 => Some(p.opcoes[5] != 0),
+                    11 => Some(p.opcoes[0] != 0),
+                    12 => Some(p.opcoes[3] != 0),
+                    13 => Some(p.opcoes[4] != 0),
+                    _ => None,
+                };
+                (nome.clone(), b.bitmap_selecionado + f, b.bitmap_normal + f, ligado)
+            })
+            .collect()
     }
 
     /// Tecla de comando da amarela (`_YellowCommandKey`), com o código de tecla virtual do Windows.

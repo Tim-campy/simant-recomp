@@ -32,7 +32,7 @@ fn main() {
         "bitmap" => {
             let d = r.objeto(Chave { tipo: 2, id }).unwrap();
             let b = engine::formats::bitmap::Bitmap::decodificar(&d).unwrap();
-            println!("{} × {}", b.largura, b.altura);
+            println!("{} × {}, cabeçalho {:02x?}, {} bytes", b.largura, b.altura, &d[..12], d.len());
             for y in 0..b.altura {
                 let l: String = (0..b.largura).map(|x| format!("{:x}", b.pixels[y * b.largura + x])).collect();
                 println!("{l}");

@@ -24,6 +24,8 @@ use std::time::Instant;
 
 use engine::core::avisos::{self, ConfigAvisos, Modal};
 use engine::core::janelas::{self, Controle, JanelasControle};
+use engine::core::menus::{self, ConfigMenus, MenuAberto};
+use engine::rules::amarela::RespostaClique;
 use engine::core::quadro::Quadro;
 use engine::core::navegacao::{Acao, ConfigNavegacao, Evento as EventoNav, Repeticao};
 use engine::core::partida::{self, AcaoPartida, BotaoTeclado, ConfigPartida, Partida, RespostaBotao};
@@ -80,6 +82,8 @@ struct Opcoes {
     fechar_avisos: usize,
     /// Sem janela: funções de botões da faixa (`_DoUserButton`) apertados antes de exportar.
     botoes: Vec<u16>,
+    /// Sem janela: abre um menu antes de exportar ("amarela@X,Y" ou "icones@OBJETO").
+    menu: Option<String>,
     som: som::OpcoesSom,
 }
 
@@ -112,6 +116,7 @@ fn ler_opcoes() -> Result<Opcoes, String> {
         salvar: None,
         fechar_avisos: 0,
         botoes: Vec::new(),
+        menu: None,
         som: som::OpcoesSom::default(),
     };
     let mut args = std::env::args().skip(1);
@@ -140,6 +145,7 @@ fn ler_opcoes() -> Result<Opcoes, String> {
                 o.novo_jogo = true;
             }
             "--salvar" => o.salvar = Some(valor()?.into()),
+            "--menu" => o.menu = Some(valor()?),
             "--botoes" => {
                 o.botoes = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| format!("{a}: número inválido"))).collect::<Result<_, _>>()?
             }
@@ -325,6 +331,20 @@ struct Sessao<'a> {
     clique_modal: Option<Retangulo>,
     /// Janelas de controle (Caste/Behavior) e a ordem delas em relação à janela de edição.
     janelas: JanelasControle,
+    /// Menus de segurar o botão (data/menus.json) e o menu aberto agora, com o seu alvo.
+    menus_cfg: ConfigMenus,
+    menu: Option<(MenuAberto, AlvoMenu)>,
+    /// Clique simples no mapa esperando o fim da espera de `_processEdit`: instante, ponto, célula.
+    clique_pendente: Option<(Instant, i32, i32, (i32, i32))>,
+}
+
+/// Para quem vai a escolha do menu aberto.
+#[derive(Clone, Debug)]
+enum AlvoMenu {
+    /// `_AntMenu`: `_YellowCommand(código)`.
+    Amarela,
+    /// Menu de ícones do botão da faixa com esse nome de objeto.
+    Botao(String),
 }
 
 impl Sessao<'_> {
@@ -377,7 +397,23 @@ impl Sessao<'_> {
         };
         let modos = modos::Modos::carregar(recursos, &interface)?;
         let janelas = JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?);
-        Ok(Sessao { recursos, interface, tela, nav_cfg, partida, cores, layout, arquivo, clique_modal: None, modos, janelas })
+        let menus_cfg: ConfigMenus = recursos.dados(menus::ARQUIVO_CONFIG)?;
+        Ok(Sessao {
+            recursos,
+            interface,
+            tela,
+            nav_cfg,
+            partida,
+            cores,
+            layout,
+            arquivo,
+            clique_modal: None,
+            modos,
+            janelas,
+            menus_cfg,
+            menu: None,
+            clique_pendente: None,
+        })
     }
 
     /// File → Save (`_SaveGame(1)`): grava no arquivo da partida; sem arquivo, ou em "Save As"
@@ -399,6 +435,11 @@ impl Sessao<'_> {
     fn quadro_rgb(&mut self) -> Result<Vec<u8>, String> {
         self.tela.atualizar(&self.partida.estado);
         self.tela.bitmaps_da_faixa = self.partida.bitmaps_dos_marcadores();
+        self.tela.selecao_da_faixa.clear();
+        for (nome, s, n, ligado) in self.partida.estado_dos_botoes() {
+            self.tela.bitmaps_da_faixa.push((nome.clone(), s, n));
+            self.tela.selecao_da_faixa.push((nome, ligado.unwrap_or(false)));
+        }
         // Janelas de controle: as que estão antes da de edição na pilha ficam atrás dela.
         let edicao = self.janelas.pilha.iter().position(|j| j.is_none()).unwrap_or(self.janelas.pilha.len());
         let (atras, frente) = self.janelas.pilha.split_at(edicao);
@@ -418,6 +459,9 @@ impl Sessao<'_> {
         self.clique_modal = clique;
         pendentes.extend(p);
         pendentes.extend(modos::desenhar(self, &mut q)?);
+        if let Some((m, _)) = &self.menu {
+            pendentes.extend(m.desenhar(&mut q, self.recursos, &self.interface)?);
+        }
         if !pendentes.is_empty() {
             eprintln!("tela de jogo: não desenhado ainda: {}", pendentes.join(", "));
         }
@@ -460,7 +504,81 @@ impl Sessao<'_> {
 
     /// Botão configurável da faixa sob (x, y): a função dele (`_DoUserButton`).
     fn botao_usuario_em(&self, x: i32, y: i32) -> Option<u16> {
-        self.tela.objetos_da_faixa_em(x, y).iter().find_map(|n| self.partida.cfg.funcao_do_botao(n))
+        self.tela.objetos_da_faixa_em(x, y).iter().find_map(|n| self.partida.funcao_do_botao(n))
+    }
+
+    /// Ctrl+clique num botão configurável: abre o menu de ícones (`_DoUserButton`, janela 36).
+    fn abrir_menu_de_icones(&mut self, x: i32, y: i32) -> bool {
+        let Some(nome) = self.tela.objetos_da_faixa_em(x, y).into_iter().find(|n| self.partida.funcao_do_botao(n).is_some()) else {
+            return false;
+        };
+        let nome = nome.to_string();
+        let Some((r, _)) = self.tela.objeto_da_faixa(&nome) else { return false };
+        let [dx, dy] = self.menus_cfg.deslocamento_icones;
+        let limite = Retangulo { esq: 0, topo: 0, dir: self.tela.cfg.largura as i16, base: self.tela.cfg.altura as i16 };
+        match MenuAberto::abrir(self.recursos, &self.interface, &self.menus_cfg.icones, i32::from(r.esq + dx), i32::from(dy), limite) {
+            Ok(mut m) => {
+                // __win_SetProxItem(função atual + 0x2402): o item da função atual já vem realçado.
+                m.realcado = self.partida.funcao_do_botao(&nome).map(usize::from);
+                self.menu = Some((m, AlvoMenu::Botao(nome)));
+                true
+            }
+            Err(e) => {
+                eprintln!("menu de ícones: {e}");
+                false
+            }
+        }
+    }
+
+    /// `_AntMenu`: o menu certo para a amarela (formiga, rainha alada sem colônia, aranha) no ponto.
+    fn abrir_menu_da_amarela(&mut self, x: i32, y: i32) {
+        let a = &self.partida.estado.amarela;
+        let cfg = if a.modo == 1 {
+            &self.menus_cfg.aranha
+        } else if a.tipo == 0x40 && a.ninho_iniciado == 0 {
+            &self.menus_cfg.rainha
+        } else {
+            &self.menus_cfg.formiga
+        };
+        let [dx, dy] = self.menus_cfg.deslocamento_formiga;
+        let limite = Retangulo { esq: 0, topo: 0, dir: self.tela.cfg.largura as i16, base: self.tela.cfg.altura as i16 };
+        match MenuAberto::abrir(self.recursos, &self.interface, cfg, x + i32::from(dx), y + i32::from(dy), limite) {
+            Ok(m) => self.menu = Some((m, AlvoMenu::Amarela)),
+            Err(e) => eprintln!("menu da amarela: {e}"),
+        }
+    }
+
+    /// Botão solto com um menu aberto: aplica a escolha.
+    fn soltar_menu(&mut self, x: i32, y: i32, shift: bool) {
+        let Some((m, alvo)) = self.menu.take() else { return };
+        let Some(mut c) = m.soltar(x, y) else { return };
+        match alvo {
+            AlvoMenu::Amarela => {
+                let [de, para] = self.menus_cfg.codigo_com_shift;
+                if shift && c == de {
+                    c = para;
+                }
+                let ok = self.partida.comando_amarela(c);
+                println!("menu da amarela: comando {c}{}", if ok { "" } else { " (erro)" });
+            }
+            AlvoMenu::Botao(nome) => {
+                self.partida.definir_funcao_do_botao(&nome, u16::from(c));
+                println!("botão {nome}: função {c}");
+            }
+        }
+    }
+
+    /// Fim da espera do clique simples no mapa: com o botão ainda apertado (e Shift solto), menu
+    /// da amarela ou Examine; senão, a ordem de sempre.
+    fn decidir_clique_pendente(&mut self, segurando: bool) {
+        let Some((_, x, y, (cx, cy))) = self.clique_pendente.take() else { return };
+        let r = self.partida.clicar_depois_da_espera(cx, cy, segurando);
+        println!("clique simples em ({cx}, {cy}), plano {}{}: {r:?}", self.partida.nav.plano_mapa, if segurando { " segurando" } else { "" });
+        match r {
+            RespostaClique::MenuAmarela => self.abrir_menu_da_amarela(x, y),
+            RespostaClique::Examinar => println!("Examine (_MagnifyMenu): a janela 29 ainda não existe no port"),
+            _ => {}
+        }
     }
 
     /// Ação do clique esquerdo em (x, y) da área cliente: seta da barra de rolagem ou botão da faixa.
@@ -641,6 +759,10 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
                 Event::Window { win_event: WindowEvent::Exposed, .. } => redesenhar = true,
                 Event::MouseMotion { x, y, mousestate, .. } => {
                     cursor = (x, y);
+                    if let Some((m, _)) = &mut s.menu {
+                        redesenhar |= m.mover(x, y);
+                        continue;
+                    }
                     let nas_janelas = mousestate.left() && s.janelas.mover(s.recursos, &mut s.partida.estado, x, y).unwrap_or(false);
                     if nas_janelas || (mousestate.left() && modos::mover(&mut s, x, y, ctrl_apertado(&eventos))) {
                         redesenhar = true;
@@ -694,6 +816,10 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
                             continue;
                         }
                     }
+                    if ctrl_apertado(&eventos) && s.abrir_menu_de_icones(x, y) {
+                        redesenhar = true;
+                        continue;
+                    }
                     if let Some(f) = s.botao_usuario_em(x, y) {
                         match s.botao_usuario(f) {
                             RespostaBotao::Feito => println!("botão {f}: {}", s.situacao()),
@@ -703,8 +829,13 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
                     } else if let Some(a) = s.acao_do_clique(x, y) {
                         s.partida.navegar(a);
                         repeticao.pressionar(a);
-                    } else {
-                        s.clicar_no_mapa(x, y, clicks >= 2);
+                    } else if clicks >= 2 {
+                        s.clique_pendente = None;
+                        s.clicar_no_mapa(x, y, true);
+                    } else if let Some(c) = s.tela.celula_em(x, y, &s.partida.nav) {
+                        // _processEdit: espera ~6 unidades de _TickCount e só então decide.
+                        s.partida.iniciar_espera_do_clique();
+                        s.clique_pendente = Some((Instant::now(), x, y, c));
                     }
                 }
                 Event::MouseButtonDown { mouse_btn: MouseButton::Right, clicks, x, y, .. } => {
@@ -715,7 +846,11 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
                     }
                     redesenhar = true;
                 }
-                Event::MouseButtonUp { mouse_btn: MouseButton::Left, .. } => {
+                Event::MouseButtonUp { mouse_btn: MouseButton::Left, x, y, .. } => {
+                    if s.menu.is_some() {
+                        s.soltar_menu(x, y, shift_apertado(&eventos));
+                        redesenhar = true;
+                    }
                     repeticao.soltar();
                     s.janelas.soltar();
                     modos::soltar(&mut s);
@@ -727,6 +862,15 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
         let agora = Instant::now();
         let ms = (agora - antes).as_millis() as u64;
         antes = agora;
+        // Fim da espera do clique simples (6 × 55 ms): botão ainda apertado e Shift solto = segurar.
+        if let Some((t0, ..)) = s.clique_pendente {
+            let espera = s.partida.cfg.espera_clique_simples_tickcount * s.partida.avisos.cfg.ms_por_tickcount;
+            if (Instant::now() - t0).as_millis() as u64 >= espera {
+                let segurando = eventos.mouse_state().left() && !shift_apertado(&eventos);
+                s.decidir_clique_pendente(segurando);
+                redesenhar = true;
+            }
+        }
         if let Some((a, n)) = repeticao.passar_tempo(ms, &s.nav_cfg.repeticao) {
             for _ in 0..n {
                 s.partida.navegar(a);
@@ -772,6 +916,13 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
         }
         canvas.present();
     }
+}
+
+/// Shift apertado agora (`GetAsyncKeyState(VK_SHIFT)` de `_processEdit` e `_AntMenu`).
+fn shift_apertado(eventos: &sdl2::EventPump) -> bool {
+    use sdl2::keyboard::Scancode;
+    let k = eventos.keyboard_state();
+    k.is_scancode_pressed(Scancode::LShift) || k.is_scancode_pressed(Scancode::RShift)
 }
 
 /// Ctrl apertado agora (`GetAsyncKeyState(VK_CONTROL)` das ferramentas do Experimental).
@@ -868,6 +1019,19 @@ fn principal() -> Result<(), String> {
         }
         for &b in &o.botoes {
             println!("botão {b}: {:?}", s.botao_usuario(b));
+        }
+        match o.menu.as_deref().and_then(|m| m.split_once('@')) {
+            Some(("amarela", p)) => {
+                let (x, y) = p.split_once(',').ok_or("--menu amarela@X,Y")?;
+                let (x, y) = (x.parse().map_err(|_| "--menu: x")?, y.parse().map_err(|_| "--menu: y")?);
+                s.abrir_menu_da_amarela(x, y);
+            }
+            Some(("icones", nome)) => {
+                let (r, _) = s.tela.objeto_da_faixa(nome).ok_or("--menu: botão desconhecido")?;
+                s.abrir_menu_de_icones(i32::from(r.esq) + 2, i32::from(r.topo) + 2);
+            }
+            Some(_) => return Err("--menu amarela@X,Y ou icones@OBJETO".into()),
+            None => {}
         }
         for _ in 0..o.fechar_avisos {
             s.partida.fechar_modal();
