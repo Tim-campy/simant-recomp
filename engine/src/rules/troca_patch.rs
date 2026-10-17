@@ -83,7 +83,7 @@ pub fn trocar_patch(e: &mut Estado, tab: &TabelasGeracao, cfg: &ConfigSimulacao)
     let semente = e.ambiente.sementes.0[(ty * COLUNAS + tx) as usize];
     let mut m = mundo_para_troca(e);
     m.patch = (i32::from(tx), i32::from(ty));
-    let mut s = e.s.clone();
+    let mut s = e.s;
     m.gerar_patch(&mut s, tab, semente, i32::from(pretas), i32::from(vermelhas), i32::from(tx), i32::from(ty))?;
 
     e.eventos.push(Evento::Musica(ids::MUSICA_TROCA));

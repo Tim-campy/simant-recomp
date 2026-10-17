@@ -322,11 +322,7 @@ impl JanelaQuintal {
             AcaoQuintal::ModoGrafico => Some(3),
             AcaoQuintal::ColocarRainha => {
                 // _PlaceQueenInYard: sem rainhas guardadas, só a mensagem (som de erro).
-                if e.preta.rainhas_guardadas < 1 {
-                    self.colocando_rainha = false;
-                } else {
-                    self.colocando_rainha = true;
-                }
+                self.colocando_rainha = e.preta.rainhas_guardadas >= 1;
                 None
             }
             AcaoQuintal::RainhasAutomatico => {
@@ -591,7 +587,7 @@ impl DesenhoQuintal {
         let grupos: [(&[String], &str); 2] = [(&c.botao_do_modo, &c.botao_do_modo[modo]), (&c.botoes_rainhas, &c.botoes_rainhas[rainha])];
         for ob in faixa.objetos.iter_mut() {
             for (grupo, escolhido) in grupos {
-                if grupo.iter().any(|n| *n == ob.nome) {
+                if grupo.contains(&ob.nome) {
                     if ob.nome == escolhido {
                         ob.flags |= FLAG_SELECIONADO;
                     } else {
