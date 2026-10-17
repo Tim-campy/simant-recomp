@@ -143,6 +143,16 @@ Mais `vida_antes.bin` / `vida_depois.bin`: `_LifeA` (8.192) + `_LifeB` (4.096) +
 set SIMANT_RAIZ=C:\...\Simant recomp
 python tools/gerar_vetores_tick.py --ticks 5                       # tests/referencias/ticks/
 python tools/gerar_vetores_tick.py --ticks 3 --alvo 300 --semente-s 0x1234 --semente-r 1 --saida re_trabalho/v300
+python tools/gerar_vetores_tick.py --ticks 1 --alvos 127,159,191,223 --saida tests/referencias/ticks/fases          # vetores esparsos
+python tools/gerar_vetores_tick.py --ticks 5 --preparar tests/referencias/roteiros/tick_amarela_ordem.txt --saida ...  # roteiro (clique) antes
+python tools/gerar_vetores_tick.py --ticks 10 --livre 300 --saida tests/referencias/ticks/colonia_5min               # 300 s livre antes
+```
+
+`--alvos` grava `--ticks` ticks a partir de cada alvo, na mesma execução. `--preparar` executa um roteiro da bancada (`clicar_em`, `teclas`, `esperar`...) com a VM rodando, logo depois do `loadvm`. `--descricao` vai para o `indice.json`. Para não disputar o overlay com outra bancada, use `--overlay` com uma cópia de `re_trabalho/qemu/c_overlay.qcow2` (o snapshot `quick` vai junto).
+
+**Cuidado com a fase:** o vetor `tick_NNNNNN` é nomeado pelo `GameTime` **antes** do tick, e o tick soma 1 a `_Cycle` antes de testar as condições periódicas. Para exercitar `_Cycle & 0x1F == 0` com `_Cycle` = 128, o vetor é o `tick_000127`.
+
+```
 ```
 
 Saída por tick, em `tick_NNNNNN/` (NNNNNN = `GameTime` antes do tick):
@@ -159,6 +169,16 @@ Saída por tick, em `tick_NNNNNN/` (NNNNNN = `GameTime` antes do tick):
 ### Vetores no repositório
 
 `tests/referencias/ticks/`: ticks 79 a 83 do snapshot `quick` (Quick Game, velocidade normal, janelas do início do jogo), sem forçar sementes. No tick 80 (`_Cycle` = 80, múltiplo de 16) a rainha preta põe um ovo (`TotalEggsLaidB` 3 → 4, lista B cresce). Repetibilidade conferida: os ticks 79–81 batem com os da execução E1 (exceto `_BirdDelay` a partir do tick 80, ver acima).
+
+Cenários em subpastas (gerados em 2026-10-17, listados em `"cenarios"` do `indice.json` da raiz; cada um com o seu `indice.json`, que guarda o comando, a `descricao` e as exceções do teste):
+
+| Subpasta | Ticks | Como foi gerado | O que exercita |
+|---|---|---|---|
+| `fases/` | 127, 159, 191, 223 (1 cada) | `--alvos 127,159,191,223` | `_Cycle` = 128, 160, 192, 224 depois da soma: fases 0, 1, 2 e 3 de `_DoSmells` (compactação A/B/R, `_FullCount`, `_HistUpdate`, `_SmoothAlarm`, `_FillHoles*`, `_ColonySmell*`); 128 e 192 também são múltiplos de 64 (`_FeedAnts`: `HealthB/R` −1, `MeHealth` −1). No 127 o original mudou 43 blocos, entre eles `HealthB/R`, `MeHealth`, `H_*`, `HistCnt`, `HistStart`, `CastePop*` |
+| `amarela_andando/` | 85–89 | `--preparar tests/referencias/roteiros/tick_amarela_ordem.txt`: clique simples na célula (32, 1) do ninho preto (tela (160, 182)) | a amarela anda de (35, 8) a (33, 3), um passo por tick, com `_MeMoveMe` = 1 e `_MeCmd` = 0, passando pelas células da rainha preta |
+| `colonia_5min/` | 1885–1894 | `--livre 300` (velocidade normal, sem intervenção) | 165 vagas na lista A, 64 na B, 76 na R (muitas mortas, T = 0), formigas em vários modos, gato saindo de cena, formiga-leão |
+
+Volume: 3,2 MB ao todo em `tests/referencias/ticks/` (~135 KB por tick).
 
 ### Comparar o port
 
@@ -198,7 +218,36 @@ Um tick do port (`RegrasOriginais` sem tabelas de geração) sobre cada vetor de
 
 O último ajuste foi o relógio do quintal: `_BirdDelay` e `_CatDelay` só batem usando o `_gameCycles` do vetor (`Estado::ciclos_jogo`) também como relógio do Mac [hipótese; ver quintal.md, "Implementação no port"]. Histórico: só o esqueleto dava 280–289/307; com inimigos, amarela e superfície, 284–293; com o ninho e o quintal, 287–305; com o relógio, 307.
 
-**O teste exige igualdade total** (`engine/tests/ticks_originais.rs`): qualquer bloco, extra ou célula de vida diferente falha. Limite da cobertura: esses 5 ticks não caem nas fases de 32/64 ticks (compactação, `_CountAnts`, `_HistUpdate`, feromônios, alimentação), não têm a amarela andando e têm só duas formigas na superfície; vetores para esses casos estão sendo gerados.
+**O teste exige igualdade total** (`engine/tests/ticks_originais.rs`): qualquer bloco, extra ou célula de vida diferente falha. Ele roda os vetores da raiz e os de cada cenário em `"cenarios"`. Exceções, sempre com o motivo, no `indice.json` do cenário: `"pendentes"` (o port ainda diverge; só se exige que o vetor rode e que a ida e volta do save funcione; quem corrigir a regra tira o tick da lista) e `"vida_nao_reconstruivel"` (a vida do original não sai das listas; não se confere a reconstrução, mas a vida depois do tick continua exigida).
+
+### Cenários novos (2026-10-17, main em `9ade9b1`)
+
+| Cenário / tick | Blocos iguais | Mudados pelo original (iguais) | Extras | Vida ≠ | Situação |
+|---|---|---|---|---|---|
+| `fases/127` (fases 0 + 64) | 307/307 | 43 (43) | 5/5 | 0 | **bate** |
+| `fases/159` (fase 1) | 297/307 | 30 (26) | 4/5 | 2 | pendente: gato |
+| `fases/191` (fase 2 + 64) | 300/307 | 40 (35) | 4/5 | 2 | pendente: gato |
+| `fases/223` (fase 3) | 297/307 | 23 (21) | 4/5 | 3 | pendente: gato |
+| `amarela_andando/85–89` | 307/307 | 23–31 (todos) | 5/5 | 0 | **bate** (5 ticks) |
+| `colonia_5min/1885`, `1886` | 307/307 | 31, 39 (todos) | 5/5 | 0 | **bate** |
+| `colonia_5min/1887` | 306/307 | 37 (36) | 5/5 | 0 | pendente: só `CatDelay` |
+| `colonia_5min/1888–1894` | 289–303/307 | 31–40 (22–29) | 4–5/5 | 0–49 | pendente: cascata do gato |
+
+Placar: **9 dos 19 vetores novos batem inteiros** (todas as partes do tick nesses ticks, inclusive fase 0 de `_DoSmells`, `_FeedAnts`, `_FullCount`/`_HistUpdate` e a amarela andando no ninho); os outros 10 ficam como pendentes.
+
+**Divergência 1 — relógio do Mac do gato (quintal, `_SimCat`, [quintal.md](quintal.md) seção 6).** O port usa `Estado::ciclos_jogo` (o `_gameCycles` do vetor) como relógio do Mac; o original não. Evidência:
+- `colonia_5min/1887`: o gato termina a fuga (estado 3) e grava `_CatDelay = relógio + 600`. Original: 19503, logo relógio ≈ 18903 (≈ 315 s em 1/60 s); port: 270585 = `_gameCycles` (269985) + 600. É o único bloco diferente nesse tick.
+- `fases/159`, `191`, `223`: com `_CatOn = 0`, o original não mexe em `_CatDelay` (3654, gravado no tick 127, e 4064), portanto o relógio dele ainda é ≤ esse valor; o port compara com `_gameCycles` (29579, 36125, 42381), acha o atraso vencido, grava `_gameCycles + 200` e sorteia `S16`. O gerador S diverge **antes** de `_DoAntSimA` (o quintal é o passo 6 do tick) e o resto vem em cascata: gato aparecendo só no port (`CatOn`/`CatX`/`CatDir`/`CatCycle`, tick 159), cachorro (`DogDir`/`DogFrame`/`DogTurnCnt`/`DogX`), uma formiga da superfície (`AlistX/Y/T`) e, no 223, a rainha preta que põe um ovo só no port (`Blist*[11]`, `ListIndexB`, `TotalEggsLaidB`, `HealthB`).
+- `colonia_5min/1888–1894`: o mesmo, partindo do `_CatDelay` = 19503 do original: S diverge e daí formigas da superfície e dos ninhos (`Alist*`, `Blist*`, `Rlist*`), feromônios (`PherMapBN/BT/RN/RT`), `MapA`, `SowDir`, `RedTask`, `LionListT` e a vida. No 1889 o port ainda mexe em 64 bytes de `MapB` e de `MapR`, em `WaterTable` e em `ListIndexR` [hipótese: também cascata]. No 1891 e no 1893 S e R batem no fim do tick mas o cachorro (1891) e duas formigas (1893) divergem: causa não isolada.
+- Nos ticks 79–83 e 127 o relógio não era testado (gato andando ou saindo com o atraso vindo do próprio vetor), por isso a hipótese "relógio do Mac = `_gameCycles`" passava. [hipótese] O relógio do Mac é o tempo real em 1/60 s (≈ 3054 no tick 127, ≈ 18903 no 1887, compatível com ~51 s e ~315 s), não capturado nos vetores. Correção sugerida: capturar o relógio do Mac (`_MacTickCount` ou a fonte dele) em `extras.json` e usá-lo no comparador; até lá, esses 10 vetores ficam pendentes.
+
+**Divergência 2 — vida não reconstruível das listas** (não é erro do port; o comparador usa a vida gravada). Casos vistos:
+- `amarela_andando/86–88`: a amarela passou pelas duas células da rainha preta (Blist 0 e 1, T 96 e 104, em (34, 6) e (34, 7)); ao sair de cada uma, o original zerou a célula e a marca da rainha sumiu de `_LifeB`.
+- `fases/159`, `191`: vários ovos e larvas em (34, 8); o ovo posto no tick (índice mais alto, T 1) fica em `_LifeB` porque foi escrito por último, e a reconstrução de `_DoLoadInitializations` deixa o de menor índice (T 2).
+- `colonia_5min` (todos): dezenas de vagas mortas (T = 0) paradas nas células dos buracos (ex.: lista A em (2, 32), lista R em (32, 1)) apagam, na reconstrução, a marca da formiga viva de índice maior que está na mesma célula.
+Consequência para o port: um save carregado no meio do jogo pode ter vida diferente da que o original tinha em memória; o original, ao carregar o mesmo save, faz a mesma reconstrução, então isso só importa para comparar com memória viva.
+
+**Lacunas:** sem vetores com chuva, revoada, aranha caçando, menino cortando a grama, inseticida, velocidades "fast"/"ultra", amarela na superfície, entrando/saindo de ninho, pegando comida ou lutando; fases 1 e 3 de `_DoSmells` (compactação B/R, `_FillHoles*`, `_ColonySmell*`) ainda sem vetor que bata, por causa do gato.
 
 ## Limitações
 
@@ -208,4 +257,4 @@ O último ajuste foi o relógio do quintal: `_BirdDelay` e `_CatDelay` só batem
 - **`_Tindex` e `_TemDensity`**: classificados por inferência, não por teste.
 - **Determinismo depende do snapshot**: o `loadvm` com a VM rodando chegou sempre ao mesmo primeiro tick nas execuções feitas, mas isso não é garantido pelo QEMU sem `icount` (o tempo até o primeiro `WM_TIMER` vem do relógio do host). Se uma execução parar num `GameTime` diferente de 79, compare por `GameTime`, não pela ordem.
 - **Seletores** valem para `-m 16` e para a sessão salva no snapshot; o script sempre procura de novo.
-- Tamanho: cada tick ocupa ~130 KB (2 × 48.386 + 2 × 16.384 + JSON). Por isso só 5 ticks estão versionados; sequências longas ficam em `re_trabalho/`.
+- Tamanho: cada tick ocupa ~130 KB (2 × 48.386 + 2 × 16.384 + JSON). Versionados: 24 ticks (3,2 MB); sequências longas ficam em `re_trabalho/`.

@@ -20,6 +20,12 @@ Uso:
 --alvo          avança (tick a tick, com breakpoints) até a entrada com GameTime >= alvo antes de gravar
 --semente-s/-r  força as sementes na primeira entrada de _DoAntSim (antes de --alvo)
 --livre SEG     depois de forçar as sementes, deixa a VM rodar SEG segundos sem breakpoints antes do --alvo
+--alvos A,B,... para cada alvo (em ordem crescente) avança até ele e grava --ticks ticks, na mesma execução
+                (vetores esparsos, ex.: as fases de 32 ticks)
+--preparar ARQ  roteiro da bancada (comandos de tools/qemu_bancada.py: clicar_em, teclas, esperar, ...),
+                executado com a VM rodando depois do snapshot e das sementes e antes de --livre/--alvo
+                (ex.: dar uma ordem à formiga amarela)
+--descricao     texto livre gravado no indice.json (o que o cenário exercita)
 --segmentos     grava também os segmentos de dados 8, 9 e 10 inteiros (seg8_antes.bin, ...), para achar
                 variáveis fora do save que o tick altera
 --mapear-leituras ARQ.json  em vez de gravar vetores, roda --ticks ticks com watchpoints de leitura em tudo o
@@ -128,6 +134,9 @@ def main():
     ap.add_argument("--overlay", default=str(qb.OVERLAY_PADRAO))
     ap.add_argument("--mem", type=int, default=16)
     ap.add_argument("--mapear-leituras", metavar="ARQ.json")
+    ap.add_argument("--alvos", type=lambda v: [int(x, 0) for x in v.split(",")])
+    ap.add_argument("--preparar", metavar="ROTEIRO.txt")
+    ap.add_argument("--descricao")
     a = ap.parse_args()
 
     saida = Path(a.saida).resolve()
@@ -142,6 +151,10 @@ def main():
             mj.escrever_variavel("SementeS", a.semente_s.to_bytes(2, "little"))
         if a.semente_r is not None:
             mj.escrever_variavel("SementeR", a.semente_r.to_bytes(4, "little"))
+        if a.preparar:
+            dep.retomar()
+            for linha in Path(a.preparar).read_text(encoding="utf-8").splitlines():
+                b.executar(linha)
         if a.livre:
             dep.retomar()
             qb.time.sleep(a.livre)
@@ -153,16 +166,20 @@ def main():
             mapear(b, a.ticks, Path(a.mapear_leituras))
             return
         ticks = []
-        for _ in range(a.ticks):
-            arqs = dep.capturar_tick(a.segmentos)
-            ex_antes, ex_depois = arqs["extras.json"]["antes"], arqs["extras.json"]["depois"]
-            pasta = saida / f"tick_{ex_antes['GameTime']:06d}"
-            for nome_arq, conteudo in arqs.items():
-                qb.gravar(pasta / nome_arq, conteudo)
-            ticks.append(pasta.name)
-            b.log(f"{pasta.name}: GameTime {ex_antes['GameTime']} -> {ex_depois['GameTime']}, "
-                  f"S {ex_antes['SementeS']:#06x} -> {ex_depois['SementeS']:#06x}, "
-                  f"R {ex_antes['SementeR']:#010x} -> {ex_depois['SementeR']:#010x}")
+        for alvo in sorted(a.alvos) if a.alvos else [None]:
+            if alvo is not None:
+                gt = dep.ate_gametime(alvo)
+                b.log(f"entrada com GameTime = {gt} (alvo {alvo})")
+            for _ in range(a.ticks):
+                arqs = dep.capturar_tick(a.segmentos)
+                ex_antes, ex_depois = arqs["extras.json"]["antes"], arqs["extras.json"]["depois"]
+                pasta = saida / f"tick_{ex_antes['GameTime']:06d}"
+                for nome_arq, conteudo in arqs.items():
+                    qb.gravar(pasta / nome_arq, conteudo)
+                ticks.append(pasta.name)
+                b.log(f"{pasta.name}: GameTime {ex_antes['GameTime']} -> {ex_depois['GameTime']}, "
+                      f"S {ex_antes['SementeS']:#06x} -> {ex_depois['SementeS']:#06x}, "
+                      f"R {ex_antes['SementeR']:#010x} -> {ex_depois['SementeR']:#010x}")
         indice = {
             "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
             "gerado_em": datetime.date.today().isoformat(),
@@ -170,6 +187,9 @@ def main():
             "semente_s_forcada": a.semente_s,
             "semente_r_forcada": a.semente_r,
             "alvo": a.alvo,
+            "alvos": a.alvos,
+            "preparar": a.preparar and Path(a.preparar).as_posix(),
+            "descricao": a.descricao,
             "livre_segundos": a.livre,
             "primeira_entrada": inicio,
             "seletores_dados": {str(k): f"{v:#06x}" for k, v in mj.localizar().items()},

@@ -1,0 +1,71 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "snapshot": "quick",
+ "semente_s_forcada": null,
+ "semente_r_forcada": null,
+ "alvo": null,
+ "alvos": [
+  127,
+  159,
+  191,
+  223
+ ],
+ "preparar": null,
+ "descricao": "Um tick em cada fase de 32 ticks de _DoSmells: entradas com Cycle 127, 159, 191, 223 (o tick soma 1 antes de testar, logo Cycle 128, 160, 192, 224 = fases 0, 1, 2, 3); 127 e 191 também caem no múltiplo de 64 (alimentação/saúde, _CountAnts, _HistUpdate)",
+ "livre_segundos": null,
+ "primeira_entrada": {
+  "SementeS": 27421,
+  "SementeR": 1405178453,
+  "gameCycles": 10379,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 79,
+  "Cycle": 79,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "seletor_codigo_6": "0x1547",
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_000127",
+  "tick_000159",
+  "tick_000191",
+  "tick_000223"
+ ],
+ "pendentes": {
+  "tick_000159": "quintal, relógio do Mac do gato: com _CatOn = 0 o port usa _gameCycles (29579) como relógio, acha vencido o _CatDelay = 3654 gravado pelo original no tick 127 e sorteia S16 (CatDelay do port = 29779); o original não mexe em _CatDelay (o relógio dele está <= 3654). Daí S diverge e, em cascata: o gato aparece só no port (CatOn/CatX/CatDir/CatCycle), o cachorro (DogDir/DogFrame/DogX) e a formiga 1 da superfície (AlistY/T)",
+  "tick_000191": "quintal, relógio do Mac do gato (como no tick 159): o port usa _gameCycles (36125), acha vencido _CatDelay = 3654 e sorteia S16 (CatDelay do port = 36325); em cascata, o cachorro (DogDir/DogFrame/DogTurnCnt/DogX) e a formiga 0 da superfície (AlistY/T)",
+  "tick_000223": "quintal, relógio do Mac do gato (como no tick 159): o port usa _gameCycles (42381), acha vencido _CatDelay = 4064 e sorteia S16 (CatDelay do port = 42581); em cascata, a formiga 1 da superfície (AlistX/T) e a rainha preta, que põe um ovo só no port (Blist*[11], ListIndexB, TotalEggsLaidB, HealthB)"
+ },
+ "vida_nao_reconstruivel": {
+  "tick_000159": "depois do tick, LifeB (34, 8): original 1, reconstruído 2. Vários ovos/larvas na mesma célula (Blist 4..8); o ovo posto neste tick (índice 8, T 1) foi escrito por último no tick, enquanto a reconstrução de _DoLoadInitializations deixa o de menor índice (T 2)",
+  "tick_000191": "depois do tick, LifeB (34, 8): original 1, reconstruído 2 (ovo novo, índice 9, sobre larvas de índice menor; como no tick 159)"
+ }
+}

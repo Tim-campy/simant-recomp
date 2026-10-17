@@ -1,0 +1,7 @@
+# Preparação do cenário de vetores de tick "amarela_andando" (tools/gerar_vetores_tick.py --preparar).
+# Parte do snapshot "quick": vista do ninho preto com _MapPnt = (24, 0); a amarela está em (36, 9).
+# Clique simples na célula (32, 1) do túnel (ordem "ir", _MeCmd = 0): área do mapa em (24, 158) da tela
+# 640x480, tiles de 16 px (docs/spec/telas/jogo.md) -> x = 24 + (32-24)*16 + 8 = 160, y = 158 + 1*16 + 8 = 182.
+# Medido (2026-10-17): 3 s depois do clique a amarela já chegou a (32, 1). Por isso a espera é curta.
+clicar_em 160 182
+esperar 0.1

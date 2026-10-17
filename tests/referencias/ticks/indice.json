@@ -1,6 +1,11 @@
 {
  "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
  "gerado_em": "2026-10-16",
+ "cenarios": [
+  "fases",
+  "amarela_andando",
+  "colonia_5min"
+ ],
  "snapshot": "quick",
  "semente_s_forcada": null,
  "semente_r_forcada": null,
