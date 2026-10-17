@@ -1,0 +1,24 @@
+# Testes e clippy a cada push/PR. Sem os arquivos do jogo (não são redistribuídos), os testes que
+# dependem deles avisam e passam; os vetores de tick do original (tests/referencias) rodam inteiros.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SDL2 do sistema
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Testes
+        run: cargo test --workspace
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
