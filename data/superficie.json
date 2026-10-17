@@ -1,0 +1,73 @@
+{
+  "_comentario": "Tabelas e constantes das regras da superfície. As tabelas foram extraídas do SIMANTW.EXE por tools/extrair_superficie.py (endereços no topo do script); as constantes de 'regras' vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/superficie.md. Valores em decimal.",
+  "carrega_carga": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0],
+  "grupo_sem_carga": [0, 2, 2, 2, 4, 2, 6, 6, 8, 6, 10, 11, 12, 13, 14, 15],
+  "casta_por_escolha": [2, 6, 4, 8],
+  "modo_por_tarefa": [2, 4, 1],
+  "modos_operaria": [
+    [1, 2, 7, 7, 7, 7, 7, 7],
+    [4, 1, 1, 1, 4, 2, 2, 2],
+    [13, 13, 13, 4, 4, 4, 2, 2],
+    [13, 13, 4, 4, 4, 4, 4, 2],
+    [1, 1, 1, 2, 2, 2, 2, 2],
+    [1, 2, 2, 2, 2, 2, 2, 2]
+  ],
+  "modos_soldado": [
+    [7, 7, 7, 7, 7, 7, 7, 7],
+    [1, 2, 2, 2, 2, 2, 2, 2],
+    [2, 2, 2, 4, 4, 2, 2, 2],
+    [2, 4, 4, 4, 4, 4, 4, 2],
+    [2, 2, 2, 2, 2, 2, 2, 2],
+    [2, 2, 2, 2, 2, 2, 2, 2]
+  ],
+  "modo_por_grupo": [8, 1, 0, 3, 14, 5, 0, 3, 14, 5, 0, 0, 9, 9, 10, 0],
+  "classe_luta": [0, 0, 0, 0, 2, 0, 1, 1, 2, 1, 0, 0, 3, 3, 0, 0],
+  "matriz_luta": [
+    [5, 2, 7, 3],
+    [8, 5, 9, 4],
+    [3, 1, 5, 2],
+    [7, 6, 8, 5]
+  ],
+  "regras": {
+    "s_ao_pegar_comida": 200,
+    "alarme_de_luta": 40,
+    "cheiro_defender_ninho": 110,
+    "cheiro_decolar": 100,
+    "revoada_pre_voo": 100,
+    "limite_enxame": 50,
+    "populacao_lider": 30,
+    "tipo_lider": 176,
+    "raio_aranha_perseguida": 100,
+    "saude_desespero": 10,
+    "saude_fome": 30,
+    "saude_pouca": 50,
+    "populacao_grande": 101,
+    "revoada_vermelha_reprodutores": 20,
+    "revoada_vermelha_contagem": 200,
+    "malvadeza_minima_populacao": 21,
+    "malvadeza_base": 30,
+    "malvadeza_sorteio": 100,
+    "musica_ataque_vermelho": 11018
+  },
+  "_origem": {
+    "s_ao_pegar_comida": "_DoRandAntA/_DoToNestAnt/_DoForageAnt: S = 200 ao pegar comida (trilha de volta)",
+    "alarme_de_luta": "_StartFightA e embutidos: _AlarmHere2(x, y, 40) na célula da nuvem de luta",
+    "cheiro_defender_ninho": "_DoDefendNest (modo 12): cheiro de ninho abaixo disto -> volta ao ninho",
+    "cheiro_decolar": "_DoRepoExit (modo 15): cheiro de ninho abaixo disto -> volta ao ninho",
+    "revoada_pre_voo": "_DoRepoLoit (modo 14): _FlyAway* acima disto -> modo 15",
+    "limite_enxame": "_DoRepoFly (modo 16): só sai do mapa se _SwarmCnt* < limite",
+    "populacao_lider": "_MakeRedInitiator: _BpopT >= isto cria a líder vermelha",
+    "tipo_lider": "_MakeRedInitiator: T gravado na líder (soldado vermelho, direção 0)",
+    "raio_aranha_perseguida": "_GetStrategy: _GetDis(aranha, amarela) < isto liga _ChaseSpid",
+    "saude_desespero": "_GetStrategy/_GstrR: saúde abaixo disto pode disparar o ataque desesperado",
+    "saude_fome": "_GetStrategy/_GstrR: saúde abaixo disto -> modo estratégico 5",
+    "saude_pouca": "_GetStrategy/_GstrR: saúde abaixo disto -> modo estratégico 4",
+    "populacao_grande": "_GetStrategy/_GstrR: população abaixo disto é 'normal' (modo 1)",
+    "revoada_vermelha_reprodutores": "_GstrR: machos + rainhas novas acima disto armam _FlyAwayR",
+    "revoada_vermelha_contagem": "_GstrR: valor posto em _FlyAwayR",
+    "malvadeza_minima_populacao": "_GstrR: população vermelha abaixo disto não ataca por sorteio",
+    "malvadeza_base": "_GstrR: _JustToBeMean = SRand1(malvadeza_sorteio) + malvadeza_base",
+    "malvadeza_sorteio": "_GstrR: ver malvadeza_base",
+    "musica_ataque_vermelho": "_GstrR: música tocada no ataque vermelho (_myBeginSong)"
+  }
+}

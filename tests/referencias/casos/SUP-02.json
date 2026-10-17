@@ -1,0 +1,63 @@
+{
+ "id": "SUP-02",
+ "spec": "docs/spec/regras/superficie.md#7-entrada-no-ninho-_goinnest-x-y-i-1028257a",
+ "descricao": "Operária preta (T = 0x12, M = 0, S = 55) sobre o buraco preto (3, 32). No primeiro tick, _GoInNest a tira da lista A (T = 0) e a põe na lista B em (32, 1) com T = 0x14 (virada para baixo), M e S preservados; _DigTileB(32, 1). Aranha desligada.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "SUP02.ANT",
+ "operacoes": [
+  {
+   "op": "escrever",
+   "nome": "SpidOn",
+   "valor": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 3,
+   "Y": 32,
+   "M": 0,
+   "T": 18,
+   "S": 55
+  }
+ ],
+ "rodar": {
+  "ate_gametime": 80,
+  "timeout": 120
+ },
+ "esperado": [
+  "A[2].T = 0 (a vaga só some na compactação do tick 128)",
+  "B[5] = a formiga que entrou: grupo 2 (T & 0xF8 = 0x10)"
+ ],
+ "conferir": [
+  {
+   "nome": "GameTime",
+   "op": ">=",
+   "valor": 80
+  },
+  {
+   "nome": "GameTime",
+   "op": "<",
+   "valor": 128
+  },
+  {
+   "formiga": "A",
+   "indice": 2,
+   "campo": "T",
+   "op": "==",
+   "valor": 0
+  },
+  {
+   "nome": "ListIndexB",
+   "op": ">=",
+   "valor": 6
+  },
+  {
+   "formiga": "B",
+   "indice": 5,
+   "campo": "T",
+   "mascara": 248,
+   "op": "==",
+   "valor": 16
+  }
+ ]
+}

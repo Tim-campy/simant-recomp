@@ -1,0 +1,194 @@
+{
+ "id": "SUP-01",
+ "spec": "docs/spec/regras/superficie.md#35-modo-3--got-food-_doreturnfoodant-10281cb4",
+ "descricao": "Carregadora de comida (M = 3, T = 0x1E: grupo 3, virada para oeste) sobre um gradiente de cheiro de ninho preto que cresce para oeste (linha de células cy = 20). Com a maior vizinha na própria direção, _GetNestDir dá 6 seja qual for o SRand2: o caminho não depende do gerador. A cada tick anda 1 para oeste, S cai 1 e deposita S na trilha preta (_JamScentBT). Aranha desligada.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "SUP01.ANT",
+ "operacoes": [
+  {
+   "op": "escrever",
+   "nome": "SpidOn",
+   "valor": 0
+  },
+  {
+   "op": "retangulo",
+   "mapa": "MapA",
+   "x0": 10,
+   "y0": 38,
+   "x1": 41,
+   "y1": 42,
+   "valor": 0
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 5,
+   "y": 20,
+   "valor": 175
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 6,
+   "y": 20,
+   "valor": 170
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 7,
+   "y": 20,
+   "valor": 165
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 8,
+   "y": 20,
+   "valor": 160
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 9,
+   "y": 20,
+   "valor": 155
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 10,
+   "y": 20,
+   "valor": 150
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 11,
+   "y": 20,
+   "valor": 145
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 12,
+   "y": 20,
+   "valor": 140
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 13,
+   "y": 20,
+   "valor": 135
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 14,
+   "y": 20,
+   "valor": 130
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 15,
+   "y": 20,
+   "valor": 125
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 16,
+   "y": 20,
+   "valor": 120
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 17,
+   "y": 20,
+   "valor": 115
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 18,
+   "y": 20,
+   "valor": 110
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 19,
+   "y": 20,
+   "valor": 105
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBN",
+   "x": 20,
+   "y": 20,
+   "valor": 100
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 40,
+   "Y": 40,
+   "M": 3,
+   "T": 30,
+   "S": 200
+  }
+ ],
+ "rodar": {
+  "ate_gametime": 90,
+  "timeout": 120
+ },
+ "esperado": [
+  "formiga A[2]: Y = 40, T = 0x1E, M = 3, X = 40 − n e S = 200 − n, n = GameTime − 78",
+  "_PherMapBT na linha cy = 20: cada célula atravessada com o S do primeiro tile pisado nela (199, 197, 195…)"
+ ],
+ "conferir": [
+  {
+   "nome": "GameTime",
+   "op": ">=",
+   "valor": 90
+  },
+  {
+   "formiga": "A",
+   "indice": 2,
+   "campo": "Y",
+   "op": "==",
+   "valor": 40
+  },
+  {
+   "formiga": "A",
+   "indice": 2,
+   "campo": "T",
+   "op": "==",
+   "valor": 30
+  },
+  {
+   "formiga": "A",
+   "indice": 2,
+   "campo": "M",
+   "op": "==",
+   "valor": 3
+  },
+  {
+   "formiga": "A",
+   "indice": 2,
+   "campo": "X",
+   "op": "<=",
+   "valor": 28
+  },
+  {
+   "formiga": "A",
+   "indice": 2,
+   "campo": "S",
+   "op": "<=",
+   "valor": 188
+  }
+ ]
+}

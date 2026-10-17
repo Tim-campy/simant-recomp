@@ -1,0 +1,130 @@
+{
+ "id": "SUP-04",
+ "spec": "docs/spec/regras/feromonios.md#3-decaimento",
+ "descricao": "Etapas de cheiro do tick sem formigas por perto: trilha vermelha 210 na célula (40, 5) decai à metade no tick 96; trilha preta 210 em (45, 5) não muda até o tick 160; alarme 200 isolado em (50, 25) é suavizado no tick 128 (100 no centro, 25 nas 4 vizinhas ortogonais); buraco vermelho (59, 16) recebe 255 − 1 no tick 96. Uma operária com M = 17 fica parada (P7). Aranha desligada.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "SUP04.ANT",
+ "operacoes": [
+  {
+   "op": "escrever",
+   "nome": "SpidOn",
+   "valor": 0
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapRT",
+   "x": 40,
+   "y": 5,
+   "valor": 210
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapBT",
+   "x": 45,
+   "y": 5,
+   "valor": 210
+  },
+  {
+   "op": "celula",
+   "mapa": "PherMapA",
+   "x": 50,
+   "y": 25,
+   "valor": 200
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 20,
+   "Y": 10,
+   "M": 17,
+   "T": 18,
+   "S": 7
+  }
+ ],
+ "rodar": {
+  "ate_gametime": 130,
+  "timeout": 150
+ },
+ "esperado": [
+  "PherMapRT(40, 5) = 105",
+  "PherMapBT(45, 5) = 210",
+  "PherMapA(50, 25) = 100; (49, 25), (51, 25), (50, 24), (50, 26) = 25",
+  "PherMapRN(59, 16) = 254",
+  "A[2] = (20, 10) T 0x12 M 17 S 7"
+ ],
+ "conferir": [
+  {
+   "nome": "GameTime",
+   "op": ">=",
+   "valor": 129
+  },
+  {
+   "nome": "GameTime",
+   "op": "<",
+   "valor": 160
+  },
+  {
+   "nome": "PherMapRT",
+   "indice": 1285,
+   "largura": 1,
+   "op": "==",
+   "valor": 105
+  },
+  {
+   "nome": "PherMapBT",
+   "indice": 1445,
+   "largura": 1,
+   "op": "==",
+   "valor": 210
+  },
+  {
+   "nome": "PherMapA",
+   "indice": 1625,
+   "largura": 1,
+   "op": "==",
+   "valor": 100
+  },
+  {
+   "nome": "PherMapA",
+   "indice": 1593,
+   "largura": 1,
+   "op": "==",
+   "valor": 25
+  },
+  {
+   "nome": "PherMapA",
+   "indice": 1624,
+   "largura": 1,
+   "op": "==",
+   "valor": 25
+  },
+  {
+   "nome": "PherMapRN",
+   "indice": 1904,
+   "largura": 1,
+   "op": "==",
+   "valor": 254
+  },
+  {
+   "formiga": "A",
+   "indice": 2,
+   "campo": "X",
+   "op": "==",
+   "valor": 20
+  },
+  {
+   "formiga": "A",
+   "indice": 2,
+   "campo": "M",
+   "op": "==",
+   "valor": 17
+  },
+  {
+   "formiga": "A",
+   "indice": 2,
+   "campo": "S",
+   "op": "==",
+   "valor": 7
+  }
+ ]
+}

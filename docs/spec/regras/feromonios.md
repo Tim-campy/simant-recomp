@@ -121,7 +121,7 @@ Gatilhos de modo ligados a cheiro (`_DoAntSimA` e companhia):
 ## 5. Estado inicial e verificação
 
 - **Verificado** no `QUICK2.ANT` (tick 78): `_PherMapA`, `_PherMapBT`, `_PherMapRN` e `_PherMapRT` estão zerados; `_PherMapBN` tem uma única célula com 254, a do buraco preto (3, 32) → célula (1, 16). É o esperado: no tick 32, `_FillHolesBN` pôs 255 e `_ColonySmellBN` tirou 1. `_PherMapRN` deveria ter recebido o mesmo no tick 96, que ainda não tinha chegado.
-- [em aberto] Conferir no próximo save (tick ≥ 96) que a célula do buraco vermelho (118, 32) → (59, 16) aparece com 254 em `_PherMapRN`.
+- **Verificado** (caso SUP-04 da bancada, 2026-10-17): no tick 130 a célula do buraco vermelho (118, 32) → (59, 16) está com 254 em `_PherMapRN`; no mesmo caso, trilha vermelha 210 → 105 no tick 96, trilha preta intacta até o tick 160 e um alarme isolado de 200 vira 100 no centro e 25 nas 4 vizinhas no tick 128. O port dá o mesmo (`sup04_feromonios_iguais_ao_original`, `engine/tests/regras_superficie.rs`).
 
 ## 6. Como testar contra o original
 
@@ -170,4 +170,5 @@ Testes: `cargo test -p engine` roda os casos construídos a partir desta spec (m
 - Mapa de saídas dos ninhos (`_ExitMapB/R`, `_FixExitMapB/R`, `_GetExitDirB`, `_GetEnterDirB`): é o "cheiro" interno do ninho e merece documento próprio.
 - Qual tecla diminui o cheiro na ferramenta Experimental (`GetAsyncKeyState` sem o argumento visível no pseudocódigo).
 - Conferir no original, com os vetores de tick, as previsões do port: suavização dupla na volta de `_Cycle` (0x1000 → 0) e o giro duplo de `_GetNestDir`.
-- `_GetRandDir`, `_GetDefendDir` e a direção dentro dos ninhos: ainda não portadas.
+- `_GetRandDir`, `_GetDefendDir` e `_GetRedDefendDir` estão em `rules/superficie.rs` (privadas); a direção dentro dos ninhos ainda não foi portada.
+- As etapas do tick (`_FillHoles*`, `_ColonySmell*`, `_SmoothAlarm`) são chamadas por `rules/tick.rs` (fases 1 e 3 e `_FullCount`) via `superficie::rodar_fase_de_cheiro`, que converte os mapas do `Estado` (`Grade`) para `feromonios::Feromonios` e de volta.
