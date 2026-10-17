@@ -5,6 +5,7 @@
 //!
 //! Especificação: docs/spec/telas/abertura.md ("Escolha do jogo") e docs/spec/telas/quintal.md.
 
+use engine::core::menu_ferramentas::{ItemMenu, MenuFerramentas};
 use engine::core::navegacao::Evento as EventoNav;
 use engine::core::quadro::Quadro;
 use engine::core::quintal_mapa::{self, ConfigQuintalMapa, DesenhoQuintal, JanelaQuintal};
@@ -12,6 +13,8 @@ use engine::core::selecao::{ConfigModos, Escolha, SelecaoDeJogo};
 use engine::core::telas::{desenhar_janela_na_tela, Interface};
 use engine::formats::janela::Retangulo;
 use engine::recursos::Recursos;
+use engine::rules::estado::Evento;
+use engine::rules::experimental::{self, Contexto, ControleExperimental, Efeito, Ferramenta, TabelasExperimental};
 
 use super::Sessao;
 
@@ -22,6 +25,12 @@ pub struct Modos {
     pub selecao: SelecaoDeJogo,
     /// O "Select a Game" está aberto sobre a partida (a simulação fica pausada).
     pub escolhendo: bool,
+    /// Menu de ferramentas do Experimental (botão ribTools).
+    pub menu: MenuFerramentas,
+    pub menu_aberto: bool,
+    pub tabelas_exp: TabelasExperimental,
+    /// `_ExpSubStates` e o arrasto de `_processExp`.
+    pub controle_exp: ControleExperimental,
 }
 
 impl Modos {
@@ -29,7 +38,10 @@ impl Modos {
         let cfg = ConfigQuintalMapa::carregar(recursos)?;
         let quintal = DesenhoQuintal::carregar(cfg, recursos, interface)?;
         let selecao = SelecaoDeJogo::carregar(recursos.dados::<ConfigModos>(engine::core::selecao::ARQUIVO_CONFIG)?, recursos, interface)?;
-        Ok(Modos { quintal, janela: JanelaQuintal::default(), selecao, escolhendo: false })
+        let tabelas_exp = TabelasExperimental::carregar(recursos)?;
+        let controle_exp = ControleExperimental::novo(&tabelas_exp);
+        let menu = MenuFerramentas::carregar(recursos)?;
+        Ok(Modos { quintal, janela: JanelaQuintal::default(), selecao, escolhendo: false, menu, menu_aberto: false, tabelas_exp, controle_exp })
     }
 }
 
@@ -60,6 +72,19 @@ pub fn desenhar(s: &Sessao, q: &mut Quadro) -> Result<Vec<String>, String> {
                 }
             }
         }
+    }
+    // _NewGame: no Experimental o botão de ferramentas da faixa usa outros bitmaps.
+    if s.partida.estado.partida.tipo_jogo == 3 && !m.janela.aberta {
+        if let Some(r) = s.tela.retangulo_da_faixa(&m.menu.cfg.botao) {
+            let id = m.menu.cfg.bitmaps_botao_experimental[1];
+            if let Ok(b) = s.recursos.objeto(engine::formats::banco::Chave { tipo: engine::formats::bitmap::TIPO_BITMAP, id }).and_then(|d| engine::formats::bitmap::Bitmap::decodificar(&d)) {
+                q.bitmap(&b, i32::from(r.esq), i32::from(r.topo));
+            }
+        }
+    }
+    if m.menu_aberto {
+        let atual = Ferramenta::de_i16(s.partida.estado.partida.ferramenta_experimental);
+        pendentes.extend(m.menu.desenhar(q, s.recursos, &s.interface, atual));
     }
     if m.escolhendo {
         pendentes.extend(desenhar_janela_na_tela(q, s.recursos, &s.interface, m.selecao.cfg.janela)?);
@@ -113,13 +138,109 @@ fn escolher(s: &mut Sessao, e: Escolha) -> Resposta {
     }
 }
 
-/// Clique esquerdo em (x, y) da área cliente. `duplo`: duplo clique do SDL.
-pub fn clique(s: &mut Sessao, x: i32, y: i32, duplo: bool) -> Resposta {
+/// Os efeitos das ferramentas viram pedidos da fila (som, música) ou linhas no terminal.
+fn tratar_efeitos(s: &mut Sessao, efeitos: Vec<Efeito>) {
+    for e in efeitos {
+        match e {
+            Efeito::Som { id, .. } => s.partida.estado.eventos.push(Evento::Som(id)),
+            Efeito::Musica(id) => s.partida.estado.eventos.push(Evento::Musica(id)),
+            Efeito::Aviso { lista, indice } => println!("aviso: texto {indice} da lista {lista}"),
+            Efeito::Examinar(x) => println!("examinar: {x:?}"),
+        }
+    }
+    s.partida.processar_eventos_do_estado();
+}
+
+/// Botão de ferramentas (`_RibbonToolsMenu`): Quick Game → Experimental; no Experimental abre o
+/// menu; no Full Game e no Tutorial, nada (o original mostra só uma figura no Full Game).
+fn botao_ferramentas(s: &mut Sessao) {
+    match s.partida.estado.partida.tipo_jogo {
+        1 => {
+            let c = Contexto { tabelas: &s.modos.tabelas_exp, amarela: &s.partida.tabelas_amarela, inimigos: &s.partida.regras.inimigos };
+            let e = &mut s.partida.estado;
+            let efeitos = experimental::quick_para_experimental(e, c);
+            println!("Quick Game -> Experimental");
+            tratar_efeitos(s, efeitos);
+        }
+        3 => {
+            if let Some(r) = s.tela.retangulo_da_faixa(&s.modos.menu.cfg.botao) {
+                s.modos.menu.abrir(r);
+                s.modos.menu_aberto = true;
+            }
+        }
+        _ => println!("ferramentas: nada neste tipo de jogo"),
+    }
+}
+
+fn clique_no_menu(s: &mut Sessao, x: i32, y: i32) {
+    if !s.modos.menu.contem(x, y) {
+        s.modos.menu_aberto = false;
+        return;
+    }
+    let Some(item) = s.modos.menu.item_em(x, y) else { return };
+    let plano = i32::from(s.partida.nav.plano_mapa);
+    let (f, sub, fecha) = match item {
+        ItemMenu::Ferramenta(f) => (f, None, s.modos.menu.submenu.is_none()),
+        ItemMenu::Subopcao(f, i) => (f, Some(i), true),
+    };
+    let mut ctl = s.modos.controle_exp.clone();
+    let c = Contexto { tabelas: &s.modos.tabelas_exp, amarela: &s.partida.tabelas_amarela, inimigos: &s.partida.regras.inimigos };
+    let e = &mut s.partida.estado;
+    let efeitos = experimental::escolher_ferramenta(e, c, &mut ctl, f, sub, plano);
+    s.modos.controle_exp = ctl;
+    println!("ferramenta {f:?} (subopção {:?})", sub.unwrap_or(s.modos.controle_exp.subopcao(f)));
+    if fecha {
+        s.modos.menu_aberto = false;
+    }
+    tratar_efeitos(s, efeitos);
+}
+
+/// Experimental: botão apertado (`pressionar`) ou arrasto (`arrastar`) numa célula do mapa.
+fn ferramenta_no_mapa(s: &mut Sessao, x: i32, y: i32, ctrl: bool, arrasto: bool) -> bool {
+    let Some((cx, cy)) = s.tela.celula_em(x, y, &s.partida.nav) else { return false };
+    let plano = i32::from(s.partida.nav.plano_mapa);
+    let mut ctl = s.modos.controle_exp.clone();
+    let c = Contexto { tabelas: &s.modos.tabelas_exp, amarela: &s.partida.tabelas_amarela, inimigos: &s.partida.regras.inimigos };
+    let e = &mut s.partida.estado;
+    let efeitos = if arrasto {
+        experimental::arrastar(e, c, &mut ctl, plano, cx, cy, ctrl)
+    } else {
+        experimental::pressionar(e, c, &mut ctl, plano, cx, cy, ctrl)
+    };
+    s.modos.controle_exp = ctl;
+    tratar_efeitos(s, efeitos);
+    true
+}
+
+/// Mouse andando com o botão esquerdo apertado: arrasto da ferramenta do Experimental.
+pub fn mover(s: &mut Sessao, x: i32, y: i32, ctrl: bool) -> bool {
+    if s.modos.controle_exp.atual.is_none() || s.partida.estado.partida.tipo_jogo != 3 {
+        return false;
+    }
+    ferramenta_no_mapa(s, x, y, ctrl, true)
+}
+
+/// Botão solto: fim do arrasto.
+pub fn soltar(s: &mut Sessao) {
+    experimental::soltar(&mut s.modos.controle_exp);
+}
+
+/// Clique (esquerdo ou direito) em (x, y) da área cliente. `duplo`: duplo clique do SDL; `ctrl`: Ctrl
+/// apertado (inverte muro, cavar, comida e cheiro no Experimental).
+pub fn clique(s: &mut Sessao, x: i32, y: i32, duplo: bool, ctrl: bool) -> Resposta {
     if s.modos.escolhendo {
         return match s.modos.selecao.escolha_em(x, y) {
             Some(e) => escolher(s, e),
             None => Resposta::Tratada,
         };
+    }
+    if s.modos.menu_aberto {
+        clique_no_menu(s, x, y);
+        return Resposta::Tratada;
+    }
+    if !s.modos.janela.aberta && s.tela.objetos_da_faixa_em(x, y).contains(&s.modos.menu.cfg.botao.as_str()) {
+        botao_ferramentas(s);
+        return Resposta::Tratada;
     }
     let m = &mut s.modos;
     if !m.janela.aberta {
@@ -127,6 +248,9 @@ pub fn clique(s: &mut Sessao, x: i32, y: i32, duplo: bool) -> Resposta {
         if abre {
             m.janela.aplicar(quintal_mapa::AcaoQuintal::Abrir, &mut s.partida.estado);
             println!("quintal aberto (modo {})", s.partida.estado.vistas.modo_quintal);
+            return Resposta::Tratada;
+        }
+        if s.partida.estado.partida.tipo_jogo == 3 && ferramenta_no_mapa(s, x, y, ctrl, false) {
             return Resposta::Tratada;
         }
         return Resposta::Seguir;
@@ -147,6 +271,10 @@ pub fn clique(s: &mut Sessao, x: i32, y: i32, duplo: bool) -> Resposta {
         // Clique fora: a janela de edição (se for ela) vem para a frente e recebe o clique.
         if na_edicao {
             m.janela.na_frente = false;
+        }
+        // _processExp: no Experimental, todo clique no mapa vai para a ferramenta.
+        if s.partida.estado.partida.tipo_jogo == 3 && ferramenta_no_mapa(s, x, y, ctrl, false) {
+            return Resposta::Tratada;
         }
         return Resposta::Seguir;
     }

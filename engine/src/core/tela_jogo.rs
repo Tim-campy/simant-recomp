@@ -430,6 +430,14 @@ impl TelaDeJogo {
         desenhar_modal(q, recursos, interface, avisos)
     }
 
+    /// Retângulo (na área cliente) do objeto da faixa com esse nome.
+    pub fn retangulo_da_faixa(&self, nome: &str) -> Option<Retangulo> {
+        let base = self.faixa.retangulo();
+        let (dx, dy) = (self.origem_faixa.0 - base.esq, self.origem_faixa.1 - base.topo);
+        let r = self.faixa.objetos.iter().find(|o| o.nome == nome)?.retangulo;
+        Some(Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy })
+    }
+
     /// Ação da seta da barra de rolagem da janela de edição sob o ponto (x, y), se houver.
     pub fn seta_em(&self, x: i32, y: i32) -> Option<Acao> {
         setas_de_rolagem(&self.cfg.edicao.moldura).into_iter().find(|(r, _)| contem(*r, x, y)).map(|(_, a)| a)

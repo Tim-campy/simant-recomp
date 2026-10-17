@@ -582,7 +582,12 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
                     audio.foco(false);
                 }
                 Event::Window { win_event: WindowEvent::Exposed, .. } => redesenhar = true,
-                Event::MouseMotion { x, y, .. } => cursor = (x, y),
+                Event::MouseMotion { x, y, mousestate, .. } => {
+                    cursor = (x, y);
+                    if mousestate.left() && modos::mover(&mut s, x, y, ctrl_apertado(&eventos)) {
+                        redesenhar = true;
+                    }
+                }
                 Event::KeyDown { keycode: Some(k), keymod, .. } => {
                     let tab = eventos.keyboard_state().is_scancode_pressed(Scancode::Tab);
                     let ev = evento_de_tecla(k, keymod);
@@ -610,7 +615,7 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
                 }
                 Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => {
                     cursor = (x, y);
-                    match modos::clique(&mut s, x, y, clicks >= 2) {
+                    match modos::clique(&mut s, x, y, clicks >= 2, ctrl_apertado(&eventos)) {
                         modos::Resposta::Seguir => {}
                         modos::Resposta::Tratada => {
                             redesenhar = true;
@@ -637,10 +642,18 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
                     }
                 }
                 Event::MouseButtonDown { mouse_btn: MouseButton::Right, clicks, x, y, .. } => {
-                    // _processEdit: clique direito simples = simples; duplo direito = duplo.
-                    s.clicar_no_mapa(x, y, clicks >= 2);
+                    // Experimental: _processExp recebe também o clique direito.
+                    if let modos::Resposta::Seguir = modos::clique(&mut s, x, y, clicks >= 2, ctrl_apertado(&eventos)) {
+                        // _processEdit: clique direito simples = simples; duplo direito = duplo.
+                        s.clicar_no_mapa(x, y, clicks >= 2);
+                    }
+                    redesenhar = true;
                 }
-                Event::MouseButtonUp { mouse_btn: MouseButton::Left, .. } => repeticao.soltar(),
+                Event::MouseButtonUp { mouse_btn: MouseButton::Left, .. } => {
+                    repeticao.soltar();
+                    modos::soltar(&mut s);
+                }
+                Event::MouseButtonUp { mouse_btn: MouseButton::Right, .. } => modos::soltar(&mut s),
                 _ => {}
             }
         }
@@ -692,6 +705,13 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
         }
         canvas.present();
     }
+}
+
+/// Ctrl apertado agora (`GetAsyncKeyState(VK_CONTROL)` das ferramentas do Experimental).
+fn ctrl_apertado(eventos: &sdl2::EventPump) -> bool {
+    use sdl2::keyboard::Scancode;
+    let k = eventos.keyboard_state();
+    k.is_scancode_pressed(Scancode::LCtrl) || k.is_scancode_pressed(Scancode::RCtrl)
 }
 
 /// Jogo novo escolhido no "Select a Game" do Ctrl+N: nova sessão com a semente do relógio.
