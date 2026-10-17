@@ -1,0 +1,8 @@
+# Teste do modo tick: para na entrada de _DoAntSim (breakpoint do gdbstub) e avança tick a tick.
+# Pré-requisito: snapshot "quick". Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_tick_passos.txt
+snapshot_carregar quick
+tick_entrada
+passo_tick re_trabalho/ticks_exp/t1
+passo_tick re_trabalho/ticks_exp/t2
+passo_tick re_trabalho/ticks_exp/t3
+fim

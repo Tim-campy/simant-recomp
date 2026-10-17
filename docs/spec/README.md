@@ -38,6 +38,7 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
   - [regras/formiga-amarela.md](regras/formiga-amarela.md): formiga amarela (estado `_Me*`, movimento e caminho, ninho, pegar/largar, comer, luta, troca de corpo, recrutamento, morte e reencarnação) e controles do jogador (mouse, teclas, menus, aceleradores, modo Experimental).
   - [regras/ninho.md](regras/ninho.md): formigas dentro dos ninhos preto e vermelho (`_DoAntSimB/R`, `_DoNestAntB/R`): despacho por modo, movimento, luta, comida guardada, escavação, mapa de saída, invasoras, água e inundação; diferenças R × B e casos de teste.
   - [regras/ciclo-de-vida.md](regras/ciclo-de-vida.md): postura, desenvolvimento e eclosão dos ovos (`_SimEggB/R`), rainha (cabeça e cauda, andar, fome), escolha de casta (`_SetCasteProd`, `_CasteTabC`) e casos de teste.
+  - [regras/testes-tick.md](regras/testes-tick.md): determinismo do original na bancada QEMU, vetores "estado antes → depois" de um tick e o que capturar além do save.
 
 ## Próximos subsistemas a especificar
 

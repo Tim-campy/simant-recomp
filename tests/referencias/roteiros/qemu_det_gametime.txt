@@ -1,0 +1,12 @@
+# Determinismo (pergunta 1 de docs/spec/regras/testes-tick.md): do snapshot "quick", para na 1ª entrada de
+# _DoAntSim, força as sementes, roda tick a tick (breakpoints) até a entrada com GameTime = 300 e grava o estado.
+# Rode duas vezes, renomeando a saída entre as execuções, e compare com tools/estado_diff.py.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_det_gametime.txt
+snapshot_carregar quick
+tick_entrada
+escrever_variavel SementeS 0x1234
+escrever_variavel SementeR 1
+ate_gametime 300
+estado re_trabalho/det/gametime300.bin
+extras re_trabalho/det/gametime300_extras.json
+fim

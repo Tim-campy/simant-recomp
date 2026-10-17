@@ -11,6 +11,8 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `Alist`/`Blist`/`Rlist` + `X`,`Y`,`M`,`T`,`S` | listas paralelas de formigas **por área** (superfície, ninho preto, ninho vermelho), de qualquer colônia: posição X/Y, M = modo/tarefa, T = tipo (bit 7 = vermelha, bits 3–6 = classe, 12 = rainha), S = auxiliar do modo [hipótese] | `_AddAntToAList`, `_CountAnts`, `_DoNestAntB`; [formatos/save-ant.md](spec/formatos/save-ant.md#estruturas-principais) |
 | `ListIndexA/B/R` | número de entradas usadas em cada lista | `_AddAntToAList`, `_CompactListA` |
 | `LifeA/B/R` | mapa de ocupação (campo T por célula), reconstruído das listas ao carregar; não é salvo | `_DoLoadInitializations` |
+| `_gameCycles` | voltas do laço do `MYTIMERFUNC` (32 bits), não ticks; depende do relógio do host; fora do save | `MYTIMERFUNC`; medido na bancada ([testes-tick.md](spec/regras/testes-tick.md)) |
+| `_BirdDelay` | próximo valor de `_gameCycles` em que `_SimBird` testa a vinda do pássaro (`_gameCycles` + 20 ou + 30); salvo, mas não reproduzível entre execuções | `_SimBird` `1030:28aa` |
 | `YMap…` (`_YMapPopB`, `_YMapSeeds`, `_YMapPnt`) | mapa do quintal inteiro (*yard*), 12 × 16 patches; não é a formiga amarela | `_SimColonies`, `_XferPatch` |
 | `CastePop`, `ModePop` | populações por grupo de casta e de modo (6 valores cada), recalculadas pela simulação | `_CountAnts`, `_TallyModePop` |
 | `PherMap` (`A`, `BN`, `BT`, `RN`, `RT`) | mapas de feromônio: alarme (A), ninho (N) e trilha (T) por colônia [hipótese, apoiada pela lista de strings 4/1000: "Black Nest Marker Pheromone", "Black Trail…"] | tabela do save, SHARED 4/1000 |
