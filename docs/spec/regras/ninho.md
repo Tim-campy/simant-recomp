@@ -246,7 +246,7 @@ senão:
     devolve 0
 ```
 
-- `_ExitHole` (`1020:2db6`) põe a formiga na superfície, na primeira vizinha 0..7 do buraco (`_HoleMapB[x]`, x) com `_MapA` < 0x50; a direção é a sorteada `r`, M e S são mantidos, e S vira 120 se M ∉ {3, 6, 7} e o buraco é do lado da cor ([formigas.md](formigas.md#7-movimento-e-escolha-de-direção)). Falha se nenhuma vizinha servir.
+- `_ExitHole` (`1020:2db6`) põe a formiga no fim da lista A, na primeira vizinha 0..7 do buraco (`_HoleMapB[x]`, x) dentro do quintal com `_MapA` < 0x50; a direção é a sorteada `r` e M é mantido. **S só é mantido com M = 6**; com os outros modos S = 0, ou 120 se M ∉ {3, 7} e o buraco é do lado da cor (pretas: x ≤ 63; vermelhas: x ≥ 65) ([formigas.md](formigas.md#7-movimento-e-escolha-de-direção)). `_ExitHole` **não grava `_LifeA`** (a célula da superfície só é marcada quando a formiga anda lá). Falha se nenhuma vizinha servir. (Revisto no pseudocódigo em 2026-10-17; a versão anterior desta spec dizia "M e S são mantidos".)
 - Se `_MakeNewHoleB` não achar lugar, `_HoleMapB[x]` continua 0 e `_ExitHole` tenta em volta de (0, x). [comportamento resultante não testado]
 - No pseudocódigo do Ghidra os argumentos M e S aparecem por engano na chamada de `_SRand8`; a desmontagem mostra que são de `_ExitHole`.
 - `_LeaveNestB` (`1028:515e`) é a primeira metade desta rotina, sem chamador, e zera `Vida[x][y]` em vez de `Vida[x][1]`.
@@ -350,7 +350,7 @@ Quem come e quando (o sorteio acontece sempre que a linha é alcançada; `COMER`
 |---|---|---|
 | Nesting, grupo 2 e outros | `S(100)` > saúde | a própria |
 | Got Food, ao largar | `S(100)` > saúde | a própria (a recém-largada) |
-| Dig In, Dig Out, depois de andar | `Sk(64)` > saúde | a nova |
+| Dig In, Dig Out, depois de andar | `Sk(64)` > saúde | a nova (preto); a antiga (vermelho) |
 
 Com saúde ≥ 63, Dig In/Dig Out nunca comem; com saúde 100, ninguém come.
 
@@ -363,7 +363,7 @@ d = _GetEnterDirB(pos, dir)                        (Sk(2) só em empate)
 se d < 0 ou Sk(16) == 0:                           (Sk(16) só se d ≥ 0)
     LARGAR_COMIDA(pos)                              (6.3)
     se T & 8: T = T − 8                             (grupo 3→2, 7→6)
-    r = S(100); se _HealthB < r: COMER(pos)
+    r = S(100); se _HealthB < r: COMER_SEM_TESTE(pos)   (_EatFoodB embutido: sem o teste 0x10–0x13)
     M = _GetNewModeB(grupo do T de ENTRADA)
 senão:
     T = (T & 0xF8) | d; Vida[pos] = T
@@ -371,6 +371,8 @@ senão:
     se Mapa[n] ≥ 0x30: FIM                          (fica parada)
     PASSO(n, d)                                      (6.4)
 ```
+
+`COMER_SEM_TESTE` não confere a faixa: se a célula era 0x13 (cheia) ou 0x14 (passagem), LARGAR não a muda e a mordida a faz cair para 0x12 ou 0x13 (a passagem vira comida). Visto no pseudocódigo (`1028:492a`), igual em `_DoFoodInR`. [hipótese: defeito]
 
 **Comida dobrada.** O novo modo é calculado com o grupo **antes** de tirar a comida (3 ou 7), e `_CasteModeTabB[3] = _CasteModeTabB[7] = 3`. A formiga fica em M = 3 sem carga; no próximo largar (fundo do túnel ou 1/16 por tick) ela credita mais uma unidade no mapa e em `_FoodB`, e só então troca de modo (agora com grupo 2 ou 6). Cada carga trazida rende **duas** unidades. Conferido na desmontagem (`1028:4bab`: o argumento é o T recebido, `[bp+0xa]`). [hipótese: defeito do original; confirmar na bancada, caso N-06]
 
@@ -401,8 +403,8 @@ se Mapa[n] ≥ 0x30: FIM
 se terra(Mapa[n]) (0x20–0x2E):
     se não _DigTileThemB(n): M = _GetNewModeB(grupo); FIM       (R: M = 0)
     T = T + 0x18 (carrega terra: grupo 2→5, 6→9); M = 5; som 0x11 (R: 0x12)
-PASSO(n, d); se houve luta: FIM
-r = Sk(64); se _HealthB < r: COMER(n)
+PASSO(n, d); se houve luta: FIM                 (Tref da luta = (T de entrada & 0xF8) | d, SEM os 0x18 da terra)
+r = Sk(64); se _HealthB < r: COMER(n)          (R: COMER(pos ANTIGA))
 se Sk(4) == 0: _FixExitMapB(n)
 [só R] se Mapa[n] == 0x14: PASSAGEM (7.7)
 ```
@@ -423,9 +425,10 @@ se Mapa[n] ≥ 0x30 (terra inundada, pedrinha…):
     FIM
 se terra(Mapa[n]): FIM                               (parada, sem mudança)
 PASSO(n, d); se houve luta: FIM
-r = Sk(64); se _HealthB < r: COMER(n)
+r = Sk(64); se _HealthB < r: COMER(n)          (R: COMER(pos ANTIGA))
 ```
 
+- **No ninho vermelho, Dig In e Dig Out comem na célula de onde a formiga saiu**, não na nova (pseudocódigo de `_DoDigInR` `1028:6f0c` e `_DoDigOutR` `1028:722a`: o índice usado é o calculado antes de atualizar a posição). Visto no código em 2026-10-17.
 - A terra carregada (grupos 5 e 9) só é descarregada na superfície (`_DoDigOutAntA`); no ninho, se o caminho estiver bloqueado, ela simplesmente some.
 - No ninho preto, o decremento de `Saída` sem teste (conferido na desmontagem, `1028:4f83`) transforma uma célula com 0 em 0xFF, um falso "ponto de saída". [hipótese: defeito; a versão R testa]
 
@@ -611,6 +614,7 @@ A formiga descansando não anda e regrava a própria célula em `Vida` a cada ti
 | Nesting (1) | leva o ovo ao fundo, guarda o estágio | larga ao acaso (1/4), estágio volta a 2 (5.4) |
 | Dig In, terra não cavável | `M = _GetNewModeB(grupo)` | `M = 0` |
 | Dig In, célula 0x14 | nada | vai para o ninho preto (7.7) |
+| Dig In/Dig Out, mordida no estoque | célula nova | célula antiga |
 | Dig Out bloqueado | `Saída[pos] −= 1` sem teste (0 → 0xFF) | só se ≠ 0 |
 | Trofalaxia em `MOVER` | sim | não |
 | Teste da amarela na checagem de luta | antes do teste de inimiga | depois |
@@ -657,10 +661,33 @@ Bancada: [../../bancada-qemu.md](../../bancada-qemu.md#casos-de-teste-injetar-um
 | N-15 | trofalaxia (4.1) | amarela no ninho preto com `_MeWantFood` = 1; vermelha invasora andando para a célula dela | a vermelha alimenta a amarela (o mesmo efeito de uma preta) | D |
 | N-16 | port, tick a tick | QUICK2, semente S forçada (no port) | o port, rodando a partir do QUICK2 com qualquer semente, deve manter os invariantes: T ∈ tipos válidos, `Vida` coerente com as listas, `_FoodB` muda só nas rotinas da seção 6 | P |
 
+### 13.3 Observado no original
+
+Bancada QEMU, `python tools/caso_ant.py rodar tests/referencias/casos/ID.json` (2026-10-17). A bancada só para ~5 ticks depois do load (o roteiro espera 1 s depois de tirar a pausa), então os casos de poucos ticks conferem o que continua valendo alguns ticks depois. Estados em `tests/referencias/saves/` (`ID_carregado.ANT` = logo depois do load; `ID_Tnnn.ANT` = final).
+
+| Id | Entrada efetiva | Observado | Resultado |
+|---|---|---|---|
+| N-03 | QUICK2 + operária T 0x12, M 2 em (32, 3) (B[5]) | parado no tick 84: B[5].T = 0; `_ListIndexA` = 3; A[2] com T & 0xF8 = 0x10, M = 2, S = 117, em (6, 33): saiu no tick 81 pelo buraco (3, 32) com S = 120 e andou 3 passos (S −1 por passo) | **confirmado** (§4.5, §4.6, §7.2; S = 120 com M = 2 e buraco do lado preto) |
+| N-06 | QUICK2 sem A[0], `_HealthB` = 100, `_AlwaysHealthy` = 1, `_FoodB` = 0; operária T 0x1A, M 3 em (32, 3) | tick 100: `_FoodB` = 2; a operária com T 0x16 (grupo 2) | **confirmado**: uma carga rende duas unidades (§6.2, "comida dobrada") |
+| N-09 | célula 0x02 com saída 0 cercada de 0x5D em (10, 40) nos dois ninhos; operária M 2 em cada uma | tick 86: `_ExitMapB`(10, 40) = 0xFF, `_ExitMapR`(10, 40) = 0; as duas com M = 4, paradas | **confirmado**: decremento sem teste no preto, com teste no vermelho (§7.2) |
+| N-13 | QUICK2, amarela movida para (30, 5); vermelha T 0x92, M 7 em (34, 9) no fim da lista B | tick 128: B[1] (cauda) e B[5] (invasora) com T = 0, `_BlkQueens` = 0; B[0] (era a cabeça) com T = 0 e **M = 8**: a nuvem terminou com vencedor S = 0 (a "ocupante" 0 venceu) e o modo saiu de `_GetNewMode(0, 0)` = `_CasteModeTabB[0]` = 8; `_RAntsKilled` = 1. No tick 128 o `_CountAnts` recontou `_CastePopB[0..4]` e parou na mensagem 10010 (modal): `_CastePopB[5]` = 1 e `_IsGameOver` = 0 até alguém clicar | **confirmado** (§3.2, "rainha atacada": a rainha some e a cauda vai junto; o defeito de `_GetWinner(0, ...)` se confirma). O fim de jogo não é conferível sem clicar na mensagem |
+
+Port: `engine/tests/regras_ninho.rs` parte de cada `ID_carregado.ANT`, roda o tick do port (só as regras do ninho ligadas) até o mesmo `GameTime` alvo, com 6 sementes S diferentes, e avalia as mesmas conferências do JSON: todas passam.
+
+**Vetores de tick** (`tests/referencias/ticks/`, ticks 79–83 do snapshot `quick`, ver [testes-tick.md](testes-tick.md)): para cada tick, partindo do `estado_antes`, o port acha uma semente S de entrada do ninho tal que `_DoAntSimB` + `_DoAntSimR` reproduzem **exatamente** mapas, mapas de saída, `_LifeB/R`, listas e contadores das colônias do `estado_depois` **e** o gerador S termina no valor do `extras.json` (k sorteios: 13, 12, 12, 12, 12; a semente de entrada é a final andada k passos para trás). O tick 80 inclui uma postura da rainha preta. Isso confirma a ordem e a quantidade de sorteios do ninho nesses ticks (morte natural, rainha, cauda, ovos) e que nada depois de `_DoAntSimR` sorteia S nesses ticks. Também confirma que `_LifeB/R` reconstruídos das listas batem com a memória do original.
+
+## Implementação no port
+
+- `engine/src/rules/ninho.rs`: `impl RegrasNinho for RegrasOriginais` chama `simular_ninho(e, cor, tabelas)` (pública, para testes com outras tabelas). A formiga em processamento é um `Formigueiro` (índice = `_Tindex`, com T, X, Y, M de entrada, como os parâmetros do original); cada método cita a rotina do original e a seção desta spec.
+- Tabelas em `data/ninho.json` (`TabelasNinho`), geradas por `tools/extrair_ninho.py` (endereços no topo do script): `_Dx8/_Dy8`, `_TurnTab`, `_ModeTabWB/SB`, `_CasteModeTabB`, `_CasteTabC`, `VitóriaR`, classe e matriz de luta, borda do buraco. `RegrasOriginais` ainda não guarda essas tabelas; o port usa a cópia embutida (`TabelasNinho::padrao`) até ganhar um campo `ninho` (um mod que troque `ninho.json` só terá efeito depois disso).
+- Pontos de extensão vazios: `_YellowFight` e `_DoTroph` (formiga amarela). Balões e o som da escavação não são regra e não estão implementados.
+- `vencedor_da_luta` (`_GetWinner`) é pública: a superfície usa a mesma regra.
+
 ## Lacunas
 
 - `_YellowFight` e `_DoTroph`: só citados; ficam com a formiga amarela (`formiga-amarela.md`).
 - Gotas e poças da superfície (`_PlaceDrop`, `_InitWater`): só a ordem dos sorteios está aqui; regra completa em `superficie.md`.
 - `_ExitHole` com a lista A cheia: compacta e, se continuar cheia, grava na vaga 1000 (fora da lista) [a conferir na desmontagem].
-- Nenhuma regra deste documento foi ainda testada na bancada. O editor e o executor de casos existem (`tools/ant_editar.py`, `tools/caso_ant.py`; usados nos casos C-01 e C-02 de [ciclo-de-vida.md](ciclo-de-vida.md#observado-no-original)); faltam escrever os JSON dos casos 13.2 e, para alguns, saves de referência com ninhos mais desenvolvidos que o `QUICK2.ANT`.
+- Testados na bancada: N-03, N-06, N-09, N-13 (§13.3). Faltam os estatísticos (N-01, N-07, N-10, N-12 no vencedor) e os que precisam de saves com ninhos mais desenvolvidos que o `QUICK2.ANT` (N-14, N-15). O executor de casos só para ~5 ticks depois do load; casos de 1 tick exigem o modo tick da bancada (ver testes-tick.md).
+- `_YellowFight`, `_DoTroph`: só ligados quando a parte da amarela existir; os casos com a amarela por perto (N-15) ficam para depois.
 - Os "defeitos" marcados ([hipótese]) devem ser confirmados no original antes de decidir se o port os reproduz por padrão (o princípio do projeto é reproduzir; um mod pode corrigir).
