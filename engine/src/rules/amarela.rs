@@ -322,7 +322,7 @@ fn e_abertura(e: &Estado, plano: i32, x: i32, y: i32) -> bool {
 }
 
 /// `_IsItDigable`.
-fn e_escavavel(e: &Estado, plano: i32, x: i32, y: i32) -> bool {
+pub(crate) fn e_escavavel(e: &Estado, plano: i32, x: i32, y: i32) -> bool {
     if plano < 2 || !(0..64).contains(&x) || !(0..64).contains(&y) {
         return false;
     }
@@ -405,7 +405,7 @@ fn cauda(t: &TabelasAmarela, x: i32, y: i32, dir: i32) -> (i32, i32) {
 }
 
 /// `_ClearMyLife`: apaga a célula só se contém 0xFF (e a cauda só se contém 0xFE).
-fn limpar_minha_vida(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, tipo: i32, dir: i32) {
+pub(crate) fn limpar_minha_vida(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, tipo: i32, dir: i32) {
     if vida_bruta(e, plano, x, y) == Some(MARCA_AMARELA) {
         por_vida(e, t, plano, x, y, 0);
     }
@@ -419,7 +419,7 @@ fn limpar_minha_vida(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: 
 
 /// `_SetMyLife`: grava `v` (e a cauda da rainha) e, se `v ≠ 0`, copia posição, tipo e direção para as `_Me*`.
 #[allow(clippy::too_many_arguments)]
-fn marcar_amarela(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, tipo: i32, dir: i32, v: u8) {
+pub(crate) fn marcar_amarela(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, tipo: i32, dir: i32, v: u8) {
     if !dentro(plano, x, y) {
         return;
     }
@@ -499,7 +499,7 @@ fn recalcular_fome(e: &mut Estado, t: &TabelasAmarela) {
 }
 
 /// `_ResetYellowVars(plano, x, y)`: encerra a ordem.
-fn encerrar_ordem(e: &mut Estado, plano: i32, x: i32, y: i32) {
+pub(crate) fn encerrar_ordem(e: &mut Estado, plano: i32, x: i32, y: i32) {
     let a = &mut e.amarela;
     a.plano = plano as i16;
     a.alvo_plano = plano as i16;
@@ -558,7 +558,7 @@ fn criar_buraco(e: &mut Estado, t: &TabelasAmarela, x: i32, y: i32) {
 }
 
 /// `_DigMyNewHole(x, y)`: exige 3 × 3 livre (quintal) ou tile < 200 (casa).
-fn cavar_novo_buraco(e: &mut Estado, t: &TabelasAmarela, x: i32, y: i32) -> bool {
+pub(crate) fn cavar_novo_buraco(e: &mut Estado, t: &TabelasAmarela, x: i32, y: i32) -> bool {
     if !(1..128).contains(&x) || !(1..64).contains(&y) {
         return false;
     }

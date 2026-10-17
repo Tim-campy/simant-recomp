@@ -11,11 +11,14 @@
 //! pasta atual). Sem --save nem --novo-jogo, mostra a abertura. Com um deles, a simulação roda ao
 //! vivo (engine::core::partida); com --ticks ou --exportar-tela-jogo, roda sem janela e sai.
 
+mod modos;
+
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use engine::core::navegacao::{Acao, ConfigNavegacao, Evento as EventoNav, Repeticao};
 use engine::core::partida::{self, BotaoTeclado, ConfigPartida, Partida};
+use engine::core::quintal_mapa::AcaoQuintal;
 use engine::core::tela_jogo::{ConfigTelaJogo, PosicaoVista, TelaDeJogo};
 use engine::core::telas::{compor, Evento, Interface, Reprodutor, Sequencia};
 use engine::formats::save::{JogoSalvo, LayoutSave};
@@ -35,6 +38,7 @@ struct ConfigJogo {
     tabela_posicoes: u16,
 }
 
+#[derive(Clone)]
 struct Opcoes {
     jogo: PathBuf,
     dados: PathBuf,
@@ -56,6 +60,10 @@ struct Opcoes {
     semente: Option<u32>,
     /// Roda N ticks sem janela (antes de exportar).
     ticks: Option<u64>,
+    /// Tipo do jogo novo (`--tipo`; padrão: Quick Game).
+    tipo: TipoJogo,
+    /// Abre a janela do quintal nesse modo (0–3) antes de mostrar ou exportar.
+    quintal: Option<i16>,
 }
 
 fn ler_acoes(texto: &str) -> Result<Vec<Acao>, String> {
@@ -82,6 +90,8 @@ fn ler_opcoes() -> Result<Opcoes, String> {
         novo_jogo: false,
         semente: None,
         ticks: None,
+        tipo: TipoJogo::Rapido,
+        quintal: None,
     };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -100,6 +110,14 @@ fn ler_opcoes() -> Result<Opcoes, String> {
             "--novo-jogo" => o.novo_jogo = true,
             "--semente" => o.semente = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
             "--ticks" => o.ticks = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
+            "--quintal" => o.quintal = Some(valor()?.parse().map_err(|_| format!("{a}: modo 0 a 3"))?),
+            "--tipo" => {
+                let v = valor()?;
+                o.tipo = engine::core::selecao::Escolha::de_nome(&v)
+                    .and_then(|e| e.tipo_jogo())
+                    .ok_or(format!("{a}: use tutorial, rapido, completo ou experimental"))?;
+                o.novo_jogo = true;
+            }
             _ => return Err(format!("opção desconhecida: {a}")),
         }
     }
@@ -181,7 +199,14 @@ fn abrir_janela(titulo: &str, largura: u32, altura: u32, escala: Option<u32>) ->
     Ok(Janela { sdl, canvas })
 }
 
-fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &[[u8; 3]], o: &Opcoes) -> Result<(), String> {
+/// Abertura até o "Select a Game"; devolve a escolha feita nele (None = saiu).
+fn executar(
+    seq: Sequencia,
+    recursos: &Recursos,
+    interface: &Interface,
+    cores: &[[u8; 3]],
+    o: &Opcoes,
+) -> Result<Option<engine::core::selecao::Escolha>, String> {
     use sdl2::event::Event;
     use sdl2::keyboard::Keycode;
     use sdl2::pixels::PixelFormatEnum;
@@ -190,6 +215,7 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
     let Janela { sdl, mut canvas } = abrir_janela("SimAnt", lw, lh, o.escala)?;
     let criador = canvas.texture_creator();
     let mut eventos = sdl.event_pump()?;
+    let selecao = modos::selecao_da_abertura(recursos, interface)?;
 
     let mut rep = Reprodutor::new(seq);
     let mut desenhada: Option<String> = None;
@@ -198,9 +224,20 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
     let mut antes = inicio;
 
     while !rep.terminou() {
+        let escolhendo = rep.atual().is_some_and(|t| t.nome == selecao.cfg.tela);
         for ev in eventos.poll_iter() {
             match ev {
-                Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return Ok(()),
+                Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return Ok(None),
+                Event::KeyDown { keycode: Some(k), keymod, .. } if escolhendo => {
+                    if let Some(e) = selecao.cfg.escolha_da_tecla(&evento_de_tecla(k, keymod)) {
+                        return Ok(Some(e));
+                    }
+                }
+                Event::MouseButtonDown { x, y, .. } if escolhendo => {
+                    if let Some(e) = selecao.escolha_em(x, y) {
+                        return Ok(Some(e));
+                    }
+                }
                 Event::KeyDown { keycode: Some(Keycode::Space), .. } => rep.evento(Evento::Espaco),
                 Event::KeyDown { .. } => rep.evento(Evento::OutraTecla),
                 Event::MouseButtonDown { .. } => rep.evento(Evento::Clique),
@@ -211,7 +248,7 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
         rep.passar_tempo((agora - antes).as_millis() as u64);
         antes = agora;
         if o.sair_apos_ms.is_some_and(|ms| (agora - inicio).as_millis() as u64 >= ms) {
-            return Ok(());
+            return Ok(None);
         }
 
         let Some(tela) = rep.atual() else { break };
@@ -231,14 +268,14 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
         }
         canvas.present();
     }
-    Ok(())
+    Ok(None)
 }
 
 /// De onde vem a partida.
 enum Origem<'o> {
     Save(&'o Path),
-    /// Quick Game gerado pelo port com a semente dada.
-    Novo(u32),
+    /// Jogo novo gerado pelo port com a semente dada.
+    Novo(u32, TipoJogo),
 }
 
 /// Tudo o que a tela de jogo ao vivo precisa: a tela carregada (layouts e tilesets), a configuração
@@ -250,6 +287,8 @@ struct Sessao<'a> {
     nav_cfg: ConfigNavegacao,
     partida: Partida,
     cores: Vec<[u8; 3]>,
+    /// Janela do quintal e "Select a Game" durante a partida (simant/src/modos.rs).
+    modos: modos::Modos,
 }
 
 impl Sessao<'_> {
@@ -267,13 +306,13 @@ impl Sessao<'_> {
                 let estado = Estado::de_save(&jogo)?;
                 (jogo, estado)
             }
-            Origem::Novo(semente) => {
+            Origem::Novo(semente, tipo) => {
                 // _initStuff: _SeedSRand e _SeedRRand com o relógio; o port usa a semente nas duas
                 // leituras do relógio. Depois _NewGame → _RandYard (geracao-mundo.md).
                 let mut s = GeradorS::new(0);
                 let mut r = GeradorR::default();
                 r.semear_com_ticks(&mut s, semente, semente);
-                let m = Mundo::novo_jogo(TipoJogo::Rapido, &mut r, &mut s, &geracao)?;
+                let m = Mundo::novo_jogo(tipo, &mut r, &mut s, &geracao)?;
                 let estado = Estado::de_mundo(&m, s, r, &cfg_sim)?;
                 (estado.para_save(&layout)?, estado)
             }
@@ -282,17 +321,19 @@ impl Sessao<'_> {
         tela.atualizar(&estado);
         // Jogo novo: _NewGame faz _SetMapPlane(_MePlane) e _CenterEdit na amarela, o mesmo que a
         // posição "ao carregar"; um save segue data/navegacao.json.
-        let posicao = if matches!(origem, Origem::Novo(_)) { PosicaoVista::AoCarregar } else { nav_cfg.posicao_inicial };
+        let posicao = if matches!(origem, Origem::Novo(..)) { PosicaoVista::AoCarregar } else { nav_cfg.posicao_inicial };
         let nav = tela.navegacao(&jogo, posicao)?;
         // Tabelas de todas as partes com mods (data/*.json); o seno da geração já foi lido do banco.
         let regras = RegrasOriginais { geracao: Some(geracao), ..RegrasOriginais::carregar_sem_banco(recursos)? };
         let partida = Partida::nova(estado, nav, regras, TabelasAmarela::carregar(recursos)?, cfg_sim, cfg_partida);
-        Ok(Sessao { recursos, interface, tela, nav_cfg, partida, cores })
+        let modos = modos::Modos::carregar(recursos, &interface)?;
+        Ok(Sessao { recursos, interface, tela, nav_cfg, partida, cores, modos })
     }
 
     fn quadro_rgb(&mut self) -> Result<Vec<u8>, String> {
         self.tela.atualizar(&self.partida.estado);
-        let (q, pendentes) = self.tela.compor(self.recursos, &self.interface, &self.partida.nav)?;
+        let (mut q, mut pendentes) = self.tela.compor(self.recursos, &self.interface, &self.partida.nav)?;
+        pendentes.extend(modos::desenhar(self, &mut q)?);
         if !pendentes.is_empty() {
             eprintln!("tela de jogo: não desenhado ainda: {}", pendentes.join(", "));
         }
@@ -410,6 +451,18 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes) -> Result<(), Strin
                 Event::KeyDown { keycode: Some(k), keymod, .. } => {
                     let tab = eventos.keyboard_state().is_scancode_pressed(Scancode::Tab);
                     let ev = evento_de_tecla(k, keymod);
+                    match modos::tecla(&mut s, &ev) {
+                        modos::Resposta::Seguir => {}
+                        modos::Resposta::Tratada => {
+                            redesenhar = true;
+                            continue;
+                        }
+                        modos::Resposta::NovoJogo(e) => {
+                            s = novo_jogo(&s, e, o)?;
+                            redesenhar = true;
+                            continue;
+                        }
+                    }
                     if let Some(b) = tratar_tecla(&mut s, &ev, tab) {
                         let agora = Instant::now();
                         let duplo = ultima_tecla_clique.is_some_and(|(ub, t)| {
@@ -421,6 +474,18 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes) -> Result<(), Strin
                 }
                 Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => {
                     cursor = (x, y);
+                    match modos::clique(&mut s, x, y, clicks >= 2) {
+                        modos::Resposta::Seguir => {}
+                        modos::Resposta::Tratada => {
+                            redesenhar = true;
+                            continue;
+                        }
+                        modos::Resposta::NovoJogo(e) => {
+                            s = novo_jogo(&s, e, o)?;
+                            redesenhar = true;
+                            continue;
+                        }
+                    }
                     if let Some(a) = s.acao_do_clique(x, y) {
                         s.partida.navegar(a);
                         repeticao.pressionar(a);
@@ -444,7 +509,10 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes) -> Result<(), Strin
                 s.partida.navegar(a);
             }
         }
-        s.partida.avancar(ms);
+        // Com o "Select a Game" aberto (Ctrl+N), a simulação fica parada (_SetPause(1) em _NewGame).
+        if !s.modos.escolhendo {
+            s.partida.avancar(ms);
+        }
         s.registrar_eventos();
         redesenhar |= s.partida.tomar_redesenho();
         if redesenhar {
@@ -475,6 +543,14 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes) -> Result<(), Strin
     }
 }
 
+/// Jogo novo escolhido no "Select a Game" do Ctrl+N: nova sessão com a semente do relógio.
+fn novo_jogo<'a>(s: &Sessao<'a>, e: engine::core::selecao::Escolha, o: &Opcoes) -> Result<Sessao<'a>, String> {
+    let tipo = e.tipo_jogo().ok_or("escolha sem jogo novo")?;
+    let n = semente(&Opcoes { semente: None, ..o.clone() });
+    println!("novo jogo {e:?} com semente {n}");
+    Sessao::abrir(s.recursos, &o.dados, Origem::Novo(n, tipo), s.cores.clone())
+}
+
 /// Semente do Quick Game: a da linha de comando ou o relógio (milissegundos desde 1970, como o
 /// `_TickCount` do original só importa a palavra baixa).
 fn semente(o: &Opcoes) -> u32 {
@@ -498,23 +574,48 @@ fn principal() -> Result<(), String> {
     }
     let cores = recursos.dados::<Paleta>("paleta.json")?.rgb()?;
 
+    let mut o = o;
+    if !o.novo_jogo && o.save.is_none() && o.exportar.is_none() {
+        // Abertura até o "Select a Game"; a escolha vira o jogo novo.
+        let seq: Sequencia = recursos.dados("telas.json")?;
+        let interface = Interface::carregar(&recursos, config.tabela_posicoes)?;
+        match executar(seq, &recursos, &interface, &cores, &o)? {
+            Some(e) => match e.tipo_jogo() {
+                Some(tipo) => {
+                    println!("Select a Game: {e:?}");
+                    o.novo_jogo = true;
+                    o.tipo = tipo;
+                }
+                None => {
+                    println!("Select a Game: {e:?} (sem jogo novo)");
+                    return Ok(());
+                }
+            },
+            None => return Ok(()),
+        }
+    }
     let origem = match (&o.save, o.novo_jogo) {
         (Some(save), _) => Some(Origem::Save(save)),
         (None, true) => {
             let n = semente(&o);
-            println!("Quick Game com semente {n}");
-            Some(Origem::Novo(n))
+            println!("{:?} com semente {n}", o.tipo);
+            Some(Origem::Novo(n, o.tipo))
         }
         _ => None,
     };
     if let Some(origem) = origem {
         let nome = match &origem {
             Origem::Save(save) => save.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
-            Origem::Novo(_) => "Quick Game".to_string(),
+            Origem::Novo(_, tipo) => format!("{tipo:?}"),
         };
         let mut s = Sessao::abrir(&recursos, &o.dados, origem, cores)?;
         for &a in &o.acoes {
             s.partida.navegar(a);
+        }
+        if let Some(m) = o.quintal {
+            let a = [AcaoQuintal::ModoQuintal, AcaoQuintal::ModoCasa, AcaoQuintal::ModoEstrategico, AcaoQuintal::ModoGrafico];
+            let a = *a.get(m as usize).ok_or("--quintal: modo 0 a 3")?;
+            s.modos.janela.aplicar(a, &mut s.partida.estado);
         }
         if let Some(n) = o.ticks {
             let antes = s.partida.estado.partida.tempo;
@@ -540,7 +641,7 @@ fn principal() -> Result<(), String> {
     let interface = Interface::carregar(&recursos, config.tabela_posicoes)?;
     match &o.exportar {
         Some(dir) => exportar(&seq, &recursos, &interface, &cores, dir),
-        None => executar(seq, &recursos, &interface, &cores, &o),
+        None => Ok(()),
     }
 }
 

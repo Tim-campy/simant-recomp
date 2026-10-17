@@ -18,7 +18,7 @@ Convenções:
 - `_HoleMapB[32] = 3` e `_HoleMapR[32] = 118`; rainha vermelha em (41, 11) com T = 0xE2 e a metade em (40, 11) com T = 0xEA, iguais à lista R salva;
 - `_FoodA = 117` (o save tem 117).
 
-Script: `re_trabalho/verifica_geracao_quick2.py` (material de trabalho, fora do git). O port reproduz o mesmo resultado em Rust, com mais variáveis conferidas (ver "Implementação no port"). A geração da **casa** (`_MakeHousePatch`) e o caminho do Full Game ao trocar de patch **não** foram verificados contra o original.
+Script: `re_trabalho/verifica_geracao_quick2.py` (material de trabalho, fora do git). O port reproduz o mesmo resultado em Rust, com mais variáveis conferidas (ver "Implementação no port"). A geração da **casa** (`_MakeHousePatch`) foi verificada depois, em quatro patches gerados pelo `_XferPatch` do original (§5.3).
 
 ## 1. Escolha do jogo: `_NewGame` e `_DoScenario`
 
@@ -220,25 +220,84 @@ Fato visto no código: zera a lagarta (`_PillarState/X/Y/Seg`, `__PillDir`) e `_
 
 ## 5. Patch da casa: `_MakeHousePatch(n)` (`1020:3120`)
 
-Fato visto no código, **não verificado** contra o original e só resumido aqui (lacuna):
+Fato visto no código (pseudocódigo de `Code5.c`; laços `rep stosw` de `_CarpetFloorR` e `_MakeSink` conferidos na desmontagem) e **verificado no original** em quatro patches (§5.3). Os 38 patches `n = px * 16 + py ≤ 37` são as colunas `px` = 0 e 1 inteiras e `px` = 2 com `py` ≤ 5.
 
-- Se `_TERRAINset ≠ 1`: `_CurGndTileID = 1001` e `_OverlayTileSet(0, 1001)` (tiles da casa, objeto tipo 9 nº 9; `_TERRAINset = 1`; `_Barrier = 0x90`).
-- `_InitAntLions(0)` e `_InitPillar()` (sem formigas-leão nem bichos-de-conta).
-- Por número do patch `n = px * 16 + py` (0 a 37):
+Coordenadas: `(x, y)` de `_MapA` (128 × 64, índice `x * 64 + y`; o `_MapA` fica em `DGROUP:0x28e8`, e o endereço de cada escrita do código foi convertido para (x, y) por `(endereço − 0x28e8) = x * 64 + y`). Intervalos `a..b` são inclusivos.
 
-| n | Rotinas |
+1. Se `_TERRAINset ≠ 1`: `_CurGndTileID = 1001` e `_OverlayTileSet(0, 1001)` (tiles da casa, objeto tipo 9 nº 9; `_TERRAINset = 1`; `_Barrier = 0x90`).
+2. `_InitAntLions(0)` (nenhuma formiga-leão; `_InitialLions = 0`; sem sorteio) e `_InitPillar()` (zera lagarta e bichos-de-conta; como `_TERRAINset = 1`, não põe bichos-de-conta nem sorteia).
+3. Monta o chão conforme `n` (todas as receitas escrevem as 8.192 células, então nada do patch anterior sobra):
+
+| n | Receita (rotinas em §5.1) |
 |---|---|
 | 0 | `_MakeKitchenWall`, `_MakeSink` |
-| 2, 3, 17, 18, 19, 33, 34, 35 | `_FloorTiles` (ladrilhos em xadrez de 16 × 16; `_DROPdir = 0`) |
-| 4, 10, 11, 13, 14 | `_CarpetFloorL` (carpete com fiapos 0x3E/0x3F a 1/200 por célula, tomada `_MakeOutletH(2, 0x19)`; `_DROPdir = 1`) |
-| 5, 6, 7 | `_CarpetFloorL` mais áreas preenchidas com 2 e objetos copiados de tabelas do DGROUP |
-| 8, 12, 15 | `_CarpetFloorL` mais `_FillMapLegs(...)` (pés de móvel) e, em 8 e 15, objetos |
+| 1, 16, 32 (caso `default`) | `_MakeKitchenWall` |
+| 2, 3, 17, 18, 19, 33, 34, 35 | `_FloorTiles` |
+| 4, 10, 11, 13, 14 | `_CarpetFloorL` |
+| 5 | `_CarpetFloorL`; x 24..70, y 20..63 = 2; moeda em (40, 45) |
+| 6 | `_CarpetFloorL`; x 24..70, y 0..63 = 2; moeda em (32, 20); clipe em (38, 55) |
+| 7 | `_CarpetFloorL`; x 24..70, y 0..20 = 2; clipe em (42, 10) |
+| 8 | `_CarpetFloorL`; `_FillMapLegs(0x18, 0x36, 0x0F, 0x2D, 2)`; clipe em (28, 34) |
 | 9 | toda a `_MapA` = 3; `_DROPdir = 2` |
+| 12 | `_CarpetFloorL`; `_FillMapLegs(0x2D, 0x5F, 8, 0x2E, 2)` |
+| 15 | `_CarpetFloorL`; `_FillMapLegs(0x32, 100, 10, 0x2D, 2)`; moeda em (75, 34) |
 | 20 a 31 | `_CarpetFloorR` |
 | 36, 37 | toda a `_MapA` = 0; `_DROPdir = 2` |
-| demais (1, 16, 32) | `_MakeKitchenWall` |
 
-[em aberto: conteúdo de `_MakeKitchenWall`, `_MakeSink`, `_TileFrame1/2`, `_MakeOutlet*`, `_MakePlug*`, `_MakeKnob`, `_MakePenny`, `_MakeClip`, `_FillMap`, `_FillMapLegs` e das tabelas que eles copiam; quais patches (x, y) são a casa na tela]
+"Moeda" é `_MakePenny` e "clipe" é `_MakeClip` (o código copia as formas em linha, com os mesmos endereços de tabela). `_DROPdir` (`9:9c66`, direção para onde a comida largada cai na casa; não está no save) é gravado pelas rotinas: 0 nos ladrilhos, 1 no carpete esquerdo, 2 na cozinha e nos patches 9/36/37, 3 no carpete direito.
+
+### 5.1 Rotinas
+
+**Formas** (`DGROUP`, bytes do executável; célula `(x + i, y + j)` recebe `forma[j * largura + i]`):
+
+| Forma | Endereço | Largura × altura | Bytes (linha j por linha) |
+|---|---|---|---|
+| tomada vertical (`_MakePlugV`) | `1048:2314` | 5 × 4 | `6b 6c 6c 6c 6d / 71 78 64 78 72 / 71 79 74 79 72 / 6e 6f 6f 6f 70` |
+| tomada horizontal (`_MakePlugH`) | `1048:2328` | 4 × 5 | `6b 6c 6c 6d / 71 76 77 72 / 71 64 64 72 / 71 76 77 72 / 6e 6f 6f 70` |
+| botão (`_MakeKnob`) | `1048:233c` | 5 × 5 | `40 41 41 41 42 / 43 4e 4e 4e 44 / 43 4e 4c 4e 44 / 43 4e 4e 4e 44 / 46 47 47 47 49` |
+| moeda (`_MakePenny`) | `1048:2356` | 3 × 3 | `28 29 2a / 2b 2c 2d / 2e 2f 30` |
+| clipe (`_MakeClip`) | `1048:2360` | 3 × 3 | `00 31 32 / 33 34 35 / 36 37 00` — **zeros não são copiados** |
+
+Entre as formas há um byte 0 (`1048:2355`, `1048:235f`).
+
+**`_FillMap(x1, x2, y1, y2, v)`** (`1020:3f54`): retângulo `x1..x2 × y1..y2` = `v`. Não é chamada pela casa (os casos 5–7 fazem o mesmo em linha).
+
+**`_TileFrame1(x1, x2, y1, y2)`** (`1020:3944`), nesta ordem: linha `y1` (x de x1 a x2) = 0x54; linha `y2` = 0x51; coluna `x1` (y de y1 a y2) = 0x5A; coluna `x2` = 0x5B; cantos `(x1, y1)` = 0x53, `(x2, y1)` = 0x55, `(x1, y2)` = 0x50, `(x2, y2)` = 0x52.
+
+**`_TileFrame2(x1, x2, y1, y2)`** (`1020:3aa2`): igual, com linha `y1` = 0x51, linha `y2` = 0x54, coluna `x1` = 0x5B, coluna `x2` = 0x5A e cantos 0x56, 0x58, 0x57, 0x59.
+
+**`_MakeOutletV(x, y)`** (`1020:3c00`): `x..x+8 × y..y+12` = 0x63; `_TileFrame1(x, x + 8, y, y + 12)`; tomada vertical em `(x + 2, y + 2)` e em `(x + 2, y + 7)`; `(x + 4, y + 6)` = 0x65 (parafuso).
+
+**`_MakeOutletH(x, y)`** (`1020:3d44`): `x..x+12 × y..y+8` = 0x63; `_TileFrame1(x, x + 12, y, y + 8)`; tomada horizontal em `(x + 2, y + 2)` e `(x + 7, y + 2)`; `(x + 6, y + 4)` = 0x65.
+
+**`_FloorTiles`** (`1020:3406`), sem sorteio, `_DROPdir = 0`:
+1. toda célula: 1 se `(x >> 4) + (y >> 4)` é par, senão 0;
+2. linhas `y` = 0, 16, 32, 48 (todas as colunas): 0x61 se `(x + y) & 0x10 = 0`, senão 0x60;
+3. colunas `x` = 0, 16, …, 112 (todas as linhas): se a célula vale menos que 2 (não é junta de linha), 0x5F se `(x + y) & 0x10 = 0`, senão 0x5E; se é junta de linha (cruzamento), 0x5C ou 0x5D com o mesmo teste.
+
+**`_CarpetFloorL`** (`1020:34c2`), `_DROPdir = 1`: x 0..20 = 0x64 (parede); x 21 = 0x7A; x 22 = 0x7B (rodapé); x 23..127 = 0x03 (carpete); **fiapos**: para x de 23 a 127 e, dentro, y de 0 a 63, `S(200)`; se deu 0, a célula recebe `0x3E + S(2)`; depois `_MakeOutletH(2, 0x19)`.
+
+**`_CarpetFloorR`** (`1020:35e2`), `_DROPdir = 3`: x 0..105 = 0x03; fiapos em x 0..105 (mesma regra); x 106 = 0x7C; x 104..105 = 0x7B; x 106..127 = 0x64 — **a coluna 106 recebe 0x7C e logo depois 0x64** (conferido na desmontagem `1020:3639`–`367b`; não é leitura errada do Ghidra) —; depois `_MakeOutletH(0x71, 0x23)`. [hipótese] Defeito: a intenção seria o espelho do carpete esquerdo (0x7C na coluna 106).
+
+**`_MakeLint2(x1, x2, y1, y2)`** (`1020:3578`): os mesmos fiapos num retângulo; não é chamada pela casa.
+
+**`_MakeKitchenWall`** (`1020:3698`), `_DROPdir = 2`, sem sorteio: y 0..23 = 0x62 (azulejo) e y 24..63 = 0 (bancada), em todas as colunas; linhas y = 0, 8 e 16 = 0x68 (juntas); nas colunas x = 0, 8, …, 120, para y 0..23: 0x62 vira 0x66 e qualquer outro valor (a junta) vira 0x67; na linha 23, em todas as colunas: 0x62 vira 0x68 e outro valor vira 0x69; depois `_MakeOutletV(0x24, 2)` e `_MakeOutletV(0x54, 2)`.
+
+**`_MakeSink`** (`1020:375c`), sem sorteio, nesta ordem: x 37..91 × y 26..56 = 0x01; x 41..68 × y 33..53 = 0xC2; x 42..68 × y 35..53 = 0xC1; `_TileFrame2(0x28, 0x44, 0x20, 0x35)`; x 73..88 × y 33..53 = 0xC2; x 74..88 × y 35..53 = 0xC1; `_TileFrame2(0x48, 0x58, 0x20, 0x35)`; `_TileFrame1(0x25, 0x5B, 0x1A, 0x38)`; botões em (44, 27) e (60, 27); `(62, 29)` = 0x4D (o centro do segundo botão: "H" e "C"); botões em (52, 27) e (52, 36); x 52..56 × y 29..38 = 0x4E; coluna 52 (y 29..38) = 0x43; coluna 56 (y 29..38) = 0x44; `(52, 40)` = 0x45 e `(56, 40)` = 0x48 (torneira); x 54..56 × y 41..42 = 0xC2; x 57..58 × y 35..42 = 0xC2.
+
+**`_FillMapLegs(x1, x2, y1, y2, v)`** (`1020:3faa`): retângulo = `v`; para x de x1 a x2 e, dentro, y de y1 a y2, `S(20)`; se deu 0, a célula recebe `0x38 + S(5)`; depois os quatro cantos 4 × 4 = 0xC0 (pés do móvel): `(x1..x1+3, y1..y1+3)`, `(x2−3..x2, y1..y1+3)`, `(x1..x1+3, y2−3..y2)`, `(x2−3..x2, y2−3..y2)`.
+
+**Sorteios:** só os fiapos dos carpetes e o miolo de `_FillMapLegs` sorteiam, sempre com x por fora e y por dentro, e o segundo sorteio só acontece quando o primeiro dá 0. A cozinha, a pia, os ladrilhos e os patches 9, 36 e 37 não sorteiam. Depois do chão, o resto de `_RandWorld` (§3, passos 4 em diante) segue igual ao do quintal, com os ramos "casa" já descritos (linha da superfície dos ninhos no passo 6, `_CanBeHouseHole` em 3.A, comida em 3.E).
+
+### 5.2 No port
+
+`engine/src/rules/casa.rs` executa as receitas de `data/casa.json`, gerado por `tools/extrair_casa.py` (formas lidas do `SIMANTW.EXE`; receitas escritas no script a partir desta seção, com o endereço de cada rotina). Cada patch é uma lista de operações (`preencher`, `celula`, `sortear`, `moldura`, `trocar`, `forma`, `ladrilhos`, `queda`, `rotina`); as rotinas acima são entradas de `rotinas`. Um mod pode redesenhar qualquer cômodo trocando a receita ou as formas; o carregamento recusa operações fora do mapa, `S(0)` e rotinas em laço. `Mundo::gerar_patch` chama a casa quando `n ≤ 37` e guarda `_DROPdir` em `Mundo::queda` (o `Estado` ainda não tem esse campo: a comida que cai na casa continua sumindo, ver formiga-amarela.md).
+
+### 5.3 Verificação no original (bancada QEMU, 2026-10-17)
+
+Partindo do snapshot `quick` (Quick Game), com a VM rodando: `_CurGameType` escrito como 2 (só o Jogo Completo transfere), `_YMapPopB[n]` = 1 no patch de destino (sem colônia preta lá, `_XferPatch` recusa com a mensagem "Sorry, there is not a black colony at this location"), clique no botão Yard da faixa (37, 55), duplo clique no patch na Yard View (`(x, y)` de tela ≈ `(298 + 28·px − 10·py, 227 + 10·py)`), espera, `pausar` e `estado` com o diálogo "You are transferring to this place in the house." aberto. Patches (0, 0) (cozinha e pia), (0, 4) (carpete esquerdo, fiapos), (0, 12) (carpete com mesa, `_FillMapLegs`) e (1, 4) (carpete direito): regerando com a semente `_YMapSeeds[py * 12 + px]` do próprio estado, pretas = `_YMapPopB[n]` (7 nas quatro execuções: a colônia escrita cresceu até o clique) e vermelhas = `_YMapPopR[n]` (0), `_MapA`, `_MapB`, `_MapR`, `_ExitMapB` e `_ExitMapR` saem **idênticos** (8.192 e 4 × 4.096 bytes), e `_TERRAINset` = 1. Isso confere também, na casa, a linha da superfície dos ninhos (com `py ≤ 3` e `> 3`), `_MakeNewHoleB` com `_CanBeHouseHole`, `_DigOutBNest` (pretas 7 → 8 > 1), as formigas pretas da superfície e `_AddFood`. Estados em `tests/referencias/saves/CASA_0_0.ANT`, `CASA_0_4.ANT`, `CASA_0_12.ANT`, `CASA_1_4.ANT`; teste `engine/tests/geracao_casa.rs` (`casa_igual_ao_original_depois_de_xfer_patch`). Roteiros: `tests/referencias/roteiros/qemu_casa_0_0.txt`, `qemu_casa_0_4.txt`, `qemu_casa_0_12.txt`, `qemu_casa_1_4.txt` (rodar com `--overlay` numa cópia do overlay com o snapshot `quick`).
+
+Não verificados no original: os patches de ladrilhos, 5–7, 9, 15, 36/37 e a cozinha sem pia (seguem as mesmas rotinas e tabelas já conferidas); `_DROPdir` (não está no save).
 
 ## 6. Tutorial por arquivo: `_GenerateTutorial` (`1030:6262`)
 
@@ -277,13 +336,13 @@ Verificado (teste `engine/tests/geracao_quick2.rs`, roda com `SIMANT_DIR` aponta
 - `_HoleMapB/R`, `_LastNewHoleB/R` (par x, coluna), `_TileTotX/Y?`, `_TilesDug?`, `_TileMassX/Y?`, `_WaterTable`, `_FoodA = 117`, `_LastFoodDrop = (64, 38)`, `_LastRedEgg`, `_RebornX/Y`, `_InitialLions`, `_LionIndex`, `_LionListX/Y`, `_BlkQueens`, `_RedQueens`, `_MePlane/_MeLocX/_MeLocY/_MeType/_MeDir`, `_ListIndexA` e as duas primeiras entradas da lista R: iguais ao save.
 - Lista B: a rainha preta é criada em (36, 9) com T = 0x62 e a metade em (35, 9) com 0x6A; no save ela está virada (0x66 em (34, 9), 0x6E em (35, 9)), e `_LastBlackEgg` já mudou para (36, 9) por causa dos ovos postos. Isso é simulação, não geração.
 
-Não verificado contra o original (implementado conforme o código, sem caso de teste real): `_DigOutBNest/RNest` (só acontece com mais de uma formiga por colônia, em `_XferPatch`), os ramos de Tutorial, Full Game e Experimental de `_InitYelloAnt`/`_RandWorld`, `_AddFood` com parâmetro ≥ 0 e na casa, e `_MakeNewHoleB/R` na casa. A sequência R de `novo_jogo` (192 chamadas a `_RRand`) segue a spec, mas o estado de R no momento do clique não está no save.
+Não verificado contra o original (implementado conforme o código, sem caso de teste real): `_DigOutBNest/RNest` (só acontece com mais de uma formiga por colônia, em `_XferPatch`), os ramos de Tutorial, Full Game e Experimental de `_InitYelloAnt`/`_RandWorld`, `_AddFood` com parâmetro ≥ 0 e `_MakeNewHoleR` na casa. (`_DigOutBNest`, `_MakeNewHoleB`, `_AddFood(−1)` e a linha da superfície dos ninhos na casa foram conferidos em §5.3.) A sequência R de `novo_jogo` (192 chamadas a `_RRand`) segue a spec, mas o estado de R no momento do clique não está no save.
 
-Fora do escopo desta implementação (lacunas): `_MakeHousePatch` (devolve erro), `_XferPatch`, feromônios, `_ClearHistory`, `_CountAnts`, `_ResetYellowVars`, vistas (`_MapPnt`, `_AMapPnt`...), `_DigMyTile` (a formiga amarela nascendo em terra devolve erro) e as demais variáveis zeradas por `_RandYard` que não são estado do mapa.
+Fora do escopo desta implementação (lacunas): `_XferPatch` (o estado do jogo; a geração do patch é `Mundo::gerar_patch`), `_DROPdir` no `Estado` (fica em `Mundo::queda`), feromônios, `_ClearHistory`, `_CountAnts`, `_ResetYellowVars`, vistas (`_MapPnt`, `_AMapPnt`...), `_DigMyTile` (a formiga amarela nascendo em terra devolve erro) e as demais variáveis zeradas por `_RandYard` que não são estado do mapa.
 
 ## Como testar contra o original
 
 1. **Regressão sem emulador (pronto):** `python re_trabalho/verifica_geracao_quick2.py` regera o patch a partir de `_YMapSeeds` do `QUICK2.ANT` e lista as diferenças. O equivalente no port é `engine/tests/geracao_quick2.rs` (entrada: semente 0x3332, `_CurGameType = 1`, patch (11, 8); saída esperada: `_MapB`, `_MapR` e `_MapA` do save, com as 10 células de bichos listadas): `SIMANT_DIR=<pasta do jogo> cargo test -p engine --test geracao_quick2`.
 2. **Novos saves na bancada QEMU** ([../../bancada-qemu.md](../../bancada-qemu.md)): gravar saves logo depois de gerar cada tipo de jogo (Tutorial, Full, Experimental), antes de qualquer passo de simulação se possível (pausar logo após o clique), e rodar a mesma comparação. Falta para isso: coordenadas dos botões Full/Experimental/Tutorial no roteiro e um roteiro por tipo.
-3. **Patches da casa e Full Game:** num Full Game, levar a rainha a outro patch (ou carregar um save em patch da casa) e salvar; comparar `_MapA` com a reimplementação de `_MakeHousePatch` usando `_YMapSeeds` do save.
+3. **Patches da casa e Full Game:** feito para a casa (§5.3: `_CurGameType` = 2 e uma colônia escrita na memória, duplo clique na Yard View). Falta repetir para patches do quintal com várias colônias e para os demais cômodos.
 4. **Dump de memória:** `memoria` da bancada logo após o clique em "Quick Game" permite ler `_YMapSeeds` e os mapas sem passar pelo save, e conferir a sequência R (192 chamadas a `_RRand`).

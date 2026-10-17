@@ -1,0 +1,56 @@
+# Uso: como qemu_experimental_e01.txt. Ver docs/spec/telas/experimental.md, seção 9.
+# Experimental E-02: comida espalhada, spray, e cavar/encher no ninho preto, com o jogo pausado.
+esperar 50
+teclas spc
+esperar 6
+teclas spc
+esperar 10
+capturar re_trabalho/exp/e2_selecao.png
+mouse_canto
+mover 185 375
+esperar 2
+clicar
+esperar_variavel CurGameType 3 60
+esperar 10
+capturar re_trabalho/exp/e2_inicio.png
+teclas shift+0
+esperar 2
+escrever_variavel CurExpTool 4
+escrever_variavel 8:8604 1 1
+ler_variavel SementeS re_trabalho/exp/e2_s0.bin
+estado re_trabalho/exp/e2_0.ANT
+# 20 pedaços em (col 12, lin 8)
+clicar_em 224 294
+esperar 3
+ler_variavel SementeS re_trabalho/exp/e2_s1.bin
+estado re_trabalho/exp/e2_1.ANT
+# spray (subopção 0) em (col 3, lin 3)
+escrever_variavel CurExpTool 6
+escrever_variavel 8:8606 0 1
+clicar_em 80 214
+esperar 3
+ler_variavel SementeS re_trabalho/exp/e2_s2.bin
+estado re_trabalho/exp/e2_2.ANT
+# ninho preto
+teclas ctrl+9
+esperar 3
+capturar re_trabalho/exp/e2_ninho.png
+escrever_variavel CurExpTool 2
+escrever_variavel 8:8602 0 1
+ler_variavel SementeS re_trabalho/exp/e2_s3.bin
+estado re_trabalho/exp/e2_3.ANT
+# cavar em (col 8, lin 4)
+clicar_em 160 230
+esperar 3
+ler_variavel SementeS re_trabalho/exp/e2_s4.bin
+estado re_trabalho/exp/e2_4.ANT
+# encher em (col 8, lin 4) e (col 2, lin 6)
+escrever_variavel 8:8602 1 1
+clicar_em 160 230
+esperar 3
+clicar_em 64 262
+esperar 3
+ler_variavel SementeS re_trabalho/exp/e2_s5.bin
+estado re_trabalho/exp/e2_5.ANT
+capturar re_trabalho/exp/e2_fim.png
+fim
