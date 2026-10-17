@@ -42,6 +42,8 @@ pub(crate) struct Sessao<'a> {
     /// Examine (janela 29) e o exame aberto agora, com o canto da janela.
     pub(crate) janela_exame: engine::core::exame::JanelaExame,
     pub(crate) exame: Option<(engine::rules::experimental::Exame, (i32, i32))>,
+    /// Janela Info (core/info.rs): cartão atual e histórico.
+    pub(crate) info: engine::core::info::JanelaInfo,
 }
 
 /// Para quem vai a escolha do menu aberto.
@@ -112,6 +114,7 @@ impl Sessao<'_> {
         let dialogos_cfg = recursos.dados(engine::core::dialogos::ARQUIVO_CONFIG)?;
         let mapa = engine::core::janela_mapa::JanelaMapa::carregar(recursos)?;
         let janela_exame = engine::core::exame::JanelaExame::carregar(recursos)?;
+        let info = engine::core::info::JanelaInfo::new(recursos.dados(engine::core::info::ARQUIVO_CONFIG)?);
         Ok(Sessao {
             recursos,
             interface,
@@ -132,6 +135,7 @@ impl Sessao<'_> {
             mapa,
             janela_exame,
             exame: None,
+            info,
         })
     }
 
@@ -164,6 +168,9 @@ impl Sessao<'_> {
         for (nome, &n) in &self.mapa.cfg.botoes_cheiro {
             self.tela.selecao_da_faixa.push((nome.clone(), n == modo));
         }
+        if self.janelas.pilha.contains(&Some(Controle::Info)) {
+            self.info.carregar(self.recursos);
+        }
         if self.janelas.pilha.contains(&Some(Controle::Mapa)) {
             self.mapa.atualizar(&self.partida.estado, self.partida.mostrar_trilhas);
         }
@@ -171,10 +178,20 @@ impl Sessao<'_> {
         let edicao = self.janelas.pilha.iter().position(|j| j.is_none()).unwrap_or(self.janelas.pilha.len());
         let (atras, frente) = self.janelas.pilha.split_at(edicao);
         let (recursos, interface, estado, janelas) = (self.recursos, &self.interface, &self.partida.estado, &self.janelas);
-        let (mapa, nav, trilhas) = (&self.mapa, &self.partida.nav, self.partida.mostrar_trilhas);
+        let (mapa, nav, trilhas, info) = (&self.mapa, &self.partida.nav, self.partida.mostrar_trilhas, &self.info);
         let desenhar = |q: &mut Quadro, lista: &[Option<Controle>]| -> Result<Vec<String>, String> {
             let mut p = Vec::new();
             for c in lista.iter().flatten() {
+                if *c == Controle::Info {
+                    let g = janelas.geometria(recursos, *c)?;
+                    let ativa = janelas.ativa() == Some(*c);
+                    let titulo = info.carta.as_ref().map(|k| k.titulo.clone()).unwrap_or_default();
+                    janelas::desenhar_moldura_com_titulo(q, interface, &janelas.cfg, &g, &titulo, ativa);
+                    if let Some(area) = janelas.area_do_info(recursos) {
+                        info.desenhar(q, recursos, interface, area);
+                    }
+                    continue;
+                }
                 if *c == Controle::Mapa {
                     let g = janelas.geometria(recursos, *c)?;
                     let ativa = janelas.ativa() == Some(*c);
@@ -216,6 +233,7 @@ impl Sessao<'_> {
             0 => self.janelas.trazer_para_frente(Some(Controle::Tarefas)),
             1 => self.janelas.trazer_para_frente(Some(Controle::Castas)),
             2 => self.janelas.trazer_para_frente(Some(Controle::Historico)),
+            3 => self.abrir_info(),
             15 => {
                 // _GotoMyAnt depois de abrir a janela de edição e trazê-la para a frente.
                 self.janelas.trazer_para_frente(None);
@@ -243,7 +261,22 @@ impl Sessao<'_> {
             }
         };
         self.centralizar_pelo_mapa();
+        if let Some((x, y)) = self.janelas.clique_info.take() {
+            if let Some(a) = self.janelas.area_do_info(self.recursos) {
+                if self.info.clicar(x - i32::from(a.esq), y - i32::from(a.topo)) {
+                    println!("info: cartão {}", self.info.atual);
+                }
+            }
+        }
         r
+    }
+
+    /// `_OpenInfoWindow`: com a janela fechada, volta ao cartão inicial; sempre a traz para a frente.
+    pub(crate) fn abrir_info(&mut self) {
+        if !self.janelas.pilha.contains(&Some(Controle::Info)) {
+            self.info.reiniciar();
+        }
+        self.janelas.trazer_para_frente(Some(Controle::Info));
     }
 
     /// `_MapAreaEvent`: o clique ou o arrasto na área do mapa centraliza a vista de edição na célula.

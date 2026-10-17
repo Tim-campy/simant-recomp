@@ -72,6 +72,8 @@ pub enum AcaoPartida {
     JanelaComportamento,
     JanelaCastas,
     JanelaHistorico,
+    /// Window → Info (0x16): a cargo da interface (Ctrl+I é extensão do port).
+    JanelaInfo,
 }
 
 /// Resultado de um botão configurável da faixa (`_DoUserButton`, `1000:04c4`).
@@ -598,7 +600,8 @@ impl Partida {
             | AcaoPartida::JanelaEdicao
             | AcaoPartida::JanelaComportamento
             | AcaoPartida::JanelaCastas
-            | AcaoPartida::JanelaHistorico => {}
+            | AcaoPartida::JanelaHistorico
+            | AcaoPartida::JanelaInfo => {}
         }
         self.redesenhar = true;
     }

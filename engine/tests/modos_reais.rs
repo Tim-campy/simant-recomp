@@ -141,3 +141,20 @@ fn examine_canto_e_textos() {
     let t: Vec<String> = j.textos(&ex).iter().map(|l| String::from_utf8_lossy(l).into_owned()).collect();
     assert_eq!(t, ["Queen", "Egg Laying", "Nothing"]);
 }
+
+#[test]
+fn info_cartao_128_tem_as_figuras() {
+    use engine::core::info::{Carta, ConfigInfo, Registro};
+    use engine::formats::banco::Chave;
+    use engine::formats::bitmap::{Bitmap, TIPO_BITMAP};
+    let Some(r) = recursos() else { return };
+    let cfg: ConfigInfo = r.dados("info.json").unwrap();
+    let c = Carta::ler(&r, &cfg, 128).unwrap();
+    assert_eq!(c.titulo, "Top Card");
+    let figuras: Vec<u16> = c.registros.iter().filter_map(|x| if let Registro::Figura { bitmap, .. } = x { Some(*bitmap) } else { None }).collect();
+    assert_eq!(figuras, [21005, 151, 150]);
+    for id in figuras {
+        let b = r.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d));
+        assert!(b.is_ok(), "bitmap {id}: {:?}", b.err());
+    }
+}

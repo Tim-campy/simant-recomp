@@ -31,6 +31,10 @@ pub(crate) fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool, o: &Opcoes
             AcaoPartida::JanelaComportamento => Some(Some(Controle::Tarefas)),
             AcaoPartida::JanelaCastas => Some(Some(Controle::Castas)),
             AcaoPartida::JanelaHistorico => Some(Some(Controle::Historico)),
+            AcaoPartida::JanelaInfo => {
+                s.abrir_info();
+                return None;
+            }
             _ => None,
         };
         if let Some(j) = janela {

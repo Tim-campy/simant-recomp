@@ -33,7 +33,8 @@
     {"tecla": "E", "ctrl": true, "acao": "janela_edicao"},
     {"tecla": "B", "ctrl": true, "acao": "janela_comportamento"},
     {"tecla": "C", "ctrl": true, "acao": "janela_castas"},
-    {"tecla": "H", "ctrl": true, "acao": "janela_historico"}
+    {"tecla": "H", "ctrl": true, "acao": "janela_historico"},
+    {"tecla": "I", "ctrl": true, "acao": "janela_info"}
   ],
   "_teclas_amarela": "Tecla do SDL -> código de tecla virtual do Windows (decimal) passado a _YellowCommandKey (formiga-amarela.md §11.4): 1–4 = 49–52, 0 = 48, NumPad 0–4 = 96–100, X = 88, F9 = 120, J = 74, NumPad * = 106 (J e * só com Tab apertado), Backspace = 8, Home = 36.",
   "teclas_amarela": {

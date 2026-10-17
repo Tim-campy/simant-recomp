@@ -87,7 +87,7 @@ Os botões de alternar (4 trilhas, 5 pausa, 7 Music, 9 Sound Effects, 10 Silly, 
 
 ## 6. O que não foi feito
 
-- Info (função 3, Window → Info): o sistema de cartões ("Top Card", hipertexto dos objetos 10/17/19) — lacuna grande.
+- Info (função 3, Window → Info): feito em [info.md](info.md), sem os popups de definição e os links do texto.
 - Trilhas (função 4): feitas com a janela do mapa ([mapa.md](mapa.md)).
 - Mystery (função 8, `_MysteryButton`): sorteia (`_RRand(15)`) entre colocar formigas, matar algumas, comida, buracos, invencibilidade, aranha ao contrário, quadros 10022/10024… — implementado em `rules/misterio.rs` ([../regras/misterio.md](../regras/misterio.md)).
 - O clique no gráfico do History (valores), WinHelp.
