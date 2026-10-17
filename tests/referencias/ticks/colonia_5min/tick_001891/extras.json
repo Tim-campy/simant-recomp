@@ -1,22 +1,26 @@
 {
  "antes": {
-  "SementeS": 26267,
-  "SementeR": 3065455050,
-  "gameCycles": 270218,
+  "SementeS": 2183,
+  "SementeR": 4005922662,
+  "gameCycles": 268041,
   "Tindex": 0,
   "GlobalKey": 0,
   "GameTime": 1891,
   "Cycle": 1891,
-  "posicao": "entrada"
+  "posicao": "entrada",
+  "MacTickCount": 18960
  },
  "depois": {
-  "SementeS": 50948,
-  "SementeR": 3864584549,
-  "gameCycles": 270218,
+  "SementeS": 43660,
+  "SementeR": 1107239057,
+  "gameCycles": 268041,
   "Tindex": 0,
   "GlobalKey": 0,
   "GameTime": 1892,
   "Cycle": 1892,
   "posicao": "saida"
- }
+ },
+ "MacTickCount_lidos": [
+  18960
+ ]
 }

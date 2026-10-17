@@ -187,6 +187,32 @@ impl Navegacao {
     }
 }
 
+impl Navegacao {
+    /// `_SetMapPlaneLocation(n, x, y)` para n = 1, 2 ou 3: troca o plano e centraliza a vista
+    /// **uma** vez em (x, y), sem ler nem gravar o ponto lembrado (jogo.md, `_GotoMapPoint`).
+    pub fn ir_para_ponto(&mut self, n: i16, x: i32, y: i32) -> bool {
+        let Some(plano) = plano_de(n).filter(|_| n > 0) else { return false };
+        let antes = (self.plano_mapa, self.vista);
+        self.plano_mapa = n;
+        self.vista.plano = plano;
+        self.vista.centralizar(x, y);
+        self.vista.limitar();
+        antes != (self.plano_mapa, self.vista)
+    }
+
+    /// Parte de vista de `_GotoMyAnt` (`1000:a764`): se a amarela está no plano mostrado (> 0),
+    /// `_CenterEdit` na posição dela; senão, `_SetMapPlaneLocation` para o plano dela.
+    pub fn ir_para_amarela(&mut self, plano: i16, x: i32, y: i32) -> bool {
+        if plano == self.plano_mapa && plano > 0 {
+            let antes = self.vista;
+            self.vista.centralizar(x, y);
+            self.vista.limitar();
+            return antes != self.vista;
+        }
+        self.ir_para_ponto(plano, x, y)
+    }
+}
+
 /// Repetição de uma ação enquanto o botão do mouse fica apertado.
 #[derive(Clone, Debug, Default)]
 pub struct Repeticao {

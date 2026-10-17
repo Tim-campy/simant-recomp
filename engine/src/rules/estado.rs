@@ -971,6 +971,9 @@ pub enum Evento {
     Musica(u16),
     /// `_EndGameDialog(0)`: pedido a cada tick enquanto `_IsGameOver` ≠ 0.
     DialogoFimDeJogo,
+    /// `_GotoMyAnt` (`1000:a764`): levar a vista da janela de edição até a formiga amarela
+    /// (AutoTrack, Home, Backspace, clique na própria amarela, ordem impossível...).
+    CentralizarNaAmarela,
 }
 
 /// Contadores de balões de fala zerados no começo do tick (simulacao-visao-geral.md §5, passo 3).
@@ -1090,6 +1093,10 @@ pub struct Estado {
     /// `_gameCycles` (`9:9b2c`): voltas do laço do temporizador (não é contador de ticks; depende do
     /// relógio). Entrada do tick: `_SimBird` o usa para `_BirdDelay` (testes-tick.md, "Pergunta 1").
     pub ciclos_jogo: u32,
+    /// Relógio do Mac (`_MacTickCount` @ `1000:9694` = `GetTickCount() / 55 × 3`, quintal.md "Relógios")
+    /// a usar neste tick, quando conhecido (vetores de tick do original). `None`: o port o deriva
+    /// (`quintal::Relogios::do_port`).
+    pub relogio_mac: Option<u32>,
     /// `_gGameNeedsSaving`.
     pub precisa_salvar: bool,
     /// Pedidos à interface acumulados desde a última vez que foram retirados.
@@ -1148,6 +1155,7 @@ impl Estado {
             baloes: Baloes::default(),
             tecla_global: 0,
             ciclos_jogo: 0,
+            relogio_mac: None,
             precisa_salvar: false,
             eventos: Vec::new(),
         }

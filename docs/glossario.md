@@ -36,7 +36,9 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `_YMapPnt`, `_AMapPnt`, `_BMapPnt`, `_RMapPnt` | centro lembrado da vista em cada plano (0 a 3) | `_SetMapPlane`, `_DoLoadInitializations` |
 | `_DoEditScroll` | trata `WM_HSCROLL`/`WM_VSCROLL` da janela de edição (linha, página, polegar); não atualiza o ponto lembrado | `MAINWNDPROC`; [telas/jogo.md](spec/telas/jogo.md), "Navegação" |
 | `_SetMapPlane`, `_SetMapPlaneLocation`, `_GotoMapPoint` | troca o plano mostrado e centraliza a vista no ponto lembrado (ou num ponto dado) | `_ProcMapRibbonEvent`, `_ProcMenu` |
-| `_goStep*` | andam a vista com a formiga amarela e atualizam o ponto lembrado | código |
+| `_goStep*` | andam a vista um passo e atualizam o ponto lembrado; sem chamadas no pseudocódigo [hipótese: resto da versão Mac] | código |
+| `_GotoMyAnt` | leva a vista até a formiga amarela (`_CenterEdit` ou `_SetMapPlaneLocation`); chamado pelo AutoTrack, Home, Backspace... | código (`1000:a764`) |
+| `_gameCycles` | voltas do laço do temporizador (`MYTIMERFUNC`), mesmo sem tick; no port, `Estado::ciclos_jogo` | código (`9:9b2c`) |
 | `_ScrollUp/Down/Left/Right`, `…S` | funções vazias na versão Windows | código |
 | `_editWidth`, `_editHeight` | tamanho da vista em tiles: `editTileArea` (+1 com faixa) dividido por 16, arredondado para cima | `_win_EditChanged` |
 | `_Me*` (`_MeLocX/Y`, `_MePlane`, `_MeType`, `_MeDir`, `_MeEgg`, `_MeBase`, `_MeMode`) | estado da formiga amarela; com `_MeMode` = 0 ela é gravada como 0xFF na camada de vida | `_SetMyLife`, `_DoCalcTile` |

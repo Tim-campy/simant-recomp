@@ -116,7 +116,7 @@ fn sobrescrever(m: &Path, arquivo: &str, mudar: impl FnOnce(&mut serde_json::Val
     fs::write(m.join("data").join(arquivo), v.to_string()).unwrap();
 }
 
-/// API de mods 0.4: os `data/*.json` das regras do tick, sobrescritos por um mod, chegam a
+/// API de mods 0.5: os `data/*.json` das regras do tick, sobrescritos por um mod, chegam a
 /// `RegrasOriginais` (e daí ao tick).
 #[test]
 fn mod_das_regras_chega_ao_tick() {

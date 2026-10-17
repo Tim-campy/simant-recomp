@@ -4,11 +4,11 @@
  "snapshot": "quick",
  "semente_s_forcada": null,
  "semente_r_forcada": null,
- "alvo": null,
+ "alvo": 1885,
  "alvos": null,
  "preparar": null,
- "descricao": "Cenário rico: snapshot quick rodando 300 s livre (velocidade normal, sem intervenção) e então 10 ticks consecutivos; dezenas de formigas na superfície e nos dois ninhos",
- "livre_segundos": 300.0,
+ "descricao": "Cenário rico: snapshot quick rodando 285 s livre (velocidade normal, sem intervenção), avanço tick a tick até GameTime 1885 e então 10 ticks consecutivos; dezenas de formigas na superfície e nos dois ninhos",
+ "livre_segundos": 285.0,
  "primeira_entrada": {
   "SementeS": 27421,
   "SementeR": 1405178453,
@@ -60,18 +60,10 @@
   "tick_001893",
   "tick_001894"
  ],
- "pendentes": {
-  "tick_001887": "quintal, relógio do Mac do gato: o gato termina a fuga (estado 3) e grava _CatDelay = relógio + 600. Original: 19503 (relógio ~18903, 1/60 s); port: 270585 = _gameCycles (269985) + 600. Só esse bloco difere",
-  "tick_001888": "cascata do _CatDelay errado do tick 1887 (o vetor parte do 19503 do original, mas o port usa _gameCycles ~270000 como relógio): com _CatOn = 0 o port acha o atraso vencido e sorteia S16; S diverge antes de _DoAntSimA e daí formigas da superfície (Alist*), Blist, feromônios (PherMapBN/RN/RT), MapA, SowDir, RedTask e a vida",
-  "tick_001889": "como o 1888 (sorteio S16 do gato só no port); além das listas e feromônios, o port mexe em 64 bytes de MapB e de MapR, WaterTable e ListIndexR, que o original não muda [hipótese: consequência do S divergente; reconferir depois de corrigir o relógio]",
-  "tick_001890": "como o 1888 (sorteio S16 do gato só no port): Alist*, PherMapRN/RT, MapA, SowDir, vida",
-  "tick_001891": "causa não isolada: o _CatDelay do port (270393) difere como no 1888, mas S e R batem no fim do tick e o cachorro diverge (DogDir/DogFrame/DogX/DogY) [hipótese: o sorteio extra do gato desloca os sorteios do cachorro e o total por acaso se compensa; senão, divergência própria do cachorro]",
-  "tick_001892": "como o 1888 (sorteio S16 do gato só no port): Alist*, Rlist*, PherMapRT, MapA, LionListT, vida",
-  "tick_001893": "causa não isolada, como o 1891: _CatDelay do port difere, S e R batem no fim, mas 2 formigas da superfície (AlistX/T), PherMapRN e a vida divergem",
-  "tick_001894": "como o 1888 (sorteio S16 do gato só no port): Alist*, Rlist*, PherMapBT/RN, vida"
- },
+ "pendentes": {},
+ "_regravado": "2026-10-17, com o relógio do Mac (MacTickCount) em extras.json; conteúdo diferente da primeira gravação (o sorteio do gato depende do tempo real)",
  "vida_nao_reconstruivel": {
-  "tick_001885": "2 a 4 células por tick (ex.: LifeA (2, 32) original 20, reconstruído 0; LifeR (32, 1) original 164, reconstruído 0): com 165 formigas na superfície há células com mais de uma ocupante e vagas mortas (T = 0) que, na reconstrução de _DoLoadInitializations, apagam a marca de uma formiga viva",
+  "tick_001885": "1 a 3 células por lado do tick (ex.: LifeA (2, 32) original 20, reconstruído 0): dezenas de vagas mortas (T = 0) paradas na célula do buraco preto e vizinhas apagam, na reconstrução de _DoLoadInitializations, a marca da formiga viva de índice maior na mesma célula",
   "tick_001886": "ver tick_001885",
   "tick_001887": "ver tick_001885",
   "tick_001888": "ver tick_001885",

@@ -264,16 +264,19 @@ pub struct Relogios {
 }
 
 impl Relogios {
-    /// Relógios do port. Com `Estado::ciclos_jogo` preenchido (laço de jogo ou vetor de tick), ele é o
-    /// `_gameCycles` e também o relógio do Mac (uma mensagem de timer de 17 ms ≈ 1/60 s) [hipótese].
-    /// Sem ele: `_gameCycles` = `_GameTime`; relógio do Mac = `_GameTime × mac_por_tick`.
+    /// Relógios do port. O relógio do Mac do original é `GetTickCount() / 55 × 3` (tempo real,
+    /// quintal.md "Relógios"): quando `Estado::relogio_mac` traz esse valor (vetor de tick), ele é usado.
+    /// Senão, regra do port: com `Estado::ciclos_jogo` preenchido, ele é o `_gameCycles` e também o
+    /// relógio do Mac; sem ele, `_gameCycles` = `_GameTime` e relógio do Mac = `_GameTime × mac_por_tick`.
     pub fn do_port(e: &Estado, t: &TabelasQuintal) -> Relogios {
-        if e.ciclos_jogo != 0 {
+        let (ciclos, mac) = if e.ciclos_jogo != 0 {
             let c = e.ciclos_jogo as i64;
-            return Relogios { ciclos: c, mac: c };
-        }
-        let tempo = e.partida.tempo as i64;
-        Relogios { ciclos: tempo, mac: tempo * t.regras.mac_por_tick }
+            (c, c)
+        } else {
+            let tempo = e.partida.tempo as i64;
+            (tempo, tempo * t.regras.mac_por_tick)
+        };
+        Relogios { ciclos, mac: e.relogio_mac.map_or(mac, i64::from) }
     }
 }
 
