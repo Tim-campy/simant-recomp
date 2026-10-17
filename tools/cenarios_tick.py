@@ -588,6 +588,107 @@ def cenario_special(c: Sessao, saida, n):
     return []
 
 
+def cenario_quick_exp(c: Sessao, saida, n):
+    """Quick → Experimental: Quick Game pausado, botão de ferramentas da faixa (354, 71) e o item
+    "EXPERIMENTAL MODE" da janela 10 (360, 127)."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    antes = fotografar(c, saida, "antes")
+    clicar_tela(c, 354, 71)
+    time.sleep(1.5)
+    clicar_tela(c, 360, 127)
+    time.sleep(3)
+    tela(c, saida, "depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"quick_exp": 1})
+    return []
+
+
+def cenario_exp_start(c: Sessao, saida, n):
+    """"Start Game" do Experimental: pausado, botão de ferramentas (354, 71) e o item START GAME (360, 246)."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    antes = fotografar(c, saida, "antes")
+    clicar_tela(c, 354, 71)
+    time.sleep(1.5)
+    clicar_tela(c, 360, 246)
+    time.sleep(3)
+    tela(c, saida, "depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"start": 1})
+    return []
+
+
+def tecla_ctrl(c: Sessao, baixa):
+    c.q.cmd("input-send-event", events=[{"type": "key", "data": {"down": baixa, "key": {"type": "qcode", "data": "ctrl"}}}])
+    time.sleep(0.1)
+
+
+def cenario_exp_ctrl(c: Sessao, saida, n):
+    """Experimental pausado, ferramentas escolhidas na memória (_CurExpTool, _ExpSubStates em 8:8600+f) e
+    cliques na janela de edição (vista em _MapPnt): comida e Ctrl+comida na mesma célula, muro e
+    Ctrl+muro, arrasto de muro numa linha e arrasto de comida. Grava os passos para o port repetir."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    antes = fotografar(c, saida, "antes")
+    s = c.save()
+    mx, my = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2)
+    pix = lambda x, y: (MAPA_X0 + (x - mx) * TILE + 8, MAPA_Y0 + (y - my) * TILE + 8)
+    passos = [
+        {"f": 4, "sub": 0, "pontos": [[55, 35]], "ctrl": False},
+        {"f": 4, "sub": 0, "pontos": [[55, 35]], "ctrl": True},
+        {"f": 1, "sub": 0, "pontos": [[57, 37]], "ctrl": False},
+        {"f": 1, "sub": 0, "pontos": [[57, 37]], "ctrl": True},
+        {"f": 1, "sub": 0, "pontos": [[58, 39], [59, 39], [60, 39], [61, 39], [62, 39], [63, 39]], "ctrl": False},
+        {"f": 4, "sub": 0, "pontos": [[60, 38], [61, 38], [62, 38], [63, 38], [64, 38]], "ctrl": False},
+    ]
+    for p in passos:
+        c.mj.sessao_gdb()
+        c.escrever("CurExpTool", p["f"], 2)
+        c.mj.escrever_variavel(f"8:{0x8600 + p['f']:x}", bytes([p["sub"]]), 1)
+        c.dep.retomar()
+        x0, y0 = pix(*p["pontos"][0])
+        qb.mouse_canto(c.q)
+        qb.mover_rel(c.q, x0, y0)
+        time.sleep(0.3)
+        if p["ctrl"]:
+            tecla_ctrl(c, True)
+        c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": True, "button": "left"}}])
+        time.sleep(0.4)
+        ant = (x0, y0)
+        for q in p["pontos"][1:]:
+            xy = pix(*q)
+            qb.mover_rel(c.q, xy[0] - ant[0], xy[1] - ant[1])
+            ant = xy
+            time.sleep(0.5)
+        c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": False, "button": "left"}}])
+        time.sleep(0.3)
+        if p["ctrl"]:
+            tecla_ctrl(c, False)
+        time.sleep(1)
+        c.log(f"passo {p}")
+    tela(c, saida, "depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"exp": passos})
+    return []
+
+
+def cenario_explorar(c: Sessao, saida, n):
+    """Exploração da tela: CLIQUES = "x,y;x,y;..." (variável de ambiente); captura depois de cada um."""
+    import os
+    c.teclas("shift+0")
+    time.sleep(1)
+    tela(c, saida, "0")
+    for k, par in enumerate(os.environ.get("CLIQUES", "").split(";")):
+        if not par:
+            continue
+        x, y = (int(v) for v in par.split(","))
+        clicar_tela(c, x, y)
+        time.sleep(2)
+        tela(c, saida, str(k + 1))
+    return []
+
+
 def gravar_acao(saida, antes, depois, acao):
     """extras.json no formato dos vetores de tick (comparável com vetor_tick::comparar_com)."""
     (Path(saida) / "extras.json").write_text(json.dumps({"antes": antes, "depois": depois, "acao": acao}, indent=1) + "\n",

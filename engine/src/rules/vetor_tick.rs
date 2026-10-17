@@ -622,6 +622,42 @@ pub fn aplicar_acao(
         transferencia_especial(e, x, y);
         return Ok(format!("{:?}", super::troca_patch::trocar_patch(e, tab, cfg)?));
     }
+    use super::experimental::{self as exp, Contexto, ControleExperimental, Ferramenta, TabelasExperimental};
+    let c = Contexto::padrao();
+    if acao.get("quick_exp").is_some() {
+        return Ok(format!("{:?}", exp::quick_para_experimental(e, c)));
+    }
+    let mut ctl = ControleExperimental::novo(TabelasExperimental::padrao());
+    if acao.get("start").is_some() {
+        let plano = e.vistas.plano as i32;
+        return Ok(format!("{:?}", exp::escolher_ferramenta(e, c, &mut ctl, Ferramenta::ComecarJogo, None, plano)));
+    }
+    if let Some(passos) = acao["exp"].as_array() {
+        // Cada passo: ferramenta e subopção (escritas na memória na bancada), Ctrl, e as células por
+        // onde o cursor passou com o botão apertado (a primeira = onde apertou).
+        let mut efeitos = Vec::new();
+        for p in passos {
+            let f = p["f"].as_i64().ok_or("passo sem f")? as i16;
+            let fer = Ferramenta::de_i16(f).ok_or(format!("ferramenta {f}"))?;
+            e.partida.ferramenta_experimental = f;
+            ctl.subopcoes[fer.indice()] = p["sub"].as_u64().unwrap_or(0) as u8;
+            let ctrl = p["ctrl"].as_bool().unwrap_or(false);
+            let plano = e.vistas.plano as i32;
+            let pontos: Vec<(i32, i32)> = p["pontos"]
+                .as_array()
+                .ok_or("passo sem pontos")?
+                .iter()
+                .map(|q| (q[0].as_i64().unwrap_or(-1) as i32, q[1].as_i64().unwrap_or(-1) as i32))
+                .collect();
+            let ((x0, y0), resto) = pontos.split_first().ok_or("passo sem pontos")?;
+            efeitos.extend(exp::pressionar(e, c, &mut ctl, plano, *x0, *y0, ctrl));
+            for &(x, y) in resto {
+                efeitos.extend(exp::arrastar(e, c, &mut ctl, plano, x, y, ctrl));
+            }
+            exp::soltar(&mut ctl);
+        }
+        return Ok(format!("{efeitos:?}"));
+    }
     Err(format!("ação desconhecida: {acao}"))
 }
 
