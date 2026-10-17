@@ -1,0 +1,61 @@
+# Avisos ao jogador (docs/spec/telas/mensagens.md) e save escrito pelo port.
+# Pré-requisitos: re_trabalho/mensagens/ov.qcow2 = cópia do overlay com o snapshot "quick";
+# re_trabalho/mensagens/a.img = disquete com PORT50.ANT (simant --save QUICK2.ANT --ticks 50 --salvar)
+# e C10.ANT (re_trabalho/casos_ninho/C-10/entrada.ANT: QUICK2 sem a cabeça da rainha preta).
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_mensagens.txt --overlay re_trabalho/mensagens/ov.qcow2
+snapshot_carregar quick
+esperar 2
+disquete re_trabalho/mensagens/a.img
+esperar 1
+# 1. O save do port é aceito pelo original?
+teclas ctrl+l
+esperar 3
+teclas n
+esperar 3
+digitar A
+teclas shift+semicolon
+digitar PORT50
+esperar 1
+teclas ret
+esperar 5
+capturar re_trabalho/mensagens/m1_port_carregado.png
+pausar
+estado re_trabalho/mensagens/port_carregado.ANT
+continuar
+# 2. Botão de velocidade da faixa (ribUserDef1F) em (159, 96) da tela: "Game speed now ..."
+clicar_em 159 96
+esperar 1
+capturar re_trabalho/mensagens/m2_velocidade.png
+# 3. Despausa (Shift+0) e espera: a mensagem do botão ainda deve estar lá ~10 s depois (prazo 270 × 55 ms).
+teclas shift+0
+esperar 10
+capturar re_trabalho/mensagens/m3_velocidade_10s.png
+esperar 8
+capturar re_trabalho/mensagens/m4_velocidade_18s.png
+# 4. Quadros de mensagem e fim de jogo (C10).
+teclas ctrl+l
+esperar 3
+teclas n
+esperar 3
+digitar A
+teclas shift+semicolon
+digitar C10
+esperar 1
+teclas ret
+esperar 5
+capturar re_trabalho/mensagens/m5_10010.png
+# Prazo de _DialogWaitInit(0xf): ~14,85 s; depois de 18 s o quadro deve ter fechado sozinho.
+esperar 18
+capturar re_trabalho/mensagens/m6_apos_18s.png
+clicar_em 323 299
+esperar 3
+capturar re_trabalho/mensagens/m7_apos_clique1.png
+clicar_em 323 299
+esperar 3
+capturar re_trabalho/mensagens/m8_apos_clique2.png
+esperar 20
+capturar re_trabalho/mensagens/m9_apos_20s.png
+clicar_em 323 299
+esperar 3
+capturar re_trabalho/mensagens/m10_apos_clique3.png
+fim

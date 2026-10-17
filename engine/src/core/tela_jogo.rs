@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
+use super::avisos::{desenhar_faixa, desenhar_modal, Avisos};
 use super::edicao::{desenhar_vista, tiles_para, CenaEdicao, VistaEdicao};
 use super::mapa::{MapaChao, Plano};
 use super::navegacao::{Acao, Navegacao};
@@ -396,6 +397,32 @@ impl TelaDeJogo {
             .filter(|o| o.visivel() && contem(o.retangulo, x - dx, y - dy))
             .map(|o| o.nome.as_str())
             .collect()
+    }
+
+    /// Retângulo (na área cliente) e cor do objeto `nome` da faixa.
+    pub fn objeto_da_faixa(&self, nome: &str) -> Option<(Retangulo, u8)> {
+        let base = self.faixa.retangulo();
+        let (dx, dy) = (self.origem_faixa.0 - base.esq, self.origem_faixa.1 - base.topo);
+        let o = self.faixa.objetos.iter().find(|o| o.nome == nome)?;
+        let r = o.retangulo;
+        Some((Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy }, o.cor))
+    }
+
+    /// Desenha os avisos por cima da tela composta: a mensagem da faixa (`_DrawRibbonMessage`) e o
+    /// aviso modal da frente. Devolve o retângulo que fecha o modal ao ser clicado e o que faltou.
+    pub fn desenhar_avisos(
+        &self,
+        q: &mut Quadro,
+        recursos: &Recursos,
+        interface: &Interface,
+        avisos: &mut Avisos,
+        agora: u64,
+    ) -> Result<(Option<Retangulo>, Vec<String>), String> {
+        let cfg = avisos.cfg.faixa.clone();
+        let (r, cor) = self.objeto_da_faixa(&cfg.objeto).ok_or(format!("faixa sem o objeto {}", cfg.objeto))?;
+        let texto = avisos.texto_da_faixa(agora).cloned();
+        desenhar_faixa(q, recursos, interface, &cfg, r, cor, texto.as_ref());
+        desenhar_modal(q, recursos, interface, avisos)
     }
 
     /// Ação da seta da barra de rolagem da janela de edição sob o ponto (x, y), se houver.

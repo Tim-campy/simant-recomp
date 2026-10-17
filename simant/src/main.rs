@@ -4,21 +4,26 @@
 //! Uso:
 //!   simant [--jogo DIR] [--dados DIR] [--mods DIR] [--exportar-telas DIR]
 //!   simant (--save ARQ.ANT | --novo-jogo [--semente N]) [--acoes a,b,...]
-//!          [--ticks N] [--exportar-tela-jogo ARQ.png]
+//!          [--ticks N] [--botoes F,F,...] [--fechar-avisos N] [--exportar-tela-jogo ARQ.png]
+//!          [--salvar ARQ.ANT]
 //!   opções da janela: [--escala N] [--sair-apos-ms N [--capturar-janela ARQ.png]]
 //!   som (simant/src/som): [--sem-som] [--soundfont ARQ.sf2] [--exportar-som DIR]
 //!
 //! Padrões: --jogo $SIMANT_DIR ou SimAnt-T/MAXIS/ANTWIN, --dados data, --mods mods (relativos à
 //! pasta atual). Sem --save nem --novo-jogo, mostra a abertura. Com um deles, a simulação roda ao
-//! vivo (engine::core::partida); com --ticks ou --exportar-tela-jogo, roda sem janela e sai.
+//! vivo (engine::core::partida); com --ticks, --exportar-tela-jogo ou --salvar, roda sem janela e
+//! sai (--salvar grava o .ANT do estado no fim). Na janela, Ctrl+S salva no arquivo da partida e
+//! Ctrl+A ("Save As") num nome novo (o de --salvar, ou SALVO01.ANT, SALVO02.ANT… na pasta atual).
 
 mod som;
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use engine::core::avisos::{self, ConfigAvisos, Modal};
 use engine::core::navegacao::{Acao, ConfigNavegacao, Evento as EventoNav, Repeticao};
-use engine::core::partida::{self, BotaoTeclado, ConfigPartida, Partida};
+use engine::core::partida::{self, AcaoPartida, BotaoTeclado, ConfigPartida, Partida, RespostaBotao};
+use engine::formats::janela::Retangulo;
 use engine::core::tela_jogo::{ConfigTelaJogo, PosicaoVista, TelaDeJogo};
 use engine::core::telas::{compor, Evento, Interface, Reprodutor, Sequencia};
 use engine::formats::save::{JogoSalvo, LayoutSave};
@@ -59,6 +64,12 @@ struct Opcoes {
     semente: Option<u32>,
     /// Roda N ticks sem janela (antes de exportar).
     ticks: Option<u64>,
+    /// Grava o estado num .ANT (sem janela: no fim; na janela: destino do "Save As").
+    salvar: Option<PathBuf>,
+    /// Sem janela: fecha os N primeiros avisos modais antes de exportar.
+    fechar_avisos: usize,
+    /// Sem janela: funções de botões da faixa (`_DoUserButton`) apertados antes de exportar.
+    botoes: Vec<u16>,
     som: som::OpcoesSom,
 }
 
@@ -86,6 +97,9 @@ fn ler_opcoes() -> Result<Opcoes, String> {
         novo_jogo: false,
         semente: None,
         ticks: None,
+        salvar: None,
+        fechar_avisos: 0,
+        botoes: Vec::new(),
         som: som::OpcoesSom::default(),
     };
     let mut args = std::env::args().skip(1);
@@ -105,13 +119,18 @@ fn ler_opcoes() -> Result<Opcoes, String> {
             "--novo-jogo" => o.novo_jogo = true,
             "--semente" => o.semente = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
             "--ticks" => o.ticks = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
+            "--salvar" => o.salvar = Some(valor()?.into()),
+            "--botoes" => {
+                o.botoes = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| format!("{a}: número inválido"))).collect::<Result<_, _>>()?
+            }
+            "--fechar-avisos" => o.fechar_avisos = valor()?.parse().map_err(|_| format!("{a}: número inválido"))?,
             outro if o.som.tratar(outro, &mut valor)? => {}
             _ => return Err(format!("opção desconhecida: {a}")),
         }
     }
     let partida = o.save.is_some() || o.novo_jogo;
-    if !partida && (o.exportar_tela_jogo.is_some() || !o.acoes.is_empty() || o.ticks.is_some()) {
-        return Err("--exportar-tela-jogo, --acoes e --ticks precisam de --save ou --novo-jogo".into());
+    if !partida && (o.exportar_tela_jogo.is_some() || !o.acoes.is_empty() || o.ticks.is_some() || o.salvar.is_some()) {
+        return Err("--exportar-tela-jogo, --acoes, --ticks e --salvar precisam de --save ou --novo-jogo".into());
     }
     if o.save.is_some() && o.novo_jogo {
         return Err("use --save ou --novo-jogo, não os dois".into());
@@ -258,6 +277,11 @@ struct Sessao<'a> {
     nav_cfg: ConfigNavegacao,
     partida: Partida,
     cores: Vec<[u8; 3]>,
+    layout: LayoutSave,
+    /// Arquivo da partida (o do --save ou o último salvo), alvo do File → Save.
+    arquivo: Option<PathBuf>,
+    /// Retângulo que fecha o aviso modal da frente, como desenhado no último quadro.
+    clique_modal: Option<Retangulo>,
 }
 
 impl Sessao<'_> {
@@ -294,17 +318,48 @@ impl Sessao<'_> {
         let nav = tela.navegacao(&jogo, posicao)?;
         // Tabelas de todas as partes com mods (data/*.json); o seno da geração já foi lido do banco.
         let regras = RegrasOriginais { geracao: Some(geracao), ..RegrasOriginais::carregar_sem_banco(recursos)? };
-        let partida = Partida::nova(estado, nav, regras, TabelasAmarela::carregar(recursos)?, cfg_sim, cfg_partida);
-        Ok(Sessao { recursos, interface, tela, nav_cfg, partida, cores })
+        let cfg_avisos: ConfigAvisos = recursos.dados(avisos::ARQUIVO_CONFIG)?;
+        let partida =
+            Partida::nova(estado, nav, regras, TabelasAmarela::carregar(recursos)?, cfg_sim, cfg_partida, cfg_avisos);
+        let arquivo = match origem {
+            Origem::Save(p) => Some(p.to_path_buf()),
+            Origem::Novo(_) => None,
+        };
+        Ok(Sessao { recursos, interface, tela, nav_cfg, partida, cores, layout, arquivo, clique_modal: None })
+    }
+
+    /// File → Save (`_SaveGame(1)`): grava no arquivo da partida; sem arquivo, ou em "Save As"
+    /// (`_SaveGame(0)`), num nome novo. O original pergunta o nome num diálogo comum do Windows.
+    fn salvar(&mut self, como: bool, destino_como: Option<&Path>) -> Result<PathBuf, String> {
+        let caminho = match (&self.arquivo, como, destino_como) {
+            (Some(a), false, _) => a.clone(),
+            (_, _, Some(d)) => d.to_path_buf(),
+            _ => (1..1000)
+                .map(|n| PathBuf::from(format!("SALVO{n:02}.ANT")))
+                .find(|p| !p.exists())
+                .ok_or("nenhum nome livre para salvar")?,
+        };
+        self.partida.estado.para_save(&self.layout)?.gravar(&caminho)?;
+        self.arquivo = Some(caminho.clone());
+        Ok(caminho)
     }
 
     fn quadro_rgb(&mut self) -> Result<Vec<u8>, String> {
         self.tela.atualizar(&self.partida.estado);
-        let (q, pendentes) = self.tela.compor(self.recursos, &self.interface, &self.partida.nav)?;
+        let (mut q, mut pendentes) = self.tela.compor(self.recursos, &self.interface, &self.partida.nav)?;
+        let agora = self.partida.agora();
+        let (clique, p) = self.tela.desenhar_avisos(&mut q, self.recursos, &self.interface, &mut self.partida.avisos, agora)?;
+        self.clique_modal = clique;
+        pendentes.extend(p);
         if !pendentes.is_empty() {
             eprintln!("tela de jogo: não desenhado ainda: {}", pendentes.join(", "));
         }
         Ok(para_rgb(&q.pixels, &self.cores))
+    }
+
+    /// Botão configurável da faixa sob (x, y): a função dele (`_DoUserButton`).
+    fn botao_usuario_em(&self, x: i32, y: i32) -> Option<u16> {
+        self.tela.objetos_da_faixa_em(x, y).iter().find_map(|n| self.partida.cfg.funcao_do_botao(n))
     }
 
     /// Ação do clique esquerdo em (x, y) da área cliente: seta da barra de rolagem ou botão da faixa.
@@ -330,7 +385,11 @@ impl Sessao<'_> {
         for ev in &eventos {
             let t = self.partida.estado.partida.tempo;
             match *ev {
-                EventoRegras::Mensagem(id) => println!("[tick {t}] mensagem {id} (SHARED tipo 4)"),
+                EventoRegras::Mensagem(id) => {
+                    let texto: Vec<String> =
+                        avisos::linhas_do_texto(self.recursos, id).iter().map(|l| l.iter().map(|&b| b as char).collect()).collect();
+                    println!("[tick {t}] mensagem {id}: {}", texto.join(" / "));
+                }
                 EventoRegras::Musica(id) => println!("[tick {t}] música {id}"),
                 EventoRegras::Som(id) => println!("[tick {t}] som {id}"),
                 EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
@@ -364,8 +423,12 @@ fn evento_de_tecla(k: sdl2::keyboard::Keycode, m: sdl2::keyboard::Mod) -> Evento
 /// Uma tecla na tela de jogo, na ordem do original: aceleradores (Speed/Options e navegação),
 /// depois `_YellowCommandKey`, depois as teclas que imitam o mouse. Devolve o botão imitado, se for
 /// o caso.
-fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool) -> Option<BotaoTeclado> {
+fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool, o: &Opcoes) -> Option<BotaoTeclado> {
     if let Some(a) = s.partida.cfg.acao_da_tecla(ev) {
+        if let AcaoPartida::Salvar | AcaoPartida::SalvarComo = a {
+            salvar_e_avisar(s, a == AcaoPartida::SalvarComo, o);
+            return None;
+        }
         s.partida.aplicar(a);
         println!("{a:?}: {}", s.situacao());
         return None;
@@ -386,6 +449,41 @@ fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool) -> Option<BotaoTeclad
         }
     }
     s.partida.cfg.botao_da_tecla(nome)
+}
+
+/// Salva e escreve o resultado ("%s Saved correctly", `_PopMsg`, no original uma caixa de mensagem).
+fn salvar_e_avisar(s: &mut Sessao, como: bool, o: &Opcoes) {
+    match s.salvar(como, o.salvar.as_deref()) {
+        Ok(p) => println!("{} Saved correctly", p.display()),
+        Err(e) => eprintln!("erro ao salvar: {e}"),
+    }
+}
+
+/// Entrada com um aviso modal na tela (`_PictureDialog`, `_EndGameDialog`): só o clique no
+/// retângulo do aviso e (no quadro) Espaço o fecham. Devolve o aviso fechado.
+fn tratar_modal(s: &mut Sessao, ev: &sdl2::event::Event) -> Option<Modal> {
+    use sdl2::event::Event;
+    use sdl2::mouse::MouseButton;
+    let r = s.clique_modal?;
+    let tecla = s.partida.avisos.cfg.quadro.tecla_continuar.clone();
+    let quadro = matches!(s.partida.avisos.modal(), Some(Modal::Quadro { .. }));
+    let fecha = match ev {
+        Event::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => {
+            let dentro = *x >= r.esq as i32 && *x < r.dir as i32 && *y >= r.topo as i32 && *y < r.base as i32;
+            if !dentro {
+                // O original toca MessageBeep.
+                println!("(bip)");
+            }
+            dentro
+        }
+        Event::KeyDown { keycode: Some(k), .. } => quadro && k.name().eq_ignore_ascii_case(&tecla),
+        _ => false,
+    };
+    if fecha {
+        s.partida.fechar_modal()
+    } else {
+        None
+    }
 }
 
 fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Result<(), String> {
@@ -409,6 +507,7 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
     let mut cursor = (0, 0);
     let mut ultima_tecla_clique: Option<(BotaoTeclado, Instant)> = None;
     let mut situacao = String::new();
+    let mut faixa = None;
     let inicio = Instant::now();
     let mut antes = inicio;
     println!("partida: {} (Shift+0 pausa, Shift+1..4 velocidade, Ctrl+G AutoTrack)", s.situacao());
@@ -416,6 +515,22 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
     loop {
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
+            if s.partida.avisos.tem_modal() && !matches!(ev, Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } | Event::Window { .. }) {
+                if let Event::MouseMotion { x, y, .. } = ev {
+                    cursor = (x, y);
+                }
+                if let Some(Modal::FimDeJogo { .. }) = tratar_modal(&mut s, &ev) {
+                    // _EndGameDialog → _NewGame(0): o original abre o "Select a Game"; o port começa
+                    // um Quick Game novo (divergencias.md).
+                    let n = semente(o);
+                    println!("fim de jogo: novo Quick Game com semente {n}");
+                    let (recursos, cores) = (s.recursos, s.cores.clone());
+                    s = Sessao::abrir(recursos, &o.dados, Origem::Novo(n), cores)?;
+                    audio.musica_jogo_novo();
+                }
+                redesenhar = true;
+                continue;
+            }
             match ev {
                 Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return Ok(()),
                 Event::Window { win_event: WindowEvent::FocusGained, .. } => {
@@ -431,7 +546,7 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
                 Event::KeyDown { keycode: Some(k), keymod, .. } => {
                     let tab = eventos.keyboard_state().is_scancode_pressed(Scancode::Tab);
                     let ev = evento_de_tecla(k, keymod);
-                    if let Some(b) = tratar_tecla(&mut s, &ev, tab) {
+                    if let Some(b) = tratar_tecla(&mut s, &ev, tab, o) {
                         let agora = Instant::now();
                         let duplo = ultima_tecla_clique.is_some_and(|(ub, t)| {
                             ub == b && (agora - t).as_millis() as u64 <= s.partida.cfg.duplo_clique_teclado_ms
@@ -442,7 +557,13 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
                 }
                 Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => {
                     cursor = (x, y);
-                    if let Some(a) = s.acao_do_clique(x, y) {
+                    if let Some(f) = s.botao_usuario_em(x, y) {
+                        match s.partida.botao_usuario(f) {
+                            RespostaBotao::Feito => println!("botão {f}: {}", s.situacao()),
+                            RespostaBotao::Salvar => salvar_e_avisar(&mut s, false, o),
+                            RespostaBotao::NaoImplementado(n) => println!("botão {n}: janela ainda não implementada"),
+                        }
+                    } else if let Some(a) = s.acao_do_clique(x, y) {
                         s.partida.navegar(a);
                         repeticao.pressionar(a);
                     } else {
@@ -469,6 +590,13 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
         let pedidos = s.registrar_eventos();
         audio.tratar(&pedidos, &s.partida.estado.partida.opcoes);
         redesenhar |= s.partida.tomar_redesenho();
+        // _DrawRibbonMessage: a mensagem vencida some da faixa.
+        let agora_faixa = s.partida.agora();
+        let nova_faixa = s.partida.avisos.texto_da_faixa(agora_faixa).cloned();
+        if nova_faixa != faixa {
+            faixa = nova_faixa;
+            redesenhar = true;
+        }
         if redesenhar {
             let rgb = s.quadro_rgb()?;
             textura.update(None, &rgb, lw as usize * 3).map_err(|e| e.to_string())?;
@@ -549,13 +677,26 @@ fn principal() -> Result<(), String> {
             s.registrar_eventos();
             println!("{n} ticks: GameTime {antes} -> {}", s.partida.estado.partida.tempo);
         }
+        for &b in &o.botoes {
+            println!("botão {b}: {:?}", s.partida.botao_usuario(b));
+        }
+        for _ in 0..o.fechar_avisos {
+            s.partida.fechar_modal();
+        }
+        if let Some(Modal::FimDeJogo { pontos, .. }) = s.partida.avisos.modal() {
+            println!("fim de jogo: {pontos} pontos");
+        }
         if let Some(png) = &o.exportar_tela_jogo {
             let rgb = s.quadro_rgb()?;
             salvar_png(png, s.tela.cfg.largura, s.tela.cfg.altura, &rgb)?;
             let (p, v) = (&s.partida.nav, &s.partida.nav.vista);
             println!("{} (plano {}, vista em ({}, {}), {} × {} tiles)", png.display(), p.plano_mapa, v.x, v.y, v.largura, v.altura);
         }
-        if o.ticks.is_some() || o.exportar_tela_jogo.is_some() {
+        if let Some(arq) = &o.salvar {
+            s.partida.estado.para_save(&s.layout)?.gravar(arq)?;
+            println!("{} Saved correctly", arq.display());
+        }
+        if o.ticks.is_some() || o.exportar_tela_jogo.is_some() || o.salvar.is_some() {
             return Ok(());
         }
         let jogo_novo = o.novo_jogo;

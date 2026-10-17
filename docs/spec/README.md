@@ -18,6 +18,7 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
 - Telas:
   - [telas/abertura.md](telas/abertura.md): abertura (`_ShowIntro`), implementada no marco 1.
   - [telas/jogo.md](telas/jogo.md): tela de jogo (faixa + janela de edição com chão e vida), planos, rolagem e reconstrução de `_LifeA/B/R`.
+  - [telas/mensagens.md](telas/mensagens.md): avisos ao jogador (mensagem da faixa, quadros de mensagem, fim de jogo e pontuação), botões configuráveis da faixa e salvar.
 - Formatos:
   - [formatos/banco-dat-ndx.md](formatos/banco-dat-ndx.md): banco de recursos e compressão LZSS.
   - [formatos/bitmap.md](formatos/bitmap.md): bitmaps e paleta.
