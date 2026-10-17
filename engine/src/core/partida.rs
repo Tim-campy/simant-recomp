@@ -413,6 +413,9 @@ impl Partida {
     /// até a amarela.
     fn ir_para_amarela(&mut self) {
         if self.estado.partida.tipo_jogo == 3 {
+            if let Some(id) = self.tabelas_amarela.sons.erro {
+                self.eventos.push_back(Evento::Som(id));
+            }
             return;
         }
         let a = &self.estado.amarela;

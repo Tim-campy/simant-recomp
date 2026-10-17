@@ -95,7 +95,39 @@ Os ids 0, 3–6, 8, 11, 12, 14, 16, 20, 25, 26, 31, 33, 34, 39, 40, 43, 46, 48, 
 
 ## Port
 
-**Regras → interface.** As regras não tocam som: pedem `Evento::Musica(id)` (id do cabeçalho tipo 18) e `Evento::Som(id)` (id do tipo 5) na fila do `Estado` (`engine/src/rules/estado.rs`). Hoje as regras emitem as músicas da amarela, dos inimigos, do quintal e da superfície; **nenhuma regra emite `Evento::Som` ainda** (o variante foi criado para isso; as chamadas acima indicam onde).
+**Regras → interface.** As regras não tocam som: pedem `Evento::Musica(id)` (id do cabeçalho tipo 18), `Evento::Som(id)` (id do tipo 5) e `Evento::TemaDoNinho` (`_TryAntTheme`) na fila do `Estado` (`engine/src/rules/estado.rs`, `Estado::pedir_som`). Os ids dos efeitos ficam na seção `sons` de cada `data/<parte>.json` (opcional: id ausente = sem som). Pedir um som **não sorteia nem muda o estado**: os sorteios que o original faz por causa de um som (latido `S(4)`, gato `S(64)`, pássaro `S2`, chuva `S(50)`, mastigação `S2`/`S256`, arroto `S2`, luta `S2`) já eram feitos e continuam no mesmo lugar. Conferido por `engine/tests/sons_regras.rs` (cada caso roda com e sem os ids e compara os estados, inclusive em 400 ticks de seis saves) e pelos 24 vetores de tick do original (307/307 blocos).
+
+### O que está ligado
+
+| Parte (`data/…json`) | Original | Pedido no port |
+|---|---|---|
+| quintal | `_SimDog`/`_MakeBark`: latido pelo sorteio `S(4)` (0x17, 0x15, 0x17, 0x16); latido 0x15 acompanhando o cortador | `cachorro` → `latir` |
+| quintal | `_SimCat`: 13 com a vista no quintal e `S(64)` = 0 | `gato` |
+| quintal | `_SimBird`: 7 quando o pássaro pega o enxame, vista no quintal e `S2` = 0 | `passaro` |
+| quintal | `_FootFall`: 0x23 a cada pisada (fora e dentro de casa); `_SimKidInside`: 9 (inseticida) e 0x18 nas combinações (contagem do nó, nó, quadro) = (3, 20, 900), (1, 21, 903), (6, 20, 6), (3, 21, 1) | `menino_fora`, `menino_dentro` |
+| quintal | `_DoWater`: 0x29 com chuva e `S(50)` = 0 | `simular_agua` |
+| ninho | `_DoDigInB/R`: 0x11 / 0x12 ao pegar a terra cavada | `cavar_para_dentro` |
+| superfície | `_AddFood(n, 1)`: 0x20 (comida periódica) | `RegrasSuperficie::adicionar_comida` |
+| inimigos | `_DoAntLions`: 0x1E ao cuspir pedrinha/comida | `formiga_leao_esperando` |
+| inimigos | `_MoveSpider`: 0x2F correndo atrás da presa; 0x2C mastigando; 10 arroto (opção Silly) | `aranha_perseguir`, `aranha_comer` |
+| inimigos | `_DoLaserFire`: 0x37 a cada formiga atingida | `laser` |
+| amarela | `_SetLife` cavando a terra: 0x13 | `por_vida` |
+| amarela | `_PickupMyRock`/`_DropMyRock`: 0x1E; `_PickupMyFood` (para carregar)/`_DropMyFood`: 0x1D; pegar ovo/`_DropMyEgg`: 0x1C | `pegar_*`, `largar_*`, `tentar_largar_ou_pegar` |
+| amarela | `_EatMyFood`: 0x2C (comida e ovo) e 10 (arroto do canibalismo) | `comer` |
+| amarela | `_AnimYellowFight`: 0x25 por quadro de luta com `S2` ≠ 0; 0x31 por quadro de choque | `animar_luta` |
+| amarela | `_DoAntMoveY`: 1 ao atravessar a passagem entre os ninhos e ao fracassar uma ordem; `_TryAntTheme` ao entrar/sair do ninho (também em `_EnterNest`/`_ExitNest`) | `passo_da_ordem`, `mover_amarela`, `entrar_no_ninho`, `sair_do_ninho` |
+| amarela | `_YellowDeath` 3 e 4 (cercada, fugiu): 1 | `matar_amarela` |
+| amarela | `_YellowBirth`: 0x1C ao pôr o ovo e 0x31 ao nascer; antes do ovo os efeitos ficam desligados (`_OptionStates[2]` = 0), então sons pedidos ali (cavar) são descartados | `nascer_de_ovo`, `fundar_colonia` |
+| amarela | `_YellowCommand`: alarme 0xF (liga/desliga) ou 1; comandos 8 e 9 impossíveis: 1; aranha 11: 2; aranha 12: 0x29 ao ligar o laser, 2 ao desligar | `comando` |
+| amarela | `_YellowCommandKey` Home: 0xF; `_ExchangeLives`: 0xF (ou a música da rainha), 1 se falha; `_processSpider` no modo alvo: 0xF ou 1 | `tecla_de_comando`, `trocar_de_corpo`, `clicar_no_mapa` |
+| partida (`core/partida.rs`) | `_GotoMyAnt` no Experimental: 1 | `ir_para_amarela` |
+| simant | `_TryAntTheme`: 10004, 10005, 10003 em ciclo, se passaram 396 s (7200 × 55 ms) desde o último; o relógio anda mesmo com a música desligada | `som::Audio`, `data/som.json` → `tema_ninho` |
+
+### O que não está ligado
+
+- **Interface (menus, botões e diálogos), fora de `rules/`:** `_EditToolsMenu`/`_MapToolsMenu`/`_RibbonToolsMenu` (2 e 11003), `_DoTool`, `_DoBookMark`, `_CheatKeys`, `_MysteryButton`, `_LionDialog`, `_YellowDialog`, `_SpiderDialog`, `_EndGameDialog` (10008/10010 e o tema seguinte), `_DrawSimPayoff` (20003, 20004), `_ProcYardEvent`, `_XferPatch`/`_SpecialXfer`/`_PlaceQueenInYard` (1, 11002, 11003), `_StartAttack` (11018 pelo menu), `_DrawMower` (0x24, desenho do cortador). Ficam para o `simant` quando essas telas existirem.
+- **Modo Experimental** (`_ExpDig`, `_ExpAddAnt`, `_ExpAddFood`, `_ExpIncSmell`, `_ExpKillAnts`): o modo ainda não está no port.
+- `_myBeginSoundSection` (0x26 da formiga-leão) é vazia no Windows: nada a pedir (o `S8()` continua).
 
 **Executável.** `simant/src/som/` recebe os eventos e toca com SDL2:
 

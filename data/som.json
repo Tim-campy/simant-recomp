@@ -13,6 +13,7 @@
   "musica_abertura": 10001,
   "musica_jogo_novo": 10001,
   "cauda_exportacao_s": 1.5,
+  "tema_ninho": { "musicas": [10004, 10005, 10003], "intervalo_ms": 396000 },
   "musicas": {
     "10001": "gamethme",
     "10003": "antthme1",

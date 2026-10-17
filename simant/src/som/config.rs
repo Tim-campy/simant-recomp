@@ -40,6 +40,17 @@ pub struct ConfigSom {
     pub musica_jogo_novo: Option<u16>,
     /// Tempo de soltura depois da última nota, ao exportar (segundos).
     pub cauda_exportacao_s: f32,
+    /// `_TryAntTheme`: temas tocados ao entrar/sair de um ninho. Ausente = sem tema.
+    #[serde(default)]
+    pub tema_ninho: Option<TemaNinho>,
     /// Id do cabeçalho (decimal) → nome do arquivo sem extensão (tabela MCI do original).
     pub musicas: BTreeMap<u16, String>,
+}
+
+/// `_TryAntTheme` (`1020:1414`): um tema por vez, em ciclo, se já passou `intervalo_ms` desde o último
+/// (7200 ticks de `_TickCount` ≈ 396 s). O relógio e o ciclo andam mesmo com a música desligada.
+#[derive(Clone, Debug, Deserialize)]
+pub struct TemaNinho {
+    pub musicas: Vec<u16>,
+    pub intervalo_ms: u64,
 }

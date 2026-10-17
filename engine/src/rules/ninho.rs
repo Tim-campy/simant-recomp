@@ -73,6 +73,18 @@ pub struct TabelasNinho {
     pub chance_vitoria: [[u8; 4]; 4],
     /// Borda do buraco na superfície por direção (DGROUP `0x230C`).
     pub borda_buraco: [u8; 8],
+    #[serde(default)]
+    pub sons: SonsNinho,
+}
+
+/// Ids dos efeitos sonoros (objetos tipo 5 do banco SOUND, `_myBeginSound`) pedidos por esta parte
+/// (docs/spec/regras/som.md). Seção opcional no JSON: um id ausente não toca (mods anteriores à API 0.8).
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct SonsNinho {
+    /// `_DoDigInB` / `_DoDigInR`: a formiga pega a terra que cavou (0x11 / 0x12).
+    pub cavar_preta: Option<u16>,
+    pub cavar_vermelha: Option<u16>,
 }
 
 impl TabelasNinho {
@@ -810,11 +822,15 @@ impl Formigueiro<'_> {
                 self.eu_mut().modo = m;
                 return;
             }
-            // Carrega a terra (grupo 2 → 5, 6 → 9) e passa a "sair". O som 0x11/0x12 do original
-            // não é uma regra e não tem evento no port.
+            // Carrega a terra (grupo 2 → 5, 6 → 9) e passa a "sair", com o som 0x11 (R: 0x12).
             let f = self.eu_mut();
             f.tipo = f.tipo.wrapping_add(0x18);
             f.modo = 5;
+            let som = match self.cor {
+                Cor::Preta => self.tab.sons.cavar_preta,
+                Cor::Vermelha => self.tab.sons.cavar_vermelha,
+            };
+            self.e.pedir_som(som);
         }
         // O T de referência da luta é o de antes de pegar a terra (desmontagem: `uVar8`).
         if !self.passo(n, d, t_ref) {

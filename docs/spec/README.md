@@ -50,4 +50,4 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
 1. Mapa de jogo: tiles (objetos tipo 9, ids 13–20) e mapas de superfície/ninho (`_MapA`, `_MapB`, `_MapR`), para exibir um mapa (marco seguinte do plano).
 2. Mapas de superfície e ninho (`_MapA`, `_MapB`, `_MapR`) e tiles (tipo 9).
 3. Regras da simulação (`SIMANT1_MODULE`, `SIMTWO_MODULE`), uma regra por vez, cada uma com caso de teste contra o original.
-4. ~~Som e música~~: especificados em formatos/som.md e regras/som.md; falta as regras emitirem `Evento::Som`.
+4. ~~Som e música~~: especificados em formatos/som.md e regras/som.md; faltam os sons das telas e diálogos que ainda não existem.
