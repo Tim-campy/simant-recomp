@@ -160,3 +160,48 @@ pub fn redesenho_do_timer(e: &mut Estado, j: &JanelasDesenho, k: &mut Contadores
     }
     passos
 }
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    fn chuva() -> Estado {
+        let mut e = Estado::vazio();
+        e.ambiente.chovendo = 1;
+        e.vistas.modo_mapa = 1;
+        e.s = super::super::rng::GeradorS::new(0x1234);
+        e
+    }
+
+    #[test]
+    fn chuva_sorteia_28_e_so_nos_modos_0_e_1() {
+        let mut e = chuva();
+        assert_eq!(desenhar_quintal(&mut e, 0), 28);
+        assert_eq!(desenhar_quintal(&mut e, 1), 28);
+        assert_eq!(desenhar_quintal(&mut e, 2), 0);
+        e.ambiente.chovendo = 0;
+        assert_eq!(desenhar_quintal(&mut e, 0), 0);
+    }
+
+    #[test]
+    fn redesenho_respeita_velocidade_janela_atras_e_inativa() {
+        let j = JanelasDesenho { ativa: true, quintal_aberto: true, quintal_na_frente: true, ..Default::default() };
+        let mut e = chuva();
+        let mut k = ContadoresRedesenho::default();
+        assert_eq!(redesenho_do_timer(&mut e, &j, &mut k), 28);
+        k.chamadas = 0;
+        e.partida.velocidade = 3;
+        let n: u32 = (0..8).map(|_| redesenho_do_timer(&mut e, &j, &mut k)).sum();
+        assert_eq!(n, 2 * 28, "ultra: 1 em 4");
+        e.partida.velocidade = 1;
+        let atras = JanelasDesenho { quintal_na_frente: false, ..j };
+        let n: u32 = (0..4).map(|_| redesenho_do_timer(&mut e, &atras, &mut k)).sum();
+        assert_eq!(n, 2 * 28, "atrás: um sim, outro não");
+        let inativa = JanelasDesenho { ativa: false, ..j };
+        k.ticks = 0;
+        let n: u32 = (0..16).map(|_| redesenho_do_timer(&mut e, &inativa, &mut k)).sum();
+        assert_eq!(n, 2 * 28, "inativa: 1 tick em 8");
+        let min = JanelasDesenho { minimizada: true, ..j };
+        assert_eq!(redesenho_do_timer(&mut e, &min, &mut k), 0);
+    }
+}
