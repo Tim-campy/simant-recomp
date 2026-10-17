@@ -1,0 +1,72 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "rico",
+ "descricao": "Amarela por cliques (vista da superfície, Ctrl+8): sai do ninho preto (MePlane 2->1 no 1733), pega comida com duplo clique (MeType 0x10->0x18 no 1792, depois da compactação da lista A no 1791) e entra no ninho vermelho pelo buraco (109, 32) (MePlane 1->3 no 1852, com troca da vista)",
+ "passos": [
+  "teclas ctrl+8",
+  "amarela no plano 2 em (36, 9); 71 comidas, buracos [(2, 32), (109, 32)]",
+  "duplo clique na célula (57, 15) com _MapPnt = (45, 6)",
+  "clique na célula (109, 32) com _MapPnt = (97, 23)",
+  "duplo clique na célula (105, 28) com _MapPnt = (39, 19)"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_001732",
+  "tick_001733",
+  "tick_001734",
+  "tick_001790",
+  "tick_001791",
+  "tick_001792",
+  "tick_001850",
+  "tick_001851",
+  "tick_001852"
+ ],
+ "selecao": [
+  "1732-1734",
+  "1790-1792",
+  "1850-1852"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); o snapshot rico tem dezenas delas"
+ }
+}

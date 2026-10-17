@@ -1,0 +1,65 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "rico",
+ "descricao": "Amarela ataca uma vermelha (duplo clique, ordem 3) e perde a luta no 1864: _YellowFight/_AnimYellowFight (relógio lido em laço, ~1000 vezes), morte, renascimento como ovo no ninho preto (MeEgg 1->7) e troca da vista",
+ "passos": [
+  "teclas ctrl+8",
+  "esperou até GameTime 1792",
+  "buraco preto (2, 32); vermelha alvo em (59, 18)",
+  "duplo clique na célula (59, 18) com _MapPnt = (47, 9)"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_001860",
+  "tick_001861",
+  "tick_001862",
+  "tick_001863",
+  "tick_001864"
+ ],
+ "selecao": [
+  "1860-1864"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); o snapshot rico tem dezenas delas"
+ }
+}

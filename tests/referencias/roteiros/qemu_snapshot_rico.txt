@@ -1,0 +1,10 @@
+# Snapshot "rico": parte do "quick" e deixa o Quick Game rodar 285 s em velocidade normal, sem intervenção
+# (~1800 ticks: dezenas de formigas na superfície e nos ninhos, menino cortando a grama, aranha na tela).
+# Usado por tools/cenarios_tick.py. Grave num overlay próprio (--overlay), não no padrão:
+#   python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_snapshot_rico.txt --overlay re_trabalho/qemu/ov_r.qcow2
+# O conteúdo não é reprodutível (o relógio do Mac é tempo real, ver docs/spec/regras/quintal.md, "Relógios").
+snapshot_carregar quick
+esperar 285
+snapshot_salvar rico
+esperar 2
+fim

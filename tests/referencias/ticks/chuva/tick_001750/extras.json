@@ -1,0 +1,27 @@
+{
+ "antes": {
+  "SementeS": 62286,
+  "SementeR": 525497992,
+  "gameCycles": 206252,
+  "Tindex": 0,
+  "GlobalKey": 168,
+  "GameTime": 1750,
+  "Cycle": 1750,
+  "posicao": "entrada",
+  "MacTickCount": 17697
+ },
+ "depois": {
+  "SementeS": 57631,
+  "SementeR": 1784043256,
+  "gameCycles": 206252,
+  "Tindex": 0,
+  "GlobalKey": 168,
+  "GameTime": 1751,
+  "Cycle": 1751,
+  "posicao": "saida"
+ },
+ "MacTickCount_lidos": [
+  17697,
+  17697
+ ]
+}

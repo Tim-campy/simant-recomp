@@ -100,7 +100,10 @@ ANDAR:
     ninho, linha y ≠ 0: se o tile do destino é 0x14 e não é rainha e destino == célula atual:
         troca de ninho (6.3) ; r = −1
     ninho, linha 0: SAI (6.2)
-    depois de ENTRA/SAI: se o destino era exatamente esta célula/plano e o plano novo ≠ plano exibido, centraliza
+    depois de ENTRA/SAI: se o destino era exatamente esta célula/plano e o plano novo ≠ plano exibido:
+        centraliza (se AutoTrack desligado) e r = −1 (a ordem termina; o código cai no rótulo de
+        "concluída", `1028:7b6b`)  ← verificado no vetor amarela_superficie/1852
+        (se o plano novo é o exibido, r continua 0 e a ordem segue, com destino ainda na superfície)
 FIM:
     se "AutoTrack": centraliza a vista na amarela
     se r == 0 e chegou (plano e célula do destino) e _MeCmd == 0: r = −1

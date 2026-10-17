@@ -9,6 +9,7 @@
 //!   ida e volta do save funcione. Quem corrigir a regra tira o tick da lista.
 //! - `"vida_nao_reconstruivel"`: {tick: motivo} — a vida do original não é reconstruível das listas
 //!   (duas ocupantes na mesma célula); não se confere a reconstrução, só a vida depois do tick.
+//!   A chave `"*"` vale para todos os ticks do cenário.
 //!
 //! Para ver o relatório de uma falha:
 //! `cargo run -p engine --example comparar_tick -- tests/referencias/ticks[/CENÁRIO]`.
@@ -42,7 +43,10 @@ fn casos() -> Vec<Caso> {
     let mut out = Vec::new();
     for (prefixo, dir) in dirs {
         let indice = ler_indice(&dir);
-        let motivo = |chave: &str, t: &str| indice[chave][t].as_str().map(str::to_owned);
+        // "*" vale para todos os ticks do cenário
+        let motivo = |chave: &str, t: &str| {
+            indice[chave][t].as_str().or_else(|| indice[chave]["*"].as_str()).map(str::to_owned)
+        };
         let ticks = indice["ticks"].as_array().expect("indice.json sem \"ticks\"");
         assert!(!ticks.is_empty(), "{}: sem ticks", dir.display());
         for t in ticks {

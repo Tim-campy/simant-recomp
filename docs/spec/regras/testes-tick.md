@@ -178,7 +178,20 @@ Cenários em subpastas (gerados em 2026-10-17, listados em `"cenarios"` do `indi
 | `amarela_andando/` | 85–89 | `--preparar tests/referencias/roteiros/tick_amarela_ordem.txt`: clique simples na célula (32, 1) do ninho preto (tela (160, 182)) | a amarela anda de (35, 8) a (33, 3), um passo por tick, com `_MeMoveMe` = 1 e `_MeCmd` = 0, passando pelas células da rainha preta |
 | `colonia_5min/` | 1885–1894 | `--livre 285 --alvo 1885` (velocidade normal, sem intervenção) | 140 vagas na lista A, 59 na B, 75 na R (muitas mortas, T = 0), formigas em vários modos, gato fora de cena (relógio do Mac lido em todo tick), formiga-leão |
 
-Volume: 3,2 MB ao todo em `tests/referencias/ticks/` (~135 KB por tick).
+Cenários de eventos (2026-10-17, `tools/cenarios_tick.py` a partir do snapshot **rico** — `tests/referencias/roteiros/qemu_snapshot_rico.txt`: o `quick` rodando 285 s, ~1710 ticks, com chuva caindo, menino cortando grama, aranha na tela e dezenas de formigas). O script grava sequências longas em `re_trabalho/cen/` (fora do git), lista os eventos (`eventos`) e copia janelas escolhidas (`selecionar`); o `indice.json` de cada cenário guarda os `passos` (escritas na memória, cliques) e a `selecao`:
+
+| Subpasta | Ticks | Preparação | O que exercita |
+|---|---|---|---|
+| `chuva/` | 1711–1712, 1747–1751 | `_GlobalKey = 0xA8` na entrada do 1711 | inundação dos ninhos (`_DoWater`, `WaterTable` 46→45, `MapB/MapR`); fim da chuva (1749) e recomeço com `_InitWater` (1750) |
+| `chuva_secando/` | 1769–1771 | nenhuma | água baixando (`WaterTable` 46→47, 0x4E volta a túnel com `S(8)`) |
+| `revoada/` | 1711–1718 | 18 formigas da superfície em M = 15 e `_FlyAwayB/R = 3` | modos 15 → 16 (`S1(F)`, depois F = 1) e saída do mapa no modo 16 (`S32`) |
+| `menino_cortador/` | 1711–1715 | menino cortando (`_BoyHere = 3`, `_BoyIsMowing = 1`) posto no patch atual (11, 8) | `_FootFall` e `_MowerFall` (38 de 56 formigas mortas no 1712), sob chuva |
+| `predadores/` | 1795–1797, 1812–1813 | nenhuma | aranha come uma preta (`_SMode` 2→3, `_BAntsEaten` +1, 1796); formiga-leão come (1813) |
+| `amarela_superficie/` | 1732–1734, 1790–1792, 1850–1852 | Ctrl+8 e cliques calculados (`_MapPnt` escrito para pôr a célula no centro) | sai do ninho (`_ExitNest`), pega comida (duplo clique, `_TryMyDropOrLift`) logo depois da compactação da lista A, entra no ninho vermelho (com troca da vista) |
+| `amarela_luta/` | 1860–1864 | duplo clique numa vermelha (ordem 3), logo depois de uma compactação | perseguição, `_YellowFight` com derrota, `_AnimYellowFight` (o relógio é lido ~1000 vezes no tick), renascimento como ovo (`_MeEgg` 1→7) |
+| `velocidade_rapida/`, `velocidade_ultra/` | 1899–1901, 1977–1979 | Shift+3 / Shift+4 | o tick é o mesmo; `_gameCycles` anda 1 por tick e o relógio do Mac fica parado (17427) enquanto a bancada avança tick a tick |
+
+Volume: 9,5 MB ao todo em `tests/referencias/ticks/` (~135 KB por tick).
 
 ### Comparar o port
 
@@ -247,7 +260,16 @@ Todos os 24 vetores batem **inteiros** (307/307 blocos, extras 5/5, vida 0): rai
 - `colonia_5min` (todos): dezenas de vagas mortas (T = 0) paradas nas células dos buracos (ex.: lista A em (2, 32), lista R em (32, 1)) apagam, na reconstrução, a marca da formiga viva de índice maior que está na mesma célula.
 Consequência para o port: um save carregado no meio do jogo pode ter vida diferente da que o original tinha em memória; o original, ao carregar o mesmo save, faz a mesma reconstrução, então isso só importa para comparar com memória viva.
 
-**Lacunas:** sem vetores com chuva, revoada, aranha caçando, menino cortando a grama, inseticida, velocidades "fast"/"ultra", amarela na superfície, entrando/saindo de ninho, pegando comida ou lutando; só um vetor por fase de `_DoSmells`; nenhum vetor com mais de uma leitura de `_MacTickCount` no mesmo tick (o port usa um valor só por tick; `_AnimYellowFight` lê o relógio em laço e precisaria da lista).
+### Cenários de eventos (2026-10-17, main em `317026e`)
+
+Os **48 vetores novos batem inteiros** (307/307, extras 5/5, vida 0); nenhum fica em `"pendentes"`. Antes da seleção, as gravações brutas inteiras também foram comparadas: 552 ticks de `re_trabalho/cen/` (chuva 80, livre 250, amarela 122, luta 64, revoada 12, menino 12, fast 6, ultra 6), todos 307/307 depois das duas correções abaixo. Todos têm `vida_nao_reconstruivel: {"*": ...}` (vagas mortas nas células dos buracos, como em `colonia_5min`).
+
+Duas divergências apareceram e foram corrigidas:
+
+1. **Regra — `_DoAntMoveY` depois de entrar no ninho** (`engine/src/rules/amarela.rs`, `passo_da_ordem`, bloco final). Com destino = a própria célula do buraco e o plano novo ≠ plano exibido, o original termina a ordem (r = −1 → `_ResetYellowVars` na posição nova: `MeGoal*` = (3, 32, 1), `MeLast*`, `MeMoveMe = 0`, `MeSteps = 0`); o port só centralizava e deixava a ordem andando. No pseudocódigo, depois do `_GotoMyAnt` o fluxo cai no rótulo `1028:7b6b` (`local_8 = −1`). Correção: `return (-1, alvo)` nesse caso (4 linhas). Vetor: `amarela_superficie/1852`. Spec: formiga-amarela.md §4.
+2. **Comparador — a vista anda dentro do tick.** `_GotoMyAnt` (`1000:a764`) chama `_CenterEdit`/`_SetMapPlaneLocation` no meio do tick e `_MapPnt`, `_MapPlane`, `_MapMode` estão no save; no port isso é da interface (`Evento::CentralizarNaAmarela`, tratado por `core::partida`). `vetor_tick.rs` (`aplicar_vista_da_bancada`) agora reproduz o efeito no save quando o tick pede a centralização: troca `_MapPlane`/`_MapMode` se a amarela está noutro plano e anda `_MapPnt` como `_CenterEdit` (Bresenham com truncamento, telas/jogo.md "Centralizar"), com a janela da bancada de 25 × 19 tiles. Conferido em `amarela_superficie/1852` ((97, 23) → (20, 0)) e `amarela_luta/1864` ((47, 9) → (25, 1): o eixo menor anda um passo a menos). [hipótese] `_editWidth` = 25 na bancada (as duas contas só fecham com meia largura 12, não 13).
+
+**Lacunas:** inseticida, Jogo Completo e Experimental não gravados (o snapshot é do Quick Game; chegar a outro tipo de jogo exige navegar diálogos de File > New, não tentado); revoada só forçada (não a armada por `_GstrR`), sem `_QueenStorage`/`_SwarmCnt` (só sobem no Jogo Completo); a luta gravada é uma derrota — falta uma vitória; só um vetor por fase de `_DoSmells`; o port usa um valor de relógio por tick, e em `amarela_luta/1864` a lista lida tem ~1000 valores diferentes, que ainda assim bateu porque a animação só usa o relógio como espera (sem sorteio dependente dele) [hipótese a conferir em `_AnimYellowFight`].
 
 ## Limitações
 
