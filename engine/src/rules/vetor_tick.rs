@@ -620,7 +620,14 @@ pub fn aplicar_acao(
         let mut regras = super::tick::RegrasOriginais::default();
         tick(e, &mut regras);
         transferencia_especial(e, x, y);
+        // A janela do quintal aparece (desenho com o patch ainda antigo) e vira a Strategic View.
+        super::desenho::desenhar_enxame(e);
+        super::desenho::desenhar_colonias(e);
         return Ok(format!("{:?}", super::troca_patch::trocar_patch(e, tab, cfg)?));
+    }
+    if let Some(m) = acao.get("desenho_quintal").and_then(|v| v.as_i64()) {
+        // Entre dois ticks com a Yard/House View aberta e na frente: um redesenho do quintal.
+        return Ok(format!("{} passos de S", super::desenho::desenhar_quintal(e, m as i16)));
     }
     use super::experimental::{self as exp, Contexto, ControleExperimental, Ferramenta, TabelasExperimental};
     let c = Contexto::padrao();

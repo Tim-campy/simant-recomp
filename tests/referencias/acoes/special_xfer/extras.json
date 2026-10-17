@@ -33,10 +33,5 @@
    8
   ]
  },
- "ignorar": {
-  "SwarmCentX": "efeito do DESENHO da Strategic View que _SpecialXfer abre dentro do tick (interface, não regra): _DrawSwarm (1010:bb0e) grava _SwarmCentX = 28*px - 10*py + 0xB2 com o patch atual ANTES da troca, (11, 8)",
-  "SwarmCentY": "efeito do DESENHO da Strategic View que _SpecialXfer abre dentro do tick (interface, não regra): _DrawSwarm grava _SwarmCentY = 10*py + 0x2E",
-  "ColonyUpdateFlag": "efeito do DESENHO da Strategic View que _SpecialXfer abre dentro do tick (interface, não regra): o desenho das colônias zera _ColonyUpdateFlag (1 -> 0)"
- },
  "MacTickCount_lidos_total": 201
 }

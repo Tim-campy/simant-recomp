@@ -5,6 +5,7 @@ pub mod amarela;
 pub mod casa;
 pub mod comum;
 pub mod conselhos;
+pub mod desenho;
 pub mod estado;
 pub mod experimental;
 pub mod feromonios;

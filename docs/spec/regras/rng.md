@@ -93,6 +93,29 @@ Contagem de chamadas no pseudocódigo (fato visto no código; lista completa obt
 
 Consequência importante para o port: como o desenho consome S, a sequência da simulação no original depende do que foi desenhado (janelas abertas, balões). Uma reprodução bit a bit da simulação exige ou reproduzir essas chamadas de desenho, ou aceitar divergência depois da geração do mundo [hipótese: não medido quanto isso afeta na prática]. A geração do mundo em si não chama desenho entre o `_SetSRandSeed` e o fim do `_RandWorld` (fato visto no código, e confirmado pela reprodução exata descrita abaixo).
 
+## Sorteios do desenho
+
+Fora do tick, o original consome S (nunca R) ao **redesenhar**. Fontes: pseudocódigo (análise de 2026-10-17, endereços abaixo) e bancada QEMU (gravações em `re_trabalho/cen/desenho_*`, `tools/cenarios_tick.py teclas` + `entre`, que conta os passos de S e R entre o fim de um tick e o começo do seguinte). Implementação: `engine/src/rules/desenho.rs`; conferência: vetores `tests/referencias/acoes/desenho_*` (o intervalo entre dois ticks: estado depois de um, estado antes do seguinte), `engine/tests/acoes_originais.rs`.
+
+**Quando há redesenho** (`MYTIMERFUNC` `1000:2440` → `_DoAntSim` → `_UpdateWindows` `1000:2224`) [código]: depois de **cada tick**, se a janela principal não está minimizada; com a aplicação inativa, só 1 tick em 8 (`DGROUP:0x2f0`). Sem tick (jogo pausado) não há `_UpdateWindows`. Velocidade: `_GameSpeed` 2 desenha só com `_UDcntr` (`9:9b00`, +1 por chamada, módulo 64) par; 3, só com `_UDcntr % 4 == 0`. Ordem: mapa (0x100, não sorteia), **quintal** (0x1900: na frente, toda chamada; atrás, uma sim e outra não), **janela de edição** (na frente, toda chamada; atrás, uma sim e outra não). O WM_PAINT das janelas só copia o buffer e não sorteia.
+
+| Rotina | Condição | Sorteios por redesenho | Grava no save |
+|---|---|---|---|
+| `_Draw_SimYard(_YardMode)` (`1010:b462`), via `_UpdateYard` | quintal aberto, `_YardMode` 0 (Yard) ou 1 (House) | chuva (`_RainOn` ≠ 0): **14 × (`SRand1(400)`, `SRand1(150)`) = 28** | — |
+| `_DrawSwarm` (`1010:bb0e`), no fim de `_Draw_SimYard` (modos 0 e 1) | `_MapMode` = 0 | pretas: `nB = min(_SwarmCntB, 16, _QueenStorageB)`; cada uma fora de ±15 volta a (`S16 − 10`, `S16 − 10`); todas andam `S1(3) − 1` em x e y → **2·nB + 2·(fora)**; vermelhas: fora de ±15 vão a (0, 0) sem sorteio, todas andam `S1(3) − 1` → **2·nR** | `_SwarmCentX = 28·px − 10·py + 178`, `_SwarmCentY = 10·py + 46` (patch atual), `_SwarmXB/YB/XR/YR` |
+| `_DrawPalps` (`1010:2594`) em `_DrawSpider`, via `_UpdateEdit` → `1010:16d4` | janela de edição aberta, aranha visível (`_PreDrawSpider`: `_SpidOn`, plano 0 ou 1, dentro da vista), `_SMode` ≠ 5 | **1 × `SRand1(4)`**, exceto com `_SMode` < 2 e `_MeSMode` < 6 | — |
+| balão da aranha (`_DrawSpider`) | "Silly" (`_OptionStates[5]`), aranha visível | `S64` + `S2` quando vence o prazo (tempo real, `_TickCount`), mesmo pausado `S32` se `_SMode` mudou ou > 4 | — |
+| `_DrawCurBalloons` (`1010:4cac`), via `1010:16d4` | "Silly", `_ELayerMode = −1` | por tipo de balão (luta preta/vermelha `S32`+`S2`, ovo e rainha `S32`+`S4`, descanso `S64`+`S2`) quando o prazo de tempo real vence ou o balão é novo | — |
+| `MYTIMERFUNC` | janela minimizada, jogo não pausado nem acabado | `SRand1(7)` por chamada do temporizador (ícone "Ant0"–"Ant6") | — |
+| `_EndGameDialog`, `_SpiderDialog` (dentro do tick) | fim de jogo; morte pela aranha com "Events" | um `S2`; um `S1(2)` | — |
+| `_DoEditUpdateDraw`/`_GotoMyAnt` dentro do tick (`_DoAntMoveY`, `_YellowFight`, `_YellowDeath`...) | janela de edição aberta | os mesmos da janela de edição (palpos, balões), no meio do tick | — |
+
+`_DrawRain` (`1010:ba9e`, o mesmo bloco da chuva) e `_SubtractFood` não têm chamador no pseudocódigo [em aberto: ponteiro]. `_MysteryButton` e `_CheatKeys` sorteiam R e S, mas são entrada do jogador, não desenho.
+
+**Verificado na bancada (2026-10-17, snapshot rico, chovendo):** Yard View (Ctrl+Y) e House View (Ctrl+5) na frente: **28 passos de S entre ticks**, todos os 7 intervalos; com a chuva acabada (tick 1749), 0. Yard View com `_SwarmCntB = 5`, `_QueenStorageB = 3`, `_SwarmCntR = 2`, `_QueenStorageR = 4`: **38** (28 + 2·3 + 2·2) e, quando `_SwarmCntB` caiu a 2, **36**; `_SwarmXB/YB/XR/YR` mudam entre os ticks exatamente como `desenho::desenhar_enxame` (vetores `desenho_chuva_enxame`, `_enxame2`, `desenho_chuva_casa`: 307/307 e S igual). Strategic View (Ctrl+6, modo 2): 0. Janela de edição na superfície, sem "Silly" e sem a aranha à vista, e no ninho: 0 em todas as gravações de vetores (centenas de intervalos). `_SpecialXfer` abre a janela do quintal dentro do tick: `_DrawSwarm` grava `_SwarmCentX/Y` com o patch antigo (11, 8) e o desenho das colônias zera `_ColonyUpdateFlag` (`acoes/special_xfer`, 307/307 com isso).
+
+**No port:** `desenho::redesenho_do_timer(e, janelas, contadores)` faz, depois de cada tick, os sorteios do quintal e dos palpos com as mesmas regras de quando redesenhar (a interface informa as janelas abertas/na frente, aplicação ativa/minimizada e se a aranha está visível, e guarda os contadores que não vão no save); `desenhar_quintal`, `desenhar_enxame`, `desenhar_palpos`, `desenhar_colonias` separadas. **Fora**: balões "Silly" e da aranha (dependem de prazos em tempo real e de estado de interface fora do `Estado`), o ícone minimizado e os desenhos de dentro do tick [lacunas].
+
 ## A semente está no save?
 
 - O estado de S (`DGROUP:0xcbf2`) e o de R (`0xae34`) **não** estão na tabela de blocos do `.ANT` (fato visto no código: a tabela `1038:9570` lida por `_SaveGame`/`_LoadGame`, listada em [../formatos/save-ant.md](../formatos/save-ant.md), não tem nenhum bloco nesses endereços).

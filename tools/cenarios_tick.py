@@ -678,6 +678,12 @@ def cenario_teclas(c: Sessao, saida, n):
     o que o DESENHO consome entre os ticks: compare o S de `depois` de um tick com o de `antes` do
     seguinte (ver `entre_ticks`)."""
     import os
+    # ESCREVER="Nome=valor,Nome=valor": escritas na memória antes (ex.: SwarmCntB=5)
+    for par in filter(None, os.environ.get("ESCREVER", "").split(",")):
+        nome, v = par.split("=")
+        c.mj.sessao_gdb()
+        c.escrever(nome, int(v, 0))
+        c.dep.retomar()
     teclas = os.environ.get("TECLAS", "").split()
     if teclas:
         c.teclas(*teclas)
@@ -711,6 +717,23 @@ def passos_r(a, b, limite=5000):
     return None
 
 
+def intervalo(bruto, tick, destino, acao):
+    """Vetor de ação com o intervalo ENTRE o tick `tick` e o seguinte de uma gravação bruta: estado de
+    antes = depois do tick, estado de depois = antes do seguinte (o que a interface fez no meio)."""
+    ds = sorted(Path(bruto).glob("tick_*"))
+    i = [d.name for d in ds].index(f"tick_{int(tick):06d}")
+    a, b = ds[i], ds[i + 1]
+    destino = Path(destino)
+    destino.mkdir(parents=True, exist_ok=True)
+    for nome, origem in (("estado_antes.bin", a / "estado_depois.bin"), ("vida_antes.bin", a / "vida_depois.bin"),
+                         ("estado_depois.bin", b / "estado_antes.bin"), ("vida_depois.bin", b / "vida_antes.bin")):
+        shutil.copyfile(origem, destino / nome)
+    xa = json.loads((a / "extras.json").read_text(encoding="utf-8"))["depois"]
+    xb = json.loads((b / "extras.json").read_text(encoding="utf-8"))["antes"]
+    gravar_acao(destino, xa, xb, json.loads(acao))
+    print(f"{a.name} -> {b.name} em {destino}")
+
+
 def entre_ticks(bruto):
     """Sorteios de S e R entre o fim de um tick e o começo do seguinte (o que a interface sorteou no
     intervalo: desenho, temporizador)."""
@@ -718,8 +741,10 @@ def entre_ticks(bruto):
     for a, b in zip(ds, ds[1:]):
         xa = json.loads((a / "extras.json").read_text(encoding="utf-8"))["depois"]
         xb = json.loads((b / "extras.json").read_text(encoding="utf-8"))["antes"]
+        sa, sb = Save.abrir(a / "estado_depois.bin"), Save.abrir(b / "estado_antes.bin")
+        mud = [n for n in sa.ordem if sa.bytes_bloco(n) != sb.bytes_bloco(n)]
         print(f"{a.name} -> {b.name}: S {passos_s(xa['SementeS'], xb['SementeS'])} passos, "
-              f"R {passos_r(xa['SementeR'], xb['SementeR'])} passos")
+              f"R {passos_r(xa['SementeR'], xb['SementeR'])} passos; blocos do save mudados: {mud}")
 
 
 def cenario_explorar(c: Sessao, saida, n):
@@ -805,6 +830,9 @@ def main():
     e.add_argument("bruto")
     t = sub.add_parser("entre")
     t.add_argument("bruto")
+    v = sub.add_parser("intervalo")
+    for n in ("bruto", "tick", "destino", "acao"):
+        v.add_argument(n)
     s = sub.add_parser("selecionar")
     s.add_argument("bruto")
     s.add_argument("destino")
@@ -815,6 +843,8 @@ def main():
         return eventos(a.bruto)
     if a.cmd == "entre":
         return entre_ticks(a.bruto)
+    if a.cmd == "intervalo":
+        return intervalo(a.bruto, a.tick, a.destino, a.acao)
     if a.cmd == "selecionar":
         return selecionar(a.bruto, a.destino, a.faixas, a.descricao)
     c = Sessao(a.overlay, a.snapshot)
