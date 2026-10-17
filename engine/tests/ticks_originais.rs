@@ -17,8 +17,7 @@
 use std::path::{Path, PathBuf};
 
 use engine::formats::save::LayoutSave;
-use engine::rules::tick::RegrasOriginais;
-use engine::rules::vetor_tick::{comparar_tick, RelatorioTick, VetorTick};
+use engine::rules::vetor_tick::{comparar_tick, regras_do_vetor, RelatorioTick, VetorTick};
 
 fn raiz() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -28,8 +27,9 @@ fn ler_indice(dir: &Path) -> serde_json::Value {
     serde_json::from_str(&std::fs::read_to_string(dir.join("indice.json")).unwrap()).unwrap()
 }
 
-/// Um vetor comparado: (cenário/tick, relatório, motivo de pendência, motivo de vida não reconstruível).
-type Caso = (String, RelatorioTick, Option<String>, Option<String>);
+/// Um vetor comparado: (cenário/tick, relatório, motivo de pendência, motivo de vida não reconstruível,
+/// diferença em `_TimeTemp`).
+type Caso = (String, RelatorioTick, Option<String>, Option<String>, Option<String>);
 
 fn casos() -> Vec<Caso> {
     let layout = LayoutSave::carregar(&raiz().join("data/save_layout.json")).unwrap();
@@ -52,8 +52,15 @@ fn casos() -> Vec<Caso> {
         for t in ticks {
             let t = t.as_str().unwrap();
             let v = VetorTick::ler(&dir.join(t), &layout).unwrap();
-            let r = comparar_tick(&v, &layout, &mut RegrasOriginais::default()).unwrap();
-            out.push((format!("{prefixo}{t}"), r, motivo("pendentes", t), motivo("vida_nao_reconstruivel", t)));
+            let mut regras = regras_do_vetor(&v);
+            let r = comparar_tick(&v, &layout, &mut regras).unwrap();
+            // `_TimeTemp` (memória do tutorial, fora do save) depois do tick, quando gravado.
+            let tutor = v
+                .extras_depois
+                .time_temp
+                .filter(|&t| regras.memoria_tutor.tempo_limite != i64::from(t))
+                .map(|t| format!("_TimeTemp: original {t}, port {}", regras.memoria_tutor.tempo_limite));
+            out.push((format!("{prefixo}{t}"), r, motivo("pendentes", t), motivo("vida_nao_reconstruivel", t), tutor));
         }
     }
     out
@@ -62,7 +69,7 @@ fn casos() -> Vec<Caso> {
 #[test]
 fn ticks_do_original() {
     let mut falhas = Vec::new();
-    for (nome, r, pendente, vida_irreconstruivel) in casos() {
+    for (nome, r, pendente, vida_irreconstruivel, tutor) in casos() {
         println!("{nome}: {}", r.placar());
         assert!(r.ida_e_volta.is_empty(), "{nome}: ida e volta do save falhou em {:?}", r.ida_e_volta);
         if vida_irreconstruivel.is_none() {
@@ -77,6 +84,7 @@ fn ticks_do_original() {
         for b in r.diferentes() {
             falhas.push(format!("{nome} {}: {:?}", b.simbolo, b.detalhes));
         }
+        falhas.extend(tutor.map(|t| format!("{nome} {t}")));
         for x in r.extras.iter().filter(|x| x.original != x.port) {
             falhas.push(format!("{nome} {}: original {}, port {}", x.nome, x.original, x.port));
         }

@@ -1,0 +1,57 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "full",
+ "desenho_quintal": 0,
+ "descricao": "600 ticks do Jogo Completo com a Yard View na frente, chuva e enxames",
+ "passos": [
+  "SwarmCntB <- 5",
+  "QueenStorageB <- 3",
+  "SwarmCntR <- 2",
+  "QueenStorageR <- 4",
+  "GlobalKey <- 168",
+  "teclas ctrl+y"
+ ],
+ "primeira_entrada": {
+  "SementeS": 60730,
+  "SementeR": 2578188780,
+  "gameCycles": 271,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 17,
+  "Cycle": 17,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "600 ticks a partir de GameTime 31"
+ ]
+}
