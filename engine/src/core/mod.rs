@@ -1,5 +1,6 @@
 //! Estados e temporização, sem janela nem áudio.
 
+pub mod avisos;
 pub mod edicao;
 pub mod mapa;
 pub mod navegacao;

@@ -8,4 +8,5 @@ pub mod lzss;
 pub mod midi;
 pub mod save;
 pub mod som;
+pub mod textos;
 pub mod tiles;
