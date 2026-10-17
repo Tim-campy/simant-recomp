@@ -513,6 +513,8 @@ impl Partida {
     /// logo no Load, caso C-10), `_SetDefaultWindPrompt(1)` e `_PauseGame(1)`: o jogo carregado
     /// fica pausado com "Game Paused" (bancada-qemu.md, "Carregar um save injetado").
     pub fn ao_carregar(&mut self) {
+        // _LoadGame: _TimeTemp = 300 (fora do save; os geradores já vêm de carregar::geradores_depois_do_load).
+        self.regras.memoria_tutor.tempo_limite = super::carregar::TEMPO_TUTOR_DEPOIS_DO_LOAD;
         self.vistas_para_estado();
         self.estado.contar_formigas();
         self.tratar_eventos();

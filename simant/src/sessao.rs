@@ -4,7 +4,9 @@ use super::*;
 
 /// De onde vem a partida.
 pub(crate) enum Origem<'o> {
-    Save(&'o Path),
+    /// File → Load: o arquivo, o gerador R da sessão antes do Load e o `_CurGameType` de antes
+    /// (`_LoadGame` roda `_RandYard` com eles antes de ler os blocos; telas/arquivos.md).
+    Save(&'o Path, GeradorR, TipoJogo),
     /// Jogo novo gerado pelo port com a semente dada.
     Novo(u32, TipoJogo),
 }
@@ -53,9 +55,12 @@ impl Sessao<'_> {
         let layout = LayoutSave::carregar(&dados.join("save_layout.json"))?;
         let geracao = TabelasGeracao::carregar(recursos)?;
         let (jogo, estado) = match origem {
-            Origem::Save(save) => {
+            Origem::Save(save, r, tipo) => {
                 let jogo = JogoSalvo::abrir(&layout, save)?;
-                let estado = Estado::de_save(&jogo)?;
+                let mut estado = Estado::de_save(&jogo)?;
+                let (s, r) = engine::core::carregar::geradores_depois_do_load(r, tipo, &geracao)?;
+                estado.s = s;
+                estado.r = r;
                 (jogo, estado)
             }
             Origem::Novo(semente, tipo) => {
@@ -83,12 +88,12 @@ impl Sessao<'_> {
         let cfg_avisos: ConfigAvisos = recursos.dados(avisos::ARQUIVO_CONFIG)?;
         let mut partida =
             Partida::nova(estado, nav, regras, TabelasAmarela::carregar(recursos)?, cfg_sim, cfg_partida, cfg_avisos);
-        if matches!(origem, Origem::Save(_)) {
+        if matches!(origem, Origem::Save(..)) {
             // File → Load: _FullCount e o jogo pausado (mensagens.md §6).
             partida.ao_carregar();
         }
         let arquivo = match origem {
-            Origem::Save(p) => Some(p.to_path_buf()),
+            Origem::Save(p, ..) => Some(p.to_path_buf()),
             Origem::Novo(..) => None,
         };
         let modos = modos::Modos::carregar(recursos, &interface)?;

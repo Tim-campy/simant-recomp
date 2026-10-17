@@ -232,7 +232,15 @@ fn principal() -> Result<(), String> {
         }
     }
     let origem = match (&o.save, o.novo_jogo) {
-        (Some(save), _) => Some(Origem::Save(save)),
+        (Some(save), _) => {
+            // _initStuff semeia S e R com o relógio; o Load do começo do programa roda _RandYard
+            // com o _CurGameType inicial, 0 [hipótese: segmento 9 zerado no carregamento].
+            let n = semente(&o);
+            let mut s = GeradorS::new(0);
+            let mut r = GeradorR::default();
+            r.semear_com_ticks(&mut s, n, n);
+            Some(Origem::Save(save, r, TipoJogo::Tutorial))
+        }
         (None, true) => {
             let n = semente(&o);
             println!("{:?} com semente {n}", o.tipo);
@@ -242,7 +250,7 @@ fn principal() -> Result<(), String> {
     };
     if let Some(origem) = origem {
         let nome = match &origem {
-            Origem::Save(save) => save.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+            Origem::Save(save, ..) => save.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
             Origem::Novo(_, tipo) => format!("{tipo:?}"),
         };
         let mut s = Sessao::abrir(&recursos, &o.dados, origem, cores)?;
