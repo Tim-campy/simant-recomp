@@ -1,0 +1,24 @@
+{
+ "id": "C-11",
+ "spec": "docs/spec/regras/ciclo-de-vida.md#4-ovos-carregados-pelas-amas",
+ "descricao": "Ama preta guarda o estágio: o ovo B[3] vai para (32, 3), no túnel de entrada, com T = 5; uma operária T 0x12, M 1, S 0 é acrescentada no fim (B[5]) na mesma célula (o ovo tem índice menor e fica em _LifeB no load). No tick 79 ela pega o ovo (B[3].T = 0; ela vira grupo 1, T & 0xF8 = 0x08, com S = 5, sem andar) e nos ticks seguintes desce pelo mapa de saída (32, 3) -> (31, 4) -> (30, 5) -> (31, 6) -> (32, 7) -> (33, 8) -> (34, 9)..., carregando o ovo (S & 7 = 5, bit 3 ainda 0) até a câmara (tick 87 ou depois). Determinístico até lá. O alvo é o tick 84 porque a bancada não para antes de ~5 ticks depois do load. (Uma primeira versão, com a ama em (36, 9), o mínimo do mapa de saída, mostrou que o largar depende do Sk(8) do passo: na mesma célula de outro ovo, Vida mostra o ovo e ela não larga.)",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "C11.ANT",
+ "operacoes": [
+  {"op": "formiga_editar", "lista": "B", "indice": 3, "X": 32, "Y": 3, "T": 5},
+  {"op": "formiga_adicionar", "lista": "B", "X": 32, "Y": 3, "M": 1, "T": 18, "S": 0}
+ ],
+ "rodar": {"ate_gametime": 84, "timeout": 120},
+ "esperado": [
+  "B[3].T = 0 (ovo pego)",
+  "B[5] com T & 0xF8 = 0x08 (carregando ovo), S = 5 e M = 1, descendo para a câmara"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 84},
+  {"nome": "GameTime", "op": "<", "valor": 88},
+  {"formiga": "B", "indice": 3, "campo": "T", "op": "==", "valor": 0},
+  {"formiga": "B", "indice": 5, "campo": "T", "mascara": 248, "op": "==", "valor": 8},
+  {"formiga": "B", "indice": 5, "campo": "S", "op": "==", "valor": 5},
+  {"formiga": "B", "indice": 5, "campo": "M", "op": "==", "valor": 1}
+ ]
+}

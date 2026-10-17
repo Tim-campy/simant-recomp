@@ -1,0 +1,23 @@
+{
+ "id": "C-10",
+ "spec": "docs/spec/regras/ciclo-de-vida.md#2-postura-cauda-da-rainha",
+ "descricao": "Cauda órfã: a cabeça da rainha preta (B[0]) é zerada (T = 0). No 1º tick a cauda (B[1]) não acha a cabeça à frente e some, com _BlkQueens = 0; no _CountAnts do tick 128 o Quick Game termina com derrota.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "C10.ANT",
+ "operacoes": [
+  {"op": "formiga_editar", "lista": "B", "indice": 0, "T": 0}
+ ],
+ "rodar": {"ate_gametime": 128, "timeout": 180},
+ "esperado": [
+  "B[1] com T = 0 e _BlkQueens = 0",
+  "no tick 128 _IsGameOver = 1 e _BlackWon = 0"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 128},
+  {"nome": "GameTime", "op": "<", "valor": 140},
+  {"formiga": "B", "indice": 1, "campo": "T", "op": "==", "valor": 0},
+  {"nome": "BlkQueens", "op": "==", "valor": 0},
+  {"nome": "IsGameOver", "op": "==", "valor": 1},
+  {"nome": "BlackWon", "op": "==", "valor": 0}
+ ]
+}

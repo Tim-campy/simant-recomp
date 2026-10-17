@@ -11,7 +11,19 @@ use engine::recursos::Recursos;
 use engine::rules::estado::{ConfigSimulacao, Estado};
 use engine::rules::geracao::{Mundo, TabelasGeracao, TipoJogo, PATCH_INICIAL};
 use engine::rules::rng::{GeradorR, GeradorS};
-use engine::rules::tick::{tick, RegrasOriginais};
+use engine::rules::tick::{
+    tick, RegrasAmarela, RegrasConselhos, RegrasInimigos, RegrasNinho, RegrasQuintal, RegrasSuperficie,
+};
+
+/// Regras com todas as sub-rotinas vazias (as implementações padrão das traits): o esqueleto do tick
+/// sozinho, independente das partes já ligadas em `RegrasOriginais`.
+struct RegrasVazias;
+impl RegrasQuintal for RegrasVazias {}
+impl RegrasInimigos for RegrasVazias {}
+impl RegrasSuperficie for RegrasVazias {}
+impl RegrasNinho for RegrasVazias {}
+impl RegrasAmarela for RegrasVazias {}
+impl RegrasConselhos for RegrasVazias {}
 
 fn raiz() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -95,7 +107,7 @@ fn tick_vazio_sobre_o_quick2() {
     let l = layout();
     let original = save("QUICK2.ANT");
     let mut e = Estado::de_save(&original).unwrap();
-    let mut regras = RegrasOriginais::default();
+    let mut regras = RegrasVazias;
     tick(&mut e, &mut regras);
     assert_eq!((e.partida.tempo, e.partida.ciclo), (79, 79));
     // Com as sub-rotinas ainda vazias, só mudam _GameTime, _Cycle e o resumo de modos (_TallyModePop

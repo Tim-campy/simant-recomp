@@ -1,0 +1,25 @@
+{
+ "id": "N-03",
+ "spec": "docs/spec/regras/ninho.md#46-sair-do-ninho-_getoutb-1028520a--_getoutr-102874ba",
+ "descricao": "Sair do ninho: operária preta T 0x12, M 2 (Foraging = Dig Out no ninho), em (32, 3) no túnel do QUICK2. Sobe a coluna 32 pelo mapa de saída (0xFC -> 0xFD -> 0xFE) e, no 3º tick (81), _GetOutB a põe na superfície pelo buraco (3, 32), na primeira vizinha livre (direção 0: (3, 31)), com M = 2 e S = 120 (buraco do lado preto). Determinístico, exceto a direção na superfície. A bancada não para antes de ~5 ticks depois do load; por isso as conferências aceitam que ela já tenha andado na superfície (S desce 1 por passo a partir de 120).",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "N03.ANT",
+ "operacoes": [
+  {"op": "formiga_adicionar", "lista": "B", "X": 32, "Y": 3, "M": 2, "T": 18, "S": 0}
+ ],
+ "rodar": {"ate_gametime": 81, "timeout": 120},
+ "esperado": [
+  "no tick 81 a entrada B[5] tem T = 0 e a lista A ganha a entrada A[2] em (3, 31) com T & 0xF8 = 0x10, M = 2, S = 120",
+  "depois, na superfície, ela anda e S desce 1 por passo"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 81},
+  {"nome": "GameTime", "op": "<", "valor": 90},
+  {"formiga": "B", "indice": 5, "campo": "T", "op": "==", "valor": 0},
+  {"nome": "ListIndexA", "op": "==", "valor": 3},
+  {"formiga": "A", "indice": 2, "campo": "T", "mascara": 248, "op": "==", "valor": 16},
+  {"formiga": "A", "indice": 2, "campo": "M", "op": "==", "valor": 2},
+  {"formiga": "A", "indice": 2, "campo": "S", "op": "<=", "valor": 120},
+  {"formiga": "A", "indice": 2, "campo": "S", "op": ">=", "valor": 110}
+ ]
+}

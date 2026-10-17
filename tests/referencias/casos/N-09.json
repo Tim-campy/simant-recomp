@@ -1,0 +1,31 @@
+{
+ "id": "N-09",
+ "spec": "docs/spec/regras/ninho.md#72-sair-carregando--sair-_dodigoutb-10284eb0-m--2-5-7-11-12-15-16",
+ "descricao": "Decremento sem teste do mapa de saída: nos dois ninhos, uma célula de túnel (0x02) em (10, 40), com _ExitMap = 0, cercada de terra inundada (0x5D); uma operária M 2 nela (preta no ninho preto, vermelha no vermelho). No 1º tick, _DoDigOut acha o caminho bloqueado (>= 0x30): no preto _ExitMapB(10, 40) -= 1 sem teste (0 vira 0xFF); no vermelho só se for != 0 (fica 0). As duas passam a M = 4 e ficam presas. Índice no mapa: 10 * 64 + 40 = 680.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "N09.ANT",
+ "operacoes": [
+  {"op": "retangulo", "mapa": "MapB", "x0": 9, "y0": 39, "x1": 11, "y1": 41, "valor": 93},
+  {"op": "retangulo", "mapa": "MapR", "x0": 9, "y0": 39, "x1": 11, "y1": 41, "valor": 93},
+  {"op": "celula", "mapa": "MapB", "x": 10, "y": 40, "valor": 2},
+  {"op": "celula", "mapa": "MapR", "x": 10, "y": 40, "valor": 2},
+  {"op": "formiga_adicionar", "lista": "B", "X": 10, "Y": 40, "M": 2, "T": 18, "S": 0},
+  {"op": "formiga_adicionar", "lista": "R", "X": 10, "Y": 40, "M": 2, "T": 146, "S": 0}
+ ],
+ "rodar": {"ate_gametime": 82, "timeout": 120},
+ "esperado": [
+  "_ExitMapB(10, 40) = 0xFF; _ExitMapR(10, 40) = 0; B[5] e R[6] com M = 4, na mesma célula"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 82},
+  {"nome": "GameTime", "op": "<", "valor": 95},
+  {"nome": "ExitMapB", "indice": 680, "op": "==", "valor": 255},
+  {"nome": "ExitMapR", "indice": 680, "op": "==", "valor": 0},
+  {"formiga": "B", "indice": 5, "campo": "M", "op": "==", "valor": 4},
+  {"formiga": "R", "indice": 6, "campo": "M", "op": "==", "valor": 4},
+  {"formiga": "B", "indice": 5, "campo": "X", "op": "==", "valor": 10},
+  {"formiga": "B", "indice": 5, "campo": "Y", "op": "==", "valor": 40},
+  {"formiga": "R", "indice": 6, "campo": "X", "op": "==", "valor": 10},
+  {"formiga": "R", "indice": 6, "campo": "Y", "op": "==", "valor": 40}
+ ]
+}

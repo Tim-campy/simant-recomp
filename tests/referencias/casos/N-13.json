@@ -1,0 +1,24 @@
+{
+ "id": "N-13",
+ "spec": "docs/spec/regras/ninho.md#32-formiga-invasora",
+ "descricao": "Rainha atacada na própria célula: vermelha T 0x92, M 7 acrescentada no fim da lista B (índice 5), na célula da cabeça da rainha preta (34, 9). A formiga amarela, que no QUICK2 está nessa célula, é movida para (30, 5) para não haver luta com a amarela. No 1º tick a cabeça (B[0]) é apagada e vira nuvem de luta (_GetWinner(0, 0x92)), a invasora some e a cauda (B[1]) some no mesmo tick (_BlkQueens = 0). No _CountAnts do tick 128 o Quick Game termina com derrota.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "N13.ANT",
+ "operacoes": [
+  {"op": "escrever", "nome": "MeLocX", "valor": 30},
+  {"op": "escrever", "nome": "MeLocY", "valor": 5},
+  {"op": "formiga_adicionar", "lista": "B", "X": 34, "Y": 9, "M": 7, "T": 146, "S": 0}
+ ],
+ "rodar": {"ate_gametime": 128, "timeout": 180},
+ "esperado": [
+  "B[1] (cauda) e B[5] (invasora) com T = 0; _BlkQueens = 0",
+  "no tick 128 o _CountAnts reconta e acha a rainha sumida: abre a mensagem 10010, que é modal e espera um clique; _IsGameOver = 1 e _BlackWon = 0 só são gravados depois do clique (observado: o estado lido no tick 128 tem _CastePopB[0..4] recontados, mas ainda _CastePopB[5] = 1 e _IsGameOver = 0), por isso não são conferidos aqui"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 128},
+  {"nome": "GameTime", "op": "<", "valor": 140},
+  {"formiga": "B", "indice": 1, "campo": "T", "op": "==", "valor": 0},
+  {"formiga": "B", "indice": 5, "campo": "T", "op": "==", "valor": 0},
+  {"nome": "BlkQueens", "op": "==", "valor": 0}
+ ]
+}

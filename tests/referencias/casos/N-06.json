@@ -1,0 +1,25 @@
+{
+ "id": "N-06",
+ "spec": "docs/spec/regras/ninho.md#62-levar-comida-_dofoodinb-1028492a-m--3",
+ "descricao": "Comida dobrada: operária preta T 0x1A (com comida), M 3, em (32, 3); _FoodB = 0. Ela desce até a câmara e larga a comida; como o novo modo sai do grupo de entrada (3), continua em M = 3 e larga mais uma unidade antes de trocar de modo. _AlwaysHealthy = 1 e _HealthB = 100 para que ninguém coma do estoque (S(100) > saúde nunca acontece); a operária preta da superfície (A[0]) é tirada para que nenhuma comida venha de fora.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "N06.ANT",
+ "operacoes": [
+  {"op": "formiga_remover", "lista": "A", "onde": {"T": 17}},
+  {"op": "escrever", "nome": "HealthB", "valor": 100},
+  {"op": "escrever", "nome": "AlwaysHealthy", "valor": 1},
+  {"op": "escrever", "nome": "FoodB", "valor": 0},
+  {"op": "formiga_adicionar", "lista": "B", "X": 32, "Y": 3, "M": 3, "T": 26, "S": 0}
+ ],
+ "rodar": {"ate_gametime": 100, "timeout": 120},
+ "esperado": [
+  "_FoodB = 2: uma carga rende duas unidades guardadas",
+  "a operária já não tem comida (grupo != 3)"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 100},
+  {"nome": "GameTime", "op": "<", "valor": 110},
+  {"nome": "FoodB", "op": "==", "valor": 2},
+  {"formiga": "B", "indice": 5, "campo": "T", "mascara": 248, "op": "!=", "valor": 24}
+ ]
+}
