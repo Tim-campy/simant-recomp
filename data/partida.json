@@ -1,0 +1,42 @@
+{
+  "_comentario": "Laço de jogo ao vivo (engine/src/core/partida.rs): relógio das mensagens de temporizador, aceleradores de velocidade/pausa/AutoTrack e teclas do jogador. Ver docs/spec/regras/simulacao-visao-geral.md (§1–4) e docs/spec/telas/jogo.md, seção 'Simulação ao vivo'. Nomes de tecla são os do SDL ('0', 'Keypad 1', 'Space', 'Backspace'...); ctrl/shift/alt têm de bater exatamente.",
+  "relogio": {
+    "_intervalo_mensagem_ms": "SetTimer(_rootWnd, 0, 17 ms, MYTIMERFUNC) em WINMAIN e _RestartSimulation (fato visto no código).",
+    "intervalo_mensagem_ms": 17,
+    "_intervalo_sem_foco_ms": "WM_ACTIVATEAPP com wParam = 0 refaz o temporizador com 170 ms (0xAA), MAINWNDPROC 1000:2930.",
+    "intervalo_sem_foco_ms": 170,
+    "_iteracoes_por_mensagem": "Por _GameSpeed (slow, normal, fast, ultra): quantas voltas do laço de MYTIMERFUNC cada mensagem rende. No original o laço de fast/ultra roda à velocidade da CPU até chegarem 2 ou 3 mensagens novas; o port fixa um número. [hipótese / escolha do port] Em slow e normal só a primeira volta pode rodar um tick (o atraso volta a 0).",
+    "iteracoes_por_mensagem": [1, 1, 2, 2],
+    "_max_mensagens_por_avanco": "Escolha do port: mensagens de temporizador geradas por chamada de avancar(ms); o tempo além disso é descartado, como as WM_TIMER do Windows, que não se acumulam.",
+    "max_mensagens_por_avanco": 3,
+    "_redesenho_mapa_a_cada": "_UpdateWindows (1000:2224): o mapa é redesenhado todo tick em slow/normal, 1 a cada 2 em fast (contador DGROUP 0x9B00 ímpar pula) e 1 a cada 4 em ultra (0x9B00 & 3).",
+    "redesenho_mapa_a_cada": [1, 1, 2, 4],
+    "_redesenho_sem_foco_a_cada": "MYTIMERFUNC: sem foco, _UpdateWindows só quando (quadros & 7) == 0.",
+    "redesenho_sem_foco_a_cada": 8
+  },
+  "_teclas": "Aceleradores do menu Speed e Options (ACCELERATORTABLE do SIMANTW.EXE, formiga-amarela.md §11.7): Shift+0 Pause (0x41, alterna _GamePaused), Shift+1..4 Slow/Normal/Fast/Ultra (0x43–0x46, _GameSpeed = 0..3), também com Shift + NumPad 0–4; Ctrl+G AutoTrack (0x31, alterna _OptionStates[0]). Ações: pausa, velocidade_lenta, velocidade_normal, velocidade_rapida, velocidade_ultra, auto_track.",
+  "teclas": [
+    {"tecla": "0", "shift": true, "acao": "pausa"},
+    {"tecla": "1", "shift": true, "acao": "velocidade_lenta"},
+    {"tecla": "2", "shift": true, "acao": "velocidade_normal"},
+    {"tecla": "3", "shift": true, "acao": "velocidade_rapida"},
+    {"tecla": "4", "shift": true, "acao": "velocidade_ultra"},
+    {"tecla": "Keypad 0", "shift": true, "acao": "pausa"},
+    {"tecla": "Keypad 1", "shift": true, "acao": "velocidade_lenta"},
+    {"tecla": "Keypad 2", "shift": true, "acao": "velocidade_normal"},
+    {"tecla": "Keypad 3", "shift": true, "acao": "velocidade_rapida"},
+    {"tecla": "Keypad 4", "shift": true, "acao": "velocidade_ultra"},
+    {"tecla": "G", "ctrl": true, "acao": "auto_track"}
+  ],
+  "_teclas_amarela": "Tecla do SDL -> código de tecla virtual do Windows (decimal) passado a _YellowCommandKey (formiga-amarela.md §11.4): 1–4 = 49–52, 0 = 48, NumPad 0–4 = 96–100, X = 88, F9 = 120, J = 74, NumPad * = 106 (J e * só com Tab apertado), Backspace = 8, Home = 36.",
+  "teclas_amarela": {
+    "1": 49, "2": 50, "3": 51, "4": 52, "0": 48,
+    "Keypad 1": 97, "Keypad 2": 98, "Keypad 3": 99, "Keypad 4": 100, "Keypad 0": 96,
+    "X": 88, "F9": 120, "J": 74, "Keypad *": 106,
+    "Backspace": 8, "Home": 36
+  },
+  "_teclas_clique": "_DoKeyDown (formiga-amarela.md §11.1): Espaço e Insert valem como clique esquerdo na posição do cursor, Delete como clique direito; se a tecla se repete logo em seguida, vale como duplo clique.",
+  "teclas_clique": {"Space": "esquerdo", "Insert": "esquerdo", "Delete": "direito"},
+  "_duplo_clique_teclado_ms": "Escolha do port: no original, é duplo clique se a mensagem seguinte da fila já é outra Espaço/Insert/Delete; o port usa este intervalo entre as duas teclas.",
+  "duplo_clique_teclado_ms": 250
+}

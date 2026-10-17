@@ -14,7 +14,8 @@ use super::vida::{plano_de, reconstruir, CamadasVida, FormigaAmarela};
 use crate::formats::banco::Chave;
 use crate::formats::janela::{Janela, Retangulo};
 use crate::formats::save::JogoSalvo;
-use crate::formats::tiles::{self, Tileset};
+use crate::formats::tiles::{self, Tileset, LADO};
+use crate::rules::estado::Estado;
 use crate::recursos::Recursos;
 
 /// Retângulo (x, y, largura, altura) em coordenadas da área cliente da janela principal.
@@ -298,6 +299,41 @@ impl TelaDeJogo {
         })
     }
 
+    /// Troca o conteúdo dinâmico (mapas de chão, camadas de vida e formiga amarela) pelo do estado
+    /// da simulação. Layouts e tilesets ficam como estão. O terreno (`_TERRAINset`) não é relido:
+    /// a troca de quintal/casa ainda não acontece durante a partida.
+    pub fn atualizar(&mut self, e: &Estado) {
+        self.mapas = [e.superficie.mapa.dados.clone(), e.ninho_b.mapa.dados.clone(), e.ninho_r.mapa.dados.clone()];
+        self.vida = CamadasVida {
+            a: e.superficie.vida.dados.clone(),
+            b: e.ninho_b.vida.dados.clone(),
+            r: e.ninho_r.vida.dados.clone(),
+        };
+        let a = &e.amarela;
+        self.amarela =
+            FormigaAmarela { modo: a.modo, plano: a.plano, x: a.x, y: a.y, tipo: a.tipo, dir: a.dir, ovo: a.ovo, base: a.base };
+    }
+
+    /// Célula do mapa sob o ponto (x, y) da área cliente, se ele cai na parte visível da janela de
+    /// edição (jogo.md, "Clique no mapa": `(px − esquerda) / 16 + _MapPnt.x`, idem para y).
+    pub fn celula_em(&self, x: i32, y: i32, nav: &Navegacao) -> Option<(i32, i32)> {
+        let cliente = cliente_da_moldura(&self.cfg.edicao.moldura);
+        if !contem(cliente, x, y) {
+            return None;
+        }
+        let [ax, ay] = self.cfg.edicao.area_na_tela;
+        let (dx, dy) = (x - ax as i32, y - ay as i32);
+        if dx < 0 || dy < 0 {
+            return None;
+        }
+        let (col, lin) = (dx / LADO as i32, dy / LADO as i32);
+        if col >= nav.vista.largura || lin >= nav.vista.altura {
+            return None;
+        }
+        let (cx, cy) = nav.vista.celula(col, lin);
+        Some((cx as i32, cy as i32))
+    }
+
     /// Estado de navegação inicial para o save, com a vista conforme `posicao`.
     pub fn navegacao(&self, jogo: &JogoSalvo, posicao: PosicaoVista) -> Result<Navegacao, String> {
         Navegacao::do_save(jogo, posicao, self.largura_vista, self.altura_vista)
@@ -377,6 +413,13 @@ fn area_de_edicao(janela: &Janela, e: &ConfigEdicao) -> Result<Retangulo, String
         .ok_or(format!("janela {}: objeto {} não existe", e.janela, e.area))
 }
 
+/// Área cliente da janela de edição sem as barras de rolagem (a mesma geometria de `desenhar_moldura`).
+pub fn cliente_da_moldura(m: &MolduraWindows) -> Retangulo {
+    let e = ret(m.externo);
+    let (t, h, b) = (m.espessura, m.altura_titulo, m.barra_rolagem);
+    Retangulo { esq: e.esq + t, topo: e.topo + t + h + 1, dir: e.dir - t - b, base: e.base - t - b }
+}
+
 fn contem(r: Retangulo, x: i32, y: i32) -> bool {
     x >= r.esq as i32 && x < r.dir as i32 && y >= r.topo as i32 && y < r.base as i32
 }
@@ -432,5 +475,17 @@ mod testes {
         assert_eq!(r(Acao::LinhaAbaixo), Retangulo { esq: 425, topo: 409, dir: 440, base: 424 });
         assert_eq!(r(Acao::LinhaEsquerda), Retangulo { esq: 24, topo: 425, dir: 39, base: 440 });
         assert_eq!(r(Acao::LinhaDireita), Retangulo { esq: 409, topo: 425, dir: 424, base: 440 });
+    }
+
+    #[test]
+    fn cliente_calculado_e_o_mesmo_do_desenho() {
+        let m: MolduraWindows = serde_json::from_str(
+            r#"{"externo": [20, 97, 424, 347], "espessura": 4, "altura_titulo": 18, "barra_rolagem": 16,
+                "cor_linha": 0, "cor_moldura": 8, "cor_titulo": 4, "cor_botao": 8,
+                "cor_relevo_claro": 15, "cor_relevo_escuro": 7, "cor_trilho": 8}"#,
+        )
+        .unwrap();
+        let mut q = Quadro::new(640, 480, 0);
+        assert_eq!(desenhar_moldura(&mut q, &m).cliente, cliente_da_moldura(&m));
     }
 }

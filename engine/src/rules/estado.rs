@@ -971,6 +971,9 @@ pub enum Evento {
     Musica(u16),
     /// `_EndGameDialog(0)`: pedido a cada tick enquanto `_IsGameOver` ≠ 0.
     DialogoFimDeJogo,
+    /// `_GotoMyAnt` (`1000:a764`): levar a vista da janela de edição até a formiga amarela
+    /// (AutoTrack, Home, Backspace, clique na própria amarela, ordem impossível...).
+    CentralizarNaAmarela,
 }
 
 /// Contadores de balões de fala zerados no começo do tick (simulacao-visao-geral.md §5, passo 3).
