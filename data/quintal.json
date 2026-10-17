@@ -1,0 +1,1588 @@
+{
+ "_comentario": "Tabelas do quintal e do tutorial. As de 'menino', 'cachorro', 'casa', 'colonias', dx8/dy8 foram extraídas do SIMANTW.EXE por tools/extrair_quintal.py (endereços no topo do script); 'regras', 'valores_iniciais', 'mensagens' e 'conselhos' vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/quintal.md e conselhos.md. Valores em decimal.",
+ "dx8": [
+  0,
+  1,
+  1,
+  1,
+  0,
+  -1,
+  -1,
+  -1
+ ],
+ "dy8": [
+  -1,
+  -1,
+  0,
+  1,
+  1,
+  1,
+  0,
+  -1
+ ],
+ "menino": {
+  "passo_x": [
+   4,
+   6,
+   -4,
+   -6
+  ],
+  "passo_y": [
+   -4,
+   0,
+   4,
+   0
+  ],
+  "quadro_por_passo": [
+   0,
+   1,
+   2,
+   1
+  ],
+  "quadro_por_dir": [
+   0,
+   3,
+   6,
+   9
+  ],
+  "corte_dx": [
+   -10,
+   25,
+   -10,
+   -33
+  ],
+  "corte_dy": [
+   -33,
+   -10,
+   25,
+   -10
+  ],
+  "vizinho_dx": [
+   0,
+   1,
+   0,
+   -1
+  ],
+  "vizinho_dy": [
+   -1,
+   0,
+   1,
+   0
+  ],
+  "dir_do_quadro": [
+   0,
+   0,
+   0,
+   1,
+   1,
+   1,
+   2,
+   2,
+   2,
+   3,
+   3,
+   3
+  ]
+ },
+ "cachorro": {
+  "passo_x": [
+   3,
+   4,
+   -3,
+   -4,
+   0,
+   0
+  ],
+  "passo_y": [
+   -3,
+   0,
+   3,
+   0,
+   0,
+   0
+  ],
+  "quadro_por_passo": [
+   0,
+   1,
+   2,
+   1
+  ],
+  "quadro_por_dir": [
+   0,
+   3,
+   6,
+   9,
+   100,
+   102
+  ]
+ },
+ "casa": {
+  "duracao": [
+   3,
+   3,
+   18,
+   18,
+   3,
+   3,
+   10,
+   10,
+   5,
+   5,
+   3,
+   3,
+   4,
+   4,
+   3,
+   3,
+   0,
+   0,
+   0,
+   0,
+   7,
+   4
+  ],
+  "proximo": [
+   [
+    10,
+    30,
+    6,
+    1,
+    3,
+    31,
+    32,
+    5,
+    14,
+    2,
+    33,
+    1,
+    34,
+    33,
+    34,
+    20,
+    0,
+    0,
+    0,
+    0,
+    38,
+    14
+   ],
+   [
+    8,
+    30,
+    6,
+    10,
+    3,
+    31,
+    32,
+    3,
+    14,
+    1,
+    33,
+    2,
+    34,
+    11,
+    34,
+    20,
+    0,
+    0,
+    0,
+    0,
+    38,
+    14
+   ],
+   [
+    2,
+    30,
+    5,
+    8,
+    6,
+    31,
+    32,
+    3,
+    20,
+    10,
+    12,
+    8,
+    15,
+    12,
+    13,
+    9,
+    0,
+    0,
+    0,
+    0,
+    38,
+    14
+   ]
+  ],
+  "roteiros": [
+   {
+    "no": 0,
+    "quadro": [
+     4,
+     5,
+     4,
+     3
+    ],
+    "x": [
+     135,
+     141,
+     147,
+     153
+    ],
+    "y": [
+     60,
+     60,
+     60,
+     60
+    ]
+   },
+   {
+    "no": 1,
+    "quadro": [
+     9,
+     10,
+     11,
+     10
+    ],
+    "x": [
+     150,
+     144,
+     138,
+     132
+    ],
+    "y": [
+     60,
+     60,
+     60,
+     60
+    ]
+   },
+   {
+    "no": 2,
+    "quadro": [
+     6,
+     7,
+     8,
+     7,
+     6,
+     7,
+     8,
+     7,
+     6,
+     7,
+     8,
+     7,
+     6,
+     7,
+     8,
+     7,
+     6,
+     7,
+     8
+    ],
+    "x": [
+     154,
+     150,
+     147,
+     143,
+     140,
+     136,
+     133,
+     129,
+     126,
+     122,
+     119,
+     115,
+     111,
+     108,
+     104,
+     101,
+     97,
+     94,
+     91
+    ],
+    "y": [
+     60,
+     64,
+     68,
+     72,
+     76,
+     80,
+     84,
+     88,
+     92,
+     96,
+     100,
+     104,
+     108,
+     112,
+     116,
+     120,
+     124,
+     128,
+     132
+    ]
+   },
+   {
+    "no": 3,
+    "quadro": [
+     0,
+     1,
+     2,
+     1,
+     0,
+     1,
+     2,
+     1,
+     0,
+     1,
+     2,
+     1,
+     0,
+     1,
+     2,
+     1,
+     0,
+     1,
+     2
+    ],
+    "x": [
+     91,
+     94,
+     97,
+     101,
+     104,
+     108,
+     111,
+     115,
+     119,
+     122,
+     126,
+     129,
+     133,
+     136,
+     140,
+     143,
+     147,
+     150,
+     154
+    ],
+    "y": [
+     132,
+     128,
+     124,
+     120,
+     116,
+     112,
+     108,
+     104,
+     100,
+     96,
+     92,
+     88,
+     84,
+     80,
+     76,
+     72,
+     68,
+     64,
+     60
+    ]
+   },
+   {
+    "no": 4,
+    "quadro": [
+     4,
+     5,
+     4,
+     3
+    ],
+    "x": [
+     65,
+     71,
+     77,
+     83
+    ],
+    "y": [
+     130,
+     130,
+     130,
+     130
+    ]
+   },
+   {
+    "no": 5,
+    "quadro": [
+     9,
+     10,
+     11,
+     10
+    ],
+    "x": [
+     80,
+     74,
+     68,
+     62
+    ],
+    "y": [
+     130,
+     130,
+     130,
+     130
+    ]
+   },
+   {
+    "no": 6,
+    "quadro": [
+     7,
+     6,
+     7,
+     8,
+     7,
+     6,
+     7,
+     8,
+     7,
+     9,
+     22
+    ],
+    "x": [
+     84,
+     80,
+     76,
+     72,
+     68,
+     64,
+     60,
+     56,
+     52,
+     46,
+     44
+    ],
+    "y": [
+     134,
+     138,
+     142,
+     146,
+     150,
+     154,
+     158,
+     162,
+     166,
+     166,
+     166
+    ]
+   },
+   {
+    "no": 7,
+    "quadro": [
+     22,
+     3,
+     0,
+     1,
+     2,
+     1,
+     0,
+     1,
+     2,
+     1,
+     0
+    ],
+    "x": [
+     44,
+     46,
+     52,
+     56,
+     60,
+     64,
+     69,
+     73,
+     78,
+     82,
+     86
+    ],
+    "y": [
+     166,
+     166,
+     166,
+     162,
+     158,
+     154,
+     150,
+     146,
+     142,
+     138,
+     134
+    ]
+   },
+   {
+    "no": 8,
+    "quadro": [
+     4,
+     5,
+     4,
+     3,
+     4,
+     5
+    ],
+    "x": [
+     159,
+     165,
+     171,
+     177,
+     183,
+     189
+    ],
+    "y": [
+     60,
+     60,
+     60,
+     60,
+     60,
+     60
+    ]
+   },
+   {
+    "no": 9,
+    "quadro": [
+     10,
+     11,
+     10,
+     9,
+     10,
+     11
+    ],
+    "x": [
+     189,
+     183,
+     177,
+     171,
+     165,
+     159
+    ],
+    "y": [
+     60,
+     60,
+     60,
+     60,
+     60,
+     60
+    ]
+   },
+   {
+    "no": 10,
+    "quadro": [
+     0,
+     1,
+     2,
+     1
+    ],
+    "x": [
+     164,
+     168,
+     172,
+     176
+    ],
+    "y": [
+     56,
+     52,
+     48,
+     44
+    ]
+   },
+   {
+    "no": 11,
+    "quadro": [
+     6,
+     7,
+     8,
+     7
+    ],
+    "x": [
+     176,
+     172,
+     168,
+     164
+    ],
+    "y": [
+     44,
+     48,
+     52,
+     56
+    ]
+   },
+   {
+    "no": 12,
+    "quadro": [
+     3,
+     4,
+     5,
+     4,
+     3
+    ],
+    "x": [
+     182,
+     188,
+     194,
+     200,
+     206
+    ],
+    "y": [
+     44,
+     44,
+     44,
+     44,
+     44
+    ]
+   },
+   {
+    "no": 13,
+    "quadro": [
+     9,
+     10,
+     11,
+     10,
+     9
+    ],
+    "x": [
+     206,
+     200,
+     194,
+     188,
+     182
+    ],
+    "y": [
+     44,
+     44,
+     44,
+     44,
+     44
+    ]
+   },
+   {
+    "no": 14,
+    "quadro": [
+     0,
+     1,
+     2,
+     1
+    ],
+    "x": [
+     196,
+     200,
+     204,
+     208
+    ],
+    "y": [
+     56,
+     52,
+     48,
+     44
+    ]
+   },
+   {
+    "no": 15,
+    "quadro": [
+     6,
+     7,
+     8,
+     7
+    ],
+    "x": [
+     208,
+     204,
+     200,
+     196
+    ],
+    "y": [
+     44,
+     48,
+     52,
+     56
+    ]
+   },
+   {
+    "no": 20,
+    "quadro": [
+     6,
+     7,
+     8,
+     900,
+     901,
+     902,
+     6,
+     7
+    ],
+    "x": [
+     192,
+     189,
+     186,
+     172,
+     172,
+     172,
+     174,
+     175
+    ],
+    "y": [
+     60,
+     64,
+     68,
+     73,
+     73,
+     73,
+     93,
+     99
+    ]
+   },
+   {
+    "no": 21,
+    "quadro": [
+     0,
+     903,
+     900,
+     1,
+     2
+    ],
+    "x": [
+     172,
+     172,
+     172,
+     186,
+     189
+    ],
+    "y": [
+     93,
+     73,
+     73,
+     68,
+     64
+    ]
+   }
+  ],
+  "nos_fixos": [
+   {
+    "no": 30,
+    "quadro": -1,
+    "x": 0,
+    "y": 0,
+    "chance": 40,
+    "proximo": 0
+   },
+   {
+    "no": 31,
+    "quadro": -1,
+    "x": 0,
+    "y": 0,
+    "chance": 40,
+    "proximo": 4
+   },
+   {
+    "no": 32,
+    "quadro": 200,
+    "x": 45,
+    "y": 166,
+    "chance": 35,
+    "proximo": 7
+   },
+   {
+    "no": 33,
+    "quadro": 20,
+    "x": 176,
+    "y": 44,
+    "chance": 8,
+    "proximo": 12
+   },
+   {
+    "no": 34,
+    "quadro": 201,
+    "x": 207,
+    "y": 47,
+    "chance": 8,
+    "proximo": 15
+   },
+   {
+    "no": 35,
+    "quadro": -1,
+    "x": 0,
+    "y": 0,
+    "chance": 6,
+    "proximo": 14
+   },
+   {
+    "no": 36,
+    "quadro": 0,
+    "x": 0,
+    "y": 0,
+    "chance": 0,
+    "proximo": 0
+   },
+   {
+    "no": 37,
+    "quadro": 0,
+    "x": 0,
+    "y": 0,
+    "chance": 0,
+    "proximo": 0
+   },
+   {
+    "no": 38,
+    "quadro": 7,
+    "x": 176,
+    "y": 104,
+    "chance": 10,
+    "proximo": 38
+   }
+  ]
+ },
+ "colonias": {
+  "vizinho_dx": [
+   0,
+   1,
+   0,
+   255,
+   0,
+   0
+  ],
+  "vizinho_dy": [
+   255,
+   0,
+   1,
+   0,
+   0,
+   0
+  ]
+ },
+ "regras": {
+  "mac_por_tick": 6,
+  "chuva_tecla": 168,
+  "chuva_chance_1": 32,
+  "chuva_chance_2": 128,
+  "chuva_duracao_min": 150,
+  "chuva_duracao_sorteio": 150,
+  "msg_menino_duracao": 300,
+  "msg_menino_limite": 23,
+  "gato_atraso": 200,
+  "gato_atraso_fugiu": 600,
+  "gato_chance": 16,
+  "gato_tecla": 141,
+  "passaro_atraso": 20,
+  "passaro_atraso_saiu": 30,
+  "latido_atraso": 60,
+  "latido_sorteio": 30,
+  "colonia_teto": 250,
+  "colonia_chance_reproduzir": 10,
+  "colonia_espalhar": 4,
+  "casa_limite": 24,
+  "nova_vermelha": 20,
+  "enxame_atraso_min": 10,
+  "enxame_teto": 50,
+  "inseticida_por_formiga": 8
+ },
+ "valores_iniciais": {
+  "_origem": "_InitSimYard 1030:1378; demais campos do menino, gato, pássaro e cachorro vão a 0",
+  "menino_x": 180,
+  "menino_y": 73,
+  "menino_dir": 2,
+  "menino_giro": 12,
+  "menino_espera": 20,
+  "cachorro_x": 250,
+  "cachorro_y": 150,
+  "cachorro_giro": 2,
+  "passaro_quadro": 1,
+  "menino_msg": -1,
+  "ciclo_quintal": -1
+ },
+ "mensagens": {
+  "_origem": "_SimColonies 1030:35f8 (_PictStrnDialog e _myBeginSong); SHARED tipo 4",
+  "vermelhas_eliminadas": 10052,
+  "falta_vermelhas": 10053,
+  "casa_tomada": 10054,
+  "tome_a_casa": 10055,
+  "derrota": 10056,
+  "vitoria": 10057,
+  "musica_vermelhas_eliminadas": 20002,
+  "musica_casa_tomada": 20003,
+  "musica_vitoria": 20005
+ },
+ "conselhos": {
+  "_origem": "_Feedback 1030:78ca (conselhos: lista SHARED 4/1020, _AdviceStrs carregada por _initStuff); _GiveLesson 1030:7b4e e _LessonDone 1030:7f02 (lições: textos SHARED 4/11000…11112)",
+  "lista": 1020,
+  "saude_critica": 10,
+  "licao_minima_ticks": 16,
+  "licoes": [
+   {
+    "n": 1,
+    "texto": 11000,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 2,
+    "texto": 11002,
+    "imagem": 17000,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 3,
+    "texto": 11004,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "marco_escavacao",
+     "soma": 2
+    },
+    "concluida": {
+     "tipo": "escavou_alem_do_marco"
+    }
+   },
+   {
+    "n": 4,
+    "texto": 11006,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "marco_escavacao",
+     "soma": 10
+    },
+    "concluida": {
+     "tipo": "escavou_alem_do_marco"
+    }
+   },
+   {
+    "n": 5,
+    "texto": 11008,
+    "imagem": 17001,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "no_plano",
+     "plano": 1
+    }
+   },
+   {
+    "n": 6,
+    "texto": 11010,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 7,
+    "texto": 11012,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "marcar_posicao_e_esperar",
+     "espera": 600
+    },
+    "concluida": {
+     "tipo": "andou_e_esperou"
+    }
+   },
+   {
+    "n": 8,
+    "texto": 11014,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "zerar_temp"
+    },
+    "concluida": {
+     "tipo": "temp_marcado"
+    }
+   },
+   {
+    "n": 9,
+    "texto": 11016,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "marcar_vista_e_esperar",
+     "espera": 600
+    },
+    "concluida": {
+     "tipo": "vista_mudou_ou_esperou"
+    }
+   },
+   {
+    "n": 10,
+    "texto": 11018,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "janela_na_frente",
+     "janela": 256
+    }
+   },
+   {
+    "n": 11,
+    "texto": 11020,
+    "imagem": 17014,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 12,
+    "texto": 11022,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "janela_na_frente",
+     "janela": 0
+    }
+   },
+   {
+    "n": 13,
+    "texto": 11024,
+    "imagem": 17002,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "superficie_acima_de",
+     "tile": 71
+    }
+   },
+   {
+    "n": 14,
+    "texto": 11026,
+    "imagem": 17002,
+    "ao_dar": {
+     "tipo": "saude_amarela",
+     "valor": 8
+    },
+    "concluida": {
+     "tipo": "saude_acima_de",
+     "valor": 90
+    }
+   },
+   {
+    "n": 15,
+    "texto": 11028,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 16,
+    "texto": 11030,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "tipo_amarela",
+     "tipo_formiga": 24
+    }
+   },
+   {
+    "n": 17,
+    "texto": 11032,
+    "imagem": 17013,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 18,
+    "texto": 11034,
+    "imagem": 17003,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "no_plano",
+     "plano": 2
+    }
+   },
+   {
+    "n": 19,
+    "texto": 11036,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "tipo_amarela",
+     "tipo_formiga": 16
+    }
+   },
+   {
+    "n": 20,
+    "texto": 11038,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "no_plano",
+     "plano": 1
+    }
+   },
+   {
+    "n": 21,
+    "texto": 11040,
+    "imagem": 17004,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "tipo_amarela",
+     "tipo_formiga": 40
+    }
+   },
+   {
+    "n": 22,
+    "texto": 11042,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "tipo_amarela",
+     "tipo_formiga": 16
+    }
+   },
+   {
+    "n": 23,
+    "texto": 11044,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "formigas_pretas",
+     "n": 10
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 24,
+    "texto": 11046,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "defesa_acima_de",
+     "valor": 1
+    }
+   },
+   {
+    "n": 25,
+    "texto": 11048,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 26,
+    "texto": 11050,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "marcar_posicao_e_esperar",
+     "espera": 600
+    },
+    "concluida": {
+     "tipo": "andou_e_esperou"
+    }
+   },
+   {
+    "n": 27,
+    "texto": 11052,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "marcar_posicao"
+    },
+    "concluida": {
+     "tipo": "andou_soltando_alarme"
+    }
+   },
+   {
+    "n": 28,
+    "texto": 11054,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 29,
+    "texto": 11056,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 30,
+    "texto": 11058,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "zerar_temp"
+    },
+    "concluida": {
+     "tipo": "temp_marcado_desliga_alarme"
+    }
+   },
+   {
+    "n": 31,
+    "texto": 11060,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 32,
+    "texto": 11062,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "janela_na_frente",
+     "janela": 256
+    }
+   },
+   {
+    "n": 33,
+    "texto": 11064,
+    "imagem": 17005,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "plano_do_mapa",
+     "plano": 0
+    }
+   },
+   {
+    "n": 34,
+    "texto": 11066,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 35,
+    "texto": 11068,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 36,
+    "texto": 11070,
+    "imagem": 17006,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "modo_quintal",
+     "modo": 1
+    }
+   },
+   {
+    "n": 37,
+    "texto": 11072,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 38,
+    "texto": 11074,
+    "imagem": 17007,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "plano_do_mapa",
+     "plano": 1
+    }
+   },
+   {
+    "n": 39,
+    "texto": 11076,
+    "imagem": 17008,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "janela_na_frente",
+     "janela": 4608
+    }
+   },
+   {
+    "n": 40,
+    "texto": 11078,
+    "imagem": 17008,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 41,
+    "texto": 11080,
+    "imagem": 17008,
+    "ao_dar": {
+     "tipo": "marcar_tarefas"
+    },
+    "concluida": {
+     "tipo": "tarefas_mudaram"
+    }
+   },
+   {
+    "n": 42,
+    "texto": 11082,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "janela_na_frente",
+     "janela": 256
+    }
+   },
+   {
+    "n": 43,
+    "texto": 11086,
+    "imagem": 17009,
+    "ao_dar": {
+     "tipo": "pular_licao"
+    },
+    "concluida": {
+     "tipo": "temp_marcado"
+    }
+   },
+   {
+    "n": 44,
+    "texto": 11086,
+    "imagem": 17009,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 45,
+    "texto": 11088,
+    "imagem": 17010,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 46,
+    "texto": 11090,
+    "imagem": 17010,
+    "ao_dar": {
+     "tipo": "zerar_temp"
+    },
+    "concluida": {
+     "tipo": "temp_marcado"
+    }
+   },
+   {
+    "n": 47,
+    "texto": 11092,
+    "imagem": 17011,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "janela_na_frente",
+     "janela": 4864
+    }
+   },
+   {
+    "n": 48,
+    "texto": 11094,
+    "imagem": 17011,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 49,
+    "texto": 11096,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "formigas_pretas_e_limpar_alarme",
+     "n": 80
+    },
+    "concluida": {
+     "tipo": "janela_na_frente",
+     "janela": 0
+    }
+   },
+   {
+    "n": 50,
+    "texto": 11098,
+    "imagem": 17012,
+    "ao_dar": {
+     "tipo": "zerar_temp"
+    },
+    "concluida": {
+     "tipo": "temp_marcado"
+    }
+   },
+   {
+    "n": 51,
+    "texto": 11100,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 52,
+    "texto": 11102,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "defesa_acima_de",
+     "valor": 40
+    }
+   },
+   {
+    "n": 53,
+    "texto": 11104,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   },
+   {
+    "n": 54,
+    "texto": 11106,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "entrou_num_ninho"
+    }
+   },
+   {
+    "n": 55,
+    "texto": 11108,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    },
+    "texto_se_temp": 11110
+   },
+   {
+    "n": 56,
+    "texto": 11112,
+    "imagem": 0,
+    "ao_dar": {
+     "tipo": "nada"
+    },
+    "concluida": {
+     "tipo": "sempre"
+    }
+   }
+  ]
+ },
+ "_origem": {
+  "mac_por_tick": "[hipótese] tiques do relógio do Mac (1/60 s) por tick do port; ~10 ticks/s na velocidade normal",
+  "chuva_tecla": "_DoSimYard 1030:14a8: _GlobalKey que força a chuva",
+  "chuva_chance_1": "_DoSimYard: RRand(32) == 0",
+  "chuva_chance_2": "_DoSimYard: e depois RRand(128) == 0",
+  "chuva_duracao_min": "_DoSimYard: _RainCnt = SRand1(150) + 150",
+  "chuva_duracao_sorteio": "_DoSimYard",
+  "msg_menino_duracao": "_SendBoyMsg 1030:15ae: _BoyMsgCnt = relógio + 300",
+  "msg_menino_limite": "_SendBoyMsg: só aceita mensagem < 23",
+  "gato_atraso": "_SimCat 1030:2b24: _CatDelay = relógio + 200 a cada teste",
+  "gato_atraso_fugiu": "_SimCat: _CatDelay = relógio + 600 ao sumir",
+  "gato_chance": "_SimCat: aparece se SRand16() == 0",
+  "gato_tecla": "_SimCat: _GlobalKey que força o gato",
+  "passaro_atraso": "_SimBird 1030:28aa: _BirdDelay = _gameCycles + 20",
+  "passaro_atraso_saiu": "_SimBird: _BirdDelay = _gameCycles + 30 ao sair da tela",
+  "latido_atraso": "_SimDog 1030:2dbc: _DogBarkDelay = relógio + 60 + SRand1(30)",
+  "latido_sorteio": "_SimDog",
+  "colonia_teto": "_SimColonies 1030:35f8: população máxima de um patch",
+  "colonia_chance_reproduzir": "_SimColonies: SRand1(10) == 0 com o patch no teto",
+  "colonia_espalhar": "_SimColonies/_Reproduce: SGSRand(4) em x e em y",
+  "casa_limite": "_SimColonies: casa tomada com _HouseColonies > 24",
+  "nova_vermelha": "_SimColonies e _CountAnts: população da colônia vermelha nova",
+  "enxame_atraso_min": "_SimColonies: revoada guardada solta se SRand8() + 10 < _SwarmDelay",
+  "enxame_teto": "_SimColonies: _SwarmCnt ≤ 50",
+  "inseticida_por_formiga": "_SimKidInside: (_RpopT + _BpopT) × 8 sorteios"
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "id": "Q-01",
+ "spec": "docs/spec/regras/quintal.md#9-chuva-e-água",
+ "descricao": "Chuva forçada: QUICK2.ANT (tick 78) com _RainOn = 1, _RainCnt = 600 e _ClearRainFlag = 0. _DoSimYard tira 1 de _RainCnt por tick; _DoWater liga _ClearRainFlag e sobe a água dos ninhos (_WaterTable cai 1 com chance 1/10 por tick, até 4).",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "Q01.ANT",
+ "operacoes": [
+  {"op": "escrever", "nome": "RainOn", "valor": 1},
+  {"op": "escrever", "nome": "RainCnt", "valor": 600},
+  {"op": "escrever", "nome": "ClearRainFlag", "valor": 0}
+ ],
+ "rodar": {"ate_gametime": 140, "timeout": 150},
+ "esperado": [
+  "_RainCnt = 600 − (GameTime − 78): 538 no tick 140",
+  "_RainOn continua 1 e _ClearRainFlag = 1",
+  "_WaterTable < 64 (a chance de não subir nenhuma linha em 62 ticks é 0,9^62 ≈ 0,15 %) e ≥ 4"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 140},
+  {"nome": "GameTime", "op": "<", "valor": 160},
+  {"nome": "RainOn", "op": "==", "valor": 1},
+  {"nome": "ClearRainFlag", "op": "==", "valor": 1},
+  {"nome": "RainCnt", "op": "<=", "valor": 538},
+  {"nome": "RainCnt", "op": ">=", "valor": 518},
+  {"nome": "WaterTable", "op": "<", "valor": 64},
+  {"nome": "WaterTable", "op": ">=", "valor": 4}
+ ]
+}

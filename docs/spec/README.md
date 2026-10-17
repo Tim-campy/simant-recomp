@@ -39,6 +39,8 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
   - [regras/ninho.md](regras/ninho.md): formigas dentro dos ninhos preto e vermelho (`_DoAntSimB/R`, `_DoNestAntB/R`): despacho por modo, movimento, luta, comida guardada, escavação, mapa de saída, invasoras, água e inundação; diferenças R × B e casos de teste.
   - [regras/ciclo-de-vida.md](regras/ciclo-de-vida.md): postura, desenvolvimento e eclosão dos ovos (`_SimEggB/R`), rainha (cabeça e cauda, andar, fome), escolha de casta (`_SetCasteProd`, `_CasteTabC`) e casos de teste.
   - [regras/testes-tick.md](regras/testes-tick.md): determinismo do original na bancada QEMU, vetores "estado antes → depois" de um tick e o que capturar além do save.
+  - [regras/quintal.md](regras/quintal.md): quintal (`_DoSimYard`): menino dentro e fora de casa, cortador, pé e inseticida, gato, cachorro, pássaro, chuva e água, colônias do quintal 12 × 16 (`_SimColonies`, revoada, migração) e fim do Jogo Completo; casos Q-01 e Q-02 confirmados no original.
+  - [regras/conselhos.md](regras/conselhos.md): `_Feedback`: mensagens de conselho (lista 4/1020) e tutorial (`_GiveLesson`/`_LessonDone`, lições 4/11000…11112).
 
 ## Próximos subsistemas a especificar
 

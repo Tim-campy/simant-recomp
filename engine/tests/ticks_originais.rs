@@ -1,28 +1,15 @@
 //! Port × original, um tick por vez, com os vetores de `tests/referencias/ticks/` (ticks 79–83 do
 //! snapshot `quick`). Protocolo e placar: docs/spec/regras/testes-tick.md.
 //!
-//! Por enquanto o teste exige só que nada quebre e que os blocos de [`ESPERADOS_IGUAIS`] batam.
-//! Quem implementar uma parte do tick acrescenta à lista os blocos que passaram a bater (rode
-//! `cargo run -p engine --example comparar_tick -- tests/referencias/ticks` para ver o relatório)
-//! e atualiza a seção "Placar do port" da spec.
+//! Desde 2026-10-17 (todas as partes do tick implementadas) o teste exige igualdade TOTAL: os 307
+//! blocos do save, os extras (S, R, `_gameCycles`, `_Tindex`, `_GlobalKey`) e a vida. Para ver o
+//! relatório de uma falha: `cargo run -p engine --example comparar_tick -- tests/referencias/ticks`.
 
 use std::path::PathBuf;
 
 use engine::formats::save::LayoutSave;
 use engine::rules::tick::RegrasOriginais;
 use engine::rules::vetor_tick::{comparar_tick, RelatorioTick, VetorTick};
-
-/// Blocos do save que o port já reproduz em todos os vetores.
-///
-/// - `GameTime`, `Cycle`: contadores do tick.
-/// - `FlyAwayB/R`: contagem regressiva da revoada (o tick a decrementa quando ≠ 0).
-/// - `CastePopB/R`, `BpopT`, `RpopT`: contagem (`_CountAnts`), só nos ticks ≡ 0 e 64 (mod 128);
-///   nos ticks 79–83 conferem que o port não as mexe fora da fase.
-const ESPERADOS_IGUAIS: &[&str] =
-    &["GameTime", "Cycle", "FlyAwayB", "FlyAwayR", "CastePopB", "CastePopR", "BpopT", "RpopT"];
-
-/// Variáveis fora do save que o port já reproduz.
-const EXTRAS_ESPERADOS_IGUAIS: &[&str] = &["gameCycles", "Tindex", "GlobalKey"];
 
 fn raiz() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -53,18 +40,15 @@ fn ticks_do_original() {
         // A reconstrução da vida a partir das listas bate com o original (conferido nos 5 vetores).
         assert!(r.vida_reconstruida.is_empty(), "{}: vida reconstruída ≠ vida_antes", r.nome);
         assert!(r.vida_reconstruida_depois.is_empty(), "{}: vida reconstruída ≠ vida_depois", r.nome);
-        for s in ESPERADOS_IGUAIS {
-            let b = r.bloco(s).unwrap_or_else(|| panic!("bloco {s} não existe no layout"));
-            if !b.igual() {
-                falhas.push(format!("{} {s}: {:?}", r.nome, b.detalhes));
-            }
+        for b in r.diferentes() {
+            falhas.push(format!("{} {}: {:?}", r.nome, b.simbolo, b.detalhes));
         }
-        for n in EXTRAS_ESPERADOS_IGUAIS {
-            let x = r.extras.iter().find(|x| x.nome == *n).unwrap();
-            if x.original != x.port {
-                falhas.push(format!("{} {n}: original {}, port {}", r.nome, x.original, x.port));
-            }
+        for x in r.extras.iter().filter(|x| x.original != x.port) {
+            falhas.push(format!("{} {}: original {}, port {}", r.nome, x.nome, x.original, x.port));
+        }
+        if !r.vida.is_empty() {
+            falhas.push(format!("{}: {} células de vida diferentes", r.nome, r.vida.len()));
         }
     }
-    assert!(falhas.is_empty(), "blocos esperados iguais diferem:\n{}", falhas.join("\n"));
+    assert!(falhas.is_empty(), "port difere do original:\n{}", falhas.join("\n"));
 }
