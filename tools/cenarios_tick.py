@@ -78,8 +78,10 @@ class Sessao:
         time.sleep(seg)
 
     # entrada do usuário (a VM precisa estar rodando)
-    def clicar_celula(self, x, y, duplo=False):
-        """Clique na célula (x, y) do plano mostrado, pondo antes _MapPnt para que ela fique no centro."""
+    def clicar_celula(self, x, y, duplo=False, pausado=False):
+        """Clique na célula (x, y) do plano mostrado, pondo antes _MapPnt para que ela fique no centro.
+        Com `pausado`, a VM fica parada (na entrada de um tick): os eventos do mouse ficam na fila do
+        dispositivo e o Windows os trata entre os ticks seguintes, que podem ser gravados."""
         px0 = max(0, min(128 - COLS, x - COLS // 2)) if self.ler("MapPlane") < 2 else max(0, min(64 - COLS, x - COLS // 2))
         py0 = max(0, min(64 - LINS, y - LINS // 2))
         self.escrever_elemento("MapPnt", 0, px0, 2)
@@ -89,11 +91,28 @@ class Sessao:
         qb.mouse_canto(self.q)
         qb.mover_rel(self.q, MAPA_X0 + (x - px0) * TILE + 8, MAPA_Y0 + (y - py0) * TILE + 8)
         time.sleep(0.2)
+        if pausado:
+            # o mouse já está sobre a célula; os botões vão com a VM correndo até a próxima entrada de
+            # _DoAntSim (o QMP não aceita eventos com a VM parada), e o Windows trata o clique entre os
+            # ticks seguintes, que já podem ser gravados
+            g = self.mj.sessao_gdb()
+            entrada = self.dep.entrada()
+            g.breakpoint(entrada)
+            g.drenar()
+            g.s.sendall(b"$c#63")
+            self.botoes(duplo)
+            while not g._e_parada(g._proximo()):
+                pass
+            g.breakpoint(entrada, False)
+        else:
+            self.botoes(duplo)
+        self.log(f"{'duplo ' if duplo else ''}clique na célula ({x}, {y}) com _MapPnt = ({px0}, {py0})")
+
+    def botoes(self, duplo):
         for _ in range(2 if duplo else 1):
             for down in (True, False):
                 self.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": down, "button": "left"}}])
                 time.sleep(0.06)
-        self.log(f"{'duplo ' if duplo else ''}clique na célula ({x}, {y}) com _MapPnt = ({px0}, {py0})")
 
     def teclas(self, *combos):
         self.dep.retomar()
@@ -332,13 +351,88 @@ def cenario_luta_soldado(c: Sessao, saida, n):
     gt = c.dep.ate_gametime((c.ler("Cycle") // 128 + 1) * 128)
     c.log(f"esperou até GameTime {gt}")
     c.escrever("MeType", 0x30)
-    s = c.save()
-    buracos = [(x, y) for x in range(64) for y in range(64) if s.celula("MapA", x, y) == 0x50]
-    verms = [(f["X"], f["Y"]) for _, f in formigas(s, "A") if f["T"] & 0x80 and (f["T"] & 0x78) >> 3 == 2]
-    alvo = perto(verms, *buracos[0])
-    c.log(f"buraco preto {buracos[0]}; operária vermelha alvo em {alvo}")
-    c.clicar_celula(*alvo, duplo=True)
+    for tentativa in range(6):
+        c.entrada()
+        s = c.save()
+        buracos = [(x, y) for x in range(64) for y in range(64) if s.celula("MapA", x, y) == 0x50]
+        # alvo parado (modos 13 Resting e 17), para que o duplo clique ainda o encontre na célula
+        verms = [(f["X"], f["Y"]) for _, f in formigas(s, "A")
+                 if f["T"] & 0x80 and (f["T"] & 0x78) >> 3 == 2 and f["M"] in (13, 17)]
+        verms = verms or [(f["X"], f["Y"]) for _, f in formigas(s, "A") if f["T"] & 0x80 and (f["T"] & 0x78) >> 3 == 2]
+        alvo = perto(verms, *buracos[0])
+        c.log(f"tentativa {tentativa}: operária vermelha alvo em {alvo}")
+        c.clicar_celula(*alvo, duplo=True)
+        time.sleep(1.5)
+        c.entrada()
+        if c.ler("MeCmd") == 3:
+            break
     return c.gravar(saida, n, parar=lambda d: d.ler("MeMoveMe") == 0)
+
+
+def cenario_revoada_natural(c: Sessao, saida, n):
+    """22 adultas vermelhas do ninho viram machos (grupo 4) em M = 14 (pré-voo), com a marca do mapa de
+    vida acertada; o resto é do jogo: _CountAnts conta os machos, _GstrR arma _FlyAwayR = 200 (> 20
+    reprodutores), o pré-voo vira 15 com F > 100 e a decolagem (16) vem com F = 1 ou S1(F).
+    Grava até o armar, ~4 ticks com F perto de 100 e os últimos ~8 ticks até F = 0."""
+    c.entrada()
+    s = c.save()
+    feitas = []
+    for lista, vida, tam in (("R", "LifeR", 4096), ("A", "LifeA", 8192)):
+        seg, off, _ = c.mj.resolver(vida, tam)
+        adultas = [(i, f) for i, f in formigas(s, lista)
+                   if f["T"] & 0x80 and (f["T"] & 0x78) >> 3 in (1, 2, 3, 5, 6, 7, 9)][:22 - len(feitas)]
+        for i, f in adultas:
+            t = 0x80 | 0x20 | (f["T"] & 7)
+            c.escrever_elemento(f"{lista}listT", i, t)
+            c.escrever_elemento(f"{lista}listM", i, 14)
+            c.mj.escrever_variavel(f"{seg}:{off + f['X'] * 64 + f['Y']:x}", bytes([t]), 1)
+            feitas.append(f"{lista}{i}")
+    c.log(f"{len(feitas)} vermelhas viram machos (T 0xA0 | dir) em M = 14: {feitas}")
+    nomes = c.gravar(saida, n, parar=lambda d: d.ler("FlyAwayR") > 0)
+    c.log(f"FlyAwayR armado depois de {len(nomes)} ticks")
+    while c.ler("FlyAwayR") > 102:
+        c.avancar(1)
+    nomes += c.gravar(saida, 4)
+    while c.ler("FlyAwayR") > 6:
+        c.avancar(1)
+    nomes += c.gravar(saida, 10)
+    return nomes
+
+
+def cenario_luta_vizinha(c: Sessao, saida, n):
+    """A amarela (soldado, vida 100) é posta na superfície numa célula livre vizinha de uma operária
+    vermelha, e o duplo clique nela dá a ordem 3: a luta vem em poucos ticks (vitória provável:
+    classe 1 contra 0)."""
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    gt = c.dep.ate_gametime((c.ler("Cycle") // 128 + 1) * 128)
+    c.log(f"esperou até GameTime {gt}")
+    s = c.save()
+    vida_a = c.mj.ler_variavel("LifeA", 8192)
+    livre = lambda x, y: 0 < x < 127 and 0 < y < 63 and s.celula("MapA", x, y) < 0x10 and vida_a[x * 64 + y] == 0
+    escolha = None
+    for i, f in formigas(s, "A"):
+        if f["T"] & 0x80 and (f["T"] & 0x78) >> 3 == 2:
+            viz = [(f["X"] + dx, f["Y"] + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if (dx, dy) != (0, 0)]
+            viz = [p for p in viz if livre(*p)]
+            if viz:
+                escolha = (i, (f["X"], f["Y"]), viz[0])
+                break
+    ia, alvo, (mx, my) = escolha
+    # M = 17 (sem efeito na superfície): a operária fica parada até o clique ser processado
+    c.escrever_elemento("AlistM", ia, 17)
+    c.log(f"AlistM[{ia}] <- 17 (alvo parado)")
+    plano, ox, oy = c.ler("MePlane"), c.ler("MeLocX"), c.ler("MeLocY")
+    vseg, voff, _ = c.mj.resolver({1: "LifeA", 2: "LifeB", 3: "LifeR"}[plano], 8192 if plano == 1 else 4096)
+    c.mj.escrever_variavel(f"{vseg}:{voff + ox * 64 + oy:x}", b"\0", 1)
+    aseg, aoff, _ = c.mj.resolver("LifeA", 8192)
+    c.mj.escrever_variavel(f"{aseg}:{aoff + mx * 64 + my:x}", b"\xff", 1)
+    for nome, v in (("MePlane", 1), ("MeLocX", mx), ("MeLocY", my), ("MeType", 0x30), ("MeHealth", 100)):
+        c.escrever(nome, v)
+    c.log(f"amarela de ({plano}, {ox}, {oy}) para a superfície em ({mx}, {my}), vizinha da vermelha em {alvo}")
+    c.clicar_celula(*alvo, duplo=True, pausado=True)
+    return c.gravar(saida, n, parar=lambda d: d.ler("MeCmd") == 3 and d.ler("MeMoveMe") == 0)
 
 
 def cenario_inseticida(c: Sessao, saida, n):

@@ -1,0 +1,63 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "rico",
+ "descricao": "Inseticida: menino dentro de casa parado no nó 32 ((45, 166) -> patch (0, 12)) com _CurYardPnt = (0, 12) escrito na entrada do 1711; pisada e (_RpopT + _BpopT) x 8 sorteios de células por tick, uma formiga morta por tick (snapshot rico, Quick Game)",
+ "passos": [
+  "NodeNum <- 32",
+  "NodeCnt <- 0",
+  "CurYardPnt <- 786432"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_001711",
+  "tick_001712",
+  "tick_001713",
+  "tick_001714"
+ ],
+ "selecao": [
+  "1711-1714"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); o snapshot rico tem dezenas delas"
+ }
+}

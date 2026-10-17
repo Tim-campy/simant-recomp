@@ -16,7 +16,11 @@
   "velocidade_rapida",
   "velocidade_ultra",
   "jogo_completo",
-  "experimental"
+  "experimental",
+  "inseticida",
+  "inseticida_morte",
+  "amarela_vitoria",
+  "revoada_armada"
  ],
  "snapshot": "quick",
  "semente_s_forcada": null,
