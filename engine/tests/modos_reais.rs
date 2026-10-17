@@ -121,3 +121,23 @@ fn balao_do_menino_aparece_acima_dele() {
     // Tudo acima do pé do menino e à direita do canto dele.
     assert!(mudados.iter().all(|&(x, y)| y < oy + 0x49 + 8 && x >= ox + 0xB4 - 16), "{:?}", mudados.first());
 }
+
+/// Examine (`_MagnifyMenu`): canto uma célula à direita e uma acima, virando para dentro da tela, e
+/// os textos das listas 1100–1103 (QUICK2: a rainha em (35, 9) do ninho preto).
+#[test]
+fn examine_canto_e_textos() {
+    use engine::core::exame::JanelaExame;
+    use engine::formats::save::{JogoSalvo, LayoutSave};
+    let Some(r) = recursos() else { return };
+    let j = JanelaExame::carregar(&r).unwrap();
+    assert_eq!(j.canto((13, 9), (24, 60), (640, 442)), (14 * 16 + 24, 8 * 16 + 60));
+    // Perto da direita e da base: vai para a esquerda e para cima a própria largura/altura.
+    let (x, y) = j.canto((38, 24), (24, 60), (640, 442));
+    assert_eq!((x, y), (39 * 16 + 24 - 92, 23 * 16 + 60 - 87));
+    let layout = LayoutSave::carregar(&raiz().join("data/save_layout.json")).unwrap();
+    let jogo = JogoSalvo::abrir(&layout, &raiz().join("tests/referencias/saves/QUICK2.ANT")).unwrap();
+    let e = Estado::de_save(&jogo).unwrap();
+    let ex = engine::rules::experimental::examinar(&e, 2, 35, 9).unwrap();
+    let t: Vec<String> = j.textos(&ex).iter().map(|l| String::from_utf8_lossy(l).into_owned()).collect();
+    assert_eq!(t, ["Queen", "Egg Laying", "Nothing"]);
+}

@@ -4,6 +4,7 @@ pub mod avisos;
 pub mod carregar;
 pub mod dialogos;
 pub mod edicao;
+pub mod exame;
 pub mod historico;
 pub mod janela_mapa;
 pub mod janelas;

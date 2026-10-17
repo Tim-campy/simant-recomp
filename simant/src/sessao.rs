@@ -39,6 +39,9 @@ pub(crate) struct Sessao<'a> {
     pub(crate) dialogo: Option<arquivos::Dialogo>,
     /// Janela do mapa (core/janela_mapa.rs): buffer das células e trilhas.
     pub(crate) mapa: engine::core::janela_mapa::JanelaMapa,
+    /// Examine (janela 29) e o exame aberto agora, com o canto da janela.
+    pub(crate) janela_exame: engine::core::exame::JanelaExame,
+    pub(crate) exame: Option<(engine::rules::experimental::Exame, (i32, i32))>,
 }
 
 /// Para quem vai a escolha do menu aberto.
@@ -108,6 +111,7 @@ impl Sessao<'_> {
         let menus_cfg: ConfigMenus = recursos.dados(menus::ARQUIVO_CONFIG)?;
         let dialogos_cfg = recursos.dados(engine::core::dialogos::ARQUIVO_CONFIG)?;
         let mapa = engine::core::janela_mapa::JanelaMapa::carregar(recursos)?;
+        let janela_exame = engine::core::exame::JanelaExame::carregar(recursos)?;
         Ok(Sessao {
             recursos,
             interface,
@@ -126,6 +130,8 @@ impl Sessao<'_> {
             dialogos_cfg,
             dialogo: None,
             mapa,
+            janela_exame,
+            exame: None,
         })
     }
 
@@ -192,6 +198,9 @@ impl Sessao<'_> {
         pendentes.extend(modos::desenhar(self, &mut q)?);
         if let Some((m, _)) = &self.menu {
             pendentes.extend(m.desenhar(&mut q, self.recursos, &self.interface)?);
+        }
+        if let Some((ex, canto)) = &self.exame {
+            self.janela_exame.desenhar(&mut q, self.recursos, &self.interface, ex, *canto);
         }
         self.desenhar_dialogo(&mut q);
         if !pendentes.is_empty() {
@@ -340,9 +349,28 @@ impl Sessao<'_> {
         println!("clique simples em ({cx}, {cy}), plano {}{}: {r:?}", self.partida.nav.plano_mapa, if segurando { " segurando" } else { "" });
         match r {
             RespostaClique::MenuAmarela => self.abrir_menu_da_amarela(x, y),
-            RespostaClique::Examinar => println!("Examine (_MagnifyMenu): a janela 29 ainda não existe no port"),
+            RespostaClique::Examinar => {
+                let plano = i32::from(self.partida.nav.plano_mapa);
+                if let Some(ex) = engine::rules::experimental::examinar(&self.partida.estado, plano, cx, cy) {
+                    self.abrir_exame(ex);
+                }
+            }
             _ => {}
         }
+    }
+
+    /// `_MagnifyMenu`: abre a janela 29 junto da célula examinada; fica aberta enquanto o botão
+    /// estiver apertado (a interface fecha ao soltar) e a simulação não anda.
+    pub(crate) fn abrir_exame(&mut self, ex: engine::rules::experimental::Exame) {
+        let v = &self.partida.nav.vista;
+        let celula = ((ex.x - v.x).rem_euclid(128), ex.y - v.y);
+        let [ax, ay] = self.tela.cfg.edicao.area_na_tela;
+        let tela = (self.tela.cfg.largura as i32, self.tela.cfg.altura as i32);
+        let canto = self.janela_exame.canto(celula, (i32::from(ax), i32::from(ay)), tela);
+        let textos = self.janela_exame.textos(&ex);
+        let t: Vec<String> = textos.iter().map(|l| l.iter().map(|&b| b as char).collect()).collect();
+        println!("Examine ({}, {}): {}", ex.x, ex.y, t.join(" / "));
+        self.exame = Some((ex, canto));
     }
 
     /// Ação do clique esquerdo em (x, y) da área cliente: seta da barra de rolagem ou botão da faixa.

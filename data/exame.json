@@ -1,0 +1,12 @@
+{
+  "_comentario": "Examine (_MagnifyMenu 1010:6b4c, _win_DrawExamineWindow 1010:69c0; telas/janelas.md §4.3): janela 29 (examineWin: bitmap 4510 de fundo e os textos examStr1..3, fonte 2). Linha 1: estágio do ovo (lista 1100, grupo 0) ou casta (1101, grupo = (vida & 0x78) >> 3); linha 2: modo da formiga achada na lista (1102); linha 3: carga (1103, pelo grupo). lado_tile: _tileWidth da janela de edição. Cor e alinhamento do texto [hipótese].",
+  "janela": 29,
+  "fonte": 2,
+  "cor_texto": 0,
+  "objetos": ["examStr1", "examStr2", "examStr3"],
+  "estagios": 1100,
+  "grupos": 1101,
+  "modos": 1102,
+  "cargas": 1103,
+  "lado_tile": 16
+}

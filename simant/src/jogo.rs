@@ -116,6 +116,19 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
     loop {
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
+            if s.exame.is_some() {
+                // _MagnifyMenu: a janela fica enquanto o botão (ou Espaço/Insert/Delete) estiver
+                // apertado; o laço do original não trata mensagens (a simulação não anda).
+                let solta = matches!(ev, Event::MouseButtonUp { .. } | Event::KeyUp { .. });
+                if solta || matches!(ev, Event::Quit { .. }) {
+                    s.exame = None;
+                    redesenhar = true;
+                }
+                if matches!(ev, Event::Quit { .. }) {
+                    return Ok(());
+                }
+                continue;
+            }
             if s.dialogo.is_some() && !matches!(ev, Event::Window { .. }) {
                 // Diálogo do Windows aberto: modal, recebe toda a entrada.
                 let r = match ev {
@@ -308,7 +321,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
         }
         // Com o "Select a Game" aberto (Ctrl+N), a simulação fica parada (_SetPause(1) em _NewGame).
         s.atualizar_janelas_desenho(minimizada);
-        if !s.modos.escolhendo && s.dialogo.is_none() {
+        if !s.modos.escolhendo && s.dialogo.is_none() && s.exame.is_none() {
             s.partida.avancar(ms);
         }
         let pedidos = s.registrar_eventos();

@@ -325,6 +325,13 @@ fn principal() -> Result<(), String> {
             Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como ou salvo")),
             None => {}
         }
+        if let Some((x, y)) = o.examinar {
+            let plano = i32::from(s.partida.nav.plano_mapa);
+            match engine::rules::experimental::examinar(&s.partida.estado, plano, x, y) {
+                Some(ex) => s.abrir_exame(ex),
+                None => println!("Examine ({x}, {y}): célula sem vida"),
+            }
+        }
         for _ in 0..o.fechar_avisos {
             s.partida.fechar_modal();
         }

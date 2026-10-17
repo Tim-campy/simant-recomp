@@ -154,7 +154,7 @@ fn tratar_efeitos(s: &mut Sessao, efeitos: Vec<Efeito>) {
             Efeito::Som { id, .. } => s.partida.estado.eventos.push(Evento::Som(id)),
             Efeito::Musica(id) => s.partida.estado.eventos.push(Evento::Musica(id)),
             Efeito::Aviso { lista, indice } => println!("aviso: texto {indice} da lista {lista}"),
-            Efeito::Examinar(x) => println!("examinar: {x:?}"),
+            Efeito::Examinar(x) => s.abrir_exame(x),
         }
     }
     s.partida.processar_eventos_do_estado();
