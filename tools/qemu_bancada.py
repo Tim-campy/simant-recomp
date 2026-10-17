@@ -676,6 +676,8 @@ DOANTSIM = (6, 0x0000)
 # 1000:96a5. É o relógio do gato, do latido e do balão do menino (docs/spec/regras/quintal.md, "Relógios").
 MACTICKCOUNT = (1, 0x9694)
 MACTICKCOUNT_RETF = (1, 0x96A5)
+# Leituras do relógio anotadas por tick; passando disso a lista termina com null (truncada).
+MAX_LEITURAS_RELOGIO = 200
 # Variáveis fora do save capturadas junto com cada estado (docs/spec/regras/testes-tick.md, pergunta 3):
 # nome -> (endereço ou símbolo, bytes)
 EXTRAS = {
@@ -768,11 +770,18 @@ class Depurador:
                 if pc == mac_ret:
                     relogio.append((regs["EDX"] & 0xFFFF) << 16 | (regs["EAX"] & 0xFFFF))
                 g.breakpoint(armado, False)
+                if len(relogio) >= MAX_LEITURAS_RELOGIO:
+                    # animações (_AnimYellowFight, morte da amarela) leem o relógio em laço milhares de
+                    # vezes; cada parada custa ~0,1 s. Daqui em diante só o retorno do tick.
+                    relogio.append(None)
+                    armado = None
+                    continue
                 armado = mac_ret if armado == mac_ini else mac_ini
                 g.breakpoint(armado)
         finally:
             g.breakpoint(self.retorno, False)
-            g.breakpoint(armado, False)
+            if armado is not None:
+                g.breakpoint(armado, False)
 
     def ate_gametime(self, alvo, timeout=120):
         """Para na entrada de _DoAntSim com GameTime (antes do incremento) >= alvo."""

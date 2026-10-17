@@ -1,0 +1,18 @@
+# Snapshot "exp": boot, "Select a Game" -> Experimental (185, 375), espera _CurGameType = 3 e grava o
+# snapshot. Base: qemu_experimental_e01.txt do agente auxiliar.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_snapshot_exp.txt --overlay re_trabalho/qemu/ov_exp2.qcow2
+esperar 50
+teclas spc
+esperar 6
+teclas spc
+esperar 10
+mouse_canto
+mover 185 375
+esperar 2
+clicar
+esperar_variavel CurGameType 3 60
+esperar 10
+capturar re_trabalho/cen/exp_inicio.png
+snapshot_salvar exp
+esperar 2
+fim

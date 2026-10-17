@@ -1,0 +1,69 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "rico",
+ "descricao": "Amarela vence uma luta: posta como soldado (vida 100) na superfície ao lado de uma operária vermelha parada (M = 17), duplo clique nela com a VM indo até a próxima entrada; no 1799 a ordem 3 se cumpre, _YellowFight dá a vitória (RAntsKilled 0->1, cadáver vermelho)",
+ "passos": [
+  "teclas ctrl+8",
+  "esperou até GameTime 1792",
+  "AlistM[1] <- 17 (alvo parado)",
+  "MePlane <- 1",
+  "MeLocX <- 97",
+  "MeLocY <- 41",
+  "MeType <- 48",
+  "MeHealth <- 100",
+  "amarela de (2, 36, 9) para a superfície em (97, 41), vizinha da vermelha em (98, 42)",
+  "duplo clique na célula (98, 42) com _MapPnt = (86, 33)"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_001799",
+  "tick_001800",
+  "tick_001801"
+ ],
+ "selecao": [
+  "1799-1801"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); o snapshot rico tem dezenas delas"
+ }
+}

@@ -1,0 +1,68 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "rico",
+ "descricao": "Revoada armada pelo jogo: 21 vermelhas viram machos em M = 14 na entrada do 1711 (preparação); _CountAnts as conta e _GstrR arma _FlyAwayR = 200 no 1727 (no mesmo tick o pré-voo vira 15); com F perto de 100 (1825-1826) e no fim (1924-1927, F 3 -> 0) as decolagens (16) e saídas do mapa",
+ "passos": [
+  "21 vermelhas viram machos (T 0xA0 | dir) em M = 14: ['R47', 'A1', 'A2', 'A3', 'A4', 'A5', 'A7', 'A11', 'A12', 'A13', 'A14', 'A15', 'A19', 'A21', 'A23', 'A25', 'A34', 'A36', 'A45', 'A46', 'A68']",
+  "FlyAwayR armado depois de 17 ticks"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_001726",
+  "tick_001727",
+  "tick_001825",
+  "tick_001826",
+  "tick_001924",
+  "tick_001925",
+  "tick_001926",
+  "tick_001927"
+ ],
+ "selecao": [
+  "1726-1727",
+  "1825-1826",
+  "1924-1927"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); o snapshot rico tem dezenas delas"
+ }
+}

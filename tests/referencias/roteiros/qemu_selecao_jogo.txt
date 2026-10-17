@@ -1,0 +1,9 @@
+# Boot até a tela "Select a Game" e captura (base: qemu_experimental_e01.txt do agente auxiliar).
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_selecao_jogo.txt --overlay re_trabalho/qemu/ov_full.qcow2
+esperar 50
+teclas spc
+esperar 6
+teclas spc
+esperar 10
+capturar re_trabalho/cen/selecao.png
+fim
