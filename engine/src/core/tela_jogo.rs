@@ -238,7 +238,10 @@ pub struct TelaDeJogo {
     /// Tamanho da vista em tiles (`_editWidth`, `_editHeight`).
     pub largura_vista: i32,
     pub altura_vista: i32,
-    tiles_chao: Tileset,
+    /// Tiles de chão do quintal (9/10) e da casa (9/9); o usado depende de `_TERRAINset`.
+    tiles_chao: [Tileset; 2],
+    /// `_TERRAINset`: 0 quintal, 1 casa.
+    terreno: u16,
     tiles_vida_superficie: Tileset,
     tiles_vida_ninho: Tileset,
     /// Mapas de chão `_MapA`, `_MapB` e `_MapR`.
@@ -272,7 +275,7 @@ impl TelaDeJogo {
         let rec = reconstruir(jogo)?;
         let mut pendencias = rec.pendencias;
         let terreno = jogo.u16("TERRAINset")?;
-        let tiles_chao = tileset(recursos, if terreno == 1 { tiles::ID_CHAO_CASA } else { tiles::ID_CHAO_QUINTAL })?;
+        let tiles_chao = [tileset(recursos, tiles::ID_CHAO_QUINTAL)?, tileset(recursos, tiles::ID_CHAO_CASA)?];
         let amarela = FormigaAmarela::do_save(jogo)?;
         if plano_de(amarela.plano).is_none() {
             pendencias.push(format!("_MePlane = {}", amarela.plano));
@@ -291,6 +294,7 @@ impl TelaDeJogo {
             largura_vista,
             altura_vista,
             tiles_chao,
+            terreno,
             tiles_vida_superficie: tileset_vida(recursos, &tiles::IDS_VIDA_SUPERFICIE)?,
             tiles_vida_ninho: tileset_vida(recursos, &tiles::IDS_VIDA_NINHO)?,
             mapas: [mapa(Plano::Superficie)?, mapa(Plano::NinhoPreto)?, mapa(Plano::NinhoVermelho)?],
@@ -301,9 +305,10 @@ impl TelaDeJogo {
     }
 
     /// Troca o conteúdo dinâmico (mapas de chão, camadas de vida e formiga amarela) pelo do estado
-    /// da simulação. Layouts e tilesets ficam como estão. O terreno (`_TERRAINset`) não é relido:
-    /// a troca de quintal/casa ainda não acontece durante a partida.
+    /// da simulação. Layouts ficam como estão; o terreno (`_TERRAINset`) escolhe os tiles de chão,
+    /// porque a troca de patch (`_XferPatch`) pode ir do quintal para a casa.
     pub fn atualizar(&mut self, e: &Estado) {
+        self.terreno = e.ambiente.terreno as u16;
         self.mapas = [e.superficie.mapa.dados.clone(), e.ninho_b.mapa.dados.clone(), e.ninho_r.mapa.dados.clone()];
         self.vida = CamadasVida {
             a: e.superficie.vida.dados.clone(),
@@ -376,7 +381,7 @@ impl TelaDeJogo {
             chao: MapaChao::new(vista.plano, &self.mapas[indice_do_plano(vista.plano)])?,
             vida: &self.vida,
             amarela: self.amarela,
-            tiles_chao: &self.tiles_chao,
+            tiles_chao: &self.tiles_chao[usize::from(self.terreno == 1)],
             tiles_vida,
         };
         q.recorte = Some(partes.cliente);
@@ -423,6 +428,14 @@ impl TelaDeJogo {
         let texto = avisos.texto_da_faixa(agora).cloned();
         desenhar_faixa(q, recursos, interface, &cfg, r, cor, texto.as_ref());
         desenhar_modal(q, recursos, interface, avisos)
+    }
+
+    /// Retângulo (na área cliente) do objeto da faixa com esse nome.
+    pub fn retangulo_da_faixa(&self, nome: &str) -> Option<Retangulo> {
+        let base = self.faixa.retangulo();
+        let (dx, dy) = (self.origem_faixa.0 - base.esq, self.origem_faixa.1 - base.topo);
+        let r = self.faixa.objetos.iter().find(|o| o.nome == nome)?.retangulo;
+        Some(Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy })
     }
 
     /// Ação da seta da barra de rolagem da janela de edição sob o ponto (x, y), se houver.

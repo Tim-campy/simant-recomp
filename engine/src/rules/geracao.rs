@@ -10,11 +10,12 @@
 //! do tick: `rules/comum.rs`, sobre a trait `Terreno`, que o [`Mundo`] implementa junto com o gerador S
 //! da geração.
 //!
-//! Fora do escopo (ver a seção "Implementação no port" da spec): patches da casa (`_MakeHousePatch`),
-//! feromônios, histórico, contagens de casta e estado de interface (vistas, janelas).
+//! Patches da casa (`_MakeHousePatch`): receitas de `data/casa.json` executadas por `rules/casa.rs`.
+//! Fora do escopo (ver a seção "Implementação no port" da spec): feromônios, histórico, contagens de casta e estado de interface (vistas, janelas).
 
 use serde::Deserialize;
 
+use super::casa::{ChaoDaCasa, TabelasCasa};
 use super::comum::{self, e_terra, Direcoes, Superficie, Terreno};
 use super::rng::{GeradorR, GeradorS};
 use crate::formats::banco::Chave;
@@ -94,6 +95,10 @@ pub struct TabelasGeracao {
     /// `_FracSineTab`: `sin(i·π/128)·32767` para i = 0…63.
     #[serde(skip)]
     pub seno: Vec<i16>,
+    /// Receitas dos patches da casa (`data/casa.json`, ver `rules/casa.rs`); sem o arquivo, o padrão
+    /// embutido.
+    #[serde(skip)]
+    pub casa: TabelasCasa,
 }
 
 impl TabelasGeracao {
@@ -101,6 +106,7 @@ impl TabelasGeracao {
     pub fn carregar(r: &Recursos) -> Result<TabelasGeracao, String> {
         let mut t: TabelasGeracao = r.dados(ARQUIVO_TABELAS)?;
         t.seno = seno_do_objeto(&r.objeto(CHAVE_SENO)?)?;
+        t.casa = TabelasCasa::carregar(r)?;
         t.validar()?;
         Ok(t)
     }
@@ -228,6 +234,8 @@ pub struct Mundo {
     pub tipo_jogo: TipoJogo,
     /// `_TERRAINset`: 0 = quintal, 1 = casa.
     pub terreno: u8,
+    /// `_DROPdir` (`9:9c66`): para onde cai a comida largada na casa; só os patches da casa o gravam.
+    pub queda: u8,
     pub mapa_a: Vec<u8>,
     pub mapa_b: Vec<u8>,
     pub mapa_r: Vec<u8>,
@@ -372,6 +380,7 @@ impl Mundo {
         Mundo {
             tipo_jogo,
             terreno: 0,
+            queda: 0,
             mapa_a: vec![0; CELULAS_SUPERFICIE],
             mapa_b: vec![0; CELULAS_NINHO],
             mapa_r: vec![0; CELULAS_NINHO],
@@ -529,15 +538,27 @@ impl Mundo {
         Ok(())
     }
 
-    /// `_MakeMap`: quintal se `px * 16 + py > 37`, senão casa (não implementada).
+    /// `_MakeMap`: quintal se `px * 16 + py > 37`, senão casa.
     fn gerar_mapa(&mut self, s: &mut GeradorS, tab: &TabelasGeracao, px: i32, py: i32) -> Result<(), String> {
         let n = px * 16 + py;
         if n > 37 {
             self.gerar_quintal(s, tab);
             Ok(())
+        } else if n < 0 {
+            Err(format!("patch ({px}, {py}) fora do quintal"))
         } else {
-            Err(format!("patch da casa ({px}, {py}) = {n}: _MakeHousePatch ainda não implementado"))
+            self.gerar_casa(s, tab, n as usize)
         }
+    }
+
+    /// `_MakeHousePatch(n)` (geracao-mundo.md §5): tileset da casa (`_TERRAINset = 1`; o `_Barrier`
+    /// fica para quem monta o estado), `_InitAntLions(0)`, `_InitPillar` (sem bichos-de-conta na casa)
+    /// e a receita do patch em `data/casa.json`.
+    fn gerar_casa(&mut self, s: &mut GeradorS, tab: &TabelasGeracao, n: usize) -> Result<(), String> {
+        self.terreno = 1;
+        self.iniciar_formigas_leao(s, tab, 0);
+        self.iniciar_bichos_de_conta(s, tab);
+        tab.casa.gerar(n, &mut ChaoDaCasa { mapa_a: &mut self.mapa_a, queda: &mut self.queda }, s)
     }
 
     /// `_MakeYardPatch` (geracao-mundo.md §4).
@@ -1028,10 +1049,12 @@ mod testes {
     }
 
     #[test]
-    fn casa_ainda_nao_implementada() {
+    fn patch_da_casa_usa_o_tileset_da_casa() {
         let t = tabelas_de_teste();
         let mut m = Mundo::vazio(TipoJogo::Completo);
         let mut s = GeradorS::new(1);
-        assert!(m.gerar_patch(&mut s, &t, 1, 1, 1, 0, 0).is_err());
+        m.gerar_patch(&mut s, &t, 1, 1, 1, 0, 0).unwrap();
+        assert_eq!((m.terreno, m.queda), (1, 2));
+        assert!(m.formigas_leao.is_empty());
     }
 }

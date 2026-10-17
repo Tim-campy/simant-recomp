@@ -55,3 +55,15 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `_myBeginSong` / `_myBeginSound` | tocar música (id do cabeçalho tipo 18) / efeito (id do tipo 5) | `GR_MODULE`; [regras/som.md](spec/regras/som.md) |
 | `_songsOnFlag`, `_effectsOnFlag` | música e efeitos ligados (cópias de `_OptionStates[1]` e `[2]`, zeradas sem foco) | `_myBeginSong`, `MAINWNDPROC` |
 | DAC (`_UncompressDACInstrument`) | efeito sonoro tipo 5: 8 bits em deltas de 4 bits | [formatos/som.md](spec/formatos/som.md) |
+| `_CurGameType` | tipo de jogo: 0 Tutorial, 1 Quick Game, 2 Full Game, 3 Experimental | `_NewGame` (`1000:d6dc`); [telas/abertura.md](spec/telas/abertura.md) |
+| `_DoScenario` | o "Select a Game" (janela 2): devolve o id do objeto clicado | [telas/abertura.md](spec/telas/abertura.md) |
+| `_YardMode` | modo da janela do quintal: 0 Yard View, 1 House View, 2 Strategic View, 3 Graphic View | `_SetYardMode`; [telas/quintal.md](spec/telas/quintal.md) |
+| `_CurYardPnt` / `_YMapPnt` | patch atual / patch escolhido na janela do quintal (12 × 16 patches) | `_XferPatch`, `_YardArea` |
+| `_XferPatch` | troca de patch no Full Game (gera o patch novo com `_RandWorld`) | `1000:ab90`; [telas/quintal.md](spec/telas/quintal.md) §5 |
+| `_PlaceQueenInYard` | botão PLACE: põe uma rainha guardada num patch a até 3 do atual | `1000:ad12` |
+| `_patchRgn`, `_patchRgn2` | polígono de um patch na janela do quintal (cursor/clique e cor das colônias) | DGROUP `1048:1894`, `1048:18a4` |
+| `_MakeHousePatch` | chão de um patch da casa (`n = px × 16 + py` ≤ 37) | `1020:3120`; [regras/geracao-mundo.md](spec/regras/geracao-mundo.md) §5 |
+| `_DROPdir` (`9:9c66`) | direção da queda da comida na casa (0 ladrilhos, 1 carpete esquerdo, 2 cozinha/liso, 3 carpete direito) | geracao-mundo.md §5 |
+| `_TileFrame1/2`, `_FillMapLegs` | molduras de azulejo; retângulo com fiapos e pés 4 × 4 (móvel) | geracao-mundo.md §5 |
+| `_CurExpTool`, `_ExpSubStates` | ferramenta do Experimental (0–7) e a subopção de cada uma | [telas/experimental.md](spec/telas/experimental.md) |
+| `_processExp`, `_DoTool` | clique/arrasto no mapa no Experimental e a ferramenta aplicada | `1010:7022`, `1010:727e` |
