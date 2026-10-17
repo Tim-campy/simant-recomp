@@ -661,6 +661,12 @@ pub fn aplicar_acao(
             for &(x, y) in resto {
                 efeitos.extend(exp::arrastar(e, c, &mut ctl, plano, x, y, ctrl));
             }
+            // "parado": voltas do laço de `_processExp` com o botão parado na última célula (no
+            // original, uma por redesenho: o número vem da bancada).
+            let (xu, yu) = *pontos.last().unwrap_or(&(*x0, *y0));
+            for _ in 0..p["parado"].as_u64().unwrap_or(0) {
+                efeitos.extend(exp::arrastar(e, c, &mut ctl, plano, xu, yu, ctrl));
+            }
             exp::soltar(&mut ctl);
         }
         return Ok(format!("{efeitos:?}"));

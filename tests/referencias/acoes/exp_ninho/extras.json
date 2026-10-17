@@ -1,0 +1,102 @@
+{
+ "antes": {
+  "SementeS": 25055,
+  "SementeR": 62299139,
+  "gameCycles": 3100,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 4,
+  "Cycle": 4,
+  "posicao": "livre"
+ },
+ "depois": {
+  "SementeS": 3277,
+  "SementeR": 62299139,
+  "gameCycles": 5544,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 4,
+  "Cycle": 4,
+  "posicao": "livre"
+ },
+ "acao": {
+  "exp": [
+   {
+    "f": 2,
+    "sub": 0,
+    "pontos": [
+     [
+      28,
+      5
+     ]
+    ],
+    "ctrl": false,
+    "plano": 2,
+    "mappnt": [
+     20,
+     0
+    ]
+   },
+   {
+    "f": 2,
+    "sub": 0,
+    "pontos": [
+     [
+      28,
+      5
+     ]
+    ],
+    "ctrl": true,
+    "plano": 2,
+    "mappnt": [
+     20,
+     0
+    ]
+   },
+   {
+    "f": 2,
+    "sub": 1,
+    "pontos": [
+     [
+      29,
+      5
+     ]
+    ],
+    "ctrl": true,
+    "plano": 2,
+    "mappnt": [
+     20,
+     0
+    ]
+   },
+   {
+    "f": 2,
+    "sub": 0,
+    "pontos": [
+     [
+      24,
+      7
+     ],
+     [
+      25,
+      7
+     ],
+     [
+      26,
+      7
+     ],
+     [
+      27,
+      7
+     ]
+    ],
+    "ctrl": false,
+    "plano": 2,
+    "mappnt": [
+     20,
+     0
+    ]
+   }
+  ]
+ }
+}
