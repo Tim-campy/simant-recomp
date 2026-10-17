@@ -148,7 +148,9 @@ fn janela_de_castas_muda_os_niveis() {
     use engine::rules::estado::Estado;
     let Some(r) = recursos() else { return };
     let mut e = Estado::de_save(&quick2()).unwrap();
-    let mut j = JanelasControle::new(r.dados("janelas.json").unwrap());
+    let cfg: ConfigTelaJogo = r.dados("tela_jogo.json").unwrap();
+    let interface = Interface::carregar(&r, cfg.tabela_posicoes).unwrap();
+    let mut j = JanelasControle::new(r.dados("janelas.json").unwrap(), &interface);
     j.trazer_para_frente(Some(Controle::Castas));
     let edicao = engine::formats::janela::Retangulo { esq: 20, topo: 97, dir: 444, base: 444 };
     // Ápice do triângulo (casteTriangle (392, 342) no layout, deslocamento (0, −52)): reprodutores 100%.

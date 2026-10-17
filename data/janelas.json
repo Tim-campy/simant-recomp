@@ -26,8 +26,8 @@
     "_cores_barras": "_modeColors (DGROUP 1048:159a) = 42, 43, 46 por _ConvColor. Medido: F verde, D amarelo, N ciano.",
     "cores_barras": [10, 11, 14]
   },
-  "_deslocamento": "Medido na bancada QEMU (640×480, capturas j01/j02 de tests/referencias/roteiros/qemu_janelas.txt): os objetos do layout aparecem 52 linhas acima na área cliente (14 na tela, que começa na linha 38).",
-  "deslocamento": [0, -52],
+  "_ajuste_posicao": "A janela vai para a posição da tabela tipo 9 (objeto 9/0 na bancada QEMU 640×480) mais a faixa; medido nas capturas j01/j02/j04 de tests/referencias/roteiros/qemu_janelas.txt: mais 2 linhas.",
+  "ajuste_posicao": [0, 2],
   "altura_titulo": 18,
   "fonte_titulo": 0,
   "titulo_ativo": [4, 15],

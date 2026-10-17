@@ -29,6 +29,12 @@ fn main() {
                 println!("{i:3} {:?}", String::from_utf8_lossy(s));
             }
         }
+        "posicoes" => {
+            let d = r.objeto(Chave { tipo: 9, id }).unwrap();
+            for (i, p) in engine::formats::janela::decodificar_posicoes(&d).unwrap().iter().enumerate() {
+                println!("{i:3} {p:?}");
+            }
+        }
         "bitmap" => {
             let d = r.objeto(Chave { tipo: 2, id }).unwrap();
             let b = engine::formats::bitmap::Bitmap::decodificar(&d).unwrap();

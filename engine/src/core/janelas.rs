@@ -50,8 +50,9 @@ pub struct ConfigControle {
 pub struct ConfigJanelas {
     pub castas: ConfigControle,
     pub tarefas: ConfigControle,
-    /// Coordenadas do layout → área cliente (bancada QEMU 640×480) [medido].
-    pub deslocamento: [i16; 2],
+    /// Ajuste da posição em relação à tabela de posições (tipo 9) + faixa [medido na bancada QEMU,
+    /// 640×480: 2 linhas abaixo].
+    pub ajuste_posicao: [i16; 2],
     pub altura_titulo: i16,
     pub fonte_titulo: usize,
     /// Cores do título: [fundo, texto] da janela ativa e da inativa (índices da paleta).
@@ -94,6 +95,9 @@ pub struct JanelasControle {
     pub porcentagem: [bool; 2],
     /// Arrasto em andamento no triângulo.
     pub arrastando: Option<Controle>,
+    /// Tabela de posições das janelas (tipo 9) e altura da faixa, da `Interface`.
+    posicoes: Vec<[i16; 4]>,
+    faixa: i16,
 }
 
 fn indice(c: Controle) -> usize {
@@ -125,13 +129,15 @@ fn contem(r: Retangulo, x: i32, y: i32) -> bool {
 impl JanelasControle {
     /// Como num Quick Game ou depois do Load (`_SetDefaultWindows`): as duas janelas abertas atrás
     /// da janela de edição, Behavior antes de Caste.
-    pub fn new(cfg: ConfigJanelas) -> JanelasControle {
+    pub fn new(cfg: ConfigJanelas, interface: &Interface) -> JanelasControle {
         JanelasControle {
             cfg,
             pilha: vec![Some(Controle::Tarefas), Some(Controle::Castas), None],
             conjunto: [0, 0],
             porcentagem: [true, true],
             arrastando: None,
+            posicoes: interface.posicoes.clone(),
+            faixa: interface.moldura.faixa.altura,
         }
     }
 
@@ -148,22 +154,14 @@ impl JanelasControle {
 
     /// Geometria da janela `c` (layout + deslocamento medido; título do Windows de 18 + 1 linhas).
     pub fn geometria(&self, recursos: &Recursos, c: Controle) -> Result<GeometriaControle, String> {
-        let j = carregar_janela(recursos, self.cfg.de(c).janela)?;
-        Ok(self.geometria_de(&j))
+        let id = self.cfg.de(c).janela;
+        let j = carregar_janela(recursos, id)?;
+        Ok(self.geometria_de(&j, id))
     }
 
-    fn geometria_de(&self, j: &Janela) -> GeometriaControle {
-        let ob0 = &j.objetos[0];
-        let t = ob0.byte_28 as i16;
-        let r = ob0.retangulo;
-        // _win_Recalc: com contorno de espessura t a janela encolhe (L+t, T+t, R−(t+1), B−(t+1)).
-        let enc = Retangulo { esq: r.esq + t, topo: r.topo + t, dir: r.dir - (t + 1), base: r.base - (t + 1) };
-        let [dx, dy] = self.cfg.deslocamento;
-        let h = self.cfg.altura_titulo;
-        let cliente = Retangulo { esq: enc.esq + dx, topo: enc.topo + h + dy, dir: enc.dir + dx, base: enc.base + dy + 1 };
-        let titulo = Retangulo { esq: cliente.esq, topo: cliente.topo - h - 1, dir: cliente.dir, base: cliente.topo - 1 };
-        let externo = Retangulo { esq: cliente.esq - 1, topo: titulo.topo - 1, dir: cliente.dir + 1, base: cliente.base + 1 };
-        GeometriaControle { externo, titulo, cliente, dx, dy }
+    fn geometria_de(&self, j: &Janela, id: u16) -> GeometriaControle {
+        let pos = self.posicoes.get(id as usize).copied().unwrap_or([0; 4]);
+        geometria_janela(j, pos, self.faixa, self.cfg.altura_titulo, self.cfg.ajuste_posicao)
     }
 
     /// Retângulo de um objeto da janela na área cliente; com `mais_um`, o pixel a mais à direita e
@@ -196,7 +194,7 @@ impl JanelasControle {
                 continue;
             };
             let janela = carregar_janela(recursos, self.cfg.de(c).janela)?;
-            let g = self.geometria_de(&janela);
+            let g = self.geometria_de(&janela, self.cfg.de(c).janela);
             if !contem(g.externo, x, y) {
                 continue;
             }
@@ -281,7 +279,7 @@ impl JanelasControle {
     pub fn mover(&mut self, recursos: &Recursos, e: &mut Estado, x: i32, y: i32) -> Result<bool, String> {
         let Some(c) = self.arrastando else { return Ok(false) };
         let j = carregar_janela(recursos, self.cfg.de(c).janela)?;
-        let g = self.geometria_de(&j);
+        let g = self.geometria_de(&j, self.cfg.de(c).janela);
         self.arrastar(&j, &g, c, e, x, y);
         Ok(true)
     }
@@ -297,7 +295,7 @@ impl JanelasControle {
         let cfg = self.cfg.de(c);
         let k = indice(c);
         let mut janela = carregar_janela(recursos, cfg.janela)?;
-        let g = self.geometria_de(&janela);
+        let g = self.geometria_de(&janela, cfg.janela);
         let ativa = self.ativa() == Some(c);
         // Estado dos botões Auto/Manual e do conjunto (grupos 3 e 4 do layout).
         let auto = match c {
@@ -322,22 +320,7 @@ impl JanelasControle {
             }
         }
         let jc = &self.cfg;
-        q.preencher(g.externo, jc.cor_fundo, jc.cor_fundo);
-        q.contorno(Retangulo { dir: g.externo.dir - 1, base: g.externo.base - 1, ..g.externo }, jc.cor_linha);
-        // Título do Windows: caixa do menu de sistema, linha, faixa com o nome, linha embaixo.
-        let [fundo, texto] = if ativa { jc.titulo_ativo } else { jc.titulo_inativo };
-        let h = jc.altura_titulo;
-        let caixa = Retangulo { dir: g.titulo.esq + h, ..g.titulo };
-        q.preencher(g.titulo, fundo, fundo);
-        q.preencher(caixa, jc.cor_caixa_sistema, jc.cor_caixa_sistema);
-        let traco = Retangulo { esq: caixa.esq + 3, topo: caixa.topo + 8, dir: caixa.dir - 3, base: caixa.topo + 10 };
-        q.preencher(traco, jc.cor_linha, jc.cor_linha);
-        q.preencher(Retangulo { esq: caixa.dir, dir: caixa.dir + 1, ..g.titulo }, jc.cor_linha, jc.cor_linha);
-        q.preencher(Retangulo { topo: g.titulo.base, base: g.titulo.base + 1, ..g.externo }, jc.cor_linha, jc.cor_linha);
-        if let Some(Some(f)) = interface.fontes.get(jc.fonte_titulo) {
-            let r = Retangulo { esq: caixa.dir + 1, ..g.titulo };
-            q.texto(r, f, cfg.titulo.as_bytes(), 0, texto, fundo);
-        }
+        desenhar_moldura_com_titulo(q, interface, jc, &g, &cfg.titulo, ativa);
         let base = janela.retangulo();
         let origem = (base.esq + g.dx, base.topo + g.dy);
         let mut pendentes = desenhar_objetos(q, recursos, interface, &janela, origem, Some(g.cliente));
@@ -407,6 +390,44 @@ impl JanelasControle {
             }
         }
         Ok(pendentes)
+    }
+}
+
+/// Geometria de uma janela de layout com título do Windows: o objeto 0 vai para a posição da
+/// tabela tipo 9 (+ faixa + ajuste) e encolhe pelo contorno (`_win_Recalc`); o encolhido é o
+/// contorno externo, com o título de `altura_titulo` + 1 linha e a área cliente embaixo.
+pub fn geometria_janela(j: &Janela, pos: [i16; 4], faixa: i16, altura_titulo: i16, ajuste: [i16; 2]) -> GeometriaControle {
+    let ob0 = &j.objetos[0];
+    let t = if ob0.tipo == crate::formats::janela::TIPO_CONTORNO { ob0.byte_28 as i16 } else { 0 };
+    let r = ob0.retangulo;
+    let dx = pos[0] - r.esq + ajuste[0];
+    let dy = pos[1] - r.topo + faixa + ajuste[1];
+    // _win_Recalc: com contorno de espessura t a janela encolhe (L+t, T+t, R−(t+1), B−(t+1)).
+    let enc = Retangulo { esq: r.esq + t, topo: r.topo + t, dir: r.dir - (t + 1), base: r.base - (t + 1) };
+    let h = altura_titulo;
+    let cliente = Retangulo { esq: enc.esq + dx, topo: enc.topo + h + dy, dir: enc.dir + dx, base: enc.base + dy + 1 };
+    let titulo = Retangulo { esq: cliente.esq, topo: cliente.topo - h - 1, dir: cliente.dir, base: cliente.topo - 1 };
+    let externo = Retangulo { esq: cliente.esq - 1, topo: titulo.topo - 1, dir: cliente.dir + 1, base: cliente.base + 1 };
+    GeometriaControle { externo, titulo, cliente, dx, dy }
+}
+
+/// Moldura com título do Windows (linha externa, caixa do menu de sistema, faixa do título com o
+/// nome, linha embaixo) e o fundo.
+pub fn desenhar_moldura_com_titulo(q: &mut Quadro, interface: &Interface, jc: &ConfigJanelas, g: &GeometriaControle, titulo: &str, ativa: bool) {
+    q.preencher(g.externo, jc.cor_fundo, jc.cor_fundo);
+    q.contorno(Retangulo { dir: g.externo.dir - 1, base: g.externo.base - 1, ..g.externo }, jc.cor_linha);
+    let [fundo, texto] = if ativa { jc.titulo_ativo } else { jc.titulo_inativo };
+    let h = jc.altura_titulo;
+    let caixa = Retangulo { dir: g.titulo.esq + h, ..g.titulo };
+    q.preencher(g.titulo, fundo, fundo);
+    q.preencher(caixa, jc.cor_caixa_sistema, jc.cor_caixa_sistema);
+    let traco = Retangulo { esq: caixa.esq + 3, topo: caixa.topo + 8, dir: caixa.dir - 3, base: caixa.topo + 10 };
+    q.preencher(traco, jc.cor_linha, jc.cor_linha);
+    q.preencher(Retangulo { esq: caixa.dir, dir: caixa.dir + 1, ..g.titulo }, jc.cor_linha, jc.cor_linha);
+    q.preencher(Retangulo { topo: g.titulo.base, base: g.titulo.base + 1, ..g.externo }, jc.cor_linha, jc.cor_linha);
+    if let Some(Some(f)) = interface.fontes.get(jc.fonte_titulo) {
+        let r = Retangulo { esq: caixa.dir + 1, ..g.titulo };
+        q.texto(r, f, titulo.as_bytes(), 0, texto, fundo);
     }
 }
 

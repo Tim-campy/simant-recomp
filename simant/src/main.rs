@@ -400,7 +400,7 @@ impl Sessao<'_> {
             Origem::Novo(..) => None,
         };
         let modos = modos::Modos::carregar(recursos, &interface)?;
-        let janelas = JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?);
+        let janelas = JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?, &interface);
         let menus_cfg: ConfigMenus = recursos.dados(menus::ARQUIVO_CONFIG)?;
         Ok(Sessao {
             recursos,
