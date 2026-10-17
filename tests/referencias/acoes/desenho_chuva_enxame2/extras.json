@@ -1,0 +1,26 @@
+{
+ "antes": {
+  "SementeS": 57896,
+  "SementeR": 731074550,
+  "gameCycles": 206312,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 1729,
+  "Cycle": 1729,
+  "posicao": "saida"
+ },
+ "depois": {
+  "SementeS": 18808,
+  "SementeR": 731074550,
+  "gameCycles": 206316,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 1729,
+  "Cycle": 1729,
+  "posicao": "entrada",
+  "MacTickCount": 17541
+ },
+ "acao": {
+  "desenho_quintal": 0
+ }
+}

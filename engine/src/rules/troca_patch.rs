@@ -143,9 +143,10 @@ pub fn aplicar_patch(e: &mut Estado, m: &Mundo, cfg: &ConfigSimulacao) -> Result
     e.feromonios = Feromonios { alarme: vazio(), ninho_b: vazio(), trilha_b: vazio(), ninho_r: vazio(), trilha_r: vazio(), f: vazio() };
     // Passo 13: listas refeitas.
     for (lista, formigas) in [(Lista::A, &m.lista_a), (Lista::B, &m.lista_b), (Lista::R, &m.lista_r)] {
-        let capacidade = e.lista(lista).capacidade();
+        // `_ListIndex? = 0` e as formigas novas por cima: as vagas além do fim guardam o lixo da lista
+        // anterior, como no original (conferido na bancada, telas/quintal.md §8).
         let l = e.lista_mut(lista);
-        *l = super::estado::ListaFormigas::vazia(capacidade);
+        l.indice = 0;
         for f in formigas {
             l.adicionar(*f);
         }
@@ -157,8 +158,11 @@ pub fn aplicar_patch(e: &mut Estado, m: &Mundo, cfg: &ConfigSimulacao) -> Result
     ] {
         let c = e.colonia_mut(cor);
         c.buracos = super::estado::Tabela(*buracos);
-        c.ultimo_buraco = ultimo_buraco;
-        c.ultima_saida = (ultimo_buraco.1, 0);
+        // `_LastNewHole?`/`_LastNewExit?` só são escritos por `_MakeNewHole?` (colônia gerada).
+        if ultimo_buraco != (0, 0) {
+            c.ultimo_buraco = ultimo_buraco;
+            c.ultima_saida = (ultimo_buraco.1, 0);
+        }
         c.soma_x_escavada = escav.tot_x;
         c.soma_y_escavada = escav.tot_y;
         c.tiles_escavados = escav.cavados;
@@ -189,6 +193,8 @@ pub fn aplicar_patch(e: &mut Estado, m: &Mundo, cfg: &ConfigSimulacao) -> Result
     e.partida.ovos_perdidos_b = 0;
     // _InitAntLions e _InitPillar (dentro de _MakeMap).
     let mut fl = FormigasLeao::default();
+    // `_InitAntLions` grava só as n primeiras vagas; as outras (todas, na casa) ficam como estavam.
+    (fl.x, fl.y) = (e.formigas_leao.x, e.formigas_leao.y);
     for (k, &(x, y)) in m.formigas_leao.iter().enumerate().take(10) {
         fl.x[k] = x;
         fl.y[k] = y;
@@ -197,7 +203,17 @@ pub fn aplicar_patch(e: &mut Estado, m: &Mundo, cfg: &ConfigSimulacao) -> Result
     fl.iniciais = m.formigas_leao_iniciais;
     e.formigas_leao = fl;
     let mut lb = LagartaEBichos::default();
-    for (k, b) in m.bichos_de_conta.iter().enumerate() {
+    // `_InitPillar` só usa as vagas 1 e 2 dos bichos-de-conta; a 0 fica como estava.
+    let ant = &e.lagarta_e_bichos;
+    (lb.bicho_x[0], lb.bicho_y[0], lb.bicho_dir[0], lb.bicho_chao[0]) =
+        (ant.bicho_x[0], ant.bicho_y[0], ant.bicho_dir[0], ant.bicho_chao[0]);
+    // Na casa `_InitPillar` não põe bichos-de-conta: as vagas 1 e 2 também ficam como estavam.
+    let usadas = if m.terreno == 0 { 1 } else { 3 };
+    for k in 1..usadas.min(3) {
+        (lb.bicho_x[k], lb.bicho_y[k], lb.bicho_dir[k], lb.bicho_chao[k]) =
+            (ant.bicho_x[k], ant.bicho_y[k], ant.bicho_dir[k], ant.bicho_chao[k]);
+    }
+    for (k, b) in m.bichos_de_conta.iter().enumerate().skip(usadas) {
         lb.bicho_x[k] = b.x;
         lb.bicho_y[k] = b.y;
         lb.bicho_dir[k] = b.dir;
@@ -212,12 +228,18 @@ pub fn aplicar_patch(e: &mut Estado, m: &Mundo, cfg: &ConfigSimulacao) -> Result
         arrotos: m.aranha.arrotos,
         ligada: m.aranha.ligada as i16,
         alvo: -2,
+        // `_InitSpider` (`1020:4668`): `_StargLife = −1`, `_SuserX/Y = 0x40`.
+        alvo_tipo: -1,
+        destino_x: 0x40,
+        destino_y: 0x40,
         ..Aranha::default()
     };
     // _InitYelloAnt.
+    // `_InitYelloAnt` (`1030:6492`) escreve só estes campos e chama `_SetMyHealth(100)` e
+    // `_ResetYellowVars`; o resto da amarela fica como estava (conferido na bancada).
     let a = &m.amarela;
     let anterior = e.amarela.clone();
-    e.amarela = Amarela {
+    let mut am = Amarela {
         plano: a.plano,
         x: a.x,
         y: a.y,
@@ -226,12 +248,18 @@ pub fn aplicar_patch(e: &mut Estado, m: &Mundo, cfg: &ConfigSimulacao) -> Result
         modo: a.modo,
         saude: a.saude,
         ovo_carregado: a.ovo_carregado,
-        ninho_iniciado: anterior.ninho_iniciado,
-        aviso_saude: anterior.aviso_saude,
         renascer_x: m.renascer.0,
         renascer_y: m.renascer.1,
-        ..Amarela::default()
+        base: 0,
+        cor: 0,
+        soltando_alarme: 0,
+        saude_contagem: 0,
+        ..anterior
     };
+    am.quer_comida = if am.aviso_saude < am.saude && am.saude > 9 { 0 } else { 1 };
+    (am.alvo_plano, am.alvo_x, am.alvo_y, am.ultimo_x, am.ultimo_y) = (am.plano, am.x, am.y, am.x, am.y);
+    (am.comando, am.mover, am.dis, am.dis_anterior, am.passos, am.contorno_contagem) = (0, 0, 0, 0, 0, -2);
+    e.amarela = am;
     // Passo 18: vistas.
     e.vistas.ponto = (0x40, 0x20);
     e.vistas.ponto_superficie = (0x40, 0x20);

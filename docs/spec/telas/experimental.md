@@ -189,7 +189,15 @@ Testes do port (`engine/tests/regras_experimental.rs`), a partir do pseudocódig
 
 Observação da bancada: a vista do Experimental novo começou em `_MapPnt` = (52, 23), não em (51, 23) como daria `_CenterEdit(0x40, 0x20)` com 26 colunas [em aberto: largura da vista no instante do `_CenterEdit` de `_NewGame`].
 
-**Não verificado no original:** Ctrl (apagar, encher invertido, tirar comida, tirar cheiro), muros encostados (tabela de conexão), cheiro, formiga em ninho, inseticida sobre a aranha e a formiga-leão, o arrasto (`_ExpLastPnt` e a repetição), Quick → Experimental e "Start Game" (dependem do menu de proximidade; falta o roteiro com os cliques no botão `editTools` e nos itens).
+**Verificado no original (bancada, 2026-10-17, `tools/cenarios_tick.py quick_exp|exp_start|exp_ctrl`; vetores em `tests/referencias/acoes/`, `engine/tests/acoes_originais.rs`; jogo pausado, estado antes e depois, 307 blocos e S e R):**
+
+- **Quick → Experimental** (`quick_exp`): snapshot `quick`, botão de ferramentas da faixa em (354, 71) (`ribTools`, com o bitmap da ferramenta) e o item "EXPERIMENTAL MODE" da janela 10 em (360, 127): `quick_para_experimental` dá 307/307.
+- **"Start Game"** (`exp_start`): snapshot `exp`, mesmo botão (abre a janela 9 abaixo dele: ANT INFO … START GAME, este em (360, 246)): `escolher_ferramenta(ComecarJogo)` dá 307/307.
+- **Ctrl e arrasto** (`exp_ctrl`, ferramenta e subopção escritas na memória, Ctrl apertado pelo QMP): comida em (55, 35) e Ctrl+comida na mesma célula (a comida sai e o chão é sorteado de novo), muro em (57, 37) e Ctrl+muro (apaga, chão sorteado), arrasto de muro de (58, 39) a (63, 39) (tiles de conexão 0x65, 0x60 … 0x63) e arrasto de comida de (60, 38) a (64, 38) (cinco 0x48, `_FoodA` +5): `pressionar`/`arrastar`/`soltar` dão 307/307 com o mesmo S.
+
+A vista do Experimental novo em `_MapPnt` = (52, 23) (seção acima) fecha com `_editWidth` = 25 na bancada (0x40 − 12 = 52), o mesmo que a centralização da amarela nos vetores de tick (testes-tick.md).
+
+**Não verificado no original:** Ctrl em cavar/encher e no cheiro, cheiro (a repetição parada depende do ritmo do redesenho), formiga em ninho, inseticida sobre a aranha e a formiga-leão.
 
 ## 10. Lacunas e divergências
 

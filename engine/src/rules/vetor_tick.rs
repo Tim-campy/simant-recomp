@@ -458,10 +458,23 @@ fn centralizar_edicao(ponto: (i16, i16), x: i32, y: i32, plano: i16) -> (i32, i3
 }
 
 pub fn comparar_tick(v: &VetorTick, layout: &LayoutSave, regras: &mut dyn Regras) -> Result<RelatorioTick, String> {
+    comparar_com(v, layout, |e| {
+        tick(e, regras);
+        aplicar_vista_da_bancada(e);
+        Ok(())
+    })
+}
+
+/// Como [`comparar_tick`], mas o port aplica `acao` (uma ação da interface gravada no original com o
+/// jogo pausado, ex.: `_XferPatch`) em vez de um tick. O vetor tem o mesmo formato.
+pub fn comparar_com(
+    v: &VetorTick,
+    layout: &LayoutSave,
+    acao: impl FnOnce(&mut Estado) -> Result<(), String>,
+) -> Result<RelatorioTick, String> {
     let entrada = montar_entrada(v, layout)?;
     let mut e = entrada.estado;
-    tick(&mut e, regras);
-    aplicar_vista_da_bancada(&mut e);
+    acao(&mut e)?;
     let port = e.para_save(layout)?;
 
     let mut blocos = Vec::with_capacity(layout.blocos.len());
@@ -571,6 +584,111 @@ impl fmt::Display for RelatorioTick {
         }
         Ok(())
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Ações da interface gravadas no original (tests/referencias/acoes/)
+// ---------------------------------------------------------------------------------------------
+
+/// Aplica ao estado a ação da interface descrita em `extras.json["acao"]` de um vetor de ação
+/// (`tools/cenarios_tick.py`): `{"xfer": [px, py]}` = duplo clique no patch da Yard View
+/// (`_XferPatch`); `{"place": [px, py]}` = PLACE e clique no patch (`_PlaceQueenInYard`).
+/// Devolve uma descrição do resultado.
+pub fn aplicar_acao(
+    e: &mut Estado,
+    acao: &serde_json::Value,
+    tab: &super::geracao::TabelasGeracao,
+    cfg: &super::estado::ConfigSimulacao,
+) -> Result<String, String> {
+    let par = |k: &str| acao[k].as_array().map(|p| (p[0].as_i64().unwrap_or(-1) as i16, p[1].as_i64().unwrap_or(-1) as i16));
+    if let Some((x, y)) = par("xfer") {
+        e.vistas.ponto_quintal = (x, y);
+        return Ok(format!("{:?}", super::troca_patch::trocar_patch(e, tab, cfg)?));
+    }
+    if let Some((x, y)) = par("place") {
+        // No original o clique que encerra o PLACE também chega a `_YardArea`: `_YMapPnt` = patch
+        // clicado, dentro ou fora do alcance (bancada, acoes/place e place_fora).
+        e.vistas.ponto_quintal = (x, y);
+        return Ok(format!("{:?}", super::troca_patch::colocar_rainha(e, x, y)));
+    }
+    if let Some((x, y)) = par("special") {
+        // Um tick em que a amarela morre sem corpo no Jogo Completo com mais de uma colônia preta: o
+        // original chama `_SpecialXfer` (`1000:7eb6`) DENTRO do tick e o jogador escolhe a colônia.
+        // Aqui: o tick do port (que só pede a escolha) e depois o efeito de `_SpecialXfer` com o patch
+        // escolhido na bancada. Ver testes-tick.md (o que difere é a ordem: no original o resto do tick
+        // já roda no patch novo).
+        let mut regras = super::tick::RegrasOriginais::default();
+        tick(e, &mut regras);
+        transferencia_especial(e, x, y);
+        // A janela do quintal aparece (desenho com o patch ainda antigo) e vira a Strategic View.
+        super::desenho::desenhar_enxame(e);
+        super::desenho::desenhar_colonias(e);
+        return Ok(format!("{:?}", super::troca_patch::trocar_patch(e, tab, cfg)?));
+    }
+    if let Some(m) = acao.get("desenho_quintal").and_then(|v| v.as_i64()) {
+        // Entre dois ticks com a Yard/House View aberta e na frente: um redesenho do quintal.
+        return Ok(format!("{} passos de S", super::desenho::desenhar_quintal(e, m as i16)));
+    }
+    use super::experimental::{self as exp, Contexto, ControleExperimental, Ferramenta, TabelasExperimental};
+    let c = Contexto::padrao();
+    if acao.get("quick_exp").is_some() {
+        return Ok(format!("{:?}", exp::quick_para_experimental(e, c)));
+    }
+    let mut ctl = ControleExperimental::novo(TabelasExperimental::padrao());
+    if acao.get("start").is_some() {
+        let plano = e.vistas.plano as i32;
+        return Ok(format!("{:?}", exp::escolher_ferramenta(e, c, &mut ctl, Ferramenta::ComecarJogo, None, plano)));
+    }
+    if let Some(passos) = acao["exp"].as_array() {
+        // Cada passo: ferramenta e subopção (escritas na memória na bancada), Ctrl, e as células por
+        // onde o cursor passou com o botão apertado (a primeira = onde apertou).
+        let mut efeitos = Vec::new();
+        for p in passos {
+            let f = p["f"].as_i64().ok_or("passo sem f")? as i16;
+            let fer = Ferramenta::de_i16(f).ok_or(format!("ferramenta {f}"))?;
+            e.partida.ferramenta_experimental = f;
+            ctl.subopcoes[fer.indice()] = p["sub"].as_u64().unwrap_or(0) as u8;
+            let ctrl = p["ctrl"].as_bool().unwrap_or(false);
+            let plano = e.vistas.plano as i32;
+            let pontos: Vec<(i32, i32)> = p["pontos"]
+                .as_array()
+                .ok_or("passo sem pontos")?
+                .iter()
+                .map(|q| (q[0].as_i64().unwrap_or(-1) as i32, q[1].as_i64().unwrap_or(-1) as i32))
+                .collect();
+            let ((x0, y0), resto) = pontos.split_first().ok_or("passo sem pontos")?;
+            efeitos.extend(exp::pressionar(e, c, &mut ctl, plano, *x0, *y0, ctrl));
+            for &(x, y) in resto {
+                efeitos.extend(exp::arrastar(e, c, &mut ctl, plano, x, y, ctrl));
+            }
+            exp::soltar(&mut ctl);
+        }
+        return Ok(format!("{efeitos:?}"));
+    }
+    Err(format!("ação desconhecida: {acao}"))
+}
+
+/// O que `_SpecialXfer` (`1000:7eb6`) faz no estado antes do `_XferPatch` do patch escolhido:
+/// zera a colônia preta do patch atual no mapa do quintal, abre a Strategic View (`_YardMode = 2`,
+/// `_ColonyUpdateFlag = 1`), `_SetMapPlane(0)` (`_OldMapPlane`, `_MapPlane = 0`, `_YMapPnt` = patch
+/// atual) e grava `_YMapPnt` = escolhido.
+pub fn transferencia_especial(e: &mut Estado, x: i16, y: i16) {
+    let (cx, cy) = e.ambiente.patch;
+    e.preta.populacao_quintal.0[(cx * 16 + cy) as usize] = 0;
+    e.vistas.modo_quintal = 2;
+    e.ambiente.atualizar_colonias = 1;
+    // `_SetMapPlane(0)`: plano e modo do mapa 0. Na bancada `_OldMapPlane` terminou como estava (0),
+    // e não com o plano anterior [em aberto: quem o repõe].
+    e.vistas.plano = 0;
+    e.vistas.modo_mapa = 0;
+    e.vistas.ponto_quintal = (x, y);
+}
+
+/// `extras.json["acao"]` de um vetor de ação.
+pub fn ler_acao(dir: &Path) -> Result<serde_json::Value, String> {
+    let texto = String::from_utf8(ler_arquivo(dir, "extras.json")?).map_err(|e| e.to_string())?;
+    let v: serde_json::Value = serde_json::from_str(&texto).map_err(|e| e.to_string())?;
+    Ok(v["acao"].clone())
 }
 
 // ---------------------------------------------------------------------------------------------
