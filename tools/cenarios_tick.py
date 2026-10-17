@@ -435,6 +435,340 @@ def cenario_luta_vizinha(c: Sessao, saida, n):
     return c.gravar(saida, n, parar=lambda d: d.ler("MeCmd") == 3 and d.ler("MeMoveMe") == 0)
 
 
+# ------------------------------------------------------------------------------------------------
+# Ações da interface fora do tick (jogo pausado): estado antes e depois
+# ------------------------------------------------------------------------------------------------
+
+YARD_ORIGEM = (120, 157)   # canto da área cliente da janela 25 na bancada (telas/quintal.md §1)
+
+
+def pixel_patch(px, py):
+    """Centro do patch (px, py) na tela 640x480 com a janela do quintal na posição padrão."""
+    ox, oy = YARD_ORIGEM
+    return ox + 28 * px - 10 * py + 177, oy + 10 * py + 70
+
+
+def fotografar(c: Sessao, pasta, nome):
+    """Estado (formato .ANT), vida e extras (S, R, GameTime...) em pasta/nome.*; a VM fica parada."""
+    c.mj.sessao_gdb()
+    qb.gravar(Path(pasta).resolve() / f"estado_{nome}.bin", c.mj.estado())
+    qb.gravar(Path(pasta).resolve() / f"vida_{nome}.bin", c.dep.vida())
+    ex = c.dep.extras()
+    c.log(f"{nome}: {ex}")
+    return ex
+
+
+def tela(c: Sessao, pasta, nome):
+    # o comando de roteiro separa por espaços: caminho relativo ao SIMANT_RAIZ (sem espaços)
+    Path(pasta).resolve().mkdir(parents=True, exist_ok=True)
+    rel = Path(pasta).resolve().relative_to(qb.RAIZ.resolve()).as_posix()
+    c.b.executar(f"capturar {rel}/{nome}.png")
+
+
+def clicar_tela(c: Sessao, x, y, duplo=False):
+    c.dep.retomar()
+    time.sleep(0.3)
+    qb.mouse_canto(c.q)
+    qb.mover_rel(c.q, x, y)
+    time.sleep(0.3)
+    c.botoes(duplo)
+    c.log(f"{'duplo ' if duplo else ''}clique em ({x}, {y})")
+
+
+def dispensar(c: Sessao):
+    """Fecha uma caixa de mensagem ("Click here to continue")."""
+    c.dep.retomar()
+    c.b.executar("clicar_em 320 330")
+    time.sleep(1)
+
+
+def cenario_xfer(c: Sessao, saida, n):
+    """_XferPatch pela Yard View, com o jogo pausado (Shift+0): no Jogo Completo do início, uma colônia
+    preta é escrita no patch (10, 8) e em _ColonyTotalBlack = 2; Ctrl+Y abre a Yard View e o duplo
+    clique no patch faz a troca. Grava antes/depois (estado, vida, extras) e capturas."""
+    alvo = (10, 8) if n != 2 else (1, 5)  # --ticks 2: patch da casa
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    c.escrever_elemento("YMapPopB", alvo[0] * 16 + alvo[1], 3)
+    c.escrever("ColonyTotalBlack", 2)
+    c.dep.retomar()
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    antes = fotografar(c, saida, "antes")
+    tela(c, saida, "1_yard")
+    clicar_tela(c, *pixel_patch(*alvo), duplo=True)
+    time.sleep(4)
+    tela(c, saida, "2_dialogo")
+    dispensar(c)
+    time.sleep(2)
+    tela(c, saida, "3_depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"xfer": alvo})
+    return []
+
+
+def cenario_place(c: Sessao, saida, n):
+    """_PlaceQueenInYard: Jogo Completo pausado, _QueenStorageB = 2, Ctrl+Y, botão PLACE da faixa 35
+    (360, 60) e um clique no patch (9, 7) (dentro do alcance) ou, com --ticks 2, (5, 8) (fora)."""
+    alvo = (9, 7) if n != 2 else (5, 8)
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    c.escrever("QueenStorageB", 2)
+    c.dep.retomar()
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    antes = fotografar(c, saida, "antes")
+    tela(c, saida, "1_yard")
+    clicar_tela(c, 360, 60)
+    time.sleep(2)
+    tela(c, saida, "2_place")
+    clicar_tela(c, *pixel_patch(*alvo))
+    time.sleep(3)
+    tela(c, saida, "3_depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"place": alvo})
+    return []
+
+
+def cenario_special(c: Sessao, saida, n):
+    """_SpecialXfer: Jogo Completo; na entrada de um tick, _ColonyTotalBlack = 2, colônia preta no
+    patch (10, 8), e a amarela sem vida há 99 ticks (_MeHealth = 0, _MeHealthCntDwn = 99): no tick ela
+    morre de fome sem corpo e, com mais de uma colônia preta, o jogo pede um patch no mapa do quintal.
+    Cada parada do tick (caixa modal) é resolvida por uma ação da lista: clicar no centro (caixa de
+    mensagem) e depois clicar no patch (10, 8) da Yard View; captura a tela a cada parada."""
+    alvo = (10, 8)
+    c.entrada()
+    c.escrever_elemento("YMapPopB", alvo[0] * 16 + alvo[1], 3)
+    for nome, v in (("ColonyTotalBlack", 2), ("MeHealth", 0), ("MeHealthCntDwn", 99)):
+        c.escrever(nome, v)
+    dep, mj = c.dep, c.mj
+    out = {"estado_antes.bin": mj.estado(), "vida_antes.bin": dep.vida()}
+    ex = {"antes": dep.extras()}
+    acoes = [("tela",), ("centro",), ("tela",), ("patch",), ("tela",), ("centro",), ("tela",), ("centro",), ("ret",)]
+    relogio = []
+    try:
+        dep.ir_saida(timeout=15, relogio=relogio)
+    except RuntimeError:
+        k = 0
+        while True:
+            parada = True
+            while parada and acoes:
+                a = acoes.pop(0)
+                if a[0] == "tela":
+                    tela(c, saida, f"parada_{k}")
+                    k += 1
+                    continue
+                if a[0] == "centro":
+                    dispensar(c)
+                elif a[0] == "patch":
+                    clicar_tela(c, *pixel_patch(*alvo))
+                    time.sleep(1)
+                else:
+                    dep.retomar()
+                    c.b.executar("teclas ret")
+                c.log(f"ação {a}")
+                parada = False
+            try:
+                dep._rodar_ate(dep.retorno, 15)
+                break
+            except RuntimeError:
+                if not acoes:
+                    raise
+    out["estado_depois.bin"] = mj.estado()
+    out["vida_depois.bin"] = dep.vida()
+    ex["depois"] = dep.extras()
+    ex["antes"]["MacTickCount"] = relogio[0] if relogio and relogio[0] is not None else None
+    ex["MacTickCount_lidos"] = relogio
+    ex["acao"] = {"special": alvo}
+    pasta = Path(saida).resolve()
+    for nome_arq, conteudo in dict(out, **{"extras.json": ex}).items():
+        qb.gravar(pasta / nome_arq, conteudo)
+    return []
+
+
+def cenario_quick_exp(c: Sessao, saida, n):
+    """Quick → Experimental: Quick Game pausado, botão de ferramentas da faixa (354, 71) e o item
+    "EXPERIMENTAL MODE" da janela 10 (360, 127)."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    antes = fotografar(c, saida, "antes")
+    clicar_tela(c, 354, 71)
+    time.sleep(1.5)
+    clicar_tela(c, 360, 127)
+    time.sleep(3)
+    tela(c, saida, "depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"quick_exp": 1})
+    return []
+
+
+def cenario_exp_start(c: Sessao, saida, n):
+    """"Start Game" do Experimental: pausado, botão de ferramentas (354, 71) e o item START GAME (360, 246)."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    antes = fotografar(c, saida, "antes")
+    clicar_tela(c, 354, 71)
+    time.sleep(1.5)
+    clicar_tela(c, 360, 246)
+    time.sleep(3)
+    tela(c, saida, "depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"start": 1})
+    return []
+
+
+def tecla_ctrl(c: Sessao, baixa):
+    c.q.cmd("input-send-event", events=[{"type": "key", "data": {"down": baixa, "key": {"type": "qcode", "data": "ctrl"}}}])
+    time.sleep(0.1)
+
+
+def cenario_exp_ctrl(c: Sessao, saida, n):
+    """Experimental pausado, ferramentas escolhidas na memória (_CurExpTool, _ExpSubStates em 8:8600+f) e
+    cliques na janela de edição (vista em _MapPnt): comida e Ctrl+comida na mesma célula, muro e
+    Ctrl+muro, arrasto de muro numa linha e arrasto de comida. Grava os passos para o port repetir."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    antes = fotografar(c, saida, "antes")
+    s = c.save()
+    mx, my = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2)
+    pix = lambda x, y: (MAPA_X0 + (x - mx) * TILE + 8, MAPA_Y0 + (y - my) * TILE + 8)
+    passos = [
+        {"f": 4, "sub": 0, "pontos": [[55, 35]], "ctrl": False},
+        {"f": 4, "sub": 0, "pontos": [[55, 35]], "ctrl": True},
+        {"f": 1, "sub": 0, "pontos": [[57, 37]], "ctrl": False},
+        {"f": 1, "sub": 0, "pontos": [[57, 37]], "ctrl": True},
+        {"f": 1, "sub": 0, "pontos": [[58, 39], [59, 39], [60, 39], [61, 39], [62, 39], [63, 39]], "ctrl": False},
+        {"f": 4, "sub": 0, "pontos": [[60, 38], [61, 38], [62, 38], [63, 38], [64, 38]], "ctrl": False},
+    ]
+    for p in passos:
+        c.mj.sessao_gdb()
+        c.escrever("CurExpTool", p["f"], 2)
+        c.mj.escrever_variavel(f"8:{0x8600 + p['f']:x}", bytes([p["sub"]]), 1)
+        c.dep.retomar()
+        x0, y0 = pix(*p["pontos"][0])
+        qb.mouse_canto(c.q)
+        qb.mover_rel(c.q, x0, y0)
+        time.sleep(0.3)
+        if p["ctrl"]:
+            tecla_ctrl(c, True)
+        c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": True, "button": "left"}}])
+        time.sleep(0.4)
+        ant = (x0, y0)
+        for q in p["pontos"][1:]:
+            xy = pix(*q)
+            qb.mover_rel(c.q, xy[0] - ant[0], xy[1] - ant[1])
+            ant = xy
+            time.sleep(0.5)
+        c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": False, "button": "left"}}])
+        time.sleep(0.3)
+        if p["ctrl"]:
+            tecla_ctrl(c, False)
+        time.sleep(1)
+        c.log(f"passo {p}")
+    tela(c, saida, "depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"exp": passos})
+    return []
+
+
+def cenario_teclas(c: Sessao, saida, n):
+    """TECLAS="ctrl+y ..." (variável de ambiente): aperta as teclas, espera 2 s e grava n ticks. Para medir
+    o que o DESENHO consome entre os ticks: compare o S de `depois` de um tick com o de `antes` do
+    seguinte (ver `entre_ticks`)."""
+    import os
+    # ESCREVER="Nome=valor,Nome=valor": escritas na memória antes (ex.: SwarmCntB=5)
+    for par in filter(None, os.environ.get("ESCREVER", "").split(",")):
+        nome, v = par.split("=")
+        c.mj.sessao_gdb()
+        c.escrever(nome, int(v, 0))
+        c.dep.retomar()
+    teclas = os.environ.get("TECLAS", "").split()
+    if teclas:
+        c.teclas(*teclas)
+    time.sleep(2)
+    c.entrada()
+    tela(c, saida, "inicio")
+    return c.gravar(saida, n)
+
+
+def passo_s(s):
+    """Um passo do gerador S (LFSR de Galois, rng.md)."""
+    vai = s & 0x8000
+    s = (s << 1) & 0xFFFF
+    return s ^ 0x1BF5 if vai else s
+
+
+def passos_s(a, b, limite=5000):
+    """Quantos passos do gerador S levam de a a b (None se mais que `limite`)."""
+    for k in range(limite + 1):
+        if a == b:
+            return k
+        a = passo_s(a)
+    return None
+
+
+def passos_r(a, b, limite=5000):
+    for k in range(limite + 1):
+        if a == b:
+            return k
+        a = (a * 0x343FD + 0x269EC3) & 0xFFFFFFFF
+    return None
+
+
+def intervalo(bruto, tick, destino, acao):
+    """Vetor de ação com o intervalo ENTRE o tick `tick` e o seguinte de uma gravação bruta: estado de
+    antes = depois do tick, estado de depois = antes do seguinte (o que a interface fez no meio)."""
+    ds = sorted(Path(bruto).glob("tick_*"))
+    i = [d.name for d in ds].index(f"tick_{int(tick):06d}")
+    a, b = ds[i], ds[i + 1]
+    destino = Path(destino)
+    destino.mkdir(parents=True, exist_ok=True)
+    for nome, origem in (("estado_antes.bin", a / "estado_depois.bin"), ("vida_antes.bin", a / "vida_depois.bin"),
+                         ("estado_depois.bin", b / "estado_antes.bin"), ("vida_depois.bin", b / "vida_antes.bin")):
+        shutil.copyfile(origem, destino / nome)
+    xa = json.loads((a / "extras.json").read_text(encoding="utf-8"))["depois"]
+    xb = json.loads((b / "extras.json").read_text(encoding="utf-8"))["antes"]
+    gravar_acao(destino, xa, xb, json.loads(acao))
+    print(f"{a.name} -> {b.name} em {destino}")
+
+
+def entre_ticks(bruto):
+    """Sorteios de S e R entre o fim de um tick e o começo do seguinte (o que a interface sorteou no
+    intervalo: desenho, temporizador)."""
+    ds = sorted(Path(bruto).glob("tick_*"))
+    for a, b in zip(ds, ds[1:]):
+        xa = json.loads((a / "extras.json").read_text(encoding="utf-8"))["depois"]
+        xb = json.loads((b / "extras.json").read_text(encoding="utf-8"))["antes"]
+        sa, sb = Save.abrir(a / "estado_depois.bin"), Save.abrir(b / "estado_antes.bin")
+        mud = [n for n in sa.ordem if sa.bytes_bloco(n) != sb.bytes_bloco(n)]
+        print(f"{a.name} -> {b.name}: S {passos_s(xa['SementeS'], xb['SementeS'])} passos, "
+              f"R {passos_r(xa['SementeR'], xb['SementeR'])} passos; blocos do save mudados: {mud}")
+
+
+def cenario_explorar(c: Sessao, saida, n):
+    """Exploração da tela: CLIQUES = "x,y;x,y;..." (variável de ambiente); captura depois de cada um."""
+    import os
+    c.teclas("shift+0")
+    time.sleep(1)
+    tela(c, saida, "0")
+    for k, par in enumerate(os.environ.get("CLIQUES", "").split(";")):
+        if not par:
+            continue
+        x, y = (int(v) for v in par.split(","))
+        clicar_tela(c, x, y)
+        time.sleep(2)
+        tela(c, saida, str(k + 1))
+    return []
+
+
+def gravar_acao(saida, antes, depois, acao):
+    """extras.json no formato dos vetores de tick (comparável com vetor_tick::comparar_com)."""
+    (Path(saida) / "extras.json").write_text(json.dumps({"antes": antes, "depois": depois, "acao": acao}, indent=1) + "\n",
+                                             encoding="utf-8")
+
+
 def cenario_inseticida(c: Sessao, saida, n):
     """Menino dentro de casa parado no nó 32 ((_BoyX, _BoyY) = (45, 166) → patch (0, 12)) com
     _CurYardPnt = (0, 12): pisada e inseticida em todo tick (quintal.md §4). No Jogo Completo, com a
@@ -494,6 +828,11 @@ def main():
     g.add_argument("--descricao", default="")
     e = sub.add_parser("eventos")
     e.add_argument("bruto")
+    t = sub.add_parser("entre")
+    t.add_argument("bruto")
+    v = sub.add_parser("intervalo")
+    for n in ("bruto", "tick", "destino", "acao"):
+        v.add_argument(n)
     s = sub.add_parser("selecionar")
     s.add_argument("bruto")
     s.add_argument("destino")
@@ -502,6 +841,10 @@ def main():
     a = ap.parse_args()
     if a.cmd == "eventos":
         return eventos(a.bruto)
+    if a.cmd == "entre":
+        return entre_ticks(a.bruto)
+    if a.cmd == "intervalo":
+        return intervalo(a.bruto, a.tick, a.destino, a.acao)
     if a.cmd == "selecionar":
         return selecionar(a.bruto, a.destino, a.faixas, a.descricao)
     c = Sessao(a.overlay, a.snapshot)

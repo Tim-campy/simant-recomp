@@ -1,0 +1,28 @@
+{
+ "antes": {
+  "SementeS": 34791,
+  "SementeR": 4186687430,
+  "gameCycles": 2134,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 19,
+  "Cycle": 19,
+  "posicao": "livre"
+ },
+ "depois": {
+  "SementeS": 18864,
+  "SementeR": 4186687430,
+  "gameCycles": 2500,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 19,
+  "Cycle": 0,
+  "posicao": "livre"
+ },
+ "acao": {
+  "xfer": [
+   1,
+   5
+  ]
+ }
+}
