@@ -350,6 +350,7 @@ impl Sessao<'_> {
 
     fn quadro_rgb(&mut self) -> Result<Vec<u8>, String> {
         self.tela.atualizar(&self.partida.estado);
+        self.tela.bitmaps_da_faixa = self.partida.bitmaps_dos_marcadores();
         let (mut q, mut pendentes) = self.tela.compor(self.recursos, &self.interface, &self.partida.nav)?;
         let agora = self.partida.agora();
         let (clique, p) = self.tela.desenhar_avisos(&mut q, self.recursos, &self.interface, &mut self.partida.avisos, agora)?;
@@ -362,6 +363,12 @@ impl Sessao<'_> {
     }
 
     /// Botão configurável da faixa sob (x, y): a função dele (`_DoUserButton`).
+    /// Marcador da faixa (`ribBM1`–`7`) sob (x, y).
+    fn marcador_em(&self, x: i32, y: i32) -> Option<usize> {
+        let nomes = &self.partida.cfg.marcadores.objetos;
+        self.tela.objetos_da_faixa_em(x, y).iter().find_map(|n| nomes.iter().position(|m| m == n))
+    }
+
     fn botao_usuario_em(&self, x: i32, y: i32) -> Option<u16> {
         self.tela.objetos_da_faixa_em(x, y).iter().find_map(|n| self.partida.cfg.funcao_do_botao(n))
     }
@@ -397,7 +404,7 @@ impl Sessao<'_> {
                 EventoRegras::Musica(id) => println!("[tick {t}] música {id}"),
                 EventoRegras::Som(_) | EventoRegras::TemaDoNinho => {} // tocados por som::Audio
                 EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
-                EventoRegras::CentralizarNaAmarela => {}
+                EventoRegras::CentralizarNaAmarela | EventoRegras::MensagemFaixa(_) => {} // a faixa é da Partida
             }
         }
         eventos
@@ -561,7 +568,10 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
                 }
                 Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => {
                     cursor = (x, y);
-                    if let Some(f) = s.botao_usuario_em(x, y) {
+                    let ctrl = sdl.keyboard().mod_state().intersects(sdl2::keyboard::Mod::LCTRLMOD | sdl2::keyboard::Mod::RCTRLMOD);
+                    if let Some(i) = s.marcador_em(x, y) {
+                        s.partida.marcador(i, ctrl);
+                    } else if let Some(f) = s.botao_usuario_em(x, y) {
                         match s.partida.botao_usuario(f) {
                             RespostaBotao::Feito => println!("botão {f}: {}", s.situacao()),
                             RespostaBotao::Salvar => salvar_e_avisar(&mut s, false, o),

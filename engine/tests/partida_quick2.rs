@@ -190,6 +190,31 @@ fn load_conta_as_formigas_e_pausa_depois_dos_quadros() {
     assert_eq!(q.estado.preta.castas, [3, 2, 0, 0, 0, 1], "_CastePopB recontado no Load (bancada-qemu.md)");
 }
 
+/// `_DoBookMark`: Ctrl+clique põe o marcador (vista atual), clique volta a ele; vazio avisa.
+#[test]
+fn marcadores_da_faixa() {
+    use engine::core::avisos::TextoFaixa;
+    use engine::core::navegacao::Acao;
+    let mut p = partida();
+    p.marcador(1, false);
+    let agora = p.agora();
+    assert_eq!(p.avisos.texto_da_faixa(agora), Some(&TextoFaixa::Literal("Bookmark has not been placed.".into())));
+    assert!(p.retirar_eventos().contains(&engine::rules::estado::Evento::Som(1)));
+    let vista = (p.nav.plano_mapa, p.nav.vista.x, p.nav.vista.y);
+    p.marcador(1, true);
+    assert_eq!(p.marcadores[1], Some(vista));
+    assert_eq!(p.bitmaps_dos_marcadores(), vec![("ribBM2".to_string(), 14558, 14508)]);
+    let agora = p.agora();
+    assert_eq!(p.avisos.texto_da_faixa(agora), Some(&TextoFaixa::Literal("Bookmark has been placed.".into())));
+    p.navegar(Acao::Superficie);
+    assert_eq!(p.nav.plano_mapa, 1);
+    p.marcador(1, false);
+    // _GotoMapPoint → _SetMapPlaneLocation centraliza uma vez só (jogo.md): o eixo menor pode ficar
+    // um passo atrás.
+    assert_eq!((p.nav.plano_mapa, p.nav.vista.x), (vista.0, vista.1));
+    assert!((p.nav.vista.y - vista.2).abs() <= 1);
+}
+
 #[test]
 fn ordem_de_andar_pelo_clique() {
     // Clique simples numa célula vizinha da amarela dá a ordem de ir (`_MeMoveMe` = 1).

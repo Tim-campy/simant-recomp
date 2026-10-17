@@ -30,7 +30,7 @@ use super::comum::{
     self, celula_livre, dentro, e_pedrinha, em_casa as casa, get_dir, get_dis, lista_do_plano as area,
     nao_e_obstaculo, tile, vida, vida_bruta, Direcoes, TabelaLuta,
 };
-use super::estado::{Estado, Evento, Feromonios, Grade};
+use super::estado::{Estado, Evento, Feromonios, Grade, MensagemFaixa};
 use super::geracao::Cor;
 use super::tick::{RegrasAmarela, RegrasOriginais};
 use crate::formats::save::{Formiga, Lista};
@@ -116,6 +116,12 @@ pub struct MensagensAmarela {
     pub sem_corpo: u16,
     pub outra_colonia: u16,
     pub transferida: u16,
+    /// Mensagens da faixa (`_EditMessage`): `_EatMyFood` 1 (trofalaxia), 2 (doação), 3 (ovo comido)
+    /// e a passagem para o ninho vermelho (`_DoAntMoveY`).
+    pub faixa_comida_recebida: MensagemFaixa,
+    pub faixa_doacao: MensagemFaixa,
+    pub faixa_canibalismo: MensagemFaixa,
+    pub faixa_ninho_vermelho: MensagemFaixa,
 }
 
 /// Conteúdo de `data/amarela.json`.
@@ -1141,6 +1147,17 @@ fn tentar_largar_ou_pegar(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32
 /// `_EatMyFood(tipo)` (§7.2).
 fn comer(e: &mut Estado, t: &TabelasAmarela, tipo: i32) {
     let maxima = t.regras.vida_maxima;
+    // _EatMyFood: os tipos 1, 2 e 3 põem a mensagem na faixa antes do resto (sem sorteio).
+    let m = &t.mensagens;
+    let faixa = match tipo {
+        1 => Some(m.faixa_comida_recebida),
+        2 => Some(m.faixa_doacao),
+        3 => Some(m.faixa_canibalismo),
+        _ => None,
+    };
+    if let Some(f) = faixa {
+        e.eventos.push(Evento::MensagemFaixa(f));
+    }
     // Tipo 0 (comida): 0x2C; tipo 3 (ovo, canibalismo): 0x2C e o arroto 10.
     if tipo == 0 || tipo == 3 {
         e.pedir_som(t.sons.comer);
@@ -1165,7 +1182,7 @@ fn comer(e: &mut Estado, t: &TabelasAmarela, tipo: i32) {
         return;
     }
     if tipo == 1 {
-        // Diálogo e mensagem 11 de 4/1010 ("You feel much better now!"): interface.
+        // `_YellowDialog` da trofalaxia (quadro com imagem): ainda não no port [lacuna].
     }
     let vida = e.amarela.saude as i32;
     let pop = e.preta.populacao as i32;
@@ -1455,7 +1472,10 @@ fn passo_da_ordem(e: &mut Estado, t: &TabelasAmarela) -> (i32, Option<Alvo>) {
             remarcar(e, t, MARCA_AMARELA);
             e.pedir_som(t.sons.passagem);
             centralizar(e);
-            // Entrando no vermelho: mensagem 4 de 4/1010 ("You have entered the red nest"), interface.
+            // Entrando no vermelho: "You have entered the red nest" na faixa.
+            if e.amarela.plano == 3 {
+                e.eventos.push(Evento::MensagemFaixa(t.mensagens.faixa_ninho_vermelho));
+            }
             return (-1, alvo);
         }
         sair_do_ninho(e, t);

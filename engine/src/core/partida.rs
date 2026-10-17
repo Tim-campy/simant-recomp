@@ -75,6 +75,15 @@ pub enum RespostaBotao {
     NaoImplementado(u16),
 }
 
+/// Marcadores da faixa (`ribBM1`–`7`, `_DoBookMark`): objetos e bitmaps do marcador posto
+/// (`base + índice`, selecionado e normal), som de erro.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct ConfigMarcadores {
+    pub objetos: Vec<String>,
+    pub bitmap_posto: [u16; 2],
+    pub som_vazio: u16,
+}
+
 /// Botões configuráveis da faixa (`ribUserDef1A`–`1H`) e a função de cada um.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct BotoesUsuario {
@@ -117,6 +126,7 @@ pub struct ConfigPartida {
     /// Espera de `_processEdit` no clique simples, em unidades de `_TickCount` (6).
     pub espera_clique_simples_tickcount: u64,
     pub botoes_usuario: BotoesUsuario,
+    pub marcadores: ConfigMarcadores,
 }
 
 impl ConfigPartida {
@@ -192,6 +202,8 @@ pub struct Partida {
     bloqueio_ms: u64,
     /// `_PauseGame(1)` do Load que espera os quadros abertos no `_FullCount` fecharem.
     pausar_ao_fechar: bool,
+    /// `_BookMarks` (`8:8aa0`, fora do save): plano e canto da vista de cada marcador.
+    pub marcadores: [Option<(i16, i32, i32)>; 7],
 }
 
 impl Partida {
@@ -225,6 +237,7 @@ impl Partida {
 
             bloqueio_ms: 0,
             pausar_ao_fechar: false,
+            marcadores: [None; 7],
         };
         p.vistas_para_estado();
         p
@@ -400,6 +413,14 @@ impl Partida {
                         self.avisos.receber_fim_de_jogo(&self.estado, agora);
                     }
                 }
+                Evento::MensagemFaixa(m) => {
+                    use super::avisos::TextoFaixa;
+                    let agora = self.agora();
+                    let opcao = self.estado.partida.opcoes[4] != 0;
+                    let texto = TextoFaixa::Lista { lista: m.lista, indice: m.indice as usize };
+                    self.avisos.editar(Some(texto), Some(u32::from(m.duracao)), m.importante, opcao, agora);
+                    self.redesenhar = true;
+                }
                 Evento::Mensagem(id) => {
                     let licoes = &self.regras.quintal.conselhos.licoes;
                     self.avisos.receber_mensagem(id, self.estado.partida.opcoes[3] != 0, licoes);
@@ -519,6 +540,40 @@ impl Partida {
             AcaoPartida::Salvar | AcaoPartida::SalvarComo => {}
         }
         self.redesenhar = true;
+    }
+
+    /// Marcador `i` da faixa (`_DoBookMark`, `1000:08a6`). Com Ctrl, guarda o plano e o canto da
+    /// vista e avisa "Bookmark has been placed."; sem Ctrl, vai até ele (`_GotoMapPoint` no centro
+    /// da vista guardada) ou, se vazio, som de erro e "Bookmark has not been placed.".
+    pub fn marcador(&mut self, i: usize, ctrl: bool) {
+        let Some(slot) = self.marcadores.get(i).copied() else { return };
+        let agora = self.agora();
+        let f = self.avisos.cfg.faixa.clone();
+        if ctrl {
+            let v = &self.nav.vista;
+            self.marcadores[i] = Some((self.nav.plano_mapa, v.x, v.y));
+            self.avisos.mensagem_literal(&f.marcador_posto, f.duracao_botao, agora);
+        } else if let Some((plano, x, y)) = slot {
+            let (w, h) = (self.nav.vista.largura, self.nav.vista.altura);
+            self.nav.ir_para_amarela(plano, w / 2 + x, h / 2 + y);
+            self.vistas_para_estado();
+        } else {
+            self.eventos.push_back(Evento::Som(self.cfg.marcadores.som_vazio));
+            self.avisos.mensagem_literal(&f.marcador_ausente, f.duracao_botao, agora);
+        }
+        self.redesenhar = true;
+    }
+
+    /// Bitmaps (selecionado, normal) dos marcadores postos, pelo nome do objeto da faixa.
+    pub fn bitmaps_dos_marcadores(&self) -> Vec<(String, u16, u16)> {
+        let c = &self.cfg.marcadores;
+        self.marcadores
+            .iter()
+            .zip(&c.objetos)
+            .enumerate()
+            .filter(|(_, (m, _))| m.is_some())
+            .map(|(i, (_, nome))| (nome.clone(), c.bitmap_posto[0] + i as u16, c.bitmap_posto[1] + i as u16))
+            .collect()
     }
 
     /// Clique simples num botão configurável da faixa (`_DoUserButton`, sem segurar o botão).

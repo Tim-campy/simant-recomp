@@ -47,7 +47,8 @@
     "malvadeza_minima_populacao": 21,
     "malvadeza_base": 30,
     "malvadeza_sorteio": 100,
-    "musica_ataque_vermelho": 11018
+    "musica_ataque_vermelho": 11018,
+    "mensagem_ataque_vermelho": {"lista": 1020, "indice": 5, "duracao": 120, "importante": false}
   },
   "_origem": {
     "s_ao_pegar_comida": "_DoRandAntA/_DoToNestAnt/_DoForageAnt: S = 200 ao pegar comida (trilha de volta)",
@@ -68,7 +69,8 @@
     "malvadeza_minima_populacao": "_GstrR: população vermelha abaixo disto não ataca por sorteio",
     "malvadeza_base": "_GstrR: _JustToBeMean = SRand1(malvadeza_sorteio) + malvadeza_base",
     "malvadeza_sorteio": "_GstrR: ver malvadeza_base",
-    "musica_ataque_vermelho": "_GstrR: música tocada no ataque vermelho (_myBeginSong)"
+    "musica_ataque_vermelho": "_GstrR: música tocada no ataque vermelho (_myBeginSong)",
+    "mensagem_ataque_vermelho": "_GstrR (1030:03c2) e _StartAttack (1030:050e): _EditMessage(_AdviceStrs[5] = SHARED 4/1020[5] \"The red ants are attacking!\", 0x78, 0)"
   },
   "sons": {
     "_origem": "docs/spec/regras/som.md: _AddFood(n, 1) (1030:6a58)",

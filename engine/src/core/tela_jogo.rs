@@ -231,6 +231,10 @@ pub fn vista_do_save(jogo: &JogoSalvo, posicao: PosicaoVista, largura: i32, altu
 /// save. A navegação (plano e vista) fica de fora, em `Navegacao`.
 pub struct TelaDeJogo {
     pub cfg: ConfigTelaJogo,
+    /// Bitmaps trocados em botões da faixa (`_win_SetButtonBitmaps`): nome, selecionado, normal.
+    pub bitmaps_da_faixa: Vec<(String, u16, u16)>,
+    /// Botões da faixa com o estado "selecionado" ligado ou desligado pelo jogo (`_UpdateUserButtons`).
+    pub selecao_da_faixa: Vec<(String, bool)>,
     faixa: Janela,
     /// Canto do objeto 0 da faixa na área cliente.
     origem_faixa: (i16, i16),
@@ -297,6 +301,8 @@ impl TelaDeJogo {
             vida: rec.camadas,
             amarela,
             pendencias,
+            bitmaps_da_faixa: Vec::new(),
+            selecao_da_faixa: Vec::new(),
         })
     }
 
@@ -348,6 +354,20 @@ impl TelaDeJogo {
         let id_faixa = interface.moldura.faixa.janela;
         // _SetMapPlaneLocation: com faixa, seleciona o botão do plano mostrado (e só ele).
         let mut faixa = self.faixa.clone();
+        for ob in faixa.objetos.iter_mut() {
+            if let Some((_, s, n)) = self.bitmaps_da_faixa.iter().find(|(nome, _, _)| *nome == ob.nome) {
+                if let crate::formats::janela::Conteudo::BotaoBitmap { selecionado, normal } = &mut ob.conteudo {
+                    (*selecionado, *normal) = (*s, *n);
+                }
+            }
+            if let Some((_, sel)) = self.selecao_da_faixa.iter().find(|(nome, _)| *nome == ob.nome) {
+                if *sel {
+                    ob.flags |= FLAG_SELECIONADO;
+                } else {
+                    ob.flags &= !FLAG_SELECIONADO;
+                }
+            }
+        }
         for ob in faixa.objetos.iter_mut().filter(|o| cfg.botao_do_plano.values().any(|n| *n == o.nome)) {
             ob.flags &= !FLAG_SELECIONADO;
         }

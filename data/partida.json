@@ -47,5 +47,11 @@
   "botoes_usuario": {
     "objetos": ["ribUserDef1A", "ribUserDef1B", "ribUserDef1C", "ribUserDef1D", "ribUserDef1E", "ribUserDef1F", "ribUserDef1G", "ribUserDef1H"],
     "funcoes": [15, 0, 1, 3, 7, 6, 5, 10]
+  },
+  "_marcadores": "_DoBookMark (1000:08a6): ribBM1–7 (ids 0x2218–0x221e). Ctrl+clique (GetAsyncKeyState(VK_CONTROL), push 0x11 no código) põe o marcador e troca os bitmaps do botão para 0x38dd + i / 0x38ab + i (selecionado / normal); _ClearBookmarks volta a 0x3899 + i / 0x3867 + i (os do layout). Marcador vazio: _myBeginSound(1).",
+  "marcadores": {
+    "objetos": ["ribBM1", "ribBM2", "ribBM3", "ribBM4", "ribBM5", "ribBM6", "ribBM7"],
+    "bitmap_posto": [14557, 14507],
+    "som_vazio": 1
   }
 }

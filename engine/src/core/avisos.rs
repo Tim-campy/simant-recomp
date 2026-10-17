@@ -55,6 +55,8 @@ pub struct ConfigFaixa {
     pub duracao_botao: u32,
     pub fator_duracao: [u64; 2],
     pub velocidade: Vec<String>,
+    pub marcador_posto: String,
+    pub marcador_ausente: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -199,6 +201,11 @@ impl Avisos {
     }
 
     /// Mensagem do botão de velocidade (`_DoUserButton` caso 6), já com a velocidade nova.
+    /// Texto literal importante com prazo (os do DGROUP: marcadores).
+    pub fn mensagem_literal(&mut self, texto: &str, duracao: u32, agora: u64) {
+        self.editar(Some(TextoFaixa::Literal(texto.to_string())), Some(duracao), true, false, agora);
+    }
+
     pub fn mensagem_de_velocidade(&mut self, velocidade: i16, agora: u64) {
         let f = &self.cfg.faixa;
         if let Some(t) = usize::try_from(velocidade).ok().and_then(|v| f.velocidade.get(v)) {

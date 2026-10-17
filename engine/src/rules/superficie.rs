@@ -82,6 +82,8 @@ pub struct RegrasSuperficieDados {
     pub malvadeza_base: i16,
     pub malvadeza_sorteio: u16,
     pub musica_ataque_vermelho: u16,
+    /// `_EditMessage(_AdviceStrs[5], 0x78, 0)`: "The red ants are attacking!".
+    pub mensagem_ataque_vermelho: super::estado::MensagemFaixa,
 }
 
 /// Conteúdo de `data/superficie.json`.
@@ -1262,8 +1264,7 @@ fn estrategia_vermelha(e: &mut Estado, t: &TabelasSuperficie) -> i16 {
     // MALVADO.
     e.lider_vermelha.malvadeza = e.s.rand1(r.malvadeza_sorteio) as i16 + r.malvadeza_base;
     e.eventos.push(super::estado::Evento::Musica(r.musica_ataque_vermelho));
-    // [lacuna] `_EditMessage(_AdviceStrs[5], 120)` ("The red ants are attacking!"): falta um evento
-    // de mensagem na janela de edição no `Estado`.
+    e.eventos.push(super::estado::Evento::MensagemFaixa(r.mensagem_ataque_vermelho));
     0
 }
 
