@@ -9,7 +9,8 @@
   "edicao": {
     "janela": 0,
     "area": "editTileArea",
-    "ajuste_area_com_faixa": 1,
+    "_ajuste_area_com_faixa": "Pixels somados à largura e à altura do editTileArea antes de dividir por 16. _win_GetObjRect soma 1 com faixa, o que daria 26 colunas; mas na bancada o original centraliza a amarela em x = 34 com _MapPnt.x = 22, ao criar o Quick Game (QUICK2) e ao carregar um save: _editWidth = 25 (ou 24). Com 0 o port chega a 25 × 19, as 25 colunas visíveis [medido; o retângulo real da área depois de _win_Recalc com a janela maximizada não foi calculado].",
+    "ajuste_area_com_faixa": 0,
     "area_na_tela": [24, 120],
     "posicao": "salva",
     "moldura": {

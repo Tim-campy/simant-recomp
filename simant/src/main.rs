@@ -319,8 +319,12 @@ impl Sessao<'_> {
         // Tabelas de todas as partes com mods (data/*.json); o seno da geração já foi lido do banco.
         let regras = RegrasOriginais { geracao: Some(geracao), ..RegrasOriginais::carregar_sem_banco(recursos)? };
         let cfg_avisos: ConfigAvisos = recursos.dados(avisos::ARQUIVO_CONFIG)?;
-        let partida =
+        let mut partida =
             Partida::nova(estado, nav, regras, TabelasAmarela::carregar(recursos)?, cfg_sim, cfg_partida, cfg_avisos);
+        if matches!(origem, Origem::Save(_)) {
+            // File → Load: _FullCount e o jogo pausado (mensagens.md §6).
+            partida.ao_carregar();
+        }
         let arquivo = match origem {
             Origem::Save(p) => Some(p.to_path_buf()),
             Origem::Novo(_) => None,

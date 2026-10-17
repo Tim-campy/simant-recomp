@@ -60,9 +60,9 @@ fn vista_do_quick2_salva_e_ao_carregar() {
     let j = quick2();
     let salva = vista_do_save(&j, PosicaoVista::Salva, 26, 19).unwrap();
     assert_eq!((salva.plano, salva.x, salva.y), (Plano::NinhoPreto, 22, 0));
-    // Ao carregar, centraliza em (_MeLocX, _MeLocY) = (34, 9): x = 34 − 26/2 = 21 [hipótese, jogo.md].
-    let carregada = vista_do_save(&j, PosicaoVista::AoCarregar, 26, 19).unwrap();
-    assert_eq!((carregada.x, carregada.y), (21, 0));
+    // Ao carregar, centraliza em (_MeLocX, _MeLocY) = (34, 9): x = 34 − 25/2 = 22 (bancada, jogo.md).
+    let carregada = vista_do_save(&j, PosicaoVista::AoCarregar, 25, 19).unwrap();
+    assert_eq!((carregada.x, carregada.y), (22, 0));
 }
 
 #[test]
@@ -94,8 +94,8 @@ fn navegacao_do_quick2_ao_carregar() {
     let texto = std::fs::read_to_string(raiz().join("data/navegacao.json")).unwrap();
     let cfg: ConfigNavegacao = serde_json::from_str(&texto).unwrap();
     assert_eq!(cfg.posicao_inicial, PosicaoVista::AoCarregar);
-    let mut n = Navegacao::do_save(&quick2(), PosicaoVista::AoCarregar, 26, 19).unwrap();
-    assert_eq!((n.plano_mapa, n.vista.x, n.vista.y), (2, 21, 0));
+    let mut n = Navegacao::do_save(&quick2(), PosicaoVista::AoCarregar, 25, 19).unwrap();
+    assert_eq!((n.plano_mapa, n.vista.x, n.vista.y), (2, 22, 0));
     // _DoLoadInitializations grava (_MeLocX, _MeLocY) = (34, 9) no ponto do ninho preto.
     assert_eq!(n.pontos[2], (34, 9));
     assert!(n.aplicar(Acao::Superficie));
@@ -114,7 +114,7 @@ fn botoes_da_faixa_e_outros_planos_do_quick2() {
     let interface = Interface::carregar(&r, cfg.tabela_posicoes).unwrap();
     let j = quick2();
     let tela = TelaDeJogo::carregar(&cfg, &r, &interface, &j).unwrap();
-    assert_eq!((tela.largura_vista, tela.altura_vista), (26, 19));
+    assert_eq!((tela.largura_vista, tela.altura_vista), (25, 19));
     // Cada botão configurado existe na faixa e é encontrado pelo clique no seu centro.
     let id_faixa = interface.moldura.faixa.janela;
     let faixa = engine::core::telas::carregar_janela(&r, id_faixa).unwrap();

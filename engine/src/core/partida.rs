@@ -190,6 +190,8 @@ pub struct Partida {
 
     /// Tempo real em que a simulação fica parada pela espera do clique simples (ms).
     bloqueio_ms: u64,
+    /// `_PauseGame(1)` do Load que espera os quadros abertos no `_FullCount` fecharem.
+    pausar_ao_fechar: bool,
 }
 
 impl Partida {
@@ -222,6 +224,7 @@ impl Partida {
             avisos: Avisos::new(cfg_avisos),
 
             bloqueio_ms: 0,
+            pausar_ao_fechar: false,
         };
         p.vistas_para_estado();
         p
@@ -263,6 +266,7 @@ impl Partida {
         self.ms_total += ms;
         if self.avisos.passar_tempo(self.agora()).is_some() {
             self.redesenhar = true;
+            self.depois_de_fechar();
         }
         if self.avisos.tem_modal() {
             self.resto_ms = 0;
@@ -454,13 +458,43 @@ impl Partida {
         self.redesenhar = true;
     }
 
+    /// O que o File → Load faz depois de ler os blocos (`_LoadGame` `1010:9fa0` e
+    /// `_DoLoadInitializations` `1010:9dbe`), além da reconstrução da vida e da vista (já feitas
+    /// por `Estado::de_save` e `Navegacao::do_save`): `_FullCount` (`_CountAnts` + `_Feedback`),
+    /// que recenseia as castas e já detecta a rainha que sumiu (quadros 10010/10011 e fim de jogo
+    /// logo no Load, caso C-10), `_SetDefaultWindPrompt(1)` e `_PauseGame(1)`: o jogo carregado
+    /// fica pausado com "Game Paused" (bancada-qemu.md, "Carregar um save injetado").
+    pub fn ao_carregar(&mut self) {
+        self.vistas_para_estado();
+        self.estado.contar_formigas();
+        self.tratar_eventos();
+        self.conselho_na_faixa();
+        // Os quadros do _FullCount são modais: a pausa só vem depois que eles fecham (bancada: com o
+        // quadro na tela, a faixa ainda está vazia).
+        if self.avisos.tem_modal() {
+            self.pausar_ao_fechar = true;
+        } else {
+            self.definir_pausa(true);
+        }
+    }
+
+    /// O que espera os avisos modais fecharem (a pausa do Load).
+    fn depois_de_fechar(&mut self) {
+        if self.pausar_ao_fechar && !self.avisos.tem_modal() {
+            self.pausar_ao_fechar = false;
+            self.definir_pausa(true);
+        }
+    }
+
     // --- avisos modais -------------------------------------------------------------------------
 
     /// Fecha o aviso modal da frente (clique na área do quadro, Espaço, clique no fim de jogo) e
     /// devolve qual era. Depois do fim de jogo, o original chama `_NewGame(0)`: a interface decide.
     pub fn fechar_modal(&mut self) -> Option<Modal> {
         self.redesenhar = true;
-        self.avisos.fechar_modal()
+        let m = self.avisos.fechar_modal();
+        self.depois_de_fechar();
+        m
     }
 
     // --- entradas do jogador -------------------------------------------------------------------

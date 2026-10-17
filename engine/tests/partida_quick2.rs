@@ -24,7 +24,7 @@ fn partida() -> Partida {
     let layout = LayoutSave::carregar(&raiz().join("data/save_layout.json")).unwrap();
     let jogo = JogoSalvo::abrir(&layout, &raiz().join("tests/referencias/saves/QUICK2.ANT")).unwrap();
     let estado = Estado::de_save(&jogo).unwrap();
-    let nav = Navegacao::do_save(&jogo, PosicaoVista::AoCarregar, 26, 19).unwrap();
+    let nav = Navegacao::do_save(&jogo, PosicaoVista::AoCarregar, 25, 19).unwrap();
     Partida::nova(
         estado,
         nav,
@@ -159,6 +159,35 @@ fn botao_de_velocidade_e_espera_do_clique() {
     assert_eq!(p.avancar(1 + 17).mensagens, 1);
     p.clicar(x, y + 1, true);
     assert_eq!(p.avancar(17).mensagens, 1);
+}
+
+/// File → Load (`_DoLoadInitializations`): `_FullCount` já detecta a rainha que sumiu (C-10 na
+/// bancada: o quadro 10010 aparece logo no Load, `GameTime` 78) e o jogo fica pausado depois que os
+/// quadros fecham.
+#[test]
+fn load_conta_as_formigas_e_pausa_depois_dos_quadros() {
+    use engine::core::avisos::{Modal, TextoFaixa};
+    let mut p = partida();
+    p.estado.ninho_b.lista.vagas[0].tipo = 0;
+    p.ao_carregar();
+    assert_eq!(p.estado.partida.tempo, 78);
+    assert_eq!(p.avisos.modal(), Some(&Modal::Quadro { texto: 10010, imagem: None }));
+    assert_eq!(p.estado.partida.pausado, 0, "a pausa espera os quadros");
+    let agora = p.agora();
+    assert_eq!(p.avisos.texto_da_faixa(agora), None);
+    p.fechar_modal();
+    assert_eq!(p.avisos.modal(), Some(&Modal::Quadro { texto: 10011, imagem: None }));
+    p.fechar_modal();
+    assert!(!p.avisos.tem_modal());
+    assert_eq!(p.estado.partida.pausado, 1);
+    let agora = p.agora();
+    assert_eq!(p.avisos.texto_da_faixa(agora), Some(&TextoFaixa::Lista { lista: 1010, indice: 2 }));
+    // QUICK2 sem mudança: só recontagem (as castas do save batem com a bancada) e a pausa.
+    let mut q = partida();
+    q.ao_carregar();
+    assert!(!q.avisos.tem_modal());
+    assert_eq!(q.estado.partida.pausado, 1);
+    assert_eq!(q.estado.preta.castas, [3, 2, 0, 0, 0, 1], "_CastePopB recontado no Load (bancada-qemu.md)");
 }
 
 #[test]
