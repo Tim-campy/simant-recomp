@@ -101,11 +101,50 @@ class Sessao:
             self.b.executar(f"teclas {c}")
         self.log(f"teclas {' '.join(combos)}")
 
+    def capturar_tick(self):
+        """Como Depurador.capturar_tick, mas um tick que abre uma caixa de mensagem modal (morte da amarela,
+        fim de jogo...) não volta sozinho: depois de 15 s sem chegar ao retorno de _DoAntSim, captura a
+        tela, aperta Enter e espera o retorno de novo (até 5 vezes). O relógio lido até a caixa é
+        guardado; o que a caixa lê depois não."""
+        dep, mj = self.dep, self.mj
+        dep.ir_entrada()
+        out = {"estado_antes.bin": mj.estado(), "vida_antes.bin": dep.vida()}
+        ex = {"antes": dep.extras()}
+        relogio = []
+        try:
+            dep.ir_saida(timeout=15, relogio=relogio)
+        except RuntimeError as err:
+            gt = ex["antes"]["GameTime"]
+            for k in range(5):
+                self.log(f"tick {gt} parado ({err}); tela em re_trabalho/cen/dialogo_{gt}_{k}.png e Enter")
+                self.b.executar(f"capturar re_trabalho/cen/dialogo_{gt}_{k}.png")
+                dep.retomar()
+                # caixa de morte da amarela: "Click here to continue" no centro da janela de edição
+                self.b.executar("clicar_em 320 330")
+                time.sleep(1)
+                self.b.executar("teclas ret")
+                time.sleep(2)
+                try:
+                    dep._rodar_ate(dep.retorno, 15)
+                    break
+                except RuntimeError as e2:
+                    err = e2
+            else:
+                raise
+            ex["dialogos"] = k + 1
+        out["estado_depois.bin"] = mj.estado()
+        out["vida_depois.bin"] = dep.vida()
+        ex["depois"] = dep.extras()
+        ex["antes"]["MacTickCount"] = relogio[0] if relogio else None
+        ex["MacTickCount_lidos"] = relogio
+        out["extras.json"] = ex
+        return out
+
     def gravar(self, saida, n, parar=None):
         """Grava n ticks consecutivos em saida/tick_NNNNNN; `parar(save_depois)` encerra antes."""
         nomes = []
         for _ in range(n):
-            arqs = self.dep.capturar_tick()
+            arqs = self.capturar_tick()
             gt = arqs["extras.json"]["antes"]["GameTime"]
             pasta = Path(saida).resolve() / f"tick_{gt:06d}"
             for nome_arq, conteudo in arqs.items():
