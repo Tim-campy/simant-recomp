@@ -87,3 +87,37 @@ fn janela_do_quintal_desenha_os_quatro_modos() {
         }
     }
 }
+
+/// Balão do menino (`_DrawSimKid` + `_MakeBalloon`): com `_BoyMessOn` aparece acima do menino, com o
+/// contorno preto e o fundo branco das peças; sem ele, nada muda.
+#[test]
+fn balao_do_menino_aparece_acima_dele() {
+    let Some(r) = recursos() else { return };
+    let interface = Interface::carregar(&r, 0).unwrap();
+    let d = DesenhoQuintal::carregar(ConfigQuintalMapa::carregar(&r).unwrap(), &r, &interface).unwrap();
+    let fonte = interface.fontes.get(d.cfg.balao_menino.fonte).and_then(|f| f.as_ref());
+    assert!(fonte.is_some(), "fonte do balão");
+    let mut e = Estado::vazio();
+    e.vistas.modo_quintal = 0;
+    e.menino.presente = 1;
+    e.menino.quadro = 0;
+    e.menino.x = 0xB4;
+    e.menino.y = 0x49;
+    let mut sem = Quadro::new(640, 442, 17);
+    d.desenhar_janela(&mut sem, &e);
+    let mut com = Quadro::new(640, 442, 17);
+    d.desenhar_janela(&mut com, &e);
+    d.desenhar_balao_do_menino(&mut com, &e, fonte);
+    assert_eq!(sem.pixels, com.pixels, "sem _BoyMessOn não há balão");
+    e.menino.mensagem_ligada = 1;
+    e.menino.mensagem_offset = 0;
+    d.desenhar_balao_do_menino(&mut com, &e, fonte);
+    let (ox, oy) = d.cfg.origem();
+    let mudados: Vec<(i32, i32)> = (0..442)
+        .flat_map(|y| (0..640).map(move |x| (x, y)))
+        .filter(|&(x, y)| sem.pixels[(y * 640 + x) as usize] != com.pixels[(y * 640 + x) as usize])
+        .collect();
+    assert!(!mudados.is_empty());
+    // Tudo acima do pé do menino e à direita do canto dele.
+    assert!(mudados.iter().all(|&(x, y)| y < oy + 0x49 + 8 && x >= ox + 0xB4 - 16), "{:?}", mudados.first());
+}

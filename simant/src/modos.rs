@@ -57,14 +57,17 @@ pub fn desenhar(s: &Sessao, q: &mut Quadro) -> Result<Vec<String>, String> {
     let mut pendentes = Vec::new();
     if m.janela.aberta {
         pendentes.extend(m.quintal.desenhar_faixa(q, s.recursos, &s.interface, &s.partida.estado));
+        let fonte_balao = s.interface.fontes.get(m.quintal.cfg.balao_menino.fonte).and_then(|f| f.as_ref());
         if m.janela.na_frente {
             m.quintal.desenhar_janela(q, &s.partida.estado);
+            m.quintal.desenhar_balao_do_menino(q, &s.partida.estado, fonte_balao);
         } else {
             // Atrás da janela de edição: só a parte fora dela aparece.
             let [x, y, w, h] = s.tela.cfg.edicao.moldura.externo;
             let edicao = Retangulo { esq: x, topo: y, dir: x + w, base: y + h };
             let guardado = q.pixels.clone();
             m.quintal.desenhar_janela(q, &s.partida.estado);
+            m.quintal.desenhar_balao_do_menino(q, &s.partida.estado, fonte_balao);
             for yy in edicao.topo.max(0) as usize..(edicao.base.max(0) as usize).min(q.altura) {
                 for xx in edicao.esq.max(0) as usize..(edicao.dir.max(0) as usize).min(q.largura) {
                     let i = yy * q.largura + xx;
