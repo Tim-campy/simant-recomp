@@ -43,7 +43,17 @@ Aceito: prazo = permanente se a duração é negativa (as chamadas usam `0xfffe,
 | `_DoBookMark` | "Bookmark has been placed." / "…has not been placed." (`1048:01a2`, `01bc`) | 0xb4 | sim |
 | `_EndGameDialog` | limpa | permanente | sim |
 
-[código; textos do banco e do DGROUP verificados]. Os marcadores (`_DoBookMark`) e o ataque vermelho de `_SimStrategy` (lista 1020[5], ver superficie.md) ainda não chegam ao port.
+[código; textos do banco e do DGROUP verificados].
+
+Mensagens pedidas pelas regras (`Evento::MensagemFaixa { lista, indice, duracao, importante }`, sem sorteio; os valores ficam nos arquivos de dados das regras) [código]:
+
+| Origem | Texto | Duração | Importante |
+|---|---|---|---|
+| `_GstrR` / `_StartAttack` (ataque vermelho) | 1020[5] "The red ants are attacking!" | 0x78 | não |
+| `_EatMyFood` tipo 1 (trofalaxia) / 2 (doação) / 3 (ovo comido) | 1010[11] / [12] / [13] | 0x78 / 0x78 / 0xb4 | não |
+| `_DoAntMoveY`, passagem para o ninho vermelho | 1010[4] "You have entered the red nest" | 0x168 | não |
+
+Marcadores (`_DoBookMark`, `1000:08a6`, botões `ribBM1`–`7`): **Ctrl**+clique (`GetAsyncKeyState(VK_CONTROL)`: o código empurra 0x11) guarda plano, `_MapPnt`, `_MapMode` e `_YardMode` e troca os bitmaps do botão (`0x38dd + i`/`0x38ab + i`), com "Bookmark has been placed."; clique sem Ctrl num marcador vazio toca o som 1 e mostra "Bookmark has not been placed."; num marcador posto, `_GotoMapPoint(plano, _editWidth/2 + x, _editHeight/2 + y)` [código]. Os marcadores não estão no save; `_NewGame` os limpa. **Bancada:** o Ctrl+clique no `ribBM1` deu a mensagem e os bitmaps iguais ao port (99,73% na faixa; j05) e o clique no `ribBM2` vazio deu "Bookmark has not been placed." (j06). O port não guarda o modo do quintal (a janela do quintal é de outro módulo).
 
 **Bancada** (`m1`–`m4`): depois do Load o jogo fica pausado com "Game Paused"; o botão de velocidade troca por "Game speed now fast." (era normal); despausar (Shift+0) **apaga** essa mensagem (pedido importante de limpar), e ~18 s depois a faixa mostrava o conselho "Your nest needs expansion" [bancada]. O prazo de 270 unidades não foi medido diretamente.
 
@@ -119,8 +129,8 @@ Os objetos `ribUserDef1A`–`1H` (ids `0x2210`–`0x2217`) chamam `_DoUserButton
 
 | Função | Efeito |
 |---|---|
-| 0, 1, 2, 3 | abre a janela Behavior, Caste, History ou Info (port: ainda não) |
-| 4 | liga/desliga as trilhas do mapa (port: ainda não) |
+| 0, 1, 2, 3 | abre a janela Behavior, Caste, History ou Info (port: Behavior, Caste e History em janelas.md; Info ainda não) |
+| 4 | liga/desliga as trilhas do mapa (port: só o estado do botão; a janela do mapa não existe) |
 | 5 | `_SetPause(!_GamePaused)` (§2.3) |
 | 6 | `_GameSpeed` += 1 (3 volta a 0) e a mensagem "Game speed now …" (§2.3) |
 | 7, 9, 10, 11, 12, 13 | alternam `_OptionStates[1]` (Music), `[2]` (Sound Effects), `[5]` (Silly), `[0]` (AutoTrack), `[3]` (Events), `[4]` (Messages) |
@@ -128,7 +138,7 @@ Os objetos `ribUserDef1A`–`1H` (ids `0x2210`–`0x2217`) chamam `_DoUserButton
 | 14 | `_SaveGame(1)` (§6) |
 | 15 | abre a janela de edição e `_GotoMyAnt` |
 
-Com o botão **segurado** (`GetAsyncKeyState(VK_LBUTTON)` no momento do evento), abre a janela 36 (`iconMenu`, bitmap 7200, 16 ícones) para escolher a função do botão; com Shift, só muda este botão, sem Shift os dois botões equivalentes das faixas 34 e 35 [código]. **O port não tem esse menu** (lacuna). Os estados selecionados dos botões (`_UpdateUserButtons`) também não são desenhados.
+Com **Ctrl** apertado (`GetAsyncKeyState(VK_CONTROL)`; o código empurra 0x11 — uma versão anterior deste documento dizia "segurado"), abre a janela 36 (`iconMenu`, bitmap 7200, 16 ícones) para escolher a função do botão; com Shift, só muda este botão, sem Shift os dois botões equivalentes das faixas 34 e 35 [código]. O menu e o estado desenhado dos botões estão em [janelas.md](janelas.md) §4.4 e §5.
 
 **Bancada:** o 6º botão (`ribUserDef1F`, em (159, 96) da tela) mostrou "Game speed now fast." partindo de normal (`m2`) [bancada].
 
@@ -139,9 +149,17 @@ Com o botão **segurado** (`GetAsyncKeyState(VK_LBUTTON)` no momento do evento),
 - **Port:** `Estado::para_save` grava os 307 blocos (a ida e volta é byte a byte, `estado_simulacao.rs`). Ctrl+S grava no arquivo do `--save` (ou no último salvo); sem arquivo, e em Ctrl+A, no nome de `--salvar`, ou no primeiro `SALVOnn.ANT` livre na pasta atual. "… Saved correctly" vai para o terminal (sem caixa de mensagem nem diálogo de arquivo: divergencias.md). Sem janela, `--salvar ARQ` grava o estado depois dos `--ticks`.
 - **Bancada:** `PORT50.ANT` (QUICK2 + 50 ticks no port, `--salvar`) foi carregado pelo original sem erro; o estado lido logo depois do Load difere do arquivo só em `_GamePaused` (o Load pausa), `_CastePopR` (recontado no Load, como com o `QUICK2.ANT`) e `_MapPnt` (21 → 22: a vista que o Load calcula; jogo.md, "Posição ao carregar") [bancada, `port_carregado.ANT`].
 
+### 6.1 O que o Load faz além de ler os blocos (`_LoadGame` `1010:9fa0`, `_DoLoadInitializations` `1010:9dbe`)
+
+- `_FullCount` (`_CountAnts` + `_Feedback`): recenseia as castas — por isso `_CastePopB/R` mudam no Load (bancada-qemu.md) — e já detecta a rainha que sumiu: no caso C-10 os quadros 10010 e 10011 aparecem **logo no Load**, com `_GameTime` = 78 [código + bancada]. Os quadros são modais e aparecem antes de as janelas serem redesenhadas (a captura mostra o jogo anterior atrás do quadro).
+- `_SetDefaultWindows`, `_CenterEdit` na amarela, `_SetDefaultWindPrompt(1)` e, depois de tudo, `_PauseGame(1)`: o jogo carregado fica pausado com "Game Paused" — só depois que os quadros do `_FullCount` fecham (a faixa está vazia com o quadro na tela) [código + bancada m5/m7].
+- Antes de ler: `_RandYard` (consome sorteios; rng.md), `9:9c70` = 1, `_TimeTemp` = 300 e mais três variáveis zeradas [código; o port não reproduz as de fora do save].
+- Port: `Partida::ao_carregar()` (chamado pelo executável no `--save`): `contar_formigas`, eventos, conselho e a pausa, adiada até os quadros fecharem. Os vetores de tick (72/72) não passam por aqui.
+- Vista: o original centraliza a amarela em (34, 9) com `_MapPnt.x` = 22, tanto ao carregar quanto ao criar o Quick Game do QUICK2: `_editWidth` = 25, não 26. O port passou a usar 25 colunas (`ajuste_area_com_faixa` = 0 em `data/tela_jogo.json`); com isso a janela de edição depois do Load bate 99,94% com a captura m7 (só o cursor) [bancada].
+
 ## 7. Espera do clique simples (`_processEdit`, `1000:6a38`)
 
-No clique simples (não duplo) com a janela de edição na frente, o original fica num laço até `_TickCount` = início + 6 (≈ 330 ms), sem tratar mensagens: a simulação não anda. Depois, se o botão continua apertado (`_myButton`) e Shift está solto, abre `_AntMenu` (clique na própria amarela) ou `_MagnifyMenu` (Examine, noutra célula); se o menu devolve uma escolha, a ordem não é dada [código]. O port para a simulação pelos 330 ms (`espera_clique_simples_tickcount` × 55 ms) e dá a ordem na hora; os menus de segurar o botão **não existem** ainda (lacuna).
+No clique simples (não duplo) com a janela de edição na frente, o original fica num laço até `_TickCount` = início + 6 (≈ 330 ms), sem tratar mensagens: a simulação não anda. Depois, se o botão continua apertado (`_myButton`) e Shift está solto, abre `_AntMenu` (clique na própria amarela) ou `_MagnifyMenu` (Examine, noutra célula); se o menu devolve uma escolha, a ordem não é dada [código]. O port para a simulação pelos mesmos 330 ms (`espera_clique_simples_tickcount` × 55 ms) e decide no fim deles, com o botão e o Shift daquele instante: menu da amarela (janelas.md §4.2), Examine (sem a janela 29, lacuna) ou a ordem.
 
 ## 8. Verificação (2026-10-17)
 

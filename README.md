@@ -39,6 +39,8 @@ Opções: `--jogo DIR` (padrão: `SIMANT_DIR` ou `SimAnt-T/MAXIS/ANTWIN`), `--da
 - Velocidade (menu Speed do original): **Shift+0** pausa/despausa, **Shift+1..4** lenta / normal / rápida / ultra. **Ctrl+G** liga o AutoTrack (a vista segue a amarela; desligado por padrão, como no original). O título da janela mostra a velocidade e a pausa. Com o jogo pausado, a amarela ainda anda até o destino (como no original).
 - Botões da segunda linha da faixa (como no original): ir até a amarela, pausa, **velocidade** (cicla e mostra "Game speed now …"), música e balões; os que abririam janelas ainda não fazem nada.
 - **Ctrl+S** salva no arquivo da partida (o do `--save`); **Ctrl+A** salva com outro nome (o de `--salvar`, ou `SALVO01.ANT`, `SALVO02.ANT`… na pasta atual). O `.ANT` gravado é aceito pelo SimAnt original.
+- **Segurar o botão** sobre a formiga amarela abre o menu dela (recrutar, liberar, trocar de corpo; Shift no "Recruit 10" recruta todas). **Ctrl+clique** num botão da segunda linha da faixa abre o menu de ícones para trocar a função do botão. **Ctrl+clique** num marcador (1–7) guarda a vista; clique volta a ela.
+- Janelas: **Ctrl+B** Behavior Control, **Ctrl+C** Caste Control (arraste no triângulo para mudar as proporções; Auto, Manual e Set 1–3), **Ctrl+H** History (os botões ligam até 4 gráficos), **Ctrl+E** volta à janela de edição; os botões da faixa também abrem Behavior e Caste. Um save carregado começa pausado (Shift+0), como no original.
 - As teclas da partida ficam em `data/partida.json` e os avisos em `data/mensagens.json` (sobrescrevíveis por mod).
 
 Modos de jogo (ver `docs/spec/telas/abertura.md`, `quintal.md` e `experimental.md`):

@@ -67,3 +67,6 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `_TileFrame1/2`, `_FillMapLegs` | molduras de azulejo; retângulo com fiapos e pés 4 × 4 (móvel) | geracao-mundo.md §5 |
 | `_CurExpTool`, `_ExpSubStates` | ferramenta do Experimental (0–7) e a subopção de cada uma | [telas/experimental.md](spec/telas/experimental.md) |
 | `_processExp`, `_DoTool` | clique/arrasto no mapa no Experimental e a ferramenta aplicada | `1010:7022`, `1010:727e` |
+| `_AntMenu` / `_win_DoProxMenu` | menu da formiga amarela ao segurar o botão sobre ela; itens viram `_YellowCommand` | `1010:6d24`, `1030:de62`; [telas/janelas.md](spec/telas/janelas.md) |
+| `_casteLevels` / `_modeLevels` | os três níveis (0–65535) dos triângulos Caste e Behavior Control | `9:9b64`, `9:9c74`; janelas.md §2 |
+| `_DoBookMark` | marcadores 1–7 da faixa (Ctrl+clique guarda a vista) | `1000:08a6`; mensagens.md §2.3 |

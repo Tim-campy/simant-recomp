@@ -216,6 +216,8 @@ pub struct Partida {
     pub marcadores: [Option<(i16, i32, i32)>; 7],
     /// Função de cada botão configurável da faixa (`1048:0012`), trocada pelo menu de ícones.
     pub funcoes_botoes: Vec<u16>,
+    /// `_showTrails` (botão 4): trilhas de cheiro na janela do mapa.
+    pub mostrar_trilhas: bool,
 }
 
 impl Partida {
@@ -251,6 +253,7 @@ impl Partida {
             pausar_ao_fechar: false,
             marcadores: [None; 7],
             funcoes_botoes: Vec::new(),
+            mostrar_trilhas: false,
         };
         p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
         p.vistas_para_estado();
@@ -618,6 +621,10 @@ impl Partida {
                 self.avisos.mensagem_de_velocidade(v, agora);
             }
             7 => alternar(&mut p.opcoes[1]),
+            4 => {
+                // _showTrails: as trilhas só aparecem na janela do mapa, que o port ainda não tem.
+                self.mostrar_trilhas = !self.mostrar_trilhas;
+            }
             9 => alternar(&mut p.opcoes[2]),
             10 => alternar(&mut p.opcoes[5]),
             11 => alternar(&mut p.opcoes[0]),
@@ -711,7 +718,7 @@ impl Partida {
             .zip(&self.funcoes_botoes)
             .map(|(nome, &f)| {
                 let ligado = match f {
-                    4 => Some(false), // trilhas do mapa: a janela do mapa ainda não existe
+                    4 => Some(self.mostrar_trilhas),
                     5 => Some(p.pausado != 0),
                     7 => Some(p.opcoes[1] != 0),
                     9 => Some(p.opcoes[2] != 0),
