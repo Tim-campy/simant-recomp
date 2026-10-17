@@ -263,10 +263,31 @@ fn principal() -> Result<(), String> {
             let a = *a.get(m as usize).ok_or("--quintal: modo 0 a 3")?;
             s.modos.janela.aplicar(a, &mut s.partida.estado);
         }
+        if let Some(m) = o.janela_mapa {
+            s.abrir_mapa();
+            match m {
+                2 => {
+                    s.partida.navegar(Acao::NinhoPreto);
+                }
+                3 => {
+                    s.partida.navegar(Acao::NinhoVermelho);
+                }
+                4..=8 => s.partida.botao_de_cheiro(m),
+                _ => {}
+            }
+        }
+        s.partida.mostrar_trilhas = o.trilhas;
+        if o.trilhas {
+            // Trilhas: a primeira geração é a base; os ticks seguintes acumulam.
+            s.quadro_rgb()?;
+        }
         if let Some(n) = o.ticks {
             let antes = s.partida.estado.partida.tempo;
             for _ in 0..n {
                 s.partida.rodar_tick();
+                if o.janela_mapa.is_some() {
+                    s.mapa.atualizar(&s.partida.estado, s.partida.mostrar_trilhas);
+                }
             }
             s.registrar_eventos();
             println!("{n} ticks: GameTime {antes} -> {}", s.partida.estado.partida.tempo);

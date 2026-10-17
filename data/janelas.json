@@ -47,6 +47,7 @@
   "_cores_grafico": "_DrawControlLevels: contorno da barra _ConvColor(0xf) e o resto da coluna _ConvColor(0) (cores do Mac: 15 = preto, 0 = branco) [hipótese conferida na captura].",
   "cor_contorno_barra": 0,
   "cor_fundo_grafico": 15,
+  "mapa": {"janela": 1, "objeto_area": "mapTileArea"},
   "historico": {
     "_comentario": "Janela 21 (_OpenHistoryWindow, _ProcHistoryEvent, _ToggleHistButton, _drawHistGraph em 1000:8a6a–8e78). Séries de _HistGraphs (8:8672) e parceiras de escala de _AltHistGraphs (8:869a), por símbolo do save; nomes da lista 4/1050. As cores dos 4 lugares vêm de _ConvColor(0x43, 0x46, 0x49, 0x45) (8:8e4c), cuja tabela não foi lida [hipótese].",
     "janela": 21,

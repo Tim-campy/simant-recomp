@@ -219,7 +219,8 @@ pub struct Partida {
     pub marcadores: [Option<(i16, i32, i32)>; 7],
     /// Função de cada botão configurável da faixa (`1048:0012`), trocada pelo menu de ícones.
     pub funcoes_botoes: Vec<u16>,
-    /// `_showTrails` (botão 4): trilhas de cheiro na janela do mapa.
+    /// `_showTrails` (botão 4): trilhas na janela do mapa — os rastros das formigas acumulados, não
+    /// o feromônio (telas/mapa.md §2.6).
     pub mostrar_trilhas: bool,
     /// Janelas abertas/na frente e minimizada, atualizadas pela interface: decidem os sorteios do
     /// desenho depois de cada tick (`rules::desenho`, rng.md "Sorteios do desenho"). `ativa` vem do
@@ -418,6 +419,11 @@ impl Partida {
         let e = &mut self.estado;
         let n = &self.nav;
         let par = |(x, y): (i32, i32)| (x as i16, y as i16);
+        // _SetMapPlane termina com _SetMapModeAnt(_MapPlane): trocar de plano volta ao mapa simples
+        // dele (telas/mapa.md); no mesmo plano, o modo de feromônio escolhido fica.
+        if e.vistas.plano != n.plano_mapa {
+            e.vistas.modo_mapa = n.plano_mapa;
+        }
         e.vistas.plano = n.plano_mapa;
         e.vistas.ponto = (n.vista.x as i16, n.vista.y as i16);
         e.vistas.ponto_quintal = par(n.pontos[0]);
@@ -631,6 +637,19 @@ impl Partida {
             .collect()
     }
 
+    /// Botão de cheiro da faixa (`ribBNestScent`… → `_SetMapModeAnt(n)`, n de 4 a 8): os feromônios
+    /// só existem na superfície (antes, `_SetMapPlane(1)`); o mesmo botão de novo volta ao mapa
+    /// simples. [o original também grava `_ELayerMode` para a janela de edição; o port não.]
+    pub fn botao_de_cheiro(&mut self, n: i16) {
+        if self.nav.plano_mapa != 1 {
+            self.navegar(Acao::Superficie);
+        }
+        self.vistas_para_estado();
+        let e = &mut self.estado;
+        e.vistas.modo_mapa = super::janela_mapa::modo_do_botao_de_cheiro(e.vistas.modo_mapa, n);
+        self.redesenhar = true;
+    }
+
     /// Clique simples num botão configurável da faixa (`_DoUserButton`, sem segurar o botão).
     pub fn botao_usuario(&mut self, funcao: u16) -> RespostaBotao {
         let p = &mut self.estado.partida;
@@ -648,7 +667,7 @@ impl Partida {
             }
             7 => alternar(&mut p.opcoes[1]),
             4 => {
-                // _showTrails: as trilhas só aparecem na janela do mapa, que o port ainda não tem.
+                // _showTrails: rastros acumulados na janela do mapa (core/janela_mapa.rs).
                 self.mostrar_trilhas = !self.mostrar_trilhas;
             }
             9 => alternar(&mut p.opcoes[2]),

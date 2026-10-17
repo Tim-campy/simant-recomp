@@ -121,6 +121,12 @@ pub fn tecla(s: &mut Sessao, ev: &EventoNav) -> Resposta {
         return Resposta::Tratada;
     }
     if let Some(a) = m.quintal.cfg.acao_da_tecla(ev) {
+        if a == quintal_mapa::AcaoQuintal::Abrir && !m.janela.aberta {
+            // _OpenMapYard: sem o quintal aberto, Ctrl+M abre a janela do mapa (_YardToMap).
+            s.abrir_mapa();
+            println!("mapa aberto (modo {})", s.partida.estado.vistas.modo_mapa);
+            return Resposta::Tratada;
+        }
         m.janela.aplicar(a, &mut s.partida.estado);
         println!("quintal: {a:?} (modo {})", s.partida.estado.vistas.modo_quintal);
         return Resposta::Tratada;

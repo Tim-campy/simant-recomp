@@ -37,6 +37,8 @@ pub(crate) struct Sessao<'a> {
     /// Diálogos do Windows (data/dialogos.json) e o aberto agora (simant/src/arquivos.rs).
     pub(crate) dialogos_cfg: engine::core::dialogos::ConfigDialogos,
     pub(crate) dialogo: Option<arquivos::Dialogo>,
+    /// Janela do mapa (core/janela_mapa.rs): buffer das células e trilhas.
+    pub(crate) mapa: engine::core::janela_mapa::JanelaMapa,
 }
 
 /// Para quem vai a escolha do menu aberto.
@@ -105,6 +107,7 @@ impl Sessao<'_> {
         let janelas = JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?, &interface);
         let menus_cfg: ConfigMenus = recursos.dados(menus::ARQUIVO_CONFIG)?;
         let dialogos_cfg = recursos.dados(engine::core::dialogos::ARQUIVO_CONFIG)?;
+        let mapa = engine::core::janela_mapa::JanelaMapa::carregar(recursos)?;
         Ok(Sessao {
             recursos,
             interface,
@@ -122,6 +125,7 @@ impl Sessao<'_> {
             clique_pendente: None,
             dialogos_cfg,
             dialogo: None,
+            mapa,
         })
     }
 
@@ -149,13 +153,31 @@ impl Sessao<'_> {
             self.tela.bitmaps_da_faixa.push((nome.clone(), s, n));
             self.tela.selecao_da_faixa.push((nome, ligado.unwrap_or(false)));
         }
+        // Botões de cheiro: o do _MapMode atual fica selecionado (grupo 1 da faixa).
+        let modo = self.partida.estado.vistas.modo_mapa;
+        for (nome, &n) in &self.mapa.cfg.botoes_cheiro {
+            self.tela.selecao_da_faixa.push((nome.clone(), n == modo));
+        }
+        if self.janelas.pilha.contains(&Some(Controle::Mapa)) {
+            self.mapa.atualizar(&self.partida.estado, self.partida.mostrar_trilhas);
+        }
         // Janelas de controle: as que estão antes da de edição na pilha ficam atrás dela.
         let edicao = self.janelas.pilha.iter().position(|j| j.is_none()).unwrap_or(self.janelas.pilha.len());
         let (atras, frente) = self.janelas.pilha.split_at(edicao);
         let (recursos, interface, estado, janelas) = (self.recursos, &self.interface, &self.partida.estado, &self.janelas);
+        let (mapa, nav, trilhas) = (&self.mapa, &self.partida.nav, self.partida.mostrar_trilhas);
         let desenhar = |q: &mut Quadro, lista: &[Option<Controle>]| -> Result<Vec<String>, String> {
             let mut p = Vec::new();
             for c in lista.iter().flatten() {
+                if *c == Controle::Mapa {
+                    let g = janelas.geometria(recursos, *c)?;
+                    let ativa = janelas.ativa() == Some(*c);
+                    janelas::desenhar_moldura_com_titulo(q, interface, &janelas.cfg, &g, &mapa.titulo(estado), ativa);
+                    if let Some(area) = janelas.area_do_mapa(recursos) {
+                        mapa.desenhar(q, area, estado, nav, trilhas);
+                    }
+                    continue;
+                }
                 p.extend(janelas.desenhar(q, recursos, interface, estado, *c)?);
             }
             Ok(p)
@@ -204,13 +226,44 @@ impl Sessao<'_> {
     /// Clique esquerdo nas janelas de controle (Caste/Behavior); `true` se foi tratado.
     pub(crate) fn clicar_nas_janelas(&mut self, x: i32, y: i32) -> bool {
         let edicao = self.tela.retangulo_da_edicao();
-        match self.janelas.clicar(self.recursos, &mut self.partida.estado, edicao, x, y) {
+        let r = match self.janelas.clicar(self.recursos, &mut self.partida.estado, edicao, x, y) {
             Ok(t) => t,
             Err(e) => {
                 eprintln!("janelas: {e}");
                 false
             }
+        };
+        self.centralizar_pelo_mapa();
+        r
+    }
+
+    /// `_MapAreaEvent`: o clique ou o arrasto na área do mapa centraliza a vista de edição na célula.
+    pub(crate) fn centralizar_pelo_mapa(&mut self) {
+        let Some((x, y)) = self.janelas.clique_mapa.take() else { return };
+        let Some(area) = self.janelas.area_do_mapa(self.recursos) else { return };
+        if let Some((cx, cy)) = self.mapa.celula_em(area, &self.partida.estado, x, y) {
+            if self.partida.nav.vista.centralizar(cx, cy) {
+                self.partida.processar_eventos_do_estado();
+            }
         }
+    }
+
+    /// Botão de cheiro da faixa sob (x, y): muda o `_MapMode` (`_ProcMapRibbonEvent`).
+    pub(crate) fn botao_de_cheiro_em(&mut self, x: i32, y: i32) -> bool {
+        let objetos = self.tela.objetos_da_faixa_em(x, y);
+        let Some(n) = objetos.iter().find_map(|o| self.mapa.cfg.botoes_cheiro.get(*o).copied()) else { return false };
+        self.partida.botao_de_cheiro(n);
+        println!("mapa: modo {}", self.partida.estado.vistas.modo_mapa);
+        true
+    }
+
+    /// Window -> Map (`_OpenMapYard`): com o quintal fechado, abre o mapa (ou o traz para a
+    /// frente) na superfície, como `_YardToMap`.
+    pub(crate) fn abrir_mapa(&mut self) {
+        if !self.janelas.pilha.contains(&Some(Controle::Mapa)) && self.partida.nav.plano_mapa != 1 {
+            self.partida.navegar(Acao::Superficie);
+        }
+        self.janelas.trazer_para_frente(Some(Controle::Mapa));
     }
 
     /// Botão configurável da faixa sob (x, y): a função dele (`_DoUserButton`).

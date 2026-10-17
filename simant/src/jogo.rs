@@ -218,6 +218,10 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                         redesenhar = true;
                         continue;
                     }
+                    if s.botao_de_cheiro_em(x, y) {
+                        redesenhar = true;
+                        continue;
+                    }
                     if let Some(i) = s.marcador_em(x, y) {
                         s.partida.marcador(i, ctrl_apertado(&eventos));
                         continue;
