@@ -146,7 +146,7 @@ pub struct TabelasAmarela {
 }
 
 /// Ids dos efeitos sonoros (objetos tipo 5 do banco SOUND, `_myBeginSound`) pedidos por esta parte
-/// (docs/spec/regras/som.md). Seção opcional no JSON: um id ausente não toca (mods anteriores à API 0.7).
+/// (docs/spec/regras/som.md). Seção opcional no JSON: um id ausente não toca (mods anteriores à API 0.8).
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct SonsAmarela {
