@@ -1,0 +1,63 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "full",
+ "descricao": "Inseticida no Jogo Completo (snapshot full, mesma preparação): no 21 a amarela (rainha alada na superfície) morre pelo inseticida (_YellowDeath(9), S4() == 0), sem corpo -> fim de jogo; as caixas 'covered with insecticide' e 'GAME OVER' abrem dentro do tick e o clique da bancada começa um jogo novo",
+ "passos": [
+  "NodeNum <- 32",
+  "NodeCnt <- 0",
+  "CurYardPnt <- 786432",
+  "tick 21 parado (gdb: nenhuma parada em 15 s (jogo pausado ou minimizado?)); tela em re_trabalho/cen/dialogo_21_0.png e Enter",
+  "tick 21 parado (gdb: nenhuma parada em 15 s (jogo pausado ou minimizado?)); tela em re_trabalho/cen/dialogo_21_1.png e Enter"
+ ],
+ "primeira_entrada": {
+  "SementeS": 60730,
+  "SementeR": 2578188780,
+  "gameCycles": 271,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 17,
+  "Cycle": 17,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_000019",
+  "tick_000020",
+  "tick_000021"
+ ],
+ "selecao": [
+  "19-21"
+ ],
+ "pendentes": {
+  "tick_000021": "fim de jogo com interface dentro do tick: a amarela morre pelo inseticida (_YellowDeath(9)) sem corpo e sem outra colônia (_ColonyTotalBlack = 1) e o tick abre as caixas \"covered with insecticide\" e \"GAME OVER\" (_EndGameDialog, passo 22); a bancada clicou para continuar e o original começou um Jogo Completo novo dentro do mesmo tick (mundo novo, _CurYardPnt (11, 8), GameTime 8, _IsGameOver de volta a 0). O port pára em _IsGameOver = 1 com o mundo intacto, como manda a regra; o reinício é da interface (simant/, core/), não do tick. Os 70 blocos diferentes são o mundo novo"
+ }
+}

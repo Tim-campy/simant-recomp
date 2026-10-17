@@ -1,0 +1,60 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "exp",
+ "descricao": "Experimental (snapshot exp: boot, Select a Game -> Experimental, CurGameType = 3), sem intervenção; o 31 cai na fase 1 de _DoSmells (Cycle 32)",
+ "passos": [],
+ "primeira_entrada": {
+  "SementeS": 49805,
+  "SementeR": 302536256,
+  "gameCycles": 373,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 3,
+  "Cycle": 3,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_000031",
+  "tick_000032",
+  "tick_000033",
+  "tick_000034"
+ ],
+ "selecao": [
+  "31-34"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "tick_000031": "LifeB (39, 11): original 1, reconstruído 2 — ovo posto no tick 31 (Cycle 32) sobre uma larva de índice menor; a vida guarda o último escrito (como fases/159)",
+  "tick_000032": "LifeB (39, 11): original 1, reconstruído 2 — ovo posto no tick 31 (Cycle 32) sobre uma larva de índice menor; a vida guarda o último escrito (como fases/159)"
+ }
+}

@@ -271,6 +271,27 @@ Duas divergências apareceram e foram corrigidas:
 
 **Lacunas:** inseticida, Jogo Completo e Experimental não gravados (o snapshot é do Quick Game; chegar a outro tipo de jogo exige navegar diálogos de File > New, não tentado); revoada só forçada (não a armada por `_GstrR`), sem `_QueenStorage`/`_SwarmCnt` (só sobem no Jogo Completo); a luta gravada é uma derrota — falta uma vitória; só um vetor por fase de `_DoSmells`; o port usa um valor de relógio por tick, e em `amarela_luta/1864` a lista lida tem ~1000 valores diferentes, que ainda assim bateu porque a animação só usa o relógio como espera (sem sorteio dependente dele) [hipótese a conferir em `_AnimYellowFight`].
 
+### Terceira rodada (2026-10-17, main em `c182a5d`): modos de jogo, inseticida, vitória, revoada armada e sequência longa
+
+| Subpasta | Ticks | Preparação | O que exercita | Resultado |
+|---|---|---|---|---|
+| `jogo_completo/` | 31–35 | snapshot `full` (`roteiros/qemu_snapshot_full.txt`: boot, "Select a Game" → Full Game em (265, 300), `_CurGameType = 2`) | início do Jogo Completo (rainha alada amarela na superfície), fase 1 de `_DoSmells` | 5 batem |
+| `experimental/` | 31–34 | snapshot `exp` (`roteiros/qemu_snapshot_exp.txt`, como `qemu_experimental_e01.txt` do agente auxiliar) | Experimental sem ferramentas; ovo posto no 31 | 4 batem (31–32 com vida não reconstruível: ovo sobre larva) |
+| `inseticida/` | 1711–1714 | rico; menino dentro de casa parado no nó 32 ((45, 166) → patch (0, 12)) e `_CurYardPnt = (0, 12)` | pisada e inseticida em todo tick (`(_RpopT + _BpopT) × 8` sorteios de célula; uma formiga morta por tick) | 4 batem |
+| `inseticida_morte/` | 19–21 | `full`, a mesma preparação | a amarela (rainha alada) morre pelo inseticida (`_YellowDeath(9)`, 21) | 19–20 batem; **21 pendente** (abaixo) |
+| `amarela_vitoria/` | 1799–1801 | rico; amarela posta como soldado (vida 100) ao lado de uma operária vermelha parada (M = 17), duplo clique | `_YellowFight` com vitória (`RAntsKilled` 0→1, cadáver vermelho) | 3 batem |
+| `revoada_armada/` | 1726–1727, 1825–1826, 1924–1927 | rico; 21 vermelhas viram machos (T 0xA0, M = 14) | o jogo arma `_FlyAwayR = 200` (`_GstrR`, 1727), pré-voo 14 → 15 com F > 100, decolagens (16) e saídas até F = 0 | 8 batem |
+
+Sequência longa (`tests/referencias/ticks_longos/rico_200/`, 392 KB): 200 ticks consecutivos do snapshot rico sem intervenção (GameTime 1711–1910), gravados por `cenarios_tick.py gravar longo`: `inicio/` (estado e vida na entrada do 1º tick), `extras.json` (os extras antes e depois de cada tick, com o relógio) e `depois_0050/`, `_0100/`, `_0150/`, `_0200/` (estado e vida). `vetor_tick::rodar_sequencia` roda os 200 ticks encadeados no port, pondo antes de cada um só o que muda fora do tick (`_gameCycles`, relógio do Mac, `_GlobalKey`), e confere S e R depois de cada tick e o save inteiro e a vida nos 4 pontos; `engine/tests/ticks_longos.rs` exige tudo igual. **Resultado: 200/200, S e R iguais em todos os ticks e os 4 pontos 307/307 com vida igual.**
+
+**Placar da rodada:** 27 vetores novos, 26 batem inteiros e exigidos; 1 pendente; a sequência longa bate. Antes da seleção também foram comparadas as gravações brutas (Jogo Completo 40, Experimental 40, inseticida 13, vitória 30, revoada 31): só o `inseticida_morte/21` difere. Nenhuma correção de regra foi necessária nesta rodada.
+
+**Pendente `inseticida_morte/tick_000021` — fim de jogo pela interface dentro do tick.** Sem corpo (nenhum ovo ou adulto preto) e com `_ColonyTotalBlack = 1`, `_YellowDeath` põe `_IsGameOver = 1` e o passo 22 do tick (`_EndGameDialog`) abre a caixa "GAME OVER" (capturas `re_trabalho/cen/dialogo_21_*.png`: antes, "You are covered with insecticide!"). A bancada clicou para continuar e o original começou um Jogo Completo novo **dentro do mesmo tick** (mundo novo, `_CurYardPnt` (0, 12) → (11, 8), `GameTime` 8, `_IsGameOver` de volta a 0). O port termina com `_IsGameOver = 1` e o mundo intacto — o que a regra manda; o reinício é da interface (`simant/`, `core/`), não do tick. Não é erro de regra.
+
+Bancada (novidades de `tools/cenarios_tick.py` e `qemu_bancada.py`): um tick que abre uma caixa modal não volta sozinho — depois de 15 s sem chegar ao retorno de `_DoAntSim`, o script captura a tela, clica em (320, 330) e aperta Enter (até 5 vezes); as leituras do relógio por tick param em 200 (a lista termina com `null`), porque as animações (`_AnimYellowFight`, morte) leem o relógio milhares de vezes e cada parada custa ~0,1 s; um clique pode ser enviado com a VM indo da entrada de um tick à próxima (`clicar_celula(..., pausado=True)`), para gravar desde o tick em que o Windows o trata.
+
+**Lacunas:** revoada no Jogo Completo com `_QueenStorage`/`_SwarmCnt` (exige colônia vermelha com reprodutores no Jogo Completo; não tentado); `_FlyAwayB` (quem arma é o jogador, ciclo de vida); Experimental com ferramentas (as do agente auxiliar aplicam com o jogo pausado, fora do tick); `_SpecialXfer` (morte no Jogo Completo com mais de uma colônia preta, escolha no mapa do quintal).
+
 ## Limitações
 
 - **Configuração única.** Snapshot `quick`: Quick Game, velocidade normal, as janelas que o jogo abre sozinho, sem balões, sem chuva, sem a formiga amarela em movimento. Outras janelas, velocidades e eventos (aranha na tela, revoada, chuva) podem fazer o desenho consumir S ou mudar o caminho do tick.

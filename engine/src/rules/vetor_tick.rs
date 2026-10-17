@@ -573,6 +573,84 @@ impl fmt::Display for RelatorioTick {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Sequência longa (tests/referencias/ticks_longos/)
+// ---------------------------------------------------------------------------------------------
+
+/// Um ponto conferido de uma sequência longa: o estado depois de `ticks` ticks encadeados.
+#[derive(Clone, Debug)]
+pub struct PontoSequencia {
+    pub ticks: usize,
+    /// Blocos do save diferentes do original (com os primeiros detalhes).
+    pub blocos: Vec<ComparacaoBloco>,
+    pub vida: Vec<DiferencaCelula>,
+}
+
+/// Resultado de rodar uma sequência longa no port.
+#[derive(Clone, Debug)]
+pub struct RelatorioSequencia {
+    pub ticks: usize,
+    /// Primeiro tick (1 = o primeiro) em que S ou R do port diferem do original depois do tick.
+    pub primeiro_sorteio_diferente: Option<usize>,
+    pub pontos: Vec<PontoSequencia>,
+}
+
+/// Roda no port, encadeados, os ticks de uma sequência longa gravada por `tools/cenarios_tick.py longo`:
+/// `inicio/estado.bin` + `inicio/vida.bin` (entrada do 1º tick), `extras.json` (lista com os extras
+/// antes/depois de cada tick, inclusive o relógio do Mac) e `depois_NNNN/` (estado e vida depois de
+/// NNNN ticks). Antes de cada tick põe `_gameCycles`, o relógio do Mac e `_GlobalKey` do original (o
+/// que muda fora do tick); S e R seguem do próprio port.
+pub fn rodar_sequencia(dir: &Path, layout: &LayoutSave, regras: &mut dyn Regras) -> Result<RelatorioSequencia, String> {
+    let inicio = JogoSalvo::ler(layout, ler_arquivo(dir, "inicio/estado.bin")?)?;
+    let vida_inicio = vida_de_bytes(&ler_arquivo(dir, "inicio/vida.bin")?)?;
+    let texto = String::from_utf8(ler_arquivo(dir, "extras.json")?).map_err(|e| e.to_string())?;
+    let lista: Vec<ExtrasArquivo> = serde_json::from_str(&texto).map_err(|e| format!("extras.json: {e}"))?;
+    let extras: Vec<(Extras, Extras)> = lista.into_iter().map(|x| (x.antes.into(), x.depois.into())).collect();
+    let (x0, d0) = *extras.first().ok_or("extras.json vazio")?;
+    let v = VetorTick {
+        nome: "inicio".into(),
+        antes: inicio.clone(),
+        depois: inicio.clone(),
+        vida_antes: vida_inicio.clone(),
+        vida_depois: vida_inicio,
+        extras_antes: x0,
+        extras_depois: d0,
+    };
+    let mut e = montar_entrada(&v, layout)?.estado;
+    let mut primeiro_sorteio_diferente = None;
+    let mut pontos = Vec::new();
+    for (k, (antes, depois)) in extras.iter().enumerate() {
+        e.ciclos_jogo = antes.game_cycles;
+        e.relogio_mac = antes.relogio_mac;
+        e.tecla_global = antes.global_key;
+        tick(&mut e, regras);
+        aplicar_vista_da_bancada(&mut e);
+        e.retirar_eventos();
+        if primeiro_sorteio_diferente.is_none()
+            && (e.s.semente() != depois.semente_s || e.r.estado() != depois.semente_r)
+        {
+            primeiro_sorteio_diferente = Some(k + 1);
+        }
+        let ponto = dir.join(format!("depois_{:04}", k + 1));
+        if ponto.is_dir() {
+            let original = JogoSalvo::ler(layout, ler_arquivo(&ponto, "estado.bin")?)?;
+            let vida_original = vida_de_bytes(&ler_arquivo(&ponto, "vida.bin")?)?;
+            let port = e.para_save(layout)?;
+            let mut blocos = Vec::new();
+            for b in &layout.blocos {
+                let s = b.simbolo.as_str();
+                let pega = |j: &JogoSalvo| j.bloco(s).map(<[u8]>::to_vec).ok_or_else(|| format!("bloco {s} ausente"));
+                let c = comparar_bloco(s, b.count, &pega(&inicio)?, &pega(&original)?, &pega(&port)?);
+                if !c.igual() {
+                    blocos.push(c);
+                }
+            }
+            pontos.push(PontoSequencia { ticks: k + 1, blocos, vida: comparar_vida(&vida_original, &vida_do_estado(&e)) });
+        }
+    }
+    Ok(RelatorioSequencia { ticks: extras.len(), primeiro_sorteio_diferente, pontos })
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;
