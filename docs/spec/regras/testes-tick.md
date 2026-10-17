@@ -186,21 +186,19 @@ Os ticks consecutivos são encadeáveis: verificado que o `estado_depois` do tic
 
 Um tick do port (`RegrasOriginais` sem tabelas de geração) sobre cada vetor de `tests/referencias/ticks/`, comparado com o `estado_depois` do original. "Mudados" = blocos que o original alterou no tick; "extras" = S, R, `_gameCycles`, `_Tindex`, `_GlobalKey`.
 
-**2026-10-17** (só o esqueleto do tick; quintal, inimigos, superfície, ninho, amarela e conselhos ainda vazios):
+**2026-10-17, depois de integrar quintal, inimigos, superfície, ninho, amarela e conselhos:** os 5 vetores batem **inteiros**.
 
-| Tick | Blocos iguais | Mudados pelo original | Mudados e iguais | Extras iguais | Células de vida diferentes |
-|---|---|---|---|---|---|
-| 79 | 280/307 | 28 | 2 (`GameTime`, `Cycle`) | 3/5 | 4 |
-| 80 | 286/307 | 22 | 2 | 3/5 | 4 |
-| 81 | 289/307 | 19 | 2 | 3/5 | 4 |
-| 82 | 287/307 | 21 | 2 | 3/5 | 4 |
-| 83 | 289/307 | 19 | 2 | 3/5 | 4 |
+| Tick | Blocos iguais | Mudados pelo original (todos iguais) | Extras iguais (S, R, `_gameCycles`, `_Tindex`, `_GlobalKey`) | Células de vida diferentes |
+|---|---|---|---|---|
+| 79 | 307/307 | 28 | 5/5 | 0 |
+| 80 | 307/307 | 22 | 5/5 | 0 |
+| 81 | 307/307 | 19 | 5/5 | 0 |
+| 82 | 307/307 | 21 | 5/5 | 0 |
+| 83 | 307/307 | 19 | 5/5 | 0 |
 
-Diferenças nos 5 ticks, por bloco (quantos ticks): `AlistX/Y/T` (5; duas formigas andam na superfície), `YardCycle`, `Scycle`, `Scycle2`, `SpidY`, `FootTog`, `BoyStandCnt`, `BoyTurnCnt`, `CatX`, `CatFrame`, `CatCycle`, `DogX`, `DogFrame`, `DogTurnCnt`, `BirdDelay` (5 cada; quintal e aranha), `ModePopR` (5; o port zera porque nenhuma formiga é contada no tick), `PillarSeg` e `MapA` (2), e só no tick 79 a postura do ovo (`BlistX/Y/M/T`, `ListIndexB`, `TotalEggsLaidB`), `HealthB`, `BoyFrame`, `DogDir`, `DogPx`. Sementes S e R diferem em todos (nenhum sorteio no port). Nenhum tick de 79 a 83 cai nas fases de 32 ticks, então compactação, `_CountAnts`, `_HistUpdate` e feromônios não são exercitados por esses vetores.
+O último ajuste foi o relógio do quintal: `_BirdDelay` e `_CatDelay` só batem usando o `_gameCycles` do vetor (`Estado::ciclos_jogo`) também como relógio do Mac [hipótese; ver quintal.md, "Implementação no port"]. Histórico: só o esqueleto dava 280–289/307; com inimigos, amarela e superfície, 284–293; com o ninho e o quintal, 287–305; com o relógio, 307.
 
-`BirdDelay` só pode bater com o `_gameCycles` do vetor (já carregado em `Estado::ciclos_jogo`).
-
-**Blocos exigidos pelo teste** (`ESPERADOS_IGUAIS` em `engine/tests/ticks_originais.rs`): `GameTime`, `Cycle`, `FlyAwayB`, `FlyAwayR`, `CastePopB`, `CastePopR`, `BpopT`, `RpopT`; extras `gameCycles`, `Tindex`, `GlobalKey`. Cada parte implementada acrescenta os blocos que passaram a bater e atualiza esta tabela.
+**O teste exige igualdade total** (`engine/tests/ticks_originais.rs`): qualquer bloco, extra ou célula de vida diferente falha. Limite da cobertura: esses 5 ticks não caem nas fases de 32/64 ticks (compactação, `_CountAnts`, `_HistUpdate`, feromônios, alimentação), não têm a amarela andando e têm só duas formigas na superfície; vetores para esses casos estão sendo gerados.
 
 ## Limitações
 

@@ -236,8 +236,14 @@ pub struct Relogios {
 }
 
 impl Relogios {
-    /// Relógios do port: `_gameCycles` = `_GameTime`; relógio do Mac = `_GameTime × mac_por_tick`.
+    /// Relógios do port. Com `Estado::ciclos_jogo` preenchido (laço de jogo ou vetor de tick), ele é o
+    /// `_gameCycles` e também o relógio do Mac (uma mensagem de timer de 17 ms ≈ 1/60 s) [hipótese].
+    /// Sem ele: `_gameCycles` = `_GameTime`; relógio do Mac = `_GameTime × mac_por_tick`.
     pub fn do_port(e: &Estado, t: &TabelasQuintal) -> Relogios {
+        if e.ciclos_jogo != 0 {
+            let c = e.ciclos_jogo as i64;
+            return Relogios { ciclos: c, mac: c };
+        }
         let tempo = e.partida.tempo as i64;
         Relogios { ciclos: tempo, mac: tempo * t.regras.mac_por_tick }
     }
