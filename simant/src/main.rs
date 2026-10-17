@@ -84,6 +84,8 @@ struct Opcoes {
     botoes: Vec<u16>,
     /// Sem janela: abre um menu antes de exportar ("amarela@X,Y" ou "icones@OBJETO").
     menu: Option<String>,
+    /// Sem janela: Ctrl+clique no marcador N (1–7) antes de exportar.
+    marcar: Option<usize>,
     som: som::OpcoesSom,
 }
 
@@ -117,6 +119,7 @@ fn ler_opcoes() -> Result<Opcoes, String> {
         fechar_avisos: 0,
         botoes: Vec::new(),
         menu: None,
+        marcar: None,
         som: som::OpcoesSom::default(),
     };
     let mut args = std::env::args().skip(1);
@@ -146,6 +149,7 @@ fn ler_opcoes() -> Result<Opcoes, String> {
             }
             "--salvar" => o.salvar = Some(valor()?.into()),
             "--menu" => o.menu = Some(valor()?),
+            "--marcar" => o.marcar = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
             "--botoes" => {
                 o.botoes = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| format!("{a}: número inválido"))).collect::<Result<_, _>>()?
             }
@@ -1019,6 +1023,9 @@ fn principal() -> Result<(), String> {
         }
         for &b in &o.botoes {
             println!("botão {b}: {:?}", s.botao_usuario(b));
+        }
+        if let Some(n) = o.marcar {
+            s.partida.marcador(n.saturating_sub(1), true);
         }
         match o.menu.as_deref().and_then(|m| m.split_once('@')) {
             Some(("amarela", p)) => {
