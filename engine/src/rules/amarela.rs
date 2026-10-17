@@ -1461,8 +1461,13 @@ fn passo_da_ordem(e: &mut Estado, t: &TabelasAmarela) -> (i32, Option<Alvo>) {
         sair_do_ninho(e, t);
     }
     let novo_plano = e.amarela.plano as i32;
-    if gp == plano && gx == mx && gy == my && novo_plano != e.vistas.plano as i32 && e.partida.opcoes[0] == 0 {
-        centralizar(e);
+    if gp == plano && gx == mx && gy == my && novo_plano != e.vistas.plano as i32 {
+        // O original cai no rótulo de "ordem concluída" (r = −1) depois do `_GotoMyAnt`: a ordem termina
+        // e `_ResetYellowVars` põe o destino na posição nova (vetor amarela_superficie, tick 1852).
+        if e.partida.opcoes[0] == 0 {
+            centralizar(e);
+        }
+        return (-1, alvo);
     }
     (0, alvo)
 }

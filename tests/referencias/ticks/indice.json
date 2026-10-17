@@ -5,7 +5,16 @@
  "cenarios": [
   "fases",
   "amarela_andando",
-  "colonia_5min"
+  "colonia_5min",
+  "chuva",
+  "chuva_secando",
+  "revoada",
+  "menino_cortador",
+  "predadores",
+  "amarela_superficie",
+  "amarela_luta",
+  "velocidade_rapida",
+  "velocidade_ultra"
  ],
  "snapshot": "quick",
  "semente_s_forcada": null,
