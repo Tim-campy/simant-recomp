@@ -10,8 +10,10 @@
 //!   modo Experimental.
 //!
 //! Tabelas e constantes: `data/inimigos.json` ([`TabelasInimigos`]), gerado por
-//! `tools/extrair_inimigos.py`. O seno do laser é o mesmo de `_AddFood` (objeto 9/1000 do banco), lido
-//! de `RegrasOriginais::geracao`.
+//! `tools/extrair_inimigos.py`, guardadas em `RegrasOriginais::inimigos` (com mods). O seno do laser é o
+//! mesmo de `_AddFood` (objeto 9/1000 do banco), lido de `RegrasOriginais::geracao`. As rotinas comuns
+//! (`_IsClearTile`, `_GetBestDir`, `_FindInAList`, `_DeadAntHere`, `_DropFoodA`...) estão em
+//! `rules/comum.rs`; a morte da amarela (`_YellowDeath`, `_MoveMyLife`), em `rules/amarela.rs`.
 //!
 //! As regras não tocam som nem janela: as mensagens vão para `Estado::eventos`; sons e o desenho do
 //! laser são omitidos (não consomem sorteio).
@@ -20,24 +22,22 @@ use std::sync::OnceLock;
 
 use serde::Deserialize;
 
+use super::amarela::{self, CausaMorte, TabelasAmarela};
+use super::comum::{self, achar_na_lista_a, e_amarela, Direcoes, TabelaDeGiro};
 use super::estado::{Estado, Evento};
 use super::geracao::TabelasGeracao;
+use crate::formats::save::Lista;
 use super::tick::{RegrasInimigos, RegrasOriginais};
 use crate::recursos::Recursos;
 
 /// Arquivo de dados com as tabelas e constantes.
 pub const ARQUIVO_TABELAS: &str = "inimigos.json";
 
-/// Cópia de `data/inimigos.json` embutida no executável, usada quando ninguém carregou as tabelas
-/// pelos [`Recursos`] (testes e `RegrasOriginais::default()`).
+/// Cópia de `data/inimigos.json` embutida no executável, para `RegrasOriginais::default` e testes.
 const JSON_PADRAO: &str = include_str!("../../../data/inimigos.json");
 
 const LARGURA: i32 = 128;
 const ALTURA: i32 = 64;
-
-/// Marca da formiga amarela no `_LifeA` (cabeça e cauda da rainha).
-const VIDA_AMARELA: u8 = 0xFF;
-const VIDA_AMARELA_2: u8 = 0xFE;
 
 // ---------------------------------------------------------------------------------------------
 // Tabelas
@@ -124,11 +124,24 @@ pub struct TabelasInimigos {
 impl TabelasInimigos {
     /// Lê `inimigos.json` (com mods).
     pub fn carregar(r: &Recursos) -> Result<TabelasInimigos, String> {
-        r.dados(ARQUIVO_TABELAS)
+        let t: TabelasInimigos = r.dados(ARQUIVO_TABELAS)?;
+        t.validar()?;
+        Ok(t)
     }
 
     pub fn de_json(texto: &str) -> Result<TabelasInimigos, String> {
-        serde_json::from_str(texto).map_err(|e| format!("{ARQUIVO_TABELAS}: {e}"))
+        let t: TabelasInimigos = serde_json::from_str(texto).map_err(|e| format!("{ARQUIVO_TABELAS}: {e}"))?;
+        t.validar()?;
+        Ok(t)
+    }
+
+    fn validar(&self) -> Result<(), String> {
+        comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx8, &self.dy8)?;
+        comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx9, &self.dy9)?;
+        if self.turn_tab.iter().flatten().any(|&d| d > 7) {
+            return Err(format!("{ARQUIVO_TABELAS}: turn_tab com direção fora de 0–7"));
+        }
+        Ok(())
     }
 
     /// As tabelas de `data/inimigos.json` como estavam na compilação.
@@ -139,12 +152,26 @@ impl TabelasInimigos {
         })
     }
 
+    /// [`Direcoes::d8`] com índice `usize`.
     fn d8(&self, d: usize) -> (i32, i32) {
-        (self.dx8[d & 7] as i32, self.dy8[d & 7] as i32)
+        Direcoes::d8(self, d as i32)
     }
 
+    /// `_TurnTab` ([`TabelaDeGiro::virar`]).
     fn giro(&self, atual: i16, alvo: i32) -> i16 {
-        self.turn_tab[(atual & 7) as usize][(alvo & 7) as usize] as i16
+        self.virar(atual as i32, alvo) as i16
+    }
+}
+
+impl Direcoes for TabelasInimigos {
+    fn deslocamentos(&self) -> (&[i8; 8], &[i8; 8]) {
+        (&self.dx8, &self.dy8)
+    }
+}
+
+impl TabelaDeGiro for TabelasInimigos {
+    fn turn_tab(&self) -> &[[u8; 8]; 8] {
+        &self.turn_tab
     }
 }
 
@@ -190,20 +217,20 @@ pub fn seno_calculado(i: usize) -> i16 {
 
 impl RegrasInimigos for RegrasOriginais {
     fn simular_formigas_leao(&mut self, e: &mut Estado) {
-        formigas_leao(e, TabelasInimigos::padrao());
+        formigas_leao(e, &self.inimigos, &self.amarela);
     }
 
     fn mover_aranha(&mut self, e: &mut Estado) {
-        aranha(e, TabelasInimigos::padrao(), self.geracao.as_ref());
+        aranha(e, &self.inimigos, &self.amarela, self.geracao.as_ref());
     }
 
     fn simular_lagarta(&mut self, e: &mut Estado) {
-        lagarta(e, TabelasInimigos::padrao());
+        lagarta(e, &self.inimigos);
     }
 }
 
 // ---------------------------------------------------------------------------------------------
-// Auxiliares do mapa, da vida e da lista A (privadas; candidatas a módulo comum)
+// Auxiliares do mapa, da vida e da lista A (as rotinas do original estão em `comum.rs`)
 // ---------------------------------------------------------------------------------------------
 
 /// `_IsValidA`.
@@ -236,116 +263,44 @@ fn vida_linear(e: &Estado, x: i32, y: i32) -> u8 {
     }
 }
 
-fn e_amarela(v: u8) -> bool {
-    v == VIDA_AMARELA || v == VIDA_AMARELA_2
-}
-
-/// `_IsClearTile(1, x, y)`: no mapa, sem formiga (a amarela conta como livre) e chão (< 0x10).
+/// `_IsClearTile(1, x, y)` ([`comum::livre_na_superficie`]).
 fn livre(e: &Estado, x: i32, y: i32) -> bool {
-    if !no_mapa(x, y) {
-        return false;
-    }
-    let v = vida(e, x, y);
-    (v == 0 || e_amarela(v)) && mapa(e, x, y).is_some_and(|m| m < 0x10)
+    comum::livre_na_superficie(e, x, y)
 }
 
-/// `_IsClear3x3(1, x, y)`.
+/// `_IsClear3x3(1, x, y)` ([`comum::livre_3x3`]).
 fn livre_3x3(e: &Estado, t: &TabelasInimigos, x: i32, y: i32) -> bool {
-    livre(e, x, y)
-        && (0..8).all(|d| {
-            let (dx, dy) = t.d8(d);
-            livre(e, x + dx, y + dy)
-        })
+    comum::livre_3x3(e, t, x, y)
 }
 
 /// `_IsThisPebble(1, v)`.
 fn e_pedrinha(v: u8) -> bool {
-    (0x51..=0x53).contains(&v)
+    comum::e_pedrinha(1, v as i32)
 }
 
-/// `_IsItFood(v)` (quintal 0x48–0x4B, casa 0x18–0x27).
+/// `_IsItFood(v)`.
 fn e_comida(e: &Estado, v: u8) -> bool {
-    if e.ambiente.terreno == 0 {
-        (0x48..=0x4B).contains(&v)
-    } else {
-        (0x18..=0x27).contains(&v)
-    }
+    comum::e_comida_superficie(comum::em_casa(e), v)
 }
 
-/// `_IsNotObstacle(1, x, y)`: no mapa e v ≤ 0x53 (quintal) ou ≤ 0x5F (casa).
-fn nao_e_obstaculo(e: &Estado, x: i32, y: i32) -> bool {
-    let limite = if e.ambiente.terreno == 0 { 0x53 } else { 0x5F };
-    mapa(e, x, y).is_some_and(|v| v <= limite)
-}
-
-/// `_GetDis`: distância ao quadrado.
+/// `_GetDis` ([`comum::get_dis`]).
 fn distancia2(x1: i32, y1: i32, x2: i32, y2: i32) -> i32 {
-    (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)
+    comum::get_dis(x1, y1, x2, y2)
 }
 
-/// `_GetDir`: 1 + direção pelo sinal de dx e dy, ou 0 se coincidem.
+/// `_GetDir` ([`comum::get_dir`]): 1 + direção, ou 0 se coincidem.
 fn direcao_para(x1: i32, y1: i32, x2: i32, y2: i32) -> i32 {
-    let (dx, dy) = ((x2 - x1).signum(), (y2 - y1).signum());
-    match (dx, dy) {
-        (0, -1) => 1,
-        (0, 1) => 5,
-        (0, _) => 0,
-        (1, -1) => 2,
-        (1, 0) => 3,
-        (1, _) => 4,
-        (_, -1) => 8,
-        (_, 0) => 7,
-        _ => 6,
-    }
+    comum::get_dir(x1, y1, x2, y2)
 }
 
-/// `_GetBestDir(1, x, y, tx, ty)` (inimigos.md 2.9): melhor vizinha livre, senão a melhor bloqueada,
-/// senão −2; −1 se já está no alvo.
+/// `_GetBestDir(1, x, y, tx, ty)` (inimigos.md 2.9, [`comum::melhor_direcao`]).
 fn melhor_direcao(e: &Estado, t: &TabelasInimigos, x: i32, y: i32, tx: i32, ty: i32) -> i32 {
-    let mut dist = distancia2(x, y, tx, ty);
-    if dist <= 0 {
-        return -1;
-    }
-    let (mut livre_k, mut bloqueada_k) = (-1, -2);
-    for k in 0..8 {
-        let (dx, dy) = t.d8(k);
-        let (vx, vy) = (x + dx, y + dy);
-        if !nao_e_obstaculo(e, vx, vy) || mapa(e, vx, vy).is_some_and(e_pedrinha) {
-            continue;
-        }
-        let d = distancia2(vx, vy, tx, ty);
-        if d < dist {
-            dist = d;
-            if vida(e, vx, vy) == 0 && livre(e, vx, vy) {
-                livre_k = k as i32;
-            } else {
-                bloqueada_k = k as i32;
-            }
-        }
-    }
-    if livre_k >= 0 {
-        livre_k
-    } else {
-        bloqueada_k
-    }
+    comum::melhor_direcao(e, t, 1, x, y, tx, ty)
 }
 
-/// `_FindInAList(x, y)`: maior índice < `_ListIndexA` com essa posição e T ≠ 0.
-fn achar_na_lista_a(e: &Estado, x: i32, y: i32) -> Option<usize> {
-    let l = &e.superficie.lista;
-    (0..l.usadas()).rev().find(|&i| {
-        let f = &l.vagas[i];
-        f.x as i32 == x && f.y as i32 == y && f.tipo != 0
-    })
-}
-
-/// `_FindAntIndex(1, x, y, T)`: maior índice < `_ListIndexA` com essa posição e esse T.
+/// `_FindAntIndex(1, x, y, T)` ([`comum::achar_formiga`]).
 fn achar_formiga(e: &Estado, x: i32, y: i32, t: u8) -> Option<usize> {
-    let l = &e.superficie.lista;
-    (0..l.usadas()).rev().find(|&i| {
-        let f = &l.vagas[i];
-        f.x as i32 == x && f.y as i32 == y && f.tipo == t
-    })
+    comum::achar_formiga(e, Lista::A, x, y, t)
 }
 
 /// `_RemoveFromAList(i)`: zera a vida da formiga e desloca as vagas seguintes uma posição para trás
@@ -366,151 +321,9 @@ fn remover_da_lista_a(e: &mut Estado, i: usize) {
     }
 }
 
-/// `_DeadAntHere(x, y, cor)` (superficie.md 6.4): cadáver no anel de 100 posições. `cor` ≠ 0 =
-/// vermelha.
+/// `_DeadAntHere(x, y, cor)` ([`comum::cadaver_aqui`]); `cor` ≠ 0 = vermelha.
 fn cadaver(e: &mut Estado, x: i32, y: i32, cor: i32) {
-    let p = &mut e.partida;
-    p.cadaver_ponteiro += 1;
-    if p.cadaver_ponteiro > 99 {
-        p.cadaver_ponteiro = 0;
-    }
-    let k = p.cadaver_ponteiro as usize;
-    let (ox, oy) = (p.cadaveres_x[k] as i32, p.cadaveres_y[k] as i32);
-    let velho = mapa(e, ox, oy).unwrap_or(0);
-    let casa = e.ambiente.terreno != 0;
-    if !casa {
-        if (0x10..0x18).contains(&velho) {
-            let v = e.s.mascara(16) as u8;
-            gravar_mapa(e, ox, oy, v);
-        }
-    } else if (8..0x18).contains(&velho) {
-        gravar_mapa(e, ox, oy, (velho - 8) >> 2);
-    }
-    e.partida.cadaveres_x[k] = x as u8;
-    e.partida.cadaveres_y[k] = y as u8;
-    let v = mapa(e, x, y).unwrap_or(0xFF);
-    if !casa {
-        if v <= 0x17 {
-            let base = if cor == 0 { 0x10 } else { 0x14 };
-            let novo = base + e.s.mascara(4) as u8;
-            gravar_mapa(e, x, y, novo);
-        }
-    } else if v <= 3 {
-        let novo = if cor == 0 {
-            (v + 2) * 4 + e.s.rand1(2) as u8
-        } else {
-            v * 4 + 10 + e.s.rand1(2) as u8
-        };
-        gravar_mapa(e, x, y, novo);
-    }
-    e.superficie.vida.definir(x, y, 0);
-}
-
-/// `_DropFoodA(x, y)` (superficie.md 8.2): uma unidade de comida na célula; `false` se não coube.
-/// Na casa, o caso "a comida cai" (tabela `10:22be/22c2` indexada por `9:9c66`) não está no estado
-/// do port [em aberto]: devolve `false`.
-fn largar_comida(e: &mut Estado, x: i32, y: i32) -> bool {
-    let Some(v) = mapa(e, x, y) else { return false };
-    let novo = if e.ambiente.terreno == 0 {
-        if v > 0x4A {
-            return false;
-        }
-        if v < 0x48 {
-            0x48
-        } else {
-            v + 1
-        }
-    } else if v <= 3 {
-        (v + 6) * 4
-    } else if (8..=0x17).contains(&v) {
-        (((v - 8) >> 2) + 6) * 4
-    } else if (0x18..=0x26).contains(&v) {
-        v + 1
-    } else {
-        return false;
-    };
-    gravar_mapa(e, x, y, novo);
-    e.ambiente.comida_superficie += 1;
-    true
-}
-
-// ---------------------------------------------------------------------------------------------
-// Formiga amarela (provisório: pertence a rules/amarela.rs)
-// ---------------------------------------------------------------------------------------------
-
-/// Mapa de vida do plano da amarela (0 e 1 = superfície, 2 = ninho preto, 3 = vermelho).
-fn vida_do_plano(e: &mut Estado, plano: i16) -> &mut super::estado::Grade {
-    match plano {
-        2 => &mut e.ninho_b.vida,
-        3 => &mut e.ninho_r.vida,
-        _ => &mut e.superficie.vida,
-    }
-}
-
-/// `_MoveMyLife(plano, x, y, tipo, dir)` (formiga-amarela.md §2): apaga a marca atual (só onde há
-/// 0xFF / 0xFE) e grava 0xFF (e 0xFE na cauda da rainha) na nova posição. Simplificação: nos ninhos não
-/// reproduz a escavação de `_SetLife` (os inimigos só chamam com plano 1).
-fn mover_vida_amarela(
-    e: &mut Estado,
-    t: &TabelasInimigos,
-    plano: i16,
-    x: i32,
-    y: i32,
-    tipo: i16,
-    dir: i16,
-) {
-    apagar_vida_amarela(e, t);
-    let plano = if plano == 0 { 1 } else { plano };
-    let largura = if plano < 2 { LARGURA } else { ALTURA };
-    if !((0..largura).contains(&x) && (0..ALTURA).contains(&y)) {
-        return;
-    }
-    let g = vida_do_plano(e, plano);
-    g.definir(x, y, VIDA_AMARELA);
-    if tipo == 0x60 {
-        let (dx, dy) = t.d8((dir ^ 4) as usize);
-        g.definir(x + dx, y + dy, VIDA_AMARELA_2);
-    }
-    let a = &mut e.amarela;
-    a.x = x as i16;
-    a.y = y as i16;
-    a.dir = dir;
-    a.tipo = tipo;
-    a.plano = plano;
-}
-
-/// `_ClearMyLife` na posição atual da amarela.
-fn apagar_vida_amarela(e: &mut Estado, t: &TabelasInimigos) {
-    let a = e.amarela.clone();
-    let (x, y) = (a.x as i32, a.y as i32);
-    let g = vida_do_plano(e, a.plano);
-    if g.em(x, y) == Some(VIDA_AMARELA) {
-        g.definir(x, y, 0);
-    }
-    if a.tipo == 0x60 {
-        let (dx, dy) = t.d8((a.dir ^ 4) as usize);
-        if g.em(x + dx, y + dy) == Some(VIDA_AMARELA_2) {
-            g.definir(x + dx, y + dy, 0);
-        }
-    }
-}
-
-/// `_YellowDeath(causa)` **provisório** (formiga-amarela.md §9; a implementação completa, com
-/// reencarnação e animações, é de `rules/amarela.rs`). Aqui só: o sorteio da música (causas 1 e 2),
-/// o contador da causa e apagar a marca da amarela do mapa de vida.
-fn morte_amarela(e: &mut Estado, t: &TabelasInimigos, causa: i32) {
-    match causa {
-        1 | 2 => {
-            let cor = super::geracao::Cor::Preta;
-            e.colonia_mut(cor).comidas_por_predadores += 1;
-            let n = e.s.rand1(5) as u16;
-            e.eventos.push(Evento::Musica(0x4E27 + n));
-        }
-        _ => e.preta.mortas_em_luta += 1,
-    }
-    if e.amarela.modo == 0 {
-        apagar_vida_amarela(e, t);
-    }
+    comum::cadaver_aqui(e, x, y, cor != 0);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -591,7 +404,8 @@ pub fn achar_formiga_leao(e: &Estado, x: i32, y: i32) -> Option<usize> {
 }
 
 /// `_DoAntLions` (1.3), todo tick.
-pub fn formigas_leao(e: &mut Estado, t: &TabelasInimigos) {
+/// `ta`: tabelas da amarela, para `_YellowDeath(2)` quando ela cai na armadilha.
+pub fn formigas_leao(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmarela) {
     let r = &t.regras;
     let fl = &e.formigas_leao;
     // Curto-circuito: S1(1024) só é sorteado com nenhuma formiga-leão e um patch que tinha alguma.
@@ -606,7 +420,7 @@ pub fn formigas_leao(e: &mut Estado, t: &TabelasInimigos) {
     while k < 10 && (k as i16) < e.formigas_leao.quantidade {
         let (x, y) = (e.formigas_leao.x[k] as i32, e.formigas_leao.y[k] as i32);
         match e.formigas_leao.m[k] {
-            0 => formiga_leao_esperando(e, t, k, x, y),
+            0 => formiga_leao_esperando(e, t, ta, k, x, y),
             1 => {
                 let n = (0..8)
                     .filter(|&d| {
@@ -661,7 +475,7 @@ pub fn formigas_leao(e: &mut Estado, t: &TabelasInimigos) {
 }
 
 /// Estado 0 da formiga-leão `k`: cospe o que caiu na armadilha ou olha o centro e uma vizinha.
-fn formiga_leao_esperando(e: &mut Estado, t: &TabelasInimigos, k: usize, x: i32, y: i32) {
+fn formiga_leao_esperando(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmarela, k: usize, x: i32, y: i32) {
     let r = &t.regras;
     let v = mapa(e, x, y).unwrap_or(0);
     if e_pedrinha(v) || e_comida(e, v) {
@@ -687,9 +501,10 @@ fn formiga_leao_esperando(e: &mut Estado, t: &TabelasInimigos, k: usize, x: i32,
         let presa = vida_linear(e, cx, cy);
         if presa != 0 {
             if e_amarela(presa) {
-                let (tipo, dir) = (e.amarela.tipo, e.amarela.dir);
-                mover_vida_amarela(e, t, 1, x, y, tipo, dir);
-                morte_amarela(e, t, 2);
+                // `_MoveMyLife` para o centro da armadilha e `_YellowDeath(2)`.
+                let (tipo, dir) = (e.amarela.tipo as i32, e.amarela.dir as i32);
+                amarela::mover_marca(e, ta, 1, x, y, tipo, dir);
+                amarela::matar_amarela(e, ta, CausaMorte::FormigaLeao);
             } else {
                 let _som = e.s.mascara(8) == 0;
                 if let Some(j) = achar_na_lista_a(e, cx, cy) {
@@ -723,10 +538,7 @@ fn formiga_leao_comecar_a_comer(e: &mut Estado, t: &TabelasInimigos, k: usize, x
 
 /// `_KillSpider` (2.8): agonia, sem mensagem. Chamada pelo menino, pé, cortador e Inseticida.
 pub fn matar_aranha(e: &mut Estado, t: &TabelasInimigos) {
-    let a = &mut e.aranha;
-    a.estado = 5;
-    a.agonia = t.regras.aranha_agonia;
-    a.ciclo_pernas = 0;
+    comum::matar_aranha(e, t.regras.aranha_agonia);
 }
 
 /// `_ScanForAnts` / cerco: células ocupadas no 3 × 3 em volta da célula (cx, cy).
@@ -765,7 +577,8 @@ fn aranha_achou(e: &mut Estado) {
 }
 
 /// `_MoveSpider` (2.2), todo tick.
-pub fn aranha(e: &mut Estado, t: &TabelasInimigos, geracao: Option<&TabelasGeracao>) {
+/// `ta`: tabelas da amarela, para `_YellowDeath` (comida, cercada, fugiu do mapa).
+pub fn aranha(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmarela, geracao: Option<&TabelasGeracao>) {
     let r = &t.regras;
     let seno = Seno(geracao);
     e.aranha.ciclo = (e.aranha.ciclo + 1) & 1023;
@@ -787,7 +600,7 @@ pub fn aranha(e: &mut Estado, t: &TabelasInimigos, geracao: Option<&TabelasGerac
             matar_aranha(e, t);
             if e.amarela.modo == 1 {
                 e.amarela.modo = 0;
-                morte_amarela(e, t, 3);
+                amarela::matar_amarela(e, ta, CausaMorte::Cercada);
                 return;
             }
             e.eventos.push(Evento::Mensagem(r.mensagem_aranha_morta));
@@ -849,11 +662,11 @@ pub fn aranha(e: &mut Estado, t: &TabelasInimigos, geracao: Option<&TabelasGerac
             }
         }
         2 => {
-            if !aranha_perseguir(e, t, cx, cy) {
+            if !aranha_perseguir(e, t, ta, cx, cy) {
                 return;
             }
         }
-        3 => aranha_comer(e, t, cx, cy),
+        3 => aranha_comer(e, t, ta, cx, cy),
         4 => {
             let k = e.s.rand1(8);
             e.aranha.dir = t.giro(e.aranha.dir, k);
@@ -869,7 +682,8 @@ pub fn aranha(e: &mut Estado, t: &TabelasInimigos, geracao: Option<&TabelasGerac
                 e.aranha.ligada = 0;
                 e.aranha.estado = 0;
                 for _ in 0..3 {
-                    largar_comida(e, cx, cy);
+                    // O resultado não é usado (comida para as formigas).
+                    comum::largar_comida_superficie(e, cx, cy);
                 }
                 return;
             }
@@ -890,7 +704,7 @@ pub fn aranha(e: &mut Estado, t: &TabelasInimigos, geracao: Option<&TabelasGerac
         e.aranha.ligada = 0;
         if e.amarela.modo == 1 {
             e.amarela.modo = 0;
-            morte_amarela(e, t, 4);
+            amarela::matar_amarela(e, ta, CausaMorte::Fugiu);
         }
     }
     if e.ambiente.terreno != 0 && mapa(e, nx, ny).is_some_and(|v| v > r.aranha_teto_casa) {
@@ -918,7 +732,7 @@ fn aranha_aparecer(e: &mut Estado, t: &TabelasInimigos) {
 
 /// Estado 2. Devolve `true` se o tick continua (para os testes finais de posição); `false` = fim.
 /// Cai direto no estado 3 quando chega na presa.
-fn aranha_perseguir(e: &mut Estado, t: &TabelasInimigos, cx: i32, cy: i32) -> bool {
+fn aranha_perseguir(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmarela, cx: i32, cy: i32) -> bool {
     let r = &t.regras;
     let alvo = e.aranha.alvo;
     if alvo < 0 {
@@ -970,12 +784,12 @@ fn aranha_perseguir(e: &mut Estado, t: &TabelasInimigos, cx: i32, cy: i32) -> bo
     e.aranha.estado = 3;
     e.aranha.x = (e.aranha.x & !0xF) + 8;
     e.aranha.y = (e.aranha.y & !0xF) + 8;
-    aranha_comer(e, t, cx, cy);
+    aranha_comer(e, t, ta, cx, cy);
     true
 }
 
 /// Estado 3 (comer e mastigar). `(cx, cy)` é a célula do começo do tick.
-fn aranha_comer(e: &mut Estado, t: &TabelasInimigos, cx: i32, cy: i32) {
+fn aranha_comer(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmarela, cx: i32, cy: i32) {
     let r = &t.regras;
     if e.amarela.modo == 1 {
         e.amarela.x = e.aranha.x >> 4;
@@ -990,9 +804,10 @@ fn aranha_comer(e: &mut Estado, t: &TabelasInimigos, cx: i32, cy: i32) {
     let alvo = e.aranha.alvo;
     if alvo != -2 {
         if alvo < 0 {
-            let (plano, tipo, dir) = (e.amarela.plano, e.amarela.tipo, e.amarela.dir);
-            mover_vida_amarela(e, t, plano, bx, by, tipo, dir);
-            morte_amarela(e, t, 1);
+            // `_MoveMyLife` para a boca e `_YellowDeath(1)`.
+            let (plano, tipo, dir) = (e.amarela.plano as i32, e.amarela.tipo as i32, e.amarela.dir as i32);
+            amarela::mover_marca(e, ta, plano, bx, by, tipo, dir);
+            amarela::matar_amarela(e, ta, CausaMorte::Aranha);
             e.aranha.base_cadaver = 0;
         } else {
             let f = e.superficie.lista.vagas[alvo as usize];

@@ -388,9 +388,9 @@ Decisões e detalhes reproduzidos (fato visto no código, salvo indicação):
 - `_RemoveFromAList` deixa a última vaga usada repetida (como o `_BlockMove` do original).
 - Sons, o desenho do laser e o centralizar da vista (AutoTrack) não são reproduzidos; os sorteios ligados a sons (`S8()` da formiga-leão, `S2()`/`S256()` da mastigação, `S2()` do arroto) são feitos e descartados.
 - Mensagens 10050 e 10046 vão para `Estado::eventos` (`Evento::Mensagem`).
-- `_DropFoodA` na casa, no caso "a comida cai" (tabela `10:22be/22c2` por `_DROPdir` `9:9c66`, que não está no save), devolve falha [em aberto].
-- **Provisório:** `_MoveMyLife` (sem a escavação de `_SetLife` nos ninhos) e `_YellowDeath` (só o contador da causa, o sorteio `S1(5)` da música nas causas 1 e 2 e apagar a marca da amarela; sem animações, diálogos nem reencarnação) são versões locais, a trocar pelas de `rules/amarela.rs`.
-- Também locais e privados, candidatos a um módulo comum: `_IsClearTile`/`_IsClear3x3`, `_IsNotObstacle`, `_IsThisPebble`, `_IsItFood`, `_GetDis`, `_GetDir`, `_GetBestDir`, `_FindInAList`, `_FindAntIndex`, `_RemoveFromAList`, `_DeadAntHere`, `_DropFoodA`.
+- `_DropFoodA` na casa, no caso "a comida cai" (tabela `10:22be/22c2` por `_DROPdir` `9:9c66`, que não está no save): a comida some [em aberto]. A aranha morta não usa o resultado.
+- `_MoveMyLife` e `_YellowDeath` (causas 1 aranha, 2 formiga-leão, 3 cercada, 4 fugiu do mapa) são os de `rules/amarela.rs` (`mover_marca`, `matar_amarela`), com animações que sorteiam, mensagens e reencarnação (formiga-amarela.md §9). `aranha` e `formigas_leao` recebem as tabelas da amarela.
+- `_IsClearTile`/`_IsClear3x3`, `_IsNotObstacle`, `_IsThisPebble`, `_IsItFood`, `_GetDis`, `_GetDir`, `_GetBestDir`, `_FindInAList`, `_FindAntIndex`, `_DeadAntHere`, `_DropFoodA` e `_KillSpider` estão em `engine/src/rules/comum.rs` (ver [../../decisoes.md](../../decisoes.md), "Módulo comum das regras"); `_RemoveFromAList` continua local (só os inimigos o usam).
 
 Verificado:
 
@@ -407,4 +407,4 @@ Não verificado contra o original: a sequência exata de sorteios dos inimigos d
 - Menino, cachorro, gato, pássaro, cortador, chuva e inseticida: documento próprio.
 - Queda de comida na casa ao morrer a aranha dentro de casa (`_DropFoodA` com a tabela de queda).
 - Conferido rodando o original: a lagarta andando (I-01), a formiga-leão comendo uma formiga (I-02) e a aranha em agonia virando comida (I-03), mais os vetores de tick 79–83 (aranha andando, formigas-leão paradas, lagarta). Falta: cerco da formiga-leão e da aranha (mostram diálogo modal), pedrinha cuspida, laser, faro, aranha do jogador e a morte da amarela pelos inimigos.
-- `_YellowDeath` e `_MoveMyLife` são da amarela ([formiga-amarela.md](formiga-amarela.md)); o port de inimigos usa versões provisórias (ver "Implementação no port").
+- A morte da amarela pelos inimigos (`_YellowDeath` 1–4) não foi conferida contra o original.

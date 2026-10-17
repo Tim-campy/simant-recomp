@@ -12,6 +12,7 @@
 use std::path::{Path, PathBuf};
 
 use engine::formats::save::{Formiga, JogoSalvo, LayoutSave, Lista};
+use engine::rules::amarela::TabelasAmarela;
 use engine::rules::estado::Estado;
 use engine::rules::geracao::Cor;
 use engine::rules::ninho::{simular_ninho, vencedor_da_luta, TabelasNinho};
@@ -69,7 +70,7 @@ fn vaga_vazia_nao_sorteia() {
     let mut e = ninho_de_teste();
     e.ninho_b.lista.adicionar(formiga(10, 5, 2, 0, 0));
     e.s.definir_semente(0x1234);
-    simular_ninho(&mut e, Cor::Preta, tab());
+    simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
     assert_eq!(e.s.semente(), 0x1234);
 }
 
@@ -82,12 +83,12 @@ fn operaria_sobe_pelo_mapa_de_saida_e_sai_pelo_buraco() {
     e.adicionar_formiga(Lista::B, formiga(10, 3, 2, 0x10, 0));
     e.s.definir_semente(0x1234);
     for esperado in [(10, 2), (10, 1)] {
-        simular_ninho(&mut e, Cor::Preta, tab());
+        simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
         let f = e.ninho_b.lista.vagas[0];
         assert_eq!((f.x, f.y, f.tipo & 0xF8), (esperado.0, esperado.1, 0x10));
         assert_eq!(e.ninho_b.vida.em(esperado.0 as i32, esperado.1 as i32), Some(f.tipo));
     }
-    simular_ninho(&mut e, Cor::Preta, tab());
+    simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
     assert_eq!(e.ninho_b.lista.vagas[0].tipo, 0, "saiu da lista B");
     assert_eq!(e.ninho_b.vida.em(10, 1), Some(0));
     let a = e.superficie.lista.vagas[0];
@@ -108,7 +109,7 @@ fn morte_natural_respeita_a_saude() {
         e.preta.saude = saude;
         e.adicionar_formiga(Lista::B, formiga(10, 5, 13, 0x12, 0));
         e.s.definir_semente(semente);
-        simular_ninho(&mut e, Cor::Preta, tab());
+        simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
         assert_eq!(e.ninho_b.lista.vagas[0].tipo == 0, morre, "saúde {saude}, Sk(32) = {b}");
         assert_eq!(e.preta.mortes_naturais, morre as i32);
     }
@@ -117,7 +118,7 @@ fn morte_natural_respeita_a_saude() {
     e.preta.saude = 0;
     e.adicionar_formiga(Lista::B, formiga(10, 5, 9, 0x6C, 0));
     e.s.definir_semente(semente);
-    simular_ninho(&mut e, Cor::Preta, tab());
+    simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
     assert_eq!(e.preta.mortes_naturais, 0);
 }
 
@@ -128,7 +129,7 @@ fn ama_preta_pega_ovo_guarda_estagio_e_larga_no_fundo() {
     e.adicionar_formiga(Lista::B, formiga(10, 18, 8, 5, 0)); // ovo, índice menor: fica em Vida
     e.ninho_b.lista.adicionar(formiga(10, 18, 1, 0x12, 0));
     e.s.definir_semente(0x4321);
-    simular_ninho(&mut e, Cor::Preta, tab());
+    simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
     let ama = e.ninho_b.lista.vagas[1];
     assert_eq!((ama.tipo, ama.s, ama.x, ama.y), (0x0A, 5, 10, 18), "pega o ovo e não anda");
     assert_eq!(e.ninho_b.lista.vagas[0].tipo, 0);
@@ -142,7 +143,7 @@ fn ama_preta_pega_ovo_guarda_estagio_e_larga_no_fundo() {
         let mut e = depois_de_pegar.clone();
         e.s.definir_semente(semente);
         for _ in 0..25 {
-            simular_ninho(&mut e, Cor::Preta, tab());
+            simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
             if e.ninho_b.lista.vagas[1].tipo & 0xF8 == 0x10 {
                 break;
             }
@@ -167,7 +168,7 @@ fn comida_dobrada() {
     e.adicionar_formiga(Lista::B, formiga(10, 3, 3, 0x1A, 0));
     e.s.definir_semente(0x0BAD);
     for _ in 0..60 {
-        simular_ninho(&mut e, Cor::Preta, tab());
+        simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
     }
     let unidades: i32 = e.ninho_b.mapa.dados.iter().filter(|v| (0x10..=0x13).contains(*v)).map(|&v| v as i32 - 0x0F).sum();
     assert_eq!(e.preta.comida, 2);
@@ -190,7 +191,7 @@ fn saida_decrementada_sem_teste_no_preto_e_com_teste_no_vermelho() {
         e.adicionar_formiga(lista, formiga(30, 40, 2, t, 0));
         e.s.definir_semente(0x7777);
         for _ in 0..3 {
-            simular_ninho(&mut e, cor, tab());
+            simular_ninho(&mut e, cor, tab(), TabelasAmarela::padrao());
         }
         let esperado = if cor == Cor::Preta { 0xFF } else { 0 };
         assert_eq!(e.ninho(cor).saida.em(30, 40), Some(esperado), "{cor:?}");
@@ -205,7 +206,7 @@ fn luta_nao_remove_a_checadora() {
     e.adicionar_formiga(Lista::B, formiga(10, 8, 0, 0x92, 0));
     e.ninho_b.lista.adicionar(formiga(10, 8, 13, 0x12, 0));
     e.s.definir_semente(0x2468);
-    simular_ninho(&mut e, Cor::Preta, tab());
+    simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
     let (v, p) = (e.ninho_b.lista.vagas[0], e.ninho_b.lista.vagas[1]);
     assert_eq!((p.tipo, p.modo), (0x12, 13));
     assert_eq!(v.modo, 10);
@@ -236,7 +237,7 @@ fn rainha_atacada_some_e_a_cauda_vai_junto() {
     e.adicionar_formiga(Lista::B, formiga(10, 9, 9, 0x6C, 0)); // cauda acima
     e.ninho_b.lista.adicionar(formiga(10, 10, 7, 0x92, 0)); // invasora na célula da cabeça
     e.s.definir_semente(0x1357);
-    simular_ninho(&mut e, Cor::Preta, tab());
+    simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
     let l = &e.ninho_b.lista.vagas;
     assert_eq!(l[2].tipo, 0, "a invasora some");
     assert_eq!(l[0].modo, 10, "a cabeça vira nuvem");
@@ -254,13 +255,13 @@ fn ovo_avanca_so_no_ciclo_do_periodo_e_eclode() {
     e.controles.proxima_casta = 2;
     e.adicionar_formiga(Lista::B, formiga(10, 5, 8, 6, 0));
     e.partida.ciclo = 31;
-    simular_ninho(&mut e, Cor::Preta, tab());
+    simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
     assert_eq!(e.ninho_b.lista.vagas[0].tipo, 6);
     e.partida.ciclo = 32;
-    simular_ninho(&mut e, Cor::Preta, tab());
+    simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
     assert_eq!(e.ninho_b.lista.vagas[0].tipo, 7);
     e.partida.ciclo = 64;
-    simular_ninho(&mut e, Cor::Preta, tab());
+    simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
     let f = e.ninho_b.lista.vagas[0];
     assert_eq!((f.tipo, f.modo), (0x12, 1), "operária virada para a direita, M = 1");
 }
@@ -285,7 +286,7 @@ fn cauda_poe_ovo_atras_e_cobra_a_saude() {
         })
         .unwrap();
     e.s.definir_semente(semente);
-    simular_ninho(&mut e, Cor::Preta, tab());
+    simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
     let ovo = e.ninho_b.lista.vagas[2];
     assert_eq!((ovo.x, ovo.y, ovo.tipo, ovo.modo), (10, 8, 1, 8));
     assert_eq!(e.preta.ultimo_ovo, (10, 8));
@@ -304,7 +305,7 @@ fn passagem_leva_a_vermelha_para_o_ninho_preto() {
     for semente in 1..200u16 {
         let mut e2 = e.clone();
         e2.s.definir_semente(semente);
-        simular_ninho(&mut e2, Cor::Vermelha, tab());
+        simular_ninho(&mut e2, Cor::Vermelha, tab(), TabelasAmarela::padrao());
         if e2.ninho_r.lista.vagas[0].tipo == 0 {
             let b = e2.ninho_b.lista.vagas[0];
             assert_eq!(e2.ninho_b.lista.indice, 1);
@@ -407,8 +408,8 @@ fn vetores_de_tick_do_original_no_ninho() {
         for k in 0..400 {
             let mut e = base.clone();
             e.s.definir_semente(s0);
-            simular_ninho(&mut e, Cor::Preta, tab());
-            simular_ninho(&mut e, Cor::Vermelha, tab());
+            simular_ninho(&mut e, Cor::Preta, tab(), TabelasAmarela::padrao());
+            simular_ninho(&mut e, Cor::Vermelha, tab(), TabelasAmarela::padrao());
             if e.s.semente() == s_final && resumo_do_ninho(&e) == alvo {
                 achou = Some(k);
                 break;

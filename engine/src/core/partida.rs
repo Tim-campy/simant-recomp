@@ -137,6 +137,8 @@ pub struct Partida {
     pub relogio: Relogio,
     /// Tempo real acumulado que ainda não completou uma mensagem.
     resto_ms: u64,
+    /// Tempo real total passado a `avancar` (o `GetTickCount` do port, ms).
+    ms_total: u64,
     /// O aplicativo tem o foco (`WM_ACTIVATEAPP`).
     ativo: bool,
     /// Ticks com redesenho (DGROUP `0x02F0`, "quadros").
@@ -169,6 +171,7 @@ impl Partida {
             cfg,
             relogio: Relogio::default(),
             resto_ms: 0,
+            ms_total: 0,
             ativo: true,
             quadros: 0,
             contador_mapa: 0,
@@ -207,6 +210,7 @@ impl Partida {
     /// pausa liberarem.
     pub fn avancar(&mut self, ms: u64) -> Avanco {
         let intervalo = self.intervalo_ms();
+        self.ms_total += ms;
         self.resto_ms += ms;
         let mut n = self.resto_ms / intervalo;
         self.resto_ms %= intervalo;
@@ -246,6 +250,8 @@ impl Partida {
     /// seguida na interface (redesenho, vista).
     pub fn rodar_tick(&mut self) {
         self.vistas_para_estado();
+        // `_MacTickCount` (1000:9694) = ⌊GetTickCount / 55⌋ × 3: tempo real (quintal.md, "Relógios").
+        self.estado.relogio_mac = Some(((self.ms_total / 55) * 3) as u32);
         tick(&mut self.estado, &mut self.regras as &mut dyn Regras);
         self.vistas_do_estado();
         self.tratar_eventos();

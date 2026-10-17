@@ -52,6 +52,9 @@ pub struct Extras {
     pub game_time: u32,
     /// `_Cycle` (idem).
     pub cycle: i16,
+    /// Relógio do Mac (`_MacTickCount`) devolvido na primeira chamada dentro do tick; `None` se o tick
+    /// não o leu ou se o vetor é anterior à captura (só existe em `antes`).
+    pub relogio_mac: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -65,6 +68,8 @@ struct ExtrasJson {
     global_key: i64,
     game_time: i64,
     cycle: i64,
+    #[serde(rename = "MacTickCount", default)]
+    mac_tick_count: Option<i64>,
 }
 
 impl From<ExtrasJson> for Extras {
@@ -78,6 +83,7 @@ impl From<ExtrasJson> for Extras {
             global_key: j.global_key as i16,
             game_time: j.game_time as u32,
             cycle: j.cycle as i16,
+            relogio_mac: j.mac_tick_count.map(|v| v as u32),
         }
     }
 }
@@ -199,6 +205,7 @@ pub fn montar_entrada(v: &VetorTick, layout: &LayoutSave) -> Result<Entrada, Str
     e.s.definir_semente(x.semente_s);
     e.r = GeradorR::de_estado(x.semente_r);
     e.ciclos_jogo = x.game_cycles;
+    e.relogio_mac = x.relogio_mac;
     e.tindex = x.tindex as i32;
     e.tecla_global = x.global_key;
     e.superficie.vida.dados.clone_from(&v.vida_antes.a);

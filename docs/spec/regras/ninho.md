@@ -678,16 +678,15 @@ Port: `engine/tests/regras_ninho.rs` parte de cada `ID_carregado.ANT`, roda o ti
 
 ## Implementação no port
 
-- `engine/src/rules/ninho.rs`: `impl RegrasNinho for RegrasOriginais` chama `simular_ninho(e, cor, tabelas)` (pública, para testes com outras tabelas). A formiga em processamento é um `Formigueiro` (índice = `_Tindex`, com T, X, Y, M de entrada, como os parâmetros do original); cada método cita a rotina do original e a seção desta spec.
-- Tabelas em `data/ninho.json` (`TabelasNinho`), geradas por `tools/extrair_ninho.py` (endereços no topo do script): `_Dx8/_Dy8`, `_TurnTab`, `_ModeTabWB/SB`, `_CasteModeTabB`, `_CasteTabC`, `VitóriaR`, classe e matriz de luta, borda do buraco. `RegrasOriginais` ainda não guarda essas tabelas; o port usa a cópia embutida (`TabelasNinho::padrao`) até ganhar um campo `ninho` (um mod que troque `ninho.json` só terá efeito depois disso).
-- Pontos de extensão vazios: `_YellowFight` e `_DoTroph` (formiga amarela). Balões e o som da escavação não são regra e não estão implementados.
-- `vencedor_da_luta` (`_GetWinner`) é pública: a superfície usa a mesma regra.
+- `engine/src/rules/ninho.rs`: `impl RegrasNinho for RegrasOriginais` chama `simular_ninho(e, cor, tabelas, tabelas_amarela)` (pública, para testes com outras tabelas). A formiga em processamento é um `Formigueiro` (índice = `_Tindex`, com T, X, Y, M de entrada, como os parâmetros do original); cada método cita a rotina do original e a seção desta spec.
+- Tabelas em `data/ninho.json` (`TabelasNinho`), geradas por `tools/extrair_ninho.py` (endereços no topo do script): `_Dx8/_Dy8`, `_TurnTab`, `_ModeTabWB/SB`, `_CasteModeTabB`, `_CasteTabC`, `VitóriaR`, classe e matriz de luta, borda do buraco. Guardadas em `RegrasOriginais::ninho` (com mods); `TabelasNinho::padrao` é a cópia embutida, para testes.
+- `_YellowFight` e `_DoTroph` são os de `rules/amarela.rs` (`lutar_com_amarela`, `trofalaxia`). Balões e o som da escavação não são regra e não estão implementados.
+- `_DigTile*`, `_SmoothEdges*`, `_FixExitMap*`, `_MakeNewHole*`, `_PlaceEgg*`, `_GetNewMode*`, `_GetWinner`, `_EatFood*`/`_StealFood*`, `_DecEat*`, `_GetBestDir` e `_ExitHole` estão em `engine/src/rules/comum.rs` (ver [../../decisoes.md](../../decisoes.md), "Módulo comum das regras"); `vencedor_da_luta` continua pública em `ninho.rs`, com as tabelas do ninho.
 
 ## Lacunas
 
-- `_YellowFight` e `_DoTroph`: só citados; ficam com a formiga amarela (`formiga-amarela.md`).
 - Gotas e poças da superfície (`_PlaceDrop`, `_InitWater`): só a ordem dos sorteios está aqui; regra completa em `superficie.md`.
 - `_ExitHole` com a lista A cheia: compacta e, se continuar cheia, grava na vaga 1000 (fora da lista) [a conferir na desmontagem].
 - Testados na bancada: N-03, N-06, N-09, N-13 (§13.3). Faltam os estatísticos (N-01, N-07, N-10, N-12 no vencedor) e os que precisam de saves com ninhos mais desenvolvidos que o `QUICK2.ANT` (N-14, N-15). O executor de casos só para ~5 ticks depois do load; casos de 1 tick exigem o modo tick da bancada (ver testes-tick.md).
-- `_YellowFight`, `_DoTroph`: só ligados quando a parte da amarela existir; os casos com a amarela por perto (N-15) ficam para depois.
+- `_YellowFight`, `_DoTroph`: ligados (teste `engine/tests/regras_comum.rs`), mas os casos com a amarela por perto (N-15) não foram rodados no original.
 - Os "defeitos" marcados ([hipótese]) devem ser confirmados no original antes de decidir se o port os reproduz por padrão (o princípio do projeto é reproduzir; um mod pode corrigir).

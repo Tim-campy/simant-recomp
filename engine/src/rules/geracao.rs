@@ -6,11 +6,16 @@
 //! nº 1000 do banco original, lido em tempo de execução. Os valores de tile que aparecem aqui como
 //! constantes são os descritos em tiles-valores.md.
 //!
+//! A escavação (`_DigTile*`, `_SmoothEdges*`, `_FixExitMap*`, `_MakeNewHole*`, `_IsClear3x3`) é a mesma
+//! do tick: `rules/comum.rs`, sobre a trait `Terreno`, que o [`Mundo`] implementa junto com o gerador S
+//! da geração.
+//!
 //! Fora do escopo (ver a seção "Implementação no port" da spec): patches da casa (`_MakeHousePatch`),
 //! feromônios, histórico, contagens de casta e estado de interface (vistas, janelas).
 
 use serde::Deserialize;
 
+use super::comum::{self, e_terra, Direcoes, Superficie, Terreno};
 use super::rng::{GeradorR, GeradorS};
 use crate::formats::banco::Chave;
 use crate::formats::save::Formiga;
@@ -34,16 +39,12 @@ pub const CHAVE_SENO: Chave = Chave { tipo: 9, id: 1000 };
 
 // Valores de tile (docs/spec/regras/tiles-valores.md).
 const TERRA_MACICA: u8 = 0x2E;
-const ABERTURA_NINHO: u8 = 0x18;
-const PASSAGEM_ENTRE_NINHOS: u8 = 0x14;
-const TUNEL_INUNDADO: u8 = 0x4E;
 const BURACO: u8 = 0x50;
 const PEDRINHA: u8 = 0x51;
 const COMIDA: u8 = 0x48;
 const FORMIGA_LEAO_CENTRO: u8 = 0x38;
 const FORMIGA_LEAO_BORDA: u8 = 0x30;
 const SAIDA_ABERTA: u8 = 0xFF;
-const SAIDA_FECHADA: u8 = 0xFE;
 /// `_LifeA/B` da formiga amarela: cabeça e segunda célula (só a rainha, tipo 0x60, ocupa duas).
 const VIDA_AMARELA: u8 = 0xFF;
 const VIDA_AMARELA_2: u8 = 0xFE;
@@ -113,6 +114,7 @@ impl TabelasGeracao {
     }
 
     fn validar(&self) -> Result<(), String> {
+        comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx8, &self.dy8)?;
         if self.pedras5.len() != 6 || self.pedras5.iter().any(|f| f.len() != 25) {
             return Err("pedras5 deve ter 6 formas de 25 bytes".into());
         }
@@ -143,8 +145,15 @@ impl TabelasGeracao {
         self.seno((angulo + 0x40) & 0xFF)
     }
 
+    /// [`Direcoes::vizinha`] com índice `usize`.
     fn vizinha(&self, x: i32, y: i32, d: usize) -> (i32, i32) {
-        (x + self.dx8[d] as i32, y + self.dy8[d] as i32)
+        Direcoes::vizinha(self, x, y, d as i32)
+    }
+}
+
+impl Direcoes for TabelasGeracao {
+    fn deslocamentos(&self) -> (&[i8; 8], &[i8; 8]) {
+        (&self.dx8, &self.dy8)
     }
 }
 
@@ -167,13 +176,13 @@ pub struct Escavacao {
 
 impl Escavacao {
     fn somar(&mut self, x: i32, y: i32) {
-        self.tot_x = self.tot_x.wrapping_add(x);
-        self.tot_y = self.tot_y.wrapping_add(y);
-        self.cavados = self.cavados.wrapping_add(1);
-        if self.cavados > 0 {
-            self.massa_x = (self.tot_x / self.cavados as i32) as i16;
-            self.massa_y = (self.tot_y / self.cavados as i32) as i16;
-        }
+        comum::somar_escavacao(
+            (&mut self.tot_x, &mut self.tot_y),
+            &mut self.cavados,
+            (&mut self.massa_x, &mut self.massa_y),
+            x,
+            y,
+        );
     }
 }
 
@@ -279,14 +288,82 @@ fn na_superficie(x: i32, y: i32) -> bool {
     (0..LARGURA_SUPERFICIE).contains(&x) && (0..LADO).contains(&y)
 }
 
-/// `_IsItDirt`: terra 0x20–0x2E.
-fn e_terra(v: u8) -> bool {
-    (0x20..=0x2E).contains(&v)
+/// O mundo em geração com o gerador S dela: o que as rotinas de escavação de `comum.rs` precisam.
+struct Escavando<'a> {
+    m: &'a mut Mundo,
+    s: &'a mut GeradorS,
 }
 
-/// Sólido para o alisamento: ≥ 0x20 e fora de 0x30–0x4E.
-fn e_solido(v: u8) -> bool {
-    v >= 0x20 && !(0x30..=0x4E).contains(&v)
+fn no_ninho(x: i32, y: i32) -> bool {
+    (0..LADO).contains(&x) && (0..LADO).contains(&y)
+}
+
+impl Superficie for Mundo {
+    fn tile_superficie(&self, x: i32, y: i32) -> Option<u8> {
+        na_superficie(x, y).then(|| self.mapa_a[ix(x, y)])
+    }
+    fn vida_superficie(&self, x: i32, y: i32) -> Option<u8> {
+        na_superficie(x, y).then(|| self.vida_a[ix(x, y)])
+    }
+}
+
+impl Superficie for Escavando<'_> {
+    fn tile_superficie(&self, x: i32, y: i32) -> Option<u8> {
+        self.m.tile_superficie(x, y)
+    }
+    fn vida_superficie(&self, x: i32, y: i32) -> Option<u8> {
+        self.m.vida_superficie(x, y)
+    }
+}
+
+impl Terreno for Escavando<'_> {
+    fn tile_ninho(&self, cor: Cor, x: i32, y: i32) -> Option<u8> {
+        let mapa = if cor == Cor::Preta { &self.m.mapa_b } else { &self.m.mapa_r };
+        no_ninho(x, y).then(|| mapa[ix(x, y)])
+    }
+    fn gravar_tile_ninho(&mut self, cor: Cor, x: i32, y: i32, v: u8) {
+        if no_ninho(x, y) {
+            self.m.ninho_mut(cor)[ix(x, y)] = v;
+        }
+    }
+    fn saida(&self, cor: Cor, x: i32, y: i32) -> Option<u8> {
+        let saida = if cor == Cor::Preta { &self.m.saida_b } else { &self.m.saida_r };
+        no_ninho(x, y).then(|| saida[ix(x, y)])
+    }
+    fn gravar_saida(&mut self, cor: Cor, x: i32, y: i32, v: u8) {
+        if no_ninho(x, y) {
+            let saida = if cor == Cor::Preta { &mut self.m.saida_b } else { &mut self.m.saida_r };
+            saida[ix(x, y)] = v;
+        }
+    }
+    fn somar_escavacao(&mut self, cor: Cor, x: i32, y: i32) {
+        self.m.escavacao_mut(cor).somar(x, y);
+    }
+    fn gravar_tile_superficie(&mut self, x: i32, y: i32, v: u8) {
+        if na_superficie(x, y) {
+            self.m.mapa_a[ix(x, y)] = v;
+        }
+    }
+    fn casa(&self) -> bool {
+        self.m.terreno != 0
+    }
+    /// A geração não tem `_LastNewExit?` separado: `Estado::de_mundo` o deriva do buraco.
+    fn registrar_buraco(&mut self, cor: Cor, x: i32, c: i32) {
+        let (ultimo, buracos) = match cor {
+            Cor::Preta => (&mut self.m.ultimo_buraco_b, &mut self.m.buracos_b),
+            Cor::Vermelha => (&mut self.m.ultimo_buraco_r, &mut self.m.buracos_r),
+        };
+        *ultimo = (x as i16, c as i16);
+        if let Some(b) = buracos.get_mut(c as usize) {
+            *b = x as u8;
+        }
+    }
+    fn sk(&mut self, k: u16) -> i32 {
+        self.s.mascara(k)
+    }
+    fn s1(&mut self, n: u16) -> i32 {
+        self.s.rand1(n)
+    }
 }
 
 impl Mundo {
@@ -543,22 +620,14 @@ impl Mundo {
         }
     }
 
-    /// `_IsClearTile(1, x, y)` na superfície.
+    /// `_IsClearTile(1, x, y)` na superfície ([`comum::livre_na_superficie`]).
     fn livre_superficie(&self, x: i32, y: i32) -> bool {
-        if !na_superficie(x, y) {
-            return false;
-        }
-        let i = ix(x, y);
-        matches!(self.vida_a[i], 0 | VIDA_AMARELA | VIDA_AMARELA_2) && self.mapa_a[i] < 0x10
+        comum::livre_na_superficie(self, x, y)
     }
 
-    /// `_IsClear3x3(1, x, y)`.
+    /// `_IsClear3x3(1, x, y)` ([`comum::livre_3x3`]).
     fn livre_3x3(&self, tab: &TabelasGeracao, x: i32, y: i32) -> bool {
-        self.livre_superficie(x, y)
-            && (0..8).all(|d| {
-                let (vx, vy) = tab.vizinha(x, y, d);
-                self.livre_superficie(vx, vy)
-            })
+        comum::livre_3x3(self, tab, x, y)
     }
 
     /// `_InitAntLions(n)`.
@@ -650,69 +719,10 @@ impl Mundo {
         }
     }
 
-    /// `_MakeNewHoleB/R(c)`: buraco na superfície (linha `c`) ligado à coluna `c` do ninho.
+    /// `_MakeNewHoleB/R(c)` ([`comum::novo_buraco`]): buraco na superfície (linha `c`) ligado à coluna
+    /// `c` do ninho.
     fn novo_buraco(&mut self, s: &mut GeradorS, tab: &TabelasGeracao, cor: Cor, c: i32) {
-        let r = s.rand1(31);
-        let x_de = |t: i32| {
-            let k = (r + t) % 32;
-            if cor == Cor::Preta {
-                k + 2
-            } else {
-                126 - k
-            }
-        };
-        let mut achado = None;
-        if self.terreno == 0 {
-            for t in 0..34 {
-                let x = x_de(t);
-                if self.livre_3x3(tab, x, c) {
-                    achado = Some(x);
-                    break;
-                }
-            }
-            let Some(x) = achado else { return };
-            self.mapa_a[ix(x, c)] = BURACO;
-            for d in 0..8 {
-                let (vx, vy) = tab.vizinha(x, c, d);
-                if na_superficie(vx, vy) && self.mapa_a[ix(vx, vy)] < BURACO {
-                    self.mapa_a[ix(vx, vy)] = tab.borda_buraco[d];
-                }
-            }
-        } else {
-            // Casa: aceita a primeira célula que tenha versão "com buraco" (_CanBeHouseHole), sem borda.
-            for t in 0..34 {
-                let x = x_de(t);
-                let i = ix(x, c);
-                let novo = match self.mapa_a[i] {
-                    0 => 0x86,
-                    2 | 3 => 0x8A,
-                    v @ 0x5E..=0x61 => v + 0x22,
-                    0x66 => 0x85,
-                    0x68 => 0x84,
-                    _ => 0,
-                };
-                if novo != 0 {
-                    self.mapa_a[i] = novo;
-                    achado = Some(x);
-                    break;
-                }
-            }
-            if achado.is_none() {
-                return;
-            }
-        }
-        let x = achado.unwrap();
-        match cor {
-            Cor::Preta => {
-                self.ultimo_buraco_b = (x as i16, c as i16);
-                self.buracos_b[c as usize] = x as u8;
-            }
-            Cor::Vermelha => {
-                self.ultimo_buraco_r = (x as i16, c as i16);
-                self.buracos_r[c as usize] = x as u8;
-            }
-        }
-        self.cavar(s, tab, cor, c, 1);
+        comum::novo_buraco(&mut Escavando { m: self, s }, tab, &tab.borda_buraco, cor, c);
     }
 
     fn ninho_mut(&mut self, cor: Cor) -> &mut Vec<u8> {
@@ -729,115 +739,15 @@ impl Mundo {
         }
     }
 
-    /// `_DigTileB/R(x, y)`: escava se for terra, alisa as quatro vizinhas e atualiza a saída.
+    /// `_DigTileB/R(x, y)` ([`comum::cavar`]): escava se for terra, alisa as quatro vizinhas e atualiza a
+    /// saída.
     fn cavar(&mut self, s: &mut GeradorS, tab: &TabelasGeracao, cor: Cor, x: i32, y: i32) {
-        let i = ix(x, y);
-        if e_terra(self.ninho_mut(cor)[i]) {
-            self.ninho_mut(cor)[i] = s.mascara(8) as u8;
-            self.escavacao_mut(cor).somar(x, y);
-            // Só no ninho preto: abaixo de y = 53, 1/64 de chance de abrir passagem nos dois ninhos.
-            if cor == Cor::Preta && y > 53 && s.rand1(64) == 0 {
-                self.mapa_b[i] = PASSAGEM_ENTRE_NINHOS;
-                if e_terra(self.mapa_r[i]) {
-                    self.mapa_r[i] = s.mascara(8) as u8;
-                    self.escavacao_r.somar(x, y);
-                }
-                self.alisar_vizinhas(s, tab, Cor::Vermelha, x, y);
-                self.mapa_r[i] = PASSAGEM_ENTRE_NINHOS;
-            }
-        }
-        self.alisar_vizinhas(s, tab, cor, x, y);
+        comum::cavar(&mut Escavando { m: self, s }, tab, cor, x, y);
     }
 
-    /// As quatro chamadas a `_SmoothEdges?` (cima, direita, baixo, esquerda) e `_FixExitMap?`.
-    fn alisar_vizinhas(&mut self, s: &mut GeradorS, tab: &TabelasGeracao, cor: Cor, x: i32, y: i32) {
-        self.alisar(s, cor, x, y - 1);
-        self.alisar(s, cor, x + 1, y);
-        self.alisar(s, cor, x, y + 1);
-        self.alisar(s, cor, x - 1, y);
-        self.corrigir_saida(tab, cor, x, y);
-    }
-
-    /// `_SmoothEdgesB/R(x, y)` (tiles-valores.md, "Regra de alisamento").
-    fn alisar(&mut self, s: &mut GeradorS, cor: Cor, x: i32, y: i32) {
-        // y < 0 só aconteceria cavando a linha 0, o que a geração não faz; o original não testa.
-        if !(0..LADO).contains(&x) || !(0..LADO).contains(&y) {
-            return;
-        }
-        let n = self.ninho_mut(cor);
-        if y == 0 {
-            if n[ix(x, 0)] <= 0x2F {
-                n[ix(x, 0)] = ABERTURA_NINHO;
-            }
-            return;
-        }
-        let i = ix(x, y);
-        let v = n[i];
-        if !e_solido(v) {
-            return;
-        }
-        let inundada = v >= TUNEL_INUNDADO;
-        let mut m = 0u8;
-        if y < 2 || e_solido(n[i - 1]) {
-            m |= 1;
-        }
-        if x >= LADO - 1 || e_solido(n[i + LADO as usize]) {
-            m |= 2;
-        }
-        if y >= LADO - 1 || e_solido(n[i + 1]) {
-            m |= 4;
-        }
-        if x <= 0 || e_solido(n[i - LADO as usize]) {
-            m |= 8;
-        }
-        n[i] = if m != 0 {
-            m + 0x1F + if inundada { 0x2F } else { 0 }
-        } else if inundada {
-            TUNEL_INUNDADO
-        } else {
-            s.mascara(8) as u8
-        };
-    }
-
-    /// `_FixExitMapB/R(x, y)`: nas linhas 0 e 1, 0xFF se for abertura e 0xFE se não; abaixo, o maior
-    /// valor das 8 vizinhas menos 1 (ou 0). Só a célula escavada é atualizada.
-    fn corrigir_saida(&mut self, tab: &TabelasGeracao, cor: Cor, x: i32, y: i32) {
-        let (mapa, saida) = match cor {
-            Cor::Preta => (&self.mapa_b, &mut self.saida_b),
-            Cor::Vermelha => (&self.mapa_r, &mut self.saida_r),
-        };
-        if y < 2 {
-            let i = ix(x, y);
-            saida[i] = if mapa[i] == ABERTURA_NINHO { SAIDA_ABERTA } else { SAIDA_FECHADA };
-            return;
-        }
-        let mut maior = 0u8;
-        for d in 0..8 {
-            let (vx, vy) = tab.vizinha(x, y, d);
-            if (0..LADO).contains(&vx) && (0..LADO).contains(&vy) {
-                maior = maior.max(saida[ix(vx, vy)]);
-            }
-        }
-        saida[ix(x, y)] = maior.saturating_sub(1);
-    }
-
-    /// `_DigTileThemB/R(x, y)`: escava sem exigir terra na célula, se as de cima e de baixo forem terra.
+    /// `_DigTileThemB/R(x, y)` ([`comum::cavar_tunel`]).
     fn cavar_tunel(&mut self, s: &mut GeradorS, tab: &TabelasGeracao, cor: Cor, x: i32, y: i32) -> bool {
-        let n = self.ninho_mut(cor);
-        let baixo_ok = y > 62 || e_terra(n[ix(x, y + 1)]);
-        let cima_ok = y < 3 || e_terra(n[ix(x, y - 1)]);
-        if !(baixo_ok && cima_ok && x != 0 && x < 63) {
-            return false;
-        }
-        if y == 0 {
-            self.ninho_mut(cor)[ix(x, 0)] = ABERTURA_NINHO;
-            self.novo_buraco(s, tab, cor, x);
-        } else {
-            self.ninho_mut(cor)[ix(x, y)] = s.mascara(8) as u8;
-        }
-        self.escavacao_mut(cor).somar(x, y);
-        self.alisar_vizinhas(s, tab, cor, x, y);
-        true
+        comum::cavar_tunel(&mut Escavando { m: self, s }, tab, &tab.borda_buraco, cor, x, y)
     }
 
     /// `_DigOutBNest/RNest(n)`: passeio aleatório a partir de (32, 1). Não usado no novo jogo.

@@ -59,11 +59,8 @@
   "tick_000191",
   "tick_000223"
  ],
- "pendentes": {
-  "tick_000159": "quintal, relógio do Mac do gato: com _CatOn = 0 o port usa _gameCycles (29579) como relógio, acha vencido o _CatDelay = 3654 gravado pelo original no tick 127 e sorteia S16 (CatDelay do port = 29779); o original não mexe em _CatDelay (o relógio dele está <= 3654). Daí S diverge e, em cascata: o gato aparece só no port (CatOn/CatX/CatDir/CatCycle), o cachorro (DogDir/DogFrame/DogX) e a formiga 1 da superfície (AlistY/T)",
-  "tick_000191": "quintal, relógio do Mac do gato (como no tick 159): o port usa _gameCycles (36125), acha vencido _CatDelay = 3654 e sorteia S16 (CatDelay do port = 36325); em cascata, o cachorro (DogDir/DogFrame/DogTurnCnt/DogX) e a formiga 0 da superfície (AlistY/T)",
-  "tick_000223": "quintal, relógio do Mac do gato (como no tick 159): o port usa _gameCycles (42381), acha vencido _CatDelay = 4064 e sorteia S16 (CatDelay do port = 42581); em cascata, a formiga 1 da superfície (AlistX/T) e a rainha preta, que põe um ovo só no port (Blist*[11], ListIndexB, TotalEggsLaidB, HealthB)"
- },
+ "pendentes": {},
+ "_regravado": "2026-10-17, com o relógio do Mac (MacTickCount) em extras.json; os ticks 191 e 223 têm conteúdo diferente da primeira gravação porque o sorteio do gato depende do tempo real",
  "vida_nao_reconstruivel": {
   "tick_000159": "depois do tick, LifeB (34, 8): original 1, reconstruído 2. Vários ovos/larvas na mesma célula (Blist 4..8); o ovo posto neste tick (índice 8, T 1) foi escrito por último no tick, enquanto a reconstrução de _DoLoadInitializations deixa o de menor índice (T 2)",
   "tick_000191": "depois do tick, LifeB (34, 8): original 1, reconstruído 2 (ovo novo, índice 9, sobre larvas de índice menor; como no tick 159)"

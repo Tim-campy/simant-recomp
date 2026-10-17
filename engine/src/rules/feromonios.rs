@@ -11,9 +11,16 @@
 
 use serde::Deserialize;
 
+use std::sync::OnceLock;
+
 use crate::formats::save::{JogoSalvo, Mapa};
 use crate::recursos::Recursos;
+use crate::rules::comum::{self, Direcoes, TabelaDeGiro};
 use crate::rules::rng::GeradorS;
+
+/// Cor de uma colônia (bit 7 do tipo da formiga: 0 = preta, 1 = vermelha). É a mesma de todas as
+/// regras ([`crate::rules::geracao::Cor`]).
+pub use crate::rules::geracao::Cor;
 
 /// Nome do arquivo de dados (em `data/` ou num mod).
 pub const ARQUIVO_TABELAS: &str = "feromonios.json";
@@ -70,34 +77,39 @@ impl TabelasFeromonio {
         Ok(t)
     }
 
+    /// Cópia embutida de `data/feromonios.json` (sem mods), para `RegrasOriginais::default` e testes.
+    pub fn padrao() -> &'static TabelasFeromonio {
+        static T: OnceLock<TabelasFeromonio> = OnceLock::new();
+        T.get_or_init(|| {
+            TabelasFeromonio::de_json(include_str!("../../../data/feromonios.json")).expect("data/feromonios.json")
+        })
+    }
+
     fn validar(&self) -> Result<(), String> {
         if self.turn_tab.iter().flatten().any(|&d| d > 7) {
             return Err(format!(
                 "{ARQUIVO_TABELAS}: turn_tab com direção fora de 0–7"
             ));
         }
-        if self
-            .dx8
-            .iter()
-            .zip(&self.dy8)
-            .any(|(x, y)| !(-1..=1).contains(x) || !(-1..=1).contains(y))
-        {
-            return Err(format!("{ARQUIVO_TABELAS}: dx8/dy8 devem estar em −1..1"));
-        }
-        Ok(())
+        comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx8, &self.dy8)
     }
 
-    /// `_TurnTab[atual][alvo]`.
+    /// `_TurnTab[atual][alvo]` ([`TabelaDeGiro::virar`]).
     pub fn virar(&self, atual: u8, alvo: u8) -> u8 {
-        self.turn_tab[atual as usize][alvo as usize]
+        TabelaDeGiro::virar(self, atual as i32, alvo as i32)
     }
 }
 
-/// Cor de uma colônia (bit 7 do tipo da formiga: 0 = preta, 1 = vermelha).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Cor {
-    Preta,
-    Vermelha,
+impl Direcoes for TabelasFeromonio {
+    fn deslocamentos(&self) -> (&[i8; 8], &[i8; 8]) {
+        (&self.dx8, &self.dy8)
+    }
+}
+
+impl TabelaDeGiro for TabelasFeromonio {
+    fn turn_tab(&self) -> &[[u8; 8]; 8] {
+        &self.turn_tab
+    }
 }
 
 /// As cinco camadas, na ordem em que aparecem no `.ANT`.
@@ -493,55 +505,15 @@ impl Feromonios {
 
 // --- escolha de direção (seção 4 da spec) ---
 
-/// Borda usada por `_GetNestDir` e `_GetAlarmDir`: na primeira/última coluna ou linha de tiles a
-/// formiga sorteia uma direção que aponta para dentro (5 opções no meio da borda, 3 nos cantos).
-/// Devolve `None` fora da borda (não consome o gerador nesse caso).
+/// Borda usada por `_GetNestDir` e `_GetAlarmDir`: [`comum::quicar`] (`_Bounce`).
 fn borda_larga(x: i32, y: i32, rng: &mut GeradorS) -> Option<u8> {
-    // (quantidade de opções, primeira direção); as direções são consecutivas, módulo 8.
-    let (n, primeira) = if x == 0 {
-        if y == 0 {
-            (3, 2)
-        } else if y == ULTIMO_Y {
-            (3, 0)
-        } else {
-            (5, 0)
-        }
-    } else if y == 0 {
-        if x == ULTIMO_X {
-            (3, 4)
-        } else {
-            (5, 2)
-        }
-    } else if x == ULTIMO_X {
-        if y == ULTIMO_Y {
-            (3, 6)
-        } else {
-            (5, 4)
-        }
-    } else if y == ULTIMO_Y {
-        (5, 6)
-    } else {
-        return None;
-    };
-    Some(((rng.rand1(n) + primeira) & 7) as u8)
+    comum::quicar(rng, x, y)
 }
 
-/// `_GetDir`: direção 0–7 de `(x1, y1)` para `(x2, y2)` pelos sinais de dx e dy, ou `None` se os
-/// pontos coincidem.
+/// `_GetDir` ([`comum::get_dir`]) como direção 0–7, ou `None` se os pontos coincidem.
 fn direcao_para(x1: i32, y1: i32, x2: i32, y2: i32) -> Option<u8> {
-    let dx = (x2 - x1).signum();
-    let dy = (y2 - y1).signum();
-    Some(match (dx, dy) {
-        (0, 0) => return None,
-        (0, -1) => 0,
-        (1, -1) => 1,
-        (1, 0) => 2,
-        (1, 1) => 3,
-        (0, 1) => 4,
-        (-1, 1) => 5,
-        (-1, 0) => 6,
-        _ => 7,
-    })
+    let d = comum::get_dir(x1, y1, x2, y2);
+    (d > 0).then(|| (d - 1) as u8)
 }
 
 /// `_GetForageDir` (`1030:0ab0`): direção de uma formiga em Foraging no tile `(x, y)`, apontando

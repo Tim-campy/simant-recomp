@@ -2,6 +2,7 @@
 //! Especificação em docs/spec/regras/.
 
 pub mod amarela;
+pub mod comum;
 pub mod conselhos;
 pub mod estado;
 pub mod feromonios;

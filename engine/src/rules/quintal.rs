@@ -12,8 +12,11 @@ use std::sync::OnceLock;
 
 use serde::Deserialize;
 
-use super::estado::{Estado, Evento, Grade};
+use super::amarela::{self, CausaMorte, TabelasAmarela};
+use super::comum::{self, achar_na_lista_a, Direcoes};
+use super::estado::{Estado, Evento};
 use super::geracao::Cor;
+use super::inimigos::TabelasInimigos;
 use super::tick::{RegrasOriginais, RegrasQuintal};
 use crate::formats::save::Lista;
 use crate::recursos::Recursos;
@@ -187,8 +190,7 @@ impl TabelasQuintal {
         Ok(t)
     }
 
-    /// Cópia de `data/quintal.json` embutida no binário (usada pelo `impl` do tick enquanto
-    /// `RegrasOriginais` não guarda as tabelas carregadas com mods).
+    /// Cópia embutida de `data/quintal.json` (sem mods), para `RegrasOriginais::default` e testes.
     pub fn padrao() -> &'static TabelasQuintal {
         static T: OnceLock<TabelasQuintal> = OnceLock::new();
         T.get_or_init(|| {
@@ -207,6 +209,11 @@ impl TabelasQuintal {
                 return Err(format!("{ARQUIVO_TABELAS}: roteiro do nó {} menor que a duração", r.no));
             }
         }
+        // `gato_chance` é o K de um `Sk(K)` (`SRand16`): potência de 2 entre 2 e 256.
+        let k = self.regras.gato_chance;
+        if !(k.is_power_of_two() && (2..=256).contains(&k)) {
+            return Err(format!("{ARQUIVO_TABELAS}: regras.gato_chance deve ser potência de 2 entre 2 e 256"));
+        }
         if c.nos_fixos.iter().any(|f| f.no < 30) {
             return Err(format!("{ARQUIVO_TABELAS}: nós fixos começam em 30"));
         }
@@ -219,6 +226,27 @@ impl TabelasQuintal {
 
     fn no_fixo(&self, no: i16) -> Option<&NoFixo> {
         self.casa.nos_fixos.iter().find(|f| f.no as i16 == no)
+    }
+}
+
+impl Direcoes for TabelasQuintal {
+    fn deslocamentos(&self) -> (&[i8; 8], &[i8; 8]) {
+        (&self.dx8, &self.dy8)
+    }
+}
+
+/// O que o quintal usa das tabelas de outras partes quando o menino mata a aranha ou a amarela.
+#[derive(Clone, Copy)]
+pub struct Vitimas<'a> {
+    /// Tabelas da amarela, para `_YellowDeath`.
+    pub amarela: &'a TabelasAmarela,
+    /// Duração da agonia de `_KillSpider` (`inimigos.json`, `regras.aranha_agonia`).
+    pub agonia_aranha: i16,
+}
+
+impl<'a> Vitimas<'a> {
+    pub fn de(amarela: &'a TabelasAmarela, inimigos: &TabelasInimigos) -> Vitimas<'a> {
+        Vitimas { amarela, agonia_aranha: inimigos.regras.aranha_agonia }
     }
 }
 
@@ -236,16 +264,19 @@ pub struct Relogios {
 }
 
 impl Relogios {
-    /// Relógios do port. Com `Estado::ciclos_jogo` preenchido (laço de jogo ou vetor de tick), ele é o
-    /// `_gameCycles` e também o relógio do Mac (uma mensagem de timer de 17 ms ≈ 1/60 s) [hipótese].
-    /// Sem ele: `_gameCycles` = `_GameTime`; relógio do Mac = `_GameTime × mac_por_tick`.
+    /// Relógios do port. O relógio do Mac do original é `GetTickCount() / 55 × 3` (tempo real,
+    /// quintal.md "Relógios"): quando `Estado::relogio_mac` traz esse valor (vetor de tick), ele é usado.
+    /// Senão, regra do port: com `Estado::ciclos_jogo` preenchido, ele é o `_gameCycles` e também o
+    /// relógio do Mac; sem ele, `_gameCycles` = `_GameTime` e relógio do Mac = `_GameTime × mac_por_tick`.
     pub fn do_port(e: &Estado, t: &TabelasQuintal) -> Relogios {
-        if e.ciclos_jogo != 0 {
+        let (ciclos, mac) = if e.ciclos_jogo != 0 {
             let c = e.ciclos_jogo as i64;
-            return Relogios { ciclos: c, mac: c };
-        }
-        let tempo = e.partida.tempo as i64;
-        Relogios { ciclos: tempo, mac: tempo * t.regras.mac_por_tick }
+            (c, c)
+        } else {
+            let tempo = e.partida.tempo as i64;
+            (tempo, tempo * t.regras.mac_por_tick)
+        };
+        Relogios { ciclos, mac: e.relogio_mac.map_or(mac, i64::from) }
     }
 }
 
@@ -273,10 +304,10 @@ pub fn normalizar_atrasos(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
 
 impl RegrasQuintal for RegrasOriginais {
     fn simular_quintal(&mut self, e: &mut Estado) {
-        let t = TabelasQuintal::padrao();
+        let t = &self.quintal;
         let rel = Relogios::do_port(e, t);
         normalizar_atrasos(e, t, rel);
-        simular_quintal_com(e, t, rel);
+        simular_quintal_com(e, t, Vitimas::de(&self.amarela, &self.inimigos), rel);
     }
 
     fn simular_agua(&mut self, e: &mut Estado) {
@@ -334,16 +365,16 @@ pub fn iniciar_quintal(e: &mut Estado, t: &TabelasQuintal) {
 }
 
 /// `_DoSimYard` (`1030:14a8`, quintal.md §2), com relógios explícitos.
-pub fn simular_quintal_com(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
+pub fn simular_quintal_com(e: &mut Estado, t: &TabelasQuintal, v: Vitimas, rel: Relogios) {
     let a = &mut e.ambiente;
     a.ciclo_quintal += 1;
     if a.ciclo_quintal > 0x3FF {
         a.ciclo_quintal = 0;
     }
     if e.menino.no_numero < 0x26 {
-        menino_dentro(e, t, rel);
+        menino_dentro(e, t, v, rel);
     } else {
-        menino_fora(e, t, rel);
+        menino_fora(e, t, v, rel);
     }
     passaro(e, t, rel);
     gato(e, t, rel);
@@ -412,7 +443,7 @@ fn cortar_grama(e: &mut Estado, x: i32, y: i32) {
     *g = ((*g as u16) & !(1u16 << y)) as i16;
 }
 
-fn menino_fora(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
+fn menino_fora(e: &mut Estado, t: &TabelasQuintal, vt: Vitimas, rel: Relogios) {
     let ciclo = e.ambiente.ciclo_quintal;
     if e.menino.pe_presente != 0 && ciclo & 3 != 0 {
         return;
@@ -602,9 +633,9 @@ fn menino_fora(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
         e.menino.cortador_x = e.menino.pe_x + tm.corte_dx[d];
         e.menino.cortador_y = e.menino.pe_y + tm.corte_dy[d];
         alternar_pe(e);
-        pisada(e, e.menino.pe_x as i32, e.menino.pe_y as i32);
+        pisada(e, vt, e.menino.pe_x as i32, e.menino.pe_y as i32);
         if e.menino.cortando_grama != 0 && e.partida.tipo_jogo != 0 {
-            cortador_no_patch(e);
+            cortador_no_patch(e, vt);
         }
     } else if e.menino.cortando_grama != 0 {
         let i = indice_patch(e.menino.px as i32, e.menino.py as i32);
@@ -638,7 +669,7 @@ fn alternar_pe(e: &mut Estado) {
 }
 
 /// `_FootFall(x, y)` (`1030:3386`, quintal.md §3.1).
-fn pisada(e: &mut Estado, x: i32, y: i32) {
+fn pisada(e: &mut Estado, vt: Vitimas, x: i32, y: i32) {
     let (x1, y1) = if e.menino.dir & 1 == 0 { (x + 6, y + 16) } else { (x + 16, y + 6) };
     for cx in x..x1 {
         for cy in y..y1 {
@@ -651,26 +682,26 @@ fn pisada(e: &mut Estado, x: i32, y: i32) {
             if v == 0 {
                 continue;
             }
-            if v == 0xFF || v == 0xFE {
-                morte_da_amarela(e, 5);
+            if comum::e_amarela(v) {
+                amarela::matar_amarela(e, vt.amarela, CausaMorte::Pisada);
             } else if let Some(j) = achar_na_lista_a(e, cx, cy) {
-                let cor = e.superficie.lista.vagas[j].tipo & 0x80;
-                cadaver_aqui(e, cx, cy, cor);
+                let vermelha = comum::e_vermelha(e.superficie.lista.vagas[j].tipo);
+                comum::cadaver_aqui(e, cx, cy, vermelha);
                 e.superficie.lista.vagas[j].tipo = 0;
             }
         }
     }
     let (sx, sy) = (e.aranha.destino_x as i32, e.aranha.destino_y as i32);
     if x <= sx && sx < x1 && y <= sy && sy < y1 {
-        matar_aranha(e);
+        comum::matar_aranha(e, vt.agonia_aranha);
         if e.amarela.modo == 1 {
-            morte_da_amarela(e, 5);
+            amarela::matar_amarela(e, vt.amarela, CausaMorte::Pisada);
         }
     }
 }
 
 /// Corpo de `_MowerFall` (`1030:34da`, quintal.md §3.2).
-fn cortador_no_patch(e: &mut Estado) {
+fn cortador_no_patch(e: &mut Estado, vt: Vitimas) {
     for j in (0..e.superficie.lista.usadas()).rev() {
         let f = e.superficie.lista.vagas[j];
         if f.tipo != 0 && e.s.mascara(4) != 0 {
@@ -679,10 +710,10 @@ fn cortador_no_patch(e: &mut Estado) {
         }
     }
     if e.aranha.ligada != 0 && e.s.mascara(4) != 0 {
-        matar_aranha(e);
+        comum::matar_aranha(e, vt.agonia_aranha);
     }
     if e.amarela.modo < 2 && e.amarela.plano == 1 && e.s.mascara(4) != 0 {
-        morte_da_amarela(e, 6);
+        amarela::matar_amarela(e, vt.amarela, CausaMorte::Cortador);
     }
 }
 
@@ -690,7 +721,7 @@ fn cortador_no_patch(e: &mut Estado) {
 // Menino dentro de casa (quintal.md §4)
 // ---------------------------------------------------------------------------------------------
 
-fn menino_dentro(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
+fn menino_dentro(e: &mut Estado, t: &TabelasQuintal, vt: Vitimas, rel: Relogios) {
     if e.ambiente.casa_a_venda == 1 {
         return;
     }
@@ -770,7 +801,7 @@ fn menino_dentro(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
     e.menino.pe_presente = 1;
     posicionar_pe(e, a, b);
     alternar_pe(e);
-    pisada(e, e.menino.pe_x as i32, e.menino.pe_y as i32);
+    pisada(e, vt, e.menino.pe_x as i32, e.menino.pe_y as i32);
     // Inseticida.
     let n = (e.vermelha.populacao as i32 + e.preta.populacao as i32) * t.regras.inseticida_por_formiga;
     for _ in 0..n.max(0) {
@@ -780,18 +811,18 @@ fn menino_dentro(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
             let j = achar_na_lista_a(e, x, y);
             e.tindex = j.map(|j| j as i32).unwrap_or(-1);
             if let Some(j) = j {
-                let cor = e.superficie.lista.vagas[j].tipo & 0x80;
-                cadaver_aqui(e, x, y, cor);
+                let vermelha = comum::e_vermelha(e.superficie.lista.vagas[j].tipo);
+                comum::cadaver_aqui(e, x, y, vermelha);
                 e.superficie.lista.vagas[j].tipo = 0;
                 e.superficie.vida.definir(x, y, 0);
             }
         }
         if (e.aranha.x as i32 >> 4, e.aranha.y as i32 >> 4) == (x, y) {
-            matar_aranha(e);
+            comum::matar_aranha(e, vt.agonia_aranha);
         }
     }
     if e.partida.tipo_jogo == 2 && e.amarela.plano == 1 && e.s.mascara(4) == 0 {
-        morte_da_amarela(e, 9);
+        amarela::matar_amarela(e, vt.amarela, CausaMorte::Inseticida);
     }
 }
 
@@ -1339,67 +1370,6 @@ pub fn iniciar_agua(e: &mut Estado) {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Auxiliares de outras partes (cópias locais; ver "Lacunas" em quintal.md)
-// ---------------------------------------------------------------------------------------------
-
-/// `_FindInAList(x, y)`: última vaga (de trás para frente) com X, Y iguais e T ≠ 0.
-fn achar_na_lista_a(e: &Estado, x: i32, y: i32) -> Option<usize> {
-    let l = &e.superficie.lista;
-    (0..l.usadas()).rev().find(|&j| {
-        let f = &l.vagas[j];
-        f.tipo != 0 && f.x as i32 == x && f.y as i32 == y
-    })
-}
-
-/// `_DeadAntHere(x, y, cor)` (superficie.md §6.4). TODO(superficie.rs): unificar com a versão de lá.
-fn cadaver_aqui(e: &mut Estado, x: i32, y: i32, cor: u8) {
-    let mut p = e.partida.cadaver_ponteiro + 1;
-    if p > 99 {
-        p = 0;
-    }
-    e.partida.cadaver_ponteiro = p;
-    let p = p as usize;
-    let (ox, oy) = (e.partida.cadaveres_x[p] as i32, e.partida.cadaveres_y[p] as i32);
-    let mapa: &mut Grade = &mut e.superficie.mapa;
-    let velho = mapa.em(ox, oy).unwrap_or(0);
-    let quintal = e.ambiente.terreno == 0;
-    if quintal {
-        if (0x10..0x18).contains(&velho) {
-            let s = e.s.mascara(16) as u8;
-            e.superficie.mapa.definir(ox, oy, s);
-        }
-    } else if (8..0x18).contains(&velho) {
-        e.superficie.mapa.definir(ox, oy, (velho - 8) >> 2);
-    }
-    e.partida.cadaveres_x[p] = x as u8;
-    e.partida.cadaveres_y[p] = y as u8;
-    let v = e.superficie.mapa.em(x, y).unwrap_or(0xFF);
-    if quintal {
-        if v <= 0x17 {
-            let base = if cor == 0 { 0x10 } else { 0x14 };
-            let s = e.s.mascara(4) as u8;
-            e.superficie.mapa.definir(x, y, base + s);
-        }
-    } else if v <= 3 {
-        let s = e.s.rand1(2) as u8;
-        let n = if cor == 0 { (v + 2) * 4 + s } else { v * 4 + 10 + s };
-        e.superficie.mapa.definir(x, y, n);
-    }
-    e.superficie.vida.definir(x, y, 0);
-}
-
-/// `_KillSpider` (inimigos.md §2.8): agonia de 500 ticks.
-fn matar_aranha(e: &mut Estado) {
-    e.aranha.estado = 5;
-    e.aranha.agonia = 500;
-    e.aranha.ciclo_pernas = 0;
-}
-
-/// `_YellowDeath(causa)` (formiga-amarela.md §9). TODO(amarela.rs): chamar a regra da amarela
-/// quando existir; por ora o port só marca o ponto (5 pisada, 6 cortador, 9 inseticida).
-fn morte_da_amarela(_e: &mut Estado, _causa: u8) {}
-
 #[cfg(test)]
 mod testes {
     use super::*;
@@ -1415,6 +1385,30 @@ mod testes {
         assert_eq!(t.colonias.vizinho_dx, [0, 1, 0, 255, 0, 0]);
         assert_eq!(t.casa.roteiros.len(), 18);
         assert_eq!(t.no_fixo(38).unwrap().proximo, 38);
+    }
+
+    /// quintal.md §3.1: o pé do menino sobre a amarela chama `_YellowDeath(5)` (formiga-amarela.md §9):
+    /// música de morte, mensagem de pisada, `_BAntsKilled` + 1 e, sem corpo para reencarnar no jogo
+    /// rápido, fim de jogo.
+    #[test]
+    fn pisada_mata_a_amarela() {
+        let ta = TabelasAmarela::padrao();
+        let mut e = Estado::vazio();
+        e.partida.tipo_jogo = 1;
+        e.partida.opcoes[3] = 1;
+        e.amarela.plano = 1;
+        e.amarela.x = 20;
+        e.amarela.y = 20;
+        e.amarela.tipo = 0x10;
+        e.superficie.vida.definir(20, 20, 0xFF);
+        let v = Vitimas::de(ta, TabelasInimigos::padrao());
+        pisada(&mut e, v, 18, 15);
+        let ev = e.retirar_eventos();
+        assert!(ev.contains(&Evento::Mensagem(ta.mensagens.pisada)), "{ev:?}");
+        assert!(ev.iter().any(|x| matches!(x, Evento::Musica(m) if (ta.musicas.morte_base..ta.musicas.morte_base + ta.musicas.morte_variacoes).contains(m))));
+        assert_eq!(e.preta.mortas_em_luta, 1);
+        assert_eq!(e.superficie.vida.em(20, 20), Some(0));
+        assert_eq!((e.partida.fim_de_jogo, e.partida.pretas_venceram), (1, 0));
     }
 
     #[test]

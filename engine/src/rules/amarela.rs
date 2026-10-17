@@ -5,12 +5,15 @@
 //!
 //! Organização:
 //! - [`TabelasAmarela`]: tabelas do executável e constantes (`data/amarela.json`, gerado por
-//!   `tools/extrair_amarela.py`). As regras do tick usam [`TabelasAmarela::padrao`] (cópia embutida do
-//!   arquivo de dados), porque `RegrasOriginais` ainda não tem um campo para elas (ver lacunas na spec).
-//! - Peças de mapa de vida e terreno (`_SetMyLife`, `_SetLife`, `_DigMyTile`…): privadas.
+//!   `tools/extrair_amarela.py`), guardadas em `RegrasOriginais::amarela` (com mods).
+//! - Peças de mapa de vida e terreno próprias da amarela (`_SetMyLife`, `_SetLife`, `_DigMyTile`…):
+//!   privadas. As rotinas que o original compartilha com as outras formigas (`_GetMap`, `_GetLife`,
+//!   `_IsClearTile`, `_DigTileB/R`, `_MakeNewHole*`, `_PlaceEgg*`, `_DeadAntHere`, `_GetWinner`,
+//!   `_PickupFoodA`, `_DropFoodA`, `_Recruit`, `_UnRecruit`, `_GetBestDir`...) estão em `rules/comum.rs`.
 //! - Regras do tick: `impl RegrasAmarela for RegrasOriginais`.
-//! - API pública usada por outras regras: [`lutar_com_amarela`] (`_YellowFight`), [`trofalaxia`]
-//!   (`_DoTroph`) e [`matar_amarela`] (`_YellowDeath`).
+//! - API pública usada por outras regras: [`lutar_com_amarela`] (`_YellowFight`; superfície e ninhos),
+//!   [`trofalaxia`] (`_DoTroph`; superfície e ninho preto), [`matar_amarela`] (`_YellowDeath`; quintal,
+//!   formiga-leão e aranha) e [`mover_marca`] (`_MoveMyLife`; formiga-leão e aranha).
 //! - API de comandos do jogador: [`clicar_no_mapa`], [`ordem_ir`], [`ordem_agir`], [`comando`],
 //!   [`tecla_de_comando`] e [`trocar_de_corpo`]. Estado da interface que não vai para o save fica em
 //!   [`ControleJogador`].
@@ -23,7 +26,11 @@ use std::sync::OnceLock;
 
 use serde::Deserialize;
 
-use super::estado::{Colonia, Estado, Evento, Feromonios, Grade};
+use super::comum::{
+    self, celula_livre, dentro, e_pedrinha, em_casa as casa, get_dir, get_dis, lista_do_plano as area,
+    nao_e_obstaculo, tile, vida, vida_bruta, Direcoes, TabelaLuta,
+};
+use super::estado::{Estado, Evento, Feromonios, Grade};
 use super::geracao::Cor;
 use super::tick::{RegrasAmarela, RegrasOriginais};
 use crate::formats::save::{Formiga, Lista};
@@ -159,10 +166,8 @@ impl TabelasAmarela {
     }
 
     fn validar(&self) -> Result<(), String> {
-        let unit = |v: &[i8]| v.iter().all(|d| (-1..=1).contains(d));
-        if !unit(&self.dx8) || !unit(&self.dy8) || !unit(&self.dx9) || !unit(&self.dy9) {
-            return Err(format!("{ARQUIVO_TABELAS}: deslocamentos devem estar em −1..1"));
-        }
+        comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx8, &self.dy8)?;
+        comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx9, &self.dy9)?;
         if self.classe_luta.iter().any(|&c| c > 3) {
             return Err(format!("{ARQUIVO_TABELAS}: classe_luta fora de 0–3"));
         }
@@ -175,16 +180,21 @@ impl TabelasAmarela {
         Ok(())
     }
 
-    /// `_Dx8/_Dy8[d & 7]`.
-    fn d8(&self, d: i32) -> (i32, i32) {
-        let d = (d & 7) as usize;
-        (self.dx8[d] as i32, self.dy8[d] as i32)
+    /// Tabelas de `_GetWinner`.
+    fn luta(&self) -> TabelaLuta<'_> {
+        TabelaLuta { classe: &self.classe_luta, chance: &self.matriz_luta }
     }
 
     /// `_Dx9/_Dy9[k]`.
     fn d9(&self, k: i32) -> (i32, i32) {
         let k = k.clamp(0, 8) as usize;
         (self.dx9[k] as i32, self.dy9[k] as i32)
+    }
+}
+
+impl Direcoes for TabelasAmarela {
+    fn deslocamentos(&self) -> (&[i8; 8], &[i8; 8]) {
+        (&self.dx8, &self.dy8)
     }
 }
 
@@ -200,53 +210,18 @@ const TIPO_OPERARIA: i32 = 0x10;
 const TIPO_SOLDADO: i32 = 0x30;
 const ABERTURA_NINHO: u8 = 0x18;
 const PASSAGEM_ENTRE_NINHOS: i32 = 0x14;
-const TUNEL_INUNDADO: u8 = 0x4E;
 const BURACO_QUINTAL: u8 = 0x50;
-const SAIDA_ABERTA: u8 = 0xFF;
-const SAIDA_FECHADA: u8 = 0xFE;
 const CENTRO_FORMIGA_LEAO: i32 = 0x38;
-const LADO_NINHO: i32 = 64;
 
 // ---------------------------------------------------------------------------------------------
 // Acesso a mapas e listas
 // ---------------------------------------------------------------------------------------------
-
-fn largura(plano: i32) -> i32 {
-    if plano < 2 {
-        128
-    } else {
-        64
-    }
-}
-
-/// Teste de limites usado por quase todas as funções do original (plano < 2: 128 × 64; senão 64 × 64).
-fn dentro(plano: i32, x: i32, y: i32) -> bool {
-    (0..largura(plano)).contains(&x) && (0..64).contains(&y)
-}
-
-fn mapa(e: &Estado, plano: i32) -> Option<&Grade> {
-    match plano {
-        0 | 1 => Some(&e.superficie.mapa),
-        2 => Some(&e.ninho_b.mapa),
-        3 => Some(&e.ninho_r.mapa),
-        _ => None,
-    }
-}
 
 fn mapa_mut(e: &mut Estado, plano: i32) -> Option<&mut Grade> {
     match plano {
         0 | 1 => Some(&mut e.superficie.mapa),
         2 => Some(&mut e.ninho_b.mapa),
         3 => Some(&mut e.ninho_r.mapa),
-        _ => None,
-    }
-}
-
-fn grade_vida(e: &Estado, plano: i32) -> Option<&Grade> {
-    match plano {
-        0 | 1 => Some(&e.superficie.vida),
-        2 => Some(&e.ninho_b.vida),
-        3 => Some(&e.ninho_r.vida),
         _ => None,
     }
 }
@@ -260,46 +235,11 @@ fn grade_vida_mut(e: &mut Estado, plano: i32) -> Option<&mut Grade> {
     }
 }
 
-/// `_GetMap`: valor do terreno, ou −1 fora do mapa.
-fn tile(e: &Estado, plano: i32, x: i32, y: i32) -> i32 {
-    if !dentro(plano, x, y) {
-        return -1;
-    }
-    mapa(e, plano).and_then(|g| g.em(x, y)).map_or(-1, i32::from)
-}
-
 fn por_tile(e: &mut Estado, plano: i32, x: i32, y: i32, v: u8) {
     if dentro(plano, x, y) {
         if let Some(g) = mapa_mut(e, plano) {
             g.definir(x, y, v);
         }
-    }
-}
-
-/// Byte do mapa de vida (0 = vazio), ou `None` fora do mapa.
-fn vida_bruta(e: &Estado, plano: i32, x: i32, y: i32) -> Option<u8> {
-    if !dentro(plano, x, y) {
-        return None;
-    }
-    grade_vida(e, plano).and_then(|g| g.em(x, y))
-}
-
-/// `_GetLife`: −1 para célula vazia ou fora do mapa; senão o byte.
-fn vida(e: &Estado, plano: i32, x: i32, y: i32) -> i32 {
-    match vida_bruta(e, plano, x, y) {
-        Some(v) if v != 0 => v as i32,
-        _ => -1,
-    }
-}
-
-/// Lista de um plano: < 2 → A, 2 → B, senão R (como `_GetAntIndex`).
-fn area(plano: i32) -> Lista {
-    if plano < 2 {
-        Lista::A
-    } else if plano == 2 {
-        Lista::B
-    } else {
-        Lista::R
     }
 }
 
@@ -322,16 +262,11 @@ fn gravar_formiga(e: &mut Estado, plano: i32, i: i32, f: Formiga) {
 
 const VAGA_VAZIA: Formiga = Formiga { x: 0, y: 0, modo: 0, tipo: 0, s: 0 };
 
-/// `_FindAntIndex`: última vaga com X, Y e T exatos.
+/// `_FindAntIndex` ([`comum::achar_formiga`]): última vaga com X, Y e T exatos, ou −1 (T fora de
+/// 0..255, como o −1 de `_GetLife`, nunca casa).
 fn achar_formiga(e: &Estado, plano: i32, x: i32, y: i32, t: i32) -> i32 {
-    let l = e.lista(area(plano));
-    (0..l.usadas())
-        .rev()
-        .find(|&i| {
-            let f = &l.vagas[i];
-            f.x as i32 == x && f.y as i32 == y && f.tipo as i32 == t
-        })
-        .map_or(-1, |i| i as i32)
+    let Ok(t) = u8::try_from(t) else { return -1 };
+    comum::achar_formiga(e, area(plano), x, y, t).map_or(-1, |i| i as i32)
 }
 
 /// `_AddAntTo?List` sem o mapa de vida (quem chama grava a vida). Devolve se coube.
@@ -344,30 +279,19 @@ fn acrescentar(e: &mut Estado, plano: i32, f: Formiga) -> bool {
     l.adicionar(f)
 }
 
+/// [`comum::e_terra`] para um valor de [`tile`] (−1 fora do mapa).
 fn e_terra(v: i32) -> bool {
-    (0x20..=0x2E).contains(&v)
+    u8::try_from(v).is_ok_and(comum::e_terra)
 }
 
+/// [`comum::e_capim`] para um valor de [`tile`].
 fn e_capim(v: i32) -> bool {
-    (0x1C..=0x1F).contains(&v)
-}
-
-/// Sólido para o alisamento: ≥ 0x20 e fora de 0x30–0x4E.
-fn e_solido(v: u8) -> bool {
-    v >= 0x20 && !(0x30..=0x4E).contains(&v)
-}
-
-fn casa(e: &Estado) -> bool {
-    e.ambiente.terreno != 0
+    u8::try_from(v).is_ok_and(comum::e_capim)
 }
 
 /// `_IsItFood` (superfície).
 fn e_comida_superficie(e: &Estado, v: i32) -> bool {
-    if casa(e) {
-        (0x18..=0x27).contains(&v)
-    } else {
-        (0x48..=0x4B).contains(&v)
-    }
+    u8::try_from(v).is_ok_and(|v| comum::e_comida_superficie(casa(e), v))
 }
 
 /// `_IsThisFood`.
@@ -382,23 +306,10 @@ fn e_comida(e: &Estado, plano: i32, v: i32) -> bool {
     }
 }
 
-/// `_IsThisPebble`.
-fn e_pedrinha(plano: i32, v: i32) -> bool {
-    if plano < 2 {
-        plano == 1 && (0x51..=0x53).contains(&v)
-    } else {
-        (0x30..=0x31).contains(&v)
-    }
-}
 
-/// `_IsItHole` (superfície).
+/// `_IsItHole` (superfície, [`comum::e_buraco_superficie`]).
 fn e_buraco(e: &Estado, x: i32, y: i32) -> bool {
-    let v = tile(e, 1, x, y);
-    if casa(e) {
-        (0x80..=0x8F).contains(&v)
-    } else {
-        v == BURACO_QUINTAL as i32
-    }
+    comum::e_buraco_superficie(e, x, y)
 }
 
 /// `_IsItAHole`: superfície → `_IsItHole`; ninho → só a abertura 0x18 na linha 0.
@@ -408,45 +319,6 @@ fn e_abertura(e: &Estado, plano: i32, x: i32, y: i32) -> bool {
     } else {
         y < 1 && tile(e, plano, x, y) == ABERTURA_NINHO as i32
     }
-}
-
-/// `_IsClearTile`.
-fn celula_livre(e: &Estado, plano: i32, x: i32, y: i32) -> bool {
-    let v = tile(e, plano, x, y);
-    if v < 0 {
-        return false;
-    }
-    let ocupante = vida(e, plano, x, y);
-    if ocupante >= 0 && ocupante != 0xFF && ocupante != 0xFE {
-        return false;
-    }
-    if plano < 2 {
-        v < 0x10
-    } else {
-        v < 8
-    }
-}
-
-/// `_IsClear3x3`.
-fn livre_3x3(e: &Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32) -> bool {
-    celula_livre(e, plano, x, y)
-        && (0..8).all(|d| {
-            let (dx, dy) = t.d8(d);
-            celula_livre(e, plano, x + dx, y + dy)
-        })
-}
-
-/// `_IsNotObstacle`.
-fn nao_e_obstaculo(e: &Estado, plano: i32, x: i32, y: i32) -> bool {
-    let v = tile(e, plano, x, y);
-    if v < 0 {
-        return false;
-    }
-    if plano < 2 {
-        // O teste de 0x50 do quintal nunca é alcançado no original (tiles-valores.md).
-        return if casa(e) { v <= 0x5F } else { v <= 0x53 };
-    }
-    v < 0x19 || (0x30..=0x31).contains(&v)
 }
 
 /// `_IsItDigable`.
@@ -462,11 +334,7 @@ fn e_escavavel(e: &Estado, plano: i32, x: i32, y: i32) -> bool {
 #[allow(clippy::too_many_arguments)]
 fn pode_pisar(e: &Estado, plano: i32, x: i32, y: i32, plano_alvo: i32, ax: i32, ay: i32, cavar: bool) -> bool {
     if plano < 2 {
-        if !dentro(plano, x, y) {
-            return false;
-        }
-        let v = tile(e, plano, x, y);
-        return if casa(e) { v <= 0x90 } else { v <= 0x53 };
+        return dentro(plano, x, y) && comum::pode_pisar_superficie(e, x, y);
     }
     if !dentro(plano, x, y) {
         return false;
@@ -502,26 +370,6 @@ fn pode_pisar(e: &Estado, plano: i32, x: i32, y: i32, plano_alvo: i32, ax: i32, 
         return true;
     }
     x == ax && y == ay
-}
-
-/// `_GetDir`: 1 + direção de (x1, y1) para (x2, y2) pelo sinal de dx e dy; 0 se coincidem.
-fn get_dir(x1: i32, y1: i32, x2: i32, y2: i32) -> i32 {
-    match ((x2 - x1).signum(), (y2 - y1).signum()) {
-        (0, 0) => 0,
-        (0, -1) => 1,
-        (1, -1) => 2,
-        (1, 0) => 3,
-        (1, 1) => 4,
-        (0, 1) => 5,
-        (-1, 1) => 6,
-        (-1, 0) => 7,
-        _ => 8,
-    }
-}
-
-/// `_GetDis`: dx² + dy².
-fn get_dis(x1: i32, y1: i32, x2: i32, y2: i32) -> i32 {
-    (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -590,8 +438,9 @@ fn marcar_amarela(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32
     }
 }
 
-/// `_MoveMyLife`: apaga a marca atual e marca a nova célula (plano 0 vira 1).
-fn mover_marca(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, tipo: i32, dir: i32) {
+/// `_MoveMyLife(plano, x, y, tipo, dir)` (§2): apaga a marca atual e marca a nova célula (plano 0 vira
+/// 1). Também usada pela formiga-leão e pela aranha antes de `_YellowDeath`.
+pub(crate) fn mover_marca(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, tipo: i32, dir: i32) {
     let a = e.amarela.clone();
     limpar_minha_vida(e, t, a.plano as i32, a.x as i32, a.y as i32, a.tipo as i32, a.dir as i32);
     let p = if plano == 0 { 1 } else { plano };
@@ -621,6 +470,11 @@ fn remarcar(e: &mut Estado, t: &TabelasAmarela, v: u8) {
 fn desmarcar(e: &mut Estado, t: &TabelasAmarela) {
     let a = e.amarela.clone();
     limpar_minha_vida(e, t, a.plano as i32, a.x as i32, a.y as i32, a.tipo as i32, a.dir as i32);
+}
+
+/// `_SetMyHealth(v)` (`1020:8c70`, §3), para outras partes (lições do tutorial).
+pub(crate) fn definir_saude(e: &mut Estado, t: &TabelasAmarela, v: i32) {
+    definir_vida(e, t, v);
 }
 
 /// `_SetMyHealth` (§3).
@@ -675,206 +529,11 @@ fn centralizar(e: &mut Estado) {
 // Escavação, buracos e mapa de saída (ninho.md §7)
 // ---------------------------------------------------------------------------------------------
 
-fn cor_do_ninho(plano: i32) -> Cor {
-    if plano == 2 {
-        Cor::Preta
-    } else {
-        Cor::Vermelha
-    }
-}
+use comum::cor_do_plano as cor_do_ninho;
 
-/// Acumula uma célula escavada nos totais e no centro de massa.
-fn somar_escavacao(c: &mut Colonia, x: i32, y: i32) {
-    c.soma_x_escavada = c.soma_x_escavada.wrapping_add(x);
-    c.soma_y_escavada = c.soma_y_escavada.wrapping_add(y);
-    c.tiles_escavados = c.tiles_escavados.wrapping_add(1);
-    if c.tiles_escavados > 0 {
-        let n = c.tiles_escavados as i32;
-        c.centro_x = (c.soma_x_escavada / n) as i16;
-        c.centro_y = (c.soma_y_escavada / n) as i16;
-    }
-}
-
-fn tile_ninho(e: &Estado, cor: Cor, x: i32, y: i32) -> u8 {
-    e.ninho(cor).mapa.em(x, y).unwrap_or(0)
-}
-
-/// `_DigTileB/R(x, y)`: escava se for terra (`Sk(8)`); no preto, abaixo de y = 53, 1/64 de chance de
-/// abrir a passagem 0x14 nos dois ninhos. Sempre alisa as vizinhas e refaz a saída.
-fn cavar_tile(e: &mut Estado, t: &TabelasAmarela, cor: Cor, x: i32, y: i32) {
-    if !(0..LADO_NINHO).contains(&x) || !(0..LADO_NINHO).contains(&y) {
-        return;
-    }
-    if e_terra(tile_ninho(e, cor, x, y) as i32) {
-        let v = e.s.mascara(8) as u8;
-        e.ninho_mut(cor).mapa.definir(x, y, v);
-        somar_escavacao(e.colonia_mut(cor), x, y);
-        if cor == Cor::Preta && y > 53 && e.s.rand1(64) == 0 {
-            e.ninho_b.mapa.definir(x, y, PASSAGEM_ENTRE_NINHOS as u8);
-            if e_terra(tile_ninho(e, Cor::Vermelha, x, y) as i32) {
-                let v = e.s.mascara(8) as u8;
-                e.ninho_r.mapa.definir(x, y, v);
-                somar_escavacao(&mut e.vermelha, x, y);
-            }
-            alisar_vizinhas(e, t, Cor::Vermelha, x, y);
-            e.ninho_r.mapa.definir(x, y, PASSAGEM_ENTRE_NINHOS as u8);
-        }
-    }
-    alisar_vizinhas(e, t, cor, x, y);
-}
-
-/// As quatro chamadas a `_SmoothEdges?` (cima, direita, baixo, esquerda) e `_FixExitMap?`.
-fn alisar_vizinhas(e: &mut Estado, t: &TabelasAmarela, cor: Cor, x: i32, y: i32) {
-    alisar(e, cor, x, y - 1);
-    alisar(e, cor, x + 1, y);
-    alisar(e, cor, x, y + 1);
-    alisar(e, cor, x - 1, y);
-    corrigir_saida(e, t, cor, x, y);
-}
-
-/// `_SmoothEdgesB/R(x, y)` (tiles-valores.md, "Regra de alisamento").
-fn alisar(e: &mut Estado, cor: Cor, x: i32, y: i32) {
-    if !(0..LADO_NINHO).contains(&x) || !(0..LADO_NINHO).contains(&y) {
-        return;
-    }
-    let at = |e: &Estado, x: i32, y: i32| tile_ninho(e, cor, x, y);
-    if y == 0 {
-        if at(e, x, 0) <= 0x2F {
-            e.ninho_mut(cor).mapa.definir(x, 0, ABERTURA_NINHO);
-        }
-        return;
-    }
-    let v = at(e, x, y);
-    if !e_solido(v) {
-        return;
-    }
-    let inundada = v >= TUNEL_INUNDADO;
-    let mut m = 0u8;
-    if y < 2 || e_solido(at(e, x, y - 1)) {
-        m |= 1;
-    }
-    if x >= LADO_NINHO - 1 || e_solido(at(e, x + 1, y)) {
-        m |= 2;
-    }
-    if y >= LADO_NINHO - 1 || e_solido(at(e, x, y + 1)) {
-        m |= 4;
-    }
-    if x <= 0 || e_solido(at(e, x - 1, y)) {
-        m |= 8;
-    }
-    let novo = if m != 0 {
-        m + 0x1F + if inundada { 0x2F } else { 0 }
-    } else if inundada {
-        TUNEL_INUNDADO
-    } else {
-        e.s.mascara(8) as u8
-    };
-    e.ninho_mut(cor).mapa.definir(x, y, novo);
-}
-
-/// `_FixExitMapB/R(x, y)`: nas linhas 0 e 1, 0xFF se abertura e 0xFE se não; abaixo, maior vizinha − 1.
-fn corrigir_saida(e: &mut Estado, t: &TabelasAmarela, cor: Cor, x: i32, y: i32) {
-    if !(0..LADO_NINHO).contains(&x) || !(0..LADO_NINHO).contains(&y) {
-        return;
-    }
-    let v = if y < 2 {
-        if tile_ninho(e, cor, x, y) == ABERTURA_NINHO {
-            SAIDA_ABERTA
-        } else {
-            SAIDA_FECHADA
-        }
-    } else {
-        let saida = &e.ninho(cor).saida;
-        let maior = (0..8)
-            .filter_map(|d| {
-                let (dx, dy) = t.d8(d);
-                saida.em(x + dx, y + dy)
-            })
-            .max()
-            .unwrap_or(0);
-        maior.saturating_sub(1)
-    };
-    e.ninho_mut(cor).saida.definir(x, y, v);
-}
-
-/// Bordas do buraco recém-aberto na superfície (só células < 0x50).
-fn borda_do_buraco(e: &mut Estado, t: &TabelasAmarela, x: i32, y: i32) {
-    for d in 0..8 {
-        let (dx, dy) = t.d8(d);
-        let (vx, vy) = (x + dx, y + dy);
-        if dentro(1, vx, vy) && tile(e, 1, vx, vy) < BURACO_QUINTAL as i32 {
-            por_tile(e, 1, vx, vy, t.borda_buraco[d as usize]);
-        }
-    }
-}
-
-/// Parte vermelha comum a `_MakeNewHoleR`, `_CreateNewHole` e `_DigMyTile`: escava (c, 1) se for terra,
-/// alisa (c, 0), (c+1, 1), (c, 2), (c−1, 1) e refaz a saída de (c, 1).
-fn abrir_coluna_vermelha(e: &mut Estado, t: &TabelasAmarela, c: i32) {
-    if e_terra(tile_ninho(e, Cor::Vermelha, c, 1) as i32) {
-        let v = e.s.mascara(8) as u8;
-        e.ninho_r.mapa.definir(c, 1, v);
-        somar_escavacao(&mut e.vermelha, c, 1);
-    }
-    alisar(e, Cor::Vermelha, c, 0);
-    alisar(e, Cor::Vermelha, c + 1, 1);
-    alisar(e, Cor::Vermelha, c, 2);
-    alisar(e, Cor::Vermelha, c - 1, 1);
-    corrigir_saida(e, t, Cor::Vermelha, c, 1);
-}
-
-/// `_MakeNewHoleB/R(c)` (geracao-mundo.md 3.A): buraco novo na linha `c` da superfície.
+/// `_MakeNewHoleB/R(c)` ([`comum::novo_buraco`]).
 fn novo_buraco(e: &mut Estado, t: &TabelasAmarela, cor: Cor, c: i32) {
-    let r = e.s.rand1(31);
-    let x_de = |k: i32| {
-        let m = (r + k) % 32;
-        if cor == Cor::Preta {
-            m + 2
-        } else {
-            126 - m
-        }
-    };
-    let mut achado = None;
-    if !casa(e) {
-        for k in 0..34 {
-            let x = x_de(k);
-            if livre_3x3(e, t, 1, x, c) {
-                achado = Some(x);
-                break;
-            }
-        }
-        let Some(x) = achado else { return };
-        por_tile(e, 1, x, c, BURACO_QUINTAL);
-        borda_do_buraco(e, t, x, c);
-    } else {
-        for k in 0..34 {
-            let x = x_de(k);
-            let novo = match tile(e, 1, x, c) {
-                0 => 0x86,
-                2 | 3 => 0x8A,
-                v @ 0x5E..=0x61 => v + 0x22,
-                0x66 => 0x85,
-                0x68 => 0x84,
-                _ => 0,
-            };
-            if novo != 0 {
-                por_tile(e, 1, x, c, novo as u8);
-                achado = Some(x);
-                break;
-            }
-        }
-    }
-    let Some(x) = achado else { return };
-    let col = e.colonia_mut(cor);
-    col.ultimo_buraco = (x as i16, c as i16);
-    col.ultima_saida = (c as i16, 0);
-    if (0..64).contains(&c) {
-        col.buracos[c as usize] = x as u8;
-    }
-    match cor {
-        Cor::Preta => cavar_tile(e, t, Cor::Preta, c, 1),
-        Cor::Vermelha => abrir_coluna_vermelha(e, t, c),
-    }
+    comum::novo_buraco(e, t, &t.borda_buraco, cor, c);
 }
 
 /// `_CreateNewHole(x, y)` (ninho.md 7.5): o buraco que a rainha alada cava na própria célula.
@@ -884,21 +543,18 @@ fn criar_buraco(e: &mut Estado, t: &TabelasAmarela, x: i32, y: i32) {
     }
     if !casa(e) {
         por_tile(e, 1, x, y, BURACO_QUINTAL);
-        borda_do_buraco(e, t, x, y);
+        comum::por_borda_do_buraco(e, t, &t.borda_buraco, x, y);
     } else {
         por_tile(e, 1, x, y, 0x59);
     }
-    if x < 64 {
-        e.preta.buracos[y as usize] = x as u8;
-        cavar_tile(e, t, Cor::Preta, y, 1);
-        e.preta.ultimo_buraco = (x as i16, y as i16);
-        e.preta.ultima_saida = (y as i16, 0);
-    } else {
-        e.vermelha.buracos[y as usize] = x as u8;
-        abrir_coluna_vermelha(e, t, y);
-        e.vermelha.ultimo_buraco = (x as i16, y as i16);
-        e.vermelha.ultima_saida = (y as i16, 0);
-    }
+    // A coluna do ninho é o y do buraco (`_HoleMap?[y] = x`); o vermelho tem `_DigTileR` embutido.
+    let cor = if x < 64 { Cor::Preta } else { Cor::Vermelha };
+    let col = e.colonia_mut(cor);
+    col.buracos[y as usize] = x as u8;
+    comum::cavar(e, t, cor, y, 1);
+    let col = e.colonia_mut(cor);
+    col.ultimo_buraco = (x as i16, y as i16);
+    col.ultima_saida = (y as i16, 0);
 }
 
 /// `_DigMyNewHole(x, y)`: exige 3 × 3 livre (quintal) ou tile < 200 (casa).
@@ -906,7 +562,7 @@ fn cavar_novo_buraco(e: &mut Estado, t: &TabelasAmarela, x: i32, y: i32) -> bool
     if !(1..128).contains(&x) || !(1..64).contains(&y) {
         return false;
     }
-    let ok = if casa(e) { tile(e, 1, x, y) < 200 } else { livre_3x3(e, t, 1, x, y) };
+    let ok = if casa(e) { tile(e, 1, x, y) < 200 } else { comum::livre_3x3(e, t, x, y) };
     if ok {
         criar_buraco(e, t, x, y);
     }
@@ -926,98 +582,23 @@ fn cavar_minha_celula(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y:
             return;
         }
     }
-    match cor {
-        Cor::Preta => cavar_tile(e, t, Cor::Preta, x, y),
-        Cor::Vermelha => {
-            if e_terra(tile_ninho(e, Cor::Vermelha, x, y) as i32) {
-                let v = e.s.mascara(8) as u8;
-                e.ninho_r.mapa.definir(x, y, v);
-                somar_escavacao(&mut e.vermelha, x, y);
-            }
-            alisar_vizinhas(e, t, Cor::Vermelha, x, y);
-        }
-    }
+    // `_DigTileB`; no vermelho, a mesma conta embutida (sem a passagem, que é só do preto).
+    comum::cavar(e, t, cor, x, y);
 }
 
-/// `_PlaceEggB/R(x, y, estágio)`.
+/// `_PlaceEggB/R(x, y, estágio)` ([`comum::por_ovo`]).
 fn por_ovo(e: &mut Estado, t: &TabelasAmarela, cor: Cor, x: i32, y: i32, estagio: u8) {
-    if e.ninho(cor).lista.indice >= 500 || !(0..=63).contains(&x) || !(1..=63).contains(&y) {
-        return;
-    }
-    cavar_tile(e, t, cor, x, y);
-    e.ninho_mut(cor).lista.adicionar(Formiga { x: x as u8, y: y as u8, modo: 8, tipo: estagio, s: 0 });
-    e.ninho_mut(cor).vida.definir(x, y, estagio);
+    comum::por_ovo(e, t, cor, x, y, estagio);
 }
 
-/// `_DecEatB/R`.
-fn gastar_reserva(e: &mut Estado, cor: Cor) {
-    let sempre = e.partida.sempre_saudavel != 0;
-    let c = e.colonia_mut(cor);
-    c.reserva_comer -= 1;
-    if c.reserva_comer < 0 {
-        c.reserva_comer = c.populacao >> 5;
-        if c.saude > 0 && !(cor == Cor::Preta && sempre) {
-            c.saude -= 1;
-        }
-    }
-}
+use comum::gastar_reserva;
 
 // ---------------------------------------------------------------------------------------------
 // Superfície: comida, cheiro, cadáver, luta (superficie.md)
 // ---------------------------------------------------------------------------------------------
 
-/// `_PickupFoodA`.
-fn tirar_comida_superficie(e: &mut Estado, x: i32, y: i32) {
-    let v = tile(e, 1, x, y);
-    if v < 0 {
-        return;
-    }
-    let novo = if !casa(e) {
-        if v == 0x48 {
-            e.s.mascara(16) as u8
-        } else {
-            (v - 1) as u8
-        }
-    } else if v % 4 == 0 {
-        ((v - 0x18) >> 2) as u8
-    } else {
-        (v - 1) as u8
-    };
-    por_tile(e, 1, x, y, novo);
-    if e.ambiente.comida_superficie > 0 {
-        e.ambiente.comida_superficie -= 1;
-    }
-}
-
-/// `_DropFoodA`. A queda da comida na casa (`_DROPdir`, tabela `10:22be/22c2`) não está no estado do
-/// port: nesse caso a comida some [lacuna].
-fn por_comida_superficie(e: &mut Estado, x: i32, y: i32) -> bool {
-    let v = tile(e, 1, x, y);
-    if v < 0 {
-        return false;
-    }
-    let novo = if casa(e) {
-        match v {
-            0..=3 => (v + 6) * 4,
-            8..=0x17 => (((v - 8) >> 2) + 6) * 4,
-            0x18..=0x26 => v + 1,
-            0x27..=0x3F => return true,
-            _ => return false,
-        }
-    } else {
-        if v > 0x4A {
-            return false;
-        }
-        if v < 0x48 {
-            0x48
-        } else {
-            v + 1
-        }
-    };
-    por_tile(e, 1, x, y, novo as u8);
-    e.ambiente.comida_superficie += 1;
-    true
-}
+use comum::largar_comida_superficie as por_comida_superficie;
+use comum::pegar_comida_superficie as tirar_comida_superficie;
 
 /// `_JamScentBT/RT`: a célula de cheiro do tile fica com o maior valor.
 fn depositar_trilha(e: &mut Estado, cor: Cor, x: i32, y: i32, v: u8) {
@@ -1038,100 +619,21 @@ fn somar_alarme(e: &mut Estado, t: &TabelasAmarela, x: i32, y: i32) {
     }
 }
 
-/// `_DeadAntHere(x, y, cor)` (superficie.md 6.4).
+/// `_DeadAntHere(x, y, cor)` ([`comum::cadaver_aqui`]); `cor` ≠ 0 = vermelha.
 fn cadaver(e: &mut Estado, x: i32, y: i32, cor: i32) {
-    let mut p = e.partida.cadaver_ponteiro + 1;
-    if p > 99 {
-        p = 0;
-    }
-    e.partida.cadaver_ponteiro = p;
-    let p = p as usize;
-    let (ox, oy) = (e.partida.cadaveres_x[p] as i32, e.partida.cadaveres_y[p] as i32);
-    let velho = tile(e, 1, ox, oy);
-    if !casa(e) {
-        if (0x10..0x18).contains(&velho) {
-            let v = e.s.mascara(16) as u8;
-            por_tile(e, 1, ox, oy, v);
-        }
-        e.partida.cadaveres_x[p] = x as u8;
-        e.partida.cadaveres_y[p] = y as u8;
-        if (0..=0x17).contains(&tile(e, 1, x, y)) {
-            let base = if cor == 0 { 0x10 } else { 0x14 };
-            let v = base + e.s.mascara(4) as u8;
-            por_tile(e, 1, x, y, v);
-        }
-    } else {
-        if (8..0x18).contains(&velho) {
-            por_tile(e, 1, ox, oy, ((velho - 8) >> 2) as u8);
-        }
-        e.partida.cadaveres_x[p] = x as u8;
-        e.partida.cadaveres_y[p] = y as u8;
-        let v = tile(e, 1, x, y);
-        if (0..=3).contains(&v) {
-            let novo = if cor == 0 { (v + 2) * 4 + e.s.rand1(2) } else { v * 4 + 10 + e.s.rand1(2) };
-            por_tile(e, 1, x, y, novo as u8);
-        }
-    }
-    if dentro(1, x, y) {
-        e.superficie.vida.definir(x, y, 0);
-    }
+    comum::cadaver_aqui(e, x, y, cor != 0);
 }
 
-/// `_GetWinner(Ta, Tb)` (superficie.md 6.2): "a" é a da célula. Sorteia com o gerador R.
+/// `_GetWinner(Ta, Tb)` ([`comum::vencedor_da_luta`]): "a" é a da célula.
 fn vencedor(e: &mut Estado, t: &TabelasAmarela, ta: i32, tb: i32) -> i32 {
-    if e.partida.invencivel == 1 {
-        e.vermelha.mortas_em_luta = e.vermelha.mortas_em_luta.wrapping_add(1);
-        return if ta & 0x80 != 0 { tb } else { ta };
-    }
-    let classe = |v: i32| t.classe_luta[((v & 0x78) >> 3) as usize] as usize;
-    let p = t.matriz_luta[classe(ta)][classe(tb)] as i32;
-    let v = if e.r.rrand(10) < p { ta } else { tb };
-    if v & 0x80 == 0 {
-        e.vermelha.perdas += 1;
-        e.vermelha.mortas_em_luta = e.vermelha.mortas_em_luta.wrapping_add(1);
-    } else {
-        e.preta.perdas += 1;
-        e.preta.mortas_em_luta = e.preta.mortas_em_luta.wrapping_add(1);
-    }
-    v
+    comum::vencedor_da_luta(e, t.luta(), ta as u8, tb as u8) as i32
 }
 
-/// `_Recruit(n)` (superficie.md 9.4).
-fn recrutar(e: &mut Estado, mut n: i32) {
-    for area in [Lista::A, Lista::B] {
-        let l = e.lista_mut(area);
-        for i in (0..l.usadas()).rev() {
-            if n < 1 {
-                return;
-            }
-            let f = &mut l.vagas[i];
-            let g = (f.tipo & 0x78) >> 3;
-            if f.tipo != 0 && f.tipo & 0x80 == 0 && (g == 2 || g == 6) && f.modo != 6 {
-                f.modo = 6;
-                f.s = 0;
-                n -= 1;
-            }
-        }
-    }
-}
+use comum::recrutar;
 
-/// `_UnRecruit(p)` (superficie.md 9.4): a quota vem da contagem de Defense do último tick.
+/// `_UnRecruit(p)` ([`comum::desrecrutar`]).
 fn liberar(e: &mut Estado, todas: bool) {
-    let defesa = e.modos_do_tick[0][6] as i32;
-    let mut n = if todas { defesa + 100 } else { defesa / 2 };
-    for (area, novo) in [(Lista::A, 0), (Lista::B, 0), (Lista::R, 7)] {
-        let l = e.lista_mut(area);
-        for i in (0..l.usadas()).rev() {
-            if n < 1 {
-                return;
-            }
-            let f = &mut l.vagas[i];
-            if f.tipo != 0 && f.tipo & 0x80 == 0 && f.modo == 6 {
-                f.modo = novo;
-                n -= 1;
-            }
-        }
-    }
+    comum::desrecrutar(e, todas as i32);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1872,7 +1374,7 @@ fn passo_da_ordem(e: &mut Estado, t: &TabelasAmarela) -> (i32, Option<Alvo>) {
             somar_alarme(e, t, mx, my);
         }
     } else {
-        corrigir_saida(e, t, cor_do_ninho(plano), mx, my);
+        comum::corrigir_saida(e, t, cor_do_ninho(plano), mx, my);
     }
     if e.amarela.passos & 1 != 0 {
         if a.tipo as i32 == TIPO_RAINHA_ALADA
@@ -1972,36 +1474,9 @@ fn animar_luta(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, d
     a.dir = dir as i16;
 }
 
-/// `_GetBestDir` (usada só pela animação de loucura aqui).
+/// `_GetBestDir` ([`comum::melhor_direcao`]; usada só pela animação de loucura aqui).
 fn melhor_direcao_simples(e: &Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, ax: i32, ay: i32) -> i32 {
-    let mut dist = get_dis(x, y, ax, ay);
-    if dist <= 0 {
-        return -1;
-    }
-    let mut livre = -1;
-    let mut bloqueada = -2;
-    for k in 0..8 {
-        let (dx, dy) = t.d8(k);
-        let (nx, ny) = (x + dx, y + dy);
-        let v = tile(e, plano, nx, ny);
-        if !nao_e_obstaculo(e, plano, nx, ny) || e_pedrinha(plano, v) {
-            continue;
-        }
-        let d2 = get_dis(nx, ny, ax, ay);
-        if d2 < dist {
-            dist = d2;
-            if vida(e, plano, nx, ny) < 1 && celula_livre(e, plano, nx, ny) {
-                livre = k;
-            } else {
-                bloqueada = k;
-            }
-        }
-    }
-    if livre >= 0 {
-        livre
-    } else {
-        bloqueada
-    }
+    comum::melhor_direcao(e, t, plano, x, y, ax, ay)
 }
 
 /// `_AnimYellowInsane(plano, x, y, dir, tipo)`: a amarela corre em volta (gerador R para o alvo, S8 quando
@@ -2295,9 +1770,9 @@ fn nascer_de_ovo(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32,
 /// `_MakeBlkQueen/_MakeRedQueen(x, y, d)` (ciclo-de-vida.md).
 fn fazer_rainha(e: &mut Estado, t: &TabelasAmarela, cor: Cor, x: i32, y: i32, d: i32) {
     let (dx, dy) = t.d8(d ^ 4);
-    cavar_tile(e, t, cor, x, y);
-    cavar_tile(e, t, cor, x + dx, y + dy);
-    cavar_tile(e, t, cor, x + 2 * dx, y + 2 * dy);
+    comum::cavar(e, t, cor, x, y);
+    comum::cavar(e, t, cor, x + dx, y + dy);
+    comum::cavar(e, t, cor, x + 2 * dx, y + 2 * dy);
     let n = e.ninho_mut(cor);
     n.lista.adicionar(Formiga { x: x as u8, y: y as u8, modo: 9, tipo: (d + 0x60) as u8, s: 0 });
     n.lista.adicionar(Formiga { x: (x + dx) as u8, y: (y + dy) as u8, modo: 9, tipo: (d + 0x68) as u8, s: 0 });
@@ -2929,11 +2404,11 @@ pub fn trocar_de_corpo(
 
 impl RegrasAmarela for RegrasOriginais {
     fn simular_amarela(&mut self, e: &mut Estado) {
-        simular_amarela(e, TabelasAmarela::padrao());
+        simular_amarela(e, &self.amarela);
     }
 
     fn mover_amarela(&mut self, e: &mut Estado) {
-        mover_amarela(e, TabelasAmarela::padrao());
+        mover_amarela(e, &self.amarela);
     }
 }
 
