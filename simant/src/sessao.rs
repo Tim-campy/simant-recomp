@@ -67,16 +67,8 @@ impl Sessao<'_> {
                 (jogo, estado)
             }
             Origem::Novo(semente, tipo) => {
-                // _initStuff: _SeedSRand e _SeedRRand com o relógio; o port usa a semente nas duas
-                // leituras do relógio. Depois _NewGame → _RandYard (geracao-mundo.md).
-                let mut s = GeradorS::new(0);
-                let mut r = GeradorR::default();
-                r.semear_com_ticks(&mut s, semente, semente);
-                let m = Mundo::novo_jogo(tipo, &mut r, &mut s, &geracao)?;
-                let mut estado = Estado::de_mundo(&m, s, r, &cfg_sim)?;
-                // _RandYard passo 3: _InitSimYard (menino, cachorro...), que Estado::de_mundo não faz.
                 let quintal = RegrasOriginais::carregar_sem_banco(recursos)?.quintal;
-                engine::rules::quintal::iniciar_quintal(&mut estado, &quintal);
+                let estado = engine::core::carregar::estado_de_jogo_novo(tipo, semente, &geracao, &cfg_sim, &quintal)?;
                 (estado.para_save(&layout)?, estado)
             }
         };

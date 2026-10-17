@@ -46,7 +46,7 @@ use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 use engine::rules::amarela::{Modificadores, RespostaTecla, TabelasAmarela};
 use engine::rules::estado::{ConfigSimulacao, Estado, Evento as EventoRegras};
-use engine::rules::geracao::{Mundo, TabelasGeracao, TipoJogo};
+use engine::rules::geracao::{TabelasGeracao, TipoJogo};
 use engine::rules::rng::{GeradorR, GeradorS};
 use engine::rules::tick::RegrasOriginais;
 use serde::Deserialize;

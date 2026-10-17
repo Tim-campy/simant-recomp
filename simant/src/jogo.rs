@@ -145,7 +145,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                 if let Event::MouseMotion { x, y, .. } = ev {
                     cursor = (x, y);
                 }
-                if let Some(Modal::FimDeJogo { .. }) = tratar_modal(&mut s, &ev) {
+                if tratar_modal(&mut s, &ev).is_some_and(|m| m.abre_selecao_de_jogo()) {
                     // _EndGameDialog → _NewGame(0): abre o "Select a Game" (simant/src/modos.rs).
                     println!("fim de jogo: Select a Game");
                     s.modos.escolhendo = true;

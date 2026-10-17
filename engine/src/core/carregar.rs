@@ -3,8 +3,29 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::rules::estado::{ConfigSimulacao, Estado};
 use crate::rules::geracao::{Mundo, TabelasGeracao, TipoJogo};
+use crate::rules::quintal::{iniciar_quintal, TabelasQuintal};
 use crate::rules::rng::{GeradorR, GeradorS};
+
+/// Jogo novo (`_NewGame` do "Select a Game"): `_initStuff` semeia S e R com o relógio (o port usa
+/// `semente` nas duas leituras), `_RandYard` gera o mundo e `_InitSimYard` põe menino, cachorro etc.
+/// (geracao-mundo.md). Usado pela interface depois do "Select a Game" (também no fim de jogo).
+pub fn estado_de_jogo_novo(
+    tipo: TipoJogo,
+    semente: u32,
+    tab: &TabelasGeracao,
+    cfg: &ConfigSimulacao,
+    quintal: &TabelasQuintal,
+) -> Result<Estado, String> {
+    let mut s = GeradorS::new(0);
+    let mut r = GeradorR::default();
+    r.semear_com_ticks(&mut s, semente, semente);
+    let m = Mundo::novo_jogo(tipo, &mut r, &mut s, tab)?;
+    let mut e = Estado::de_mundo(&m, s, r, cfg)?;
+    iniciar_quintal(&mut e, quintal);
+    Ok(e)
+}
 
 /// `_LoadGame` chama `_RandYard` antes de ler os blocos: 192 `_RRand` para as sementes dos patches
 /// e a geração do patch (11, 8) com S semeado pela semente nova. Os blocos lidos depois

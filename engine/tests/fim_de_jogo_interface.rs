@@ -108,11 +108,44 @@ fn jogo_completo_novo_tem_a_forma_do_que_o_original_comecou() {
     }
 }
 
-/// O caminho inteiro pela interface: `Partida::fechar_modal` devolve o quadro de fim de jogo e a
-/// interface (simant/, `jogo.rs::novo_jogo`) abre "Select a Game" e cria a sessão nova. Esse caminho
-/// está no executável, não no `engine`: não há como dirigi-lo daqui.
+/// O caminho inteiro pela interface: `Partida::fechar_modal` devolve o quadro de fim de jogo, que
+/// abre o "Select a Game" (`Modal::abre_selecao_de_jogo`, `_NewGame(0)`); com Full Game, a interface
+/// cria o jogo novo por `carregar::estado_de_jogo_novo` (o mesmo que simant/src/sessao.rs usa).
 #[test]
-#[ignore = "falta API no engine: a volta do fim de jogo para \"Select a Game\" e o jogo novo ficam em simant/src/jogo.rs (Sessao::abrir), fora de core::partida"]
 fn fim_de_jogo_volta_a_selecao_e_comeca_jogo_completo() {
-    unimplemented!("ver o teste acima e simant/src/jogo.rs::novo_jogo");
+    use engine::core::carregar::estado_de_jogo_novo;
+    use engine::core::selecao::Escolha;
+    let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+    if !jogo.join("SHARED.NDX").is_file() {
+        eprintln!("AVISO: arquivos do jogo não encontrados em {}; teste ignorado", jogo.display());
+        return;
+    }
+    let (v, layout) = vetor();
+    let mut p = partida(&v, &layout);
+    for _ in 0..3 {
+        tick(&mut p.estado, &mut p.regras);
+        p.processar_eventos_do_estado();
+    }
+    let mut fechados = Vec::new();
+    while let Some(m) = p.fechar_modal() {
+        fechados.push(m);
+    }
+    assert!(fechados.last().is_some_and(Modal::abre_selecao_de_jogo), "{fechados:?}");
+    assert!(fechados[..fechados.len() - 1].iter().all(|m| !m.abre_selecao_de_jogo()));
+    // "Select a Game" → Full Game.
+    let tipo = Escolha::Completo.tipo_jogo().unwrap();
+    let r = Recursos::abrir(&jogo, &["SHARED".to_string()], &raiz().join("data"), None).unwrap();
+    let tab = TabelasGeracao::carregar(&r).unwrap();
+    let cfg = ConfigSimulacao::de_json(&ler("data/simulacao.json")).unwrap();
+    let quintal = RegrasOriginais::carregar_sem_banco(&r).unwrap().quintal;
+    let novo = estado_de_jogo_novo(tipo, 1234, &tab, &cfg, &quintal).unwrap();
+    let original = Estado::de_save(&v.depois).unwrap();
+    for e in [&original, &novo] {
+        assert_eq!(e.partida.tipo_jogo, 2);
+        assert_eq!(e.ambiente.patch, (11, 8));
+        assert_eq!((e.amarela.tipo, e.amarela.plano, e.amarela.ninho_iniciado), (0x40, 1, 0));
+        assert_eq!(e.partida.fim_de_jogo, 0);
+    }
+    // O menino e o cachorro postos por _InitSimYard (quintal.md: _BoyX/_BoyY = 0xB4/0x49).
+    assert_eq!((novo.menino.x, novo.menino.y), (0xB4, 0x49));
 }
