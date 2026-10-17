@@ -632,7 +632,7 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md). Ferramenta de leitura do
 - Significado prático dos modos 17/18 na superfície (se alguma formiga sai do ninho com eles).
 - `_ForceModeA/B`, `_StartAttack`, `_GetNewRedTask` e demais funções sem chamador: confirmar se há chamadas indiretas (tabela de ponteiros) com o Ghidra.
 - Ainda não conferidos no original: morte natural (T1), luta e proporção de vitórias (T5, T6), revoada (T8), estratégia vermelha (T9), recrutamento pelo jogador (T11). As regras foram conferidas só pelos casos da seção "Observado no original".
-- `_YellowFight` e `_DoTroph` estão no port só na parte que toca a superfície; `_YellowDeath(0)`, `_ResetYellowVars`, mensagens e balões (`_RestBalloons`, `_FightBalloons`) faltam (formiga amarela e interface).
+- `_YellowFight` e `_DoTroph` são os completos de `amarela.rs` (com `_YellowDeath(0)` e `_ResetYellowVars`); faltam só os balões (`_RestBalloons`, `_FightBalloons`, interface).
 
 ## Observado no original
 
@@ -659,14 +659,16 @@ Código: `engine/src/rules/superficie.rs`. Dados: `data/superficie.json`, gerado
 | `_AddFood` | `adicionar_comida` (precisa das `TabelasGeracao`, por causa do seno) |
 | `_GetStrategy`, `_GstrR`, `_SetCasteProd`, `_SetModeProd` | `escolher_estrategia` |
 | `_MakeRedInitiator` | `criar_lider_vermelha` |
-| `_GetNewMode`, `_GetWinner`, `_DeadAntHere` | `modo_novo`, `vencedor_da_luta`, `cadaver_aqui` (públicas: o ninho usa as mesmas regras) |
+| `_GetNewMode`, `_GetWinner`, `_DeadAntHere` | `modo_novo`, `vencedor_da_luta`, `cadaver_aqui` (públicas; implementação em `comum.rs`, a mesma do ninho, da amarela, do quintal e dos inimigos) |
 | `_Recruit`, `_UnRecruit`, `_RecruitRed`, `_UnRecruitRed` | `recrutar`, `desrecrutar`, `recrutar_vermelhas`, `desrecrutar_vermelhas` |
 | `_GetForageDir`, `_GetNestDir`, `_GetAlarmDir` | as de `feromonios.rs`, sobre uma cópia dos mapas feita no começo do laço e devolvida no fim |
-| `_Bounce`, `_GetRandDir`, `_GetDefendDir`, `_GetRedDefendDir`, `_GetDir`, `_GetDis`, `_GetRedBestDirs`, `_TileCanBeMovedOn`/`_IsClearTile` (superfície), `_DigTileB/R`, `_SmoothEdges`, `_FixExitMap`, `_GoInNest`, `_PickupFoodA` | funções privadas de `superficie.rs` |
+| `_GetRandDir`, `_GetDefendDir`, `_GetRedDefendDir`, `_GetRedBestDirs`, `_GoInNest` | funções privadas de `superficie.rs` |
+| `_Bounce`, `_GetDir`, `_GetDis`, `_TileCanBeMovedOn`/`_IsClearTile` (superfície), `_IsItHole`, `_DigTileB/R`, `_SmoothEdges`, `_FixExitMap`, `_PickupFoodA` | `engine/src/rules/comum.rs` (ver [../../decisoes.md](../../decisoes.md), "Módulo comum das regras") |
+| `_YellowFight`, `_DoTroph` | `amarela::lutar_com_amarela`, `amarela::trofalaxia` |
 
 Decisões do port:
 
-- Enquanto `RegrasOriginais` não guarda as tabelas desta parte, a implementação da trait usa as cópias embutidas de `superficie.json` e `feromonios.json` (`tabelas_padrao`): um mod que sobrescreva esses arquivos ainda não tem efeito no tick. As funções públicas recebem as tabelas explícitas.
+- A implementação da trait usa `RegrasOriginais::superficie` e `RegrasOriginais::feromonios` (carregados com mods); `tabelas_padrao()` devolve as cópias embutidas, para testes. As funções públicas recebem as tabelas explícitas.
 - Sem `TabelasGeracao` (sem os arquivos do jogo), `adicionar_comida` da trait não faz nada.
-- Leituras fora do mapa (que o original faria em memória vizinha) contam como obstáculo; índices de tabela fora da faixa (modo estratégico > 5, modo ≥ 20 na contagem) usam 0 ou são ignorados.
+- Leituras fora do mapa (que o original faria em memória vizinha) contam como obstáculo; índices de tabela fora da faixa: modo estratégico > 5 usa a última linha da tabela (a mesma escolha do ninho; antes da unificação a superfície devolvia o modo 0), modo ≥ 20 na contagem é ignorado.
 - O som de `_AddFood` e o `_EditMessage` do ataque vermelho não geram evento (falta variante em `Evento`); a música 0x2B0A gera `Evento::Musica`.

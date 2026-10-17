@@ -8,8 +8,9 @@
 
 use serde::Deserialize;
 
+use super::amarela::{self, TabelasAmarela};
 use super::estado::Estado;
-use super::quintal::{Relogios, TabelasQuintal};
+use super::quintal::Relogios;
 use super::tick::{RegrasConselhos, RegrasOriginais};
 use crate::formats::save::{Formiga, Lista};
 
@@ -129,12 +130,33 @@ impl InterfaceTutor for SemInterface {
     }
 }
 
+/// O estado de interface que o tutorial consulta, guardado em `RegrasOriginais::interface_tutor`: a
+/// interface grava aqui as janelas que estão na frente (a cada quadro, ou quando mudam). Vazio =
+/// [`SemInterface`].
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct JanelasNaFrente {
+    pub janelas: Vec<u16>,
+}
+
+impl InterfaceTutor for JanelasNaFrente {
+    fn janela_na_frente(&self, janela: u16) -> bool {
+        self.janelas.contains(&janela)
+    }
+}
+
 impl RegrasConselhos for RegrasOriginais {
     fn dar_conselhos(&mut self, e: &mut Estado) {
-        // TODO(integração): guardar `MemoriaTutor` e a interface em `RegrasOriginais` (conselhos.md, "Lacunas").
-        let t = TabelasQuintal::padrao();
-        let rel = Relogios::do_port(e, t);
-        executar_tutor(e, &t.conselhos, &mut MemoriaTutor::default(), &SemInterface, rel.mac);
+        // A memória (`_TimeTemp`) e a interface ficam em `RegrasOriginais` e valem de um tick para o
+        // outro, como a variável global do original.
+        let rel = Relogios::do_port(e, &self.quintal);
+        executar_tutor(
+            e,
+            &self.quintal.conselhos,
+            &self.amarela,
+            &mut self.memoria_tutor,
+            &self.interface_tutor,
+            rel.mac,
+        );
     }
 }
 
@@ -166,6 +188,7 @@ pub fn conselho(e: &Estado, t: &TabelasConselhos) -> Conselho {
 pub fn executar_tutor(
     e: &mut Estado,
     t: &TabelasConselhos,
+    ta: &TabelasAmarela,
     mem: &mut MemoriaTutor,
     ui: &dyn InterfaceTutor,
     relogio: i64,
@@ -184,7 +207,7 @@ pub fn executar_tutor(
     tu.duracao += 1;
     if tu.dada == 0 {
         let n = tu.licao;
-        dar_licao(e, t, mem, relogio, n);
+        dar_licao(e, t, ta, mem, relogio, n);
         e.tutorial.dada = 1;
         e.tutorial.duracao = 0;
     } else if licao_concluida(e, t, mem, ui, relogio, e.tutorial.licao) {
@@ -196,7 +219,8 @@ pub fn executar_tutor(
 }
 
 /// `_GiveLesson(n)`.
-pub fn dar_licao(e: &mut Estado, t: &TabelasConselhos, mem: &mut MemoriaTutor, relogio: i64, n: i16) {
+/// `ta`: tabelas da amarela (`_SetMyHealth` da lição que muda a vida dela).
+pub fn dar_licao(e: &mut Estado, t: &TabelasConselhos, ta: &TabelasAmarela, mem: &mut MemoriaTutor, relogio: i64, n: i16) {
     let Some(l) = t.licao(n) else { return };
     let soma_posicao = e.amarela.y as i32 + e.amarela.x as i32;
     match l.ao_dar {
@@ -216,7 +240,7 @@ pub fn dar_licao(e: &mut Estado, t: &TabelasConselhos, mem: &mut MemoriaTutor, r
             e.tutorial.temporario = m[1].wrapping_add(m[0]) as i16;
         }
         AoDar::ZerarTemp => e.tutorial.temporario = 0,
-        AoDar::SaudeAmarela { valor } => definir_saude_amarela(e, valor),
+        AoDar::SaudeAmarela { valor } => amarela::definir_saude(e, ta, valor as i32),
         AoDar::FormigasPretas { n } => adicionar_formigas_pretas(e, n),
         AoDar::FormigasPretasELimparAlarme { .. } => {}
         AoDar::PularLicao => e.tutorial.licao += 1,
@@ -289,17 +313,6 @@ pub fn licao_concluida(
     }
 }
 
-/// `_SetMyHealth(v)` (formiga-amarela.md, `1020:8c70`).
-fn definir_saude_amarela(e: &mut Estado, v: i16) {
-    let v = if e.partida.nunca_com_fome != 0 { 100 } else { v };
-    let a = &mut e.amarela;
-    if v > 0 {
-        a.saude_contagem = 0;
-    }
-    a.saude = v.clamp(0, 100);
-    a.quer_comida = if a.saude > a.aviso_saude && a.saude > 9 { 0 } else { 1 };
-}
-
 /// `_AddBlackAnts(n)` (`1030:6c5a`, geracao-mundo.md): pretas novas na superfície, x de 0 a 63, y de 16 a 47.
 fn adicionar_formigas_pretas(e: &mut Estado, mut n: i32) {
     for x in 0..64 {
@@ -322,9 +335,14 @@ fn adicionar_formigas_pretas(e: &mut Estado, mut n: i32) {
 #[cfg(test)]
 mod testes {
     use super::*;
+    use crate::rules::quintal::TabelasQuintal;
 
     fn t() -> &'static TabelasConselhos {
         &TabelasQuintal::padrao().conselhos
+    }
+
+    fn ta() -> &'static TabelasAmarela {
+        TabelasAmarela::padrao()
     }
 
     fn base() -> Estado {
@@ -375,15 +393,15 @@ mod testes {
         e.tutorial.licao = 1;
         e.tutorial.contagem = 7;
         let mut m = MemoriaTutor::default();
-        executar_tutor(&mut e, t(), &mut m, &SemInterface, 0);
+        executar_tutor(&mut e, t(), ta(), &mut m, &SemInterface, 0);
         assert_eq!(e.retirar_eventos(), vec![crate::rules::estado::Evento::Mensagem(11000)]);
         assert_eq!((e.tutorial.dada, e.tutorial.duracao), (1, 0));
         for _ in 0..8 {
-            executar_tutor(&mut e, t(), &mut m, &SemInterface, 0);
+            executar_tutor(&mut e, t(), ta(), &mut m, &SemInterface, 0);
         }
         assert_eq!((e.tutorial.licao, e.tutorial.dada), (2, 0));
         for _ in 0..8 {
-            executar_tutor(&mut e, t(), &mut m, &SemInterface, 0);
+            executar_tutor(&mut e, t(), ta(), &mut m, &SemInterface, 0);
         }
         assert_eq!(e.retirar_eventos(), vec![crate::rules::estado::Evento::Mensagem(11002)]);
     }
@@ -397,7 +415,7 @@ mod testes {
         e.amarela.plano = 1;
         assert!(licao_concluida(&mut e, t(), &m, &SemInterface, 0, 5));
         e.tutorial.licao = 0x2B;
-        dar_licao(&mut e, t(), &mut MemoriaTutor::default(), 0, 0x2B);
+        dar_licao(&mut e, t(), ta(), &mut MemoriaTutor::default(), 0, 0x2B);
         assert_eq!(e.tutorial.licao, 0x2C);
         assert_eq!(e.retirar_eventos(), vec![crate::rules::estado::Evento::Mensagem(11086)]);
     }
@@ -407,7 +425,7 @@ mod testes {
         let mut e = Estado::vazio();
         e.partida.tipo_jogo = 1;
         e.tutorial.contagem = 7;
-        executar_tutor(&mut e, t(), &mut MemoriaTutor::default(), &SemInterface, 0);
+        executar_tutor(&mut e, t(), ta(), &mut MemoriaTutor::default(), &SemInterface, 0);
         assert_eq!(e.tutorial.contagem, 7);
     }
 }

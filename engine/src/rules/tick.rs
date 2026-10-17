@@ -10,8 +10,16 @@
 //! Para implementar um assunto: em `rules/<assunto>.rs`, escreva `impl Regras<Assunto> for
 //! RegrasOriginais { ... }` e apague a linha vazia correspondente no fim deste arquivo.
 
+use super::amarela::TabelasAmarela;
+use super::conselhos::{JanelasNaFrente, MemoriaTutor};
 use super::estado::{indice_cor, ConfigSimulacao, Estado, Evento};
+use super::feromonios::{FaseCheiro, TabelasFeromonio};
 use super::geracao::{Cor, TabelasGeracao};
+use super::inimigos::TabelasInimigos;
+use super::ninho::TabelasNinho;
+use super::quintal::TabelasQuintal;
+use super::superficie::TabelasSuperficie;
+use crate::recursos::Recursos;
 
 /// Quintal (`_DoSimYard` com menino, pássaro, gato, cachorro, chuva e `_SimColonies`) e água
 /// (`_DoWater`). Spec: simulacao-visao-geral.md §6, ninho.md §8.
@@ -42,6 +50,13 @@ pub trait RegrasSuperficie {
     fn escolher_estrategia(&mut self, _e: &mut Estado) {}
     /// `_MakeRedInitiator` (`1028:967c`), chamado quando nenhuma vermelha está no modo 19.
     fn criar_lider_vermelha(&mut self, _e: &mut Estado) {}
+    /// Parte de cheiro de `_DoSmells` (`_FillHoles*`, `_ColonySmell*`, `_SmoothAlarm`; feromonios.md
+    /// §2–3), chamada pelo próprio tick nas fases periódicas. É parte do esqueleto do tick, por isso o
+    /// padrão **não** é vazio: roda a fase com as tabelas embutidas de `data/feromonios.json`.
+    /// `RegrasOriginais` usa as tabelas que carregou (com mods).
+    fn fase_de_cheiro(&mut self, e: &mut Estado, fase: FaseCheiro) {
+        super::superficie::rodar_fase_de_cheiro(e, fase, &TabelasFeromonio::padrao().regras);
+    }
 }
 
 /// Formigas dentro dos ninhos (com ovos e rainha). Spec: ninho.md e ciclo-de-vida.md.
@@ -75,11 +90,75 @@ impl<T> Regras for T where
 {
 }
 
-/// As regras do jogo original. Guarda as tabelas de dados que as sub-rotinas usam.
-#[derive(Clone, Debug, Default)]
+/// As regras do jogo original, com as tabelas de dados de cada parte e o estado do tutorial que não
+/// vai para o save.
+///
+/// [`RegrasOriginais::carregar`] lê as tabelas pelos [`Recursos`] (com mods: um `data/<parte>.json` de
+/// mod chega aqui e, daí, ao tick). [`RegrasOriginais::default`] usa as cópias de `data/*.json`
+/// embutidas na compilação, sem mods e sem as tabelas que vêm do banco (`geracao`): é o construtor dos
+/// testes.
+#[derive(Clone, Debug)]
 pub struct RegrasOriginais {
-    /// Tabelas da geração (seno de `_AddFood`, direções...), de `data/geracao.json` + banco.
+    /// Tabelas da geração (seno de `_AddFood` e do laser, direções...), de `data/geracao.json` + banco.
+    /// `None` sem os arquivos do jogo: `_AddFood` não faz nada e o laser usa o seno calculado.
     pub geracao: Option<TabelasGeracao>,
+    /// `data/quintal.json` (menino, bichos, colônias do quintal e, no bloco `conselhos`, o tutorial).
+    pub quintal: TabelasQuintal,
+    /// `data/inimigos.json` (formiga-leão, aranha, lagarta).
+    pub inimigos: TabelasInimigos,
+    /// `data/superficie.json` (formigas da superfície, estratégia, líder vermelha).
+    pub superficie: TabelasSuperficie,
+    /// `data/feromonios.json` (direções pelo cheiro e manutenção dos mapas de cheiro).
+    pub feromonios: TabelasFeromonio,
+    /// `data/ninho.json` (formigas dos ninhos, ovos, rainha).
+    pub ninho: TabelasNinho,
+    /// `data/amarela.json` (formiga amarela; também usado quando outra parte mata ou alimenta a amarela).
+    pub amarela: TabelasAmarela,
+    /// `_TimeTemp` do tutorial (fora do save), mantido entre os ticks.
+    pub memoria_tutor: MemoriaTutor,
+    /// O que o tutorial sabe da interface (janelas na frente). A interface atualiza a cada quadro.
+    pub interface_tutor: JanelasNaFrente,
+}
+
+impl Default for RegrasOriginais {
+    fn default() -> RegrasOriginais {
+        RegrasOriginais {
+            geracao: None,
+            quintal: TabelasQuintal::padrao().clone(),
+            inimigos: TabelasInimigos::padrao().clone(),
+            superficie: TabelasSuperficie::padrao().clone(),
+            feromonios: TabelasFeromonio::padrao().clone(),
+            ninho: TabelasNinho::padrao().clone(),
+            amarela: TabelasAmarela::padrao().clone(),
+            memoria_tutor: MemoriaTutor::default(),
+            interface_tutor: JanelasNaFrente::default(),
+        }
+    }
+}
+
+impl RegrasOriginais {
+    /// Todas as tabelas pelos recursos (`data/` com mods por cima; o seno da geração vem do banco).
+    pub fn carregar(r: &Recursos) -> Result<RegrasOriginais, String> {
+        Ok(RegrasOriginais {
+            geracao: Some(TabelasGeracao::carregar(r)?),
+            ..RegrasOriginais::carregar_sem_banco(r)?
+        })
+    }
+
+    /// Como [`RegrasOriginais::carregar`], mas sem as tabelas que dependem do banco (`geracao = None`).
+    pub fn carregar_sem_banco(r: &Recursos) -> Result<RegrasOriginais, String> {
+        Ok(RegrasOriginais {
+            geracao: None,
+            quintal: TabelasQuintal::carregar(r)?,
+            inimigos: TabelasInimigos::carregar(r)?,
+            superficie: TabelasSuperficie::carregar(r)?,
+            feromonios: TabelasFeromonio::carregar(r)?,
+            ninho: TabelasNinho::carregar(r)?,
+            amarela: TabelasAmarela::carregar(r)?,
+            memoria_tutor: MemoriaTutor::default(),
+            interface_tutor: JanelasNaFrente::default(),
+        })
+    }
 }
 
 /// Um passo da simulação (`_DoAntSim`), na ordem exata do original (simulacao-visao-geral.md §5).
@@ -111,12 +190,12 @@ pub fn tick(e: &mut Estado, regras: &mut dyn Regras) {
             }
             1 => {
                 e.ninho_b.lista.compactar();
-                feromonios_fase_preta(e);
+                regras.fase_de_cheiro(e, FaseCheiro::Pretos);
             }
             2 => contagem_completa(e, regras),
             _ => {
                 e.ninho_r.lista.compactar();
-                feromonios_fase_vermelha(e);
+                regras.fase_de_cheiro(e, FaseCheiro::Vermelhos);
             }
         }
     }
@@ -187,25 +266,8 @@ fn contagem_completa(e: &mut Estado, regras: &mut dyn Regras) {
     e.contar_formigas();
     regras.dar_conselhos(e);
     e.atualizar_historico();
-    suavizar_alarme(e);
-}
-
-/// Fase 1 (tick ≡ 32 mod 128): `_FillHolesBN`, `_ColonySmellBN`, `_ColonySmellBT`.
-fn feromonios_fase_preta(e: &mut Estado) {
-    // Buracos pretos, decaimento do ninho preto e da trilha preta, nessa ordem (feromonios.md §2–3).
-    super::superficie::rodar_fase_de_cheiro(e, super::feromonios::FaseCheiro::Pretos);
-}
-
-/// Fase 3 (tick ≡ 96 mod 128): `_FillHolesRN`, `_ColonySmellRN`, `_ColonySmellRT`.
-fn feromonios_fase_vermelha(e: &mut Estado) {
-    // Idem, para a cor vermelha.
-    super::superficie::rodar_fase_de_cheiro(e, super::feromonios::FaseCheiro::Vermelhos);
-}
-
-/// `_SmoothAlarm` (`1028:9380`), ticks ≡ 0 e 64 (mod 128), depois de `_HistUpdate`.
-fn suavizar_alarme(e: &mut Estado) {
-    // feromonios.md §3, "Suavização do alarme".
-    super::superficie::rodar_fase_de_cheiro(e, super::feromonios::FaseCheiro::Alarme);
+    // `_SmoothAlarm` (`1028:9380`), ticks ≡ 0 e 64 (mod 128), depois de `_HistUpdate`.
+    regras.fase_de_cheiro(e, FaseCheiro::Alarme);
 }
 
 // ---------------------------------------------------------------------------------------------

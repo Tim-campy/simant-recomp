@@ -284,7 +284,8 @@ impl Sessao<'_> {
         // posição "ao carregar"; um save segue data/navegacao.json.
         let posicao = if matches!(origem, Origem::Novo(_)) { PosicaoVista::AoCarregar } else { nav_cfg.posicao_inicial };
         let nav = tela.navegacao(&jogo, posicao)?;
-        let regras = RegrasOriginais { geracao: Some(geracao) };
+        // Tabelas de todas as partes com mods (data/*.json); o seno da geração já foi lido do banco.
+        let regras = RegrasOriginais { geracao: Some(geracao), ..RegrasOriginais::carregar_sem_banco(recursos)? };
         let partida = Partida::nova(estado, nav, regras, TabelasAmarela::carregar(recursos)?, cfg_sim, cfg_partida);
         Ok(Sessao { recursos, interface, tela, nav_cfg, partida, cores })
     }

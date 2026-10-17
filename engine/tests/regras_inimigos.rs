@@ -9,6 +9,7 @@ use std::path::PathBuf;
 
 use engine::formats::save::{Formiga, JogoSalvo, LayoutSave};
 use engine::recursos::Recursos;
+use engine::rules::amarela::TabelasAmarela;
 use engine::rules::estado::{Estado, Evento};
 use engine::rules::geracao::TabelasGeracao;
 use engine::rules::inimigos::{self, seno_calculado, TabelasInimigos};
@@ -389,7 +390,7 @@ fn i5_formiga_leao_come_a_formiga_do_centro() {
     e.adicionar_formiga(engine::formats::save::Lista::A, formiga(40, 20, 0x14));
     e.adicionar_formiga(engine::formats::save::Lista::A, formiga(11, 11, 0x93));
     let mut s = e.s;
-    inimigos::formigas_leao(&mut e, t());
+    inimigos::formigas_leao(&mut e, t(), TabelasAmarela::padrao());
     s.mascara(8); // só o sorteio do som
     assert_eq!(
         e.s, s,
@@ -411,7 +412,7 @@ fn i5_formiga_leao_come_a_formiga_do_centro() {
     // Ciclo completo: T sobe até 4, S desce até 0 (com quadros sorteados), volta e conta a refeição.
     let mut chamadas = 1;
     while e.formigas_leao.m[0] != 0 {
-        inimigos::formigas_leao(&mut e, t());
+        inimigos::formigas_leao(&mut e, t(), TabelasAmarela::padrao());
         chamadas += 1;
         assert!((0x38..=0x3E).contains(&mapa(&e, 40, 20)));
         assert!(chamadas < 200);
@@ -434,7 +435,7 @@ fn i5_formiga_leao_olha_uma_vizinha_sorteada() {
     por_formiga_leao(&mut e, 0, 40, 20);
     let (px, py) = ((40 + dx) as u8, (20 + dy) as u8);
     e.adicionar_formiga(engine::formats::save::Lista::A, formiga(px, py, 0x95));
-    inimigos::formigas_leao(&mut e, t());
+    inimigos::formigas_leao(&mut e, t(), TabelasAmarela::padrao());
     assert_eq!(e.superficie.lista.indice, 0);
     assert_eq!(e.vermelha.comidas_por_predadores, 1);
     assert_eq!(e.formigas_leao.m[0], 1);
@@ -442,7 +443,7 @@ fn i5_formiga_leao_olha_uma_vizinha_sorteada() {
     let mut e = quintal(semente);
     por_formiga_leao(&mut e, 0, 40, 20);
     let mut s = e.s;
-    inimigos::formigas_leao(&mut e, t());
+    inimigos::formigas_leao(&mut e, t(), TabelasAmarela::padrao());
     s.rand1(8);
     s.rand1(8);
     assert_eq!(e.s, s);
@@ -457,7 +458,7 @@ fn i5_formiga_leao_pega_a_amarela() {
     e.amarela.y = 20;
     e.amarela.tipo = 0x10;
     e.superficie.vida.definir(40, 20, 0xFF);
-    inimigos::formigas_leao(&mut e, t());
+    inimigos::formigas_leao(&mut e, t(), TabelasAmarela::padrao());
     assert_eq!(e.formigas_leao.m[0], 1);
     assert_eq!(
         e.preta.comidas_por_predadores, 1,
@@ -480,7 +481,7 @@ fn i6_formiga_leao_cercada_morre_e_a_seguinte_pula_o_tick() {
             .vida
             .definir(20 + t().dx8[d] as i32, 30 + t().dy8[d] as i32, 0x12);
     }
-    inimigos::formigas_leao(&mut e, t());
+    inimigos::formigas_leao(&mut e, t(), TabelasAmarela::padrao());
     assert_eq!(e.retirar_eventos(), vec![Evento::Mensagem(10050)]);
     assert_eq!(mapa(&e, 20, 30), 0x3F);
     let fl = &e.formigas_leao;
@@ -506,7 +507,7 @@ fn i7_pedrinha_na_armadilha_e_cuspida() {
     por_formiga_leao(&mut e, 0, 40, 20);
     e.superficie.mapa.definir(40, 20, 0x51);
     e.superficie.vida.definir(40, 20, 0x12); // formiga no centro: ignorada enquanto há pedrinha
-    inimigos::formigas_leao(&mut e, t());
+    inimigos::formigas_leao(&mut e, t(), TabelasAmarela::padrao());
     let (ax, ay) = (40 + 2 * t().dx8[d] as i32, 20 + 2 * t().dy8[d] as i32);
     assert_eq!(mapa(&e, ax, ay), 0x51);
     assert_eq!(mapa(&e, 40, 20), 0x39);
@@ -522,7 +523,7 @@ fn i7_pedrinha_na_armadilha_e_cuspida() {
     por_formiga_leao(&mut e, 0, 40, 20);
     e.superficie.mapa.definir(40, 20, 0x4A);
     let mut s = e.s;
-    inimigos::formigas_leao(&mut e, t());
+    inimigos::formigas_leao(&mut e, t(), TabelasAmarela::padrao());
     s.rand1(512);
     assert_eq!(e.s, s);
     assert_eq!((e.formigas_leao.m[0], mapa(&e, 40, 20)), (0, 0x4A));
@@ -535,7 +536,7 @@ fn formiga_leao_nova_quando_nao_resta_nenhuma() {
         .unwrap();
     let mut e = quintal(semente);
     e.formigas_leao.iniciais = 2;
-    inimigos::formigas_leao(&mut e, t());
+    inimigos::formigas_leao(&mut e, t(), TabelasAmarela::padrao());
     let fl = &e.formigas_leao;
     assert_eq!(fl.quantidade, 1);
     let (x, y) = (fl.x[0] as i32, fl.y[0] as i32);
@@ -547,7 +548,7 @@ fn formiga_leao_nova_quando_nao_resta_nenhuma() {
     // Sem formigas-leão iniciais (casa), nem o S1(1024) é sorteado.
     let mut e = quintal(semente);
     let s = e.s;
-    inimigos::formigas_leao(&mut e, t());
+    inimigos::formigas_leao(&mut e, t(), TabelasAmarela::padrao());
     assert_eq!(e.s, s);
 }
 
@@ -571,7 +572,7 @@ fn i8_aranha_aparece_por_cima_ou_por_baixo() {
     let mut e = quintal(0x9ABC);
     let mut n = 0;
     while e.aranha.ligada == 0 {
-        inimigos::aranha(&mut e, t(), None);
+        inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
         n += 1;
         assert!(n < 10_000);
     }
@@ -588,7 +589,7 @@ fn i8_aranha_aparece_por_cima_ou_por_baixo() {
     e.partida.tipo_jogo = 0;
     let s = e.s;
     for _ in 0..2000 {
-        inimigos::aranha(&mut e, t(), None);
+        inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
     }
     assert_eq!((e.aranha.ligada, e.s), (0, s));
 }
@@ -598,7 +599,7 @@ fn aranha_sai_pela_borda_e_desliga() {
     let mut e = quintal(0x1);
     por_aranha(&mut e, 64, 0, 1, 0);
     e.aranha.y = 2;
-    inimigos::aranha(&mut e, t(), None);
+    inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
     assert_eq!(e.aranha.y, -2);
     assert_eq!(e.aranha.ligada, 0);
 }
@@ -608,14 +609,14 @@ fn i9_aranha_ve_a_formiga_a_frente_persegue_e_come() {
     let mut e = quintal(0x0F0F);
     por_aranha(&mut e, 40, 20, 0, 2);
     e.adicionar_formiga(engine::formats::save::Lista::A, formiga(45, 20, 0x12));
-    inimigos::aranha(&mut e, t(), None);
+    inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
     assert_eq!(
         (e.aranha.estado, e.aranha.alvo, e.aranha.alvo_tipo),
         (2, 0, 0x12)
     );
     let mut n = 0;
     while e.aranha.estado == 2 {
-        inimigos::aranha(&mut e, t(), None);
+        inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
         n += 1;
         assert!(n < 20);
     }
@@ -637,7 +638,7 @@ fn i9_aranha_ve_a_formiga_a_frente_persegue_e_come() {
         "restos pretos na boca"
     );
     while e.aranha.estado == 3 {
-        inimigos::aranha(&mut e, t(), None);
+        inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
     }
     assert_eq!(e.aranha.mastigando, 0);
     assert_eq!(e.aranha.arrotos, 9);
@@ -658,7 +659,7 @@ fn aranha_faro_acha_formiga_atras() {
     e.amarela.modo_aranha = 7;
     e.adicionar_formiga(engine::formats::save::Lista::A, formiga(30, 20, 0x92)); // atrás, dist² 100
     e.adicionar_formiga(engine::formats::save::Lista::A, formiga(100, 20, 0x12)); // longe
-    inimigos::aranha(&mut e, t(), None);
+    inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
     assert_eq!(
         (e.aranha.estado, e.aranha.alvo, e.aranha.alvo_tipo),
         (2, 0, 0x92)
@@ -672,7 +673,7 @@ fn aranha_desiste_se_a_presa_muda() {
     e.adicionar_formiga(engine::formats::save::Lista::A, formiga(45, 20, 0x32)); // virou soldado (grupo 6): outro T
     e.aranha.alvo = 0;
     e.aranha.alvo_tipo = 0x12;
-    inimigos::aranha(&mut e, t(), None);
+    inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
     assert_eq!((e.aranha.estado, e.aranha.alvo), (0, -2));
 }
 
@@ -689,7 +690,7 @@ fn i10_cerco_mata_a_aranha_e_arma_a_vinganca() {
             }
         }
         let s = e.s;
-        inimigos::aranha(&mut e, t(), None);
+        inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
         let a = &e.aranha;
         assert_eq!(
             (a.estado, a.agonia, a.ciclo_pernas, a.vinganca),
@@ -709,7 +710,7 @@ fn cerco_com_cinco_formigas_faz_fugir() {
     for (dx, dy) in [(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 1)] {
         e.superficie.vida.definir(40 + dx, 20 + dy, 0x12);
     }
-    inimigos::aranha(&mut e, t(), None);
+    inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
     assert_eq!(e.aranha.estado, 4);
     // Sem múltiplo de 4, nada de cerco.
     let mut e2 = quintal(0x4444);
@@ -718,7 +719,7 @@ fn cerco_com_cinco_formigas_faz_fugir() {
     for (dx, dy) in [(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 1)] {
         e2.superficie.vida.definir(40 + dx, 20 + dy, 0x12);
     }
-    inimigos::aranha(&mut e2, t(), None);
+    inimigos::aranha(&mut e2, t(), TabelasAmarela::padrao(), None);
     assert_ne!(e2.aranha.estado, 4);
 }
 
@@ -729,7 +730,7 @@ fn aranha_morta_vira_tres_comidas() {
     e.aranha.agonia = 3;
     e.ambiente.comida_superficie = 10;
     for _ in 0..3 {
-        inimigos::aranha(&mut e, t(), None);
+        inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
     }
     assert_eq!(
         (e.aranha.ligada, e.aranha.estado, e.aranha.agonia),
@@ -759,7 +760,7 @@ fn i11_laser_acerta_formiga_no_cone() {
     e.adicionar_formiga(engine::formats::save::Lista::A, formiga(43, 20, 0x12));
     let mut atingida = false;
     for _ in 0..50 {
-        inimigos::aranha(&mut e, t(), None);
+        inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
         if e.superficie.lista.vagas[0].tipo == 0 {
             atingida = true;
             break;
@@ -782,7 +783,7 @@ fn aranha_do_jogador_anda_para_o_destino() {
     e.aranha.destino_y = 20;
     e.amarela.comando = 1;
     let s = e.s;
-    inimigos::aranha(&mut e, t(), None);
+    inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
     // Gira de 0 para 1 (no máximo 45°) e corre: 5 × (3, −3).
     assert_eq!(e.aranha.dir, 1);
     assert_eq!(
@@ -797,7 +798,7 @@ fn aranha_do_jogador_anda_para_o_destino() {
     // No destino: só o quadro das pernas.
     e.amarela.x = 50;
     e.amarela.y = 20;
-    inimigos::aranha(&mut e, t(), None);
+    inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
     assert_eq!(e.aranha.ciclo_pernas, 2);
 }
 
@@ -870,9 +871,7 @@ fn rodar_ate(inicio: &str, fim: &str) -> Option<(Estado, Estado)> {
     let (a, b) = (save_ref(inicio)?, save_ref(fim)?);
     let mut e = Estado::de_save(&a).unwrap();
     let alvo = Estado::de_save(&b).unwrap();
-    let mut r = RegrasOriginais {
-        geracao: tabelas_geracao(),
-    };
+    let mut r = RegrasOriginais { geracao: tabelas_geracao(), ..RegrasOriginais::default() };
     assert!(alvo.partida.tempo > e.partida.tempo);
     while e.partida.tempo < alvo.partida.tempo {
         tick(&mut e, &mut r);
@@ -966,6 +965,7 @@ fn vetores_de_tick_do_original() {
     let mut nomes: Vec<PathBuf> = lista
         .filter_map(|d| d.ok())
         .map(|d| d.path())
+        // Só os vetores da raiz (ticks 79–83); as subpastas de cenário têm o seu próprio índice.
         .filter(|p| p.join("estado_antes.bin").is_file())
         .collect();
     nomes.sort();
@@ -978,8 +978,8 @@ fn vetores_de_tick_do_original() {
         let o = Estado::de_save(&depois).unwrap();
         e.s = GeradorS::new(extras["antes"]["SementeS"].as_u64().unwrap() as u16);
         e.partida.ciclo += 1;
-        inimigos::formigas_leao(&mut e, t());
-        inimigos::aranha(&mut e, t(), None);
+        inimigos::formigas_leao(&mut e, t(), TabelasAmarela::padrao());
+        inimigos::aranha(&mut e, t(), TabelasAmarela::padrao(), None);
         if e.partida.ciclo & 1 != 0 {
             inimigos::lagarta(&mut e, t());
         }

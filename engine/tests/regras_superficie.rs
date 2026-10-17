@@ -9,6 +9,7 @@
 use std::path::PathBuf;
 
 use engine::formats::save::{Formiga, JogoSalvo, LayoutSave, Lista};
+use engine::rules::amarela::TabelasAmarela;
 use engine::rules::estado::Estado;
 use engine::rules::geracao::TabelasGeracao;
 use engine::rules::rng::{GeradorR, GeradorS};
@@ -43,7 +44,7 @@ fn por(e: &mut Estado, x: u8, y: u8, modo: u8, tipo: u8, s: u8) -> usize {
 
 fn rodar(e: &mut Estado) {
     let (t, f) = tabelas_padrao();
-    simular_superficie(e, t, f);
+    simular_superficie(e, t, f, TabelasAmarela::padrao());
 }
 
 fn vaga(e: &Estado, i: usize) -> Formiga {
@@ -571,7 +572,7 @@ fn vetores_de_tick_do_original() {
         for k in 0..4000 {
             let mut e = base.clone();
             e.s = s;
-            simular_superficie(&mut e, t, f);
+            simular_superficie(&mut e, t, f, TabelasAmarela::padrao());
             let lista_ok = e.superficie.lista.vagas[..n] == depois.superficie.lista.vagas[..n];
             let cheiro_ok = e.feromonios == depois.feromonios;
             let vida_ok = e.superficie.lista.vagas[..n]
