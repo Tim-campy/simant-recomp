@@ -15,6 +15,7 @@
 //! sai (--salvar grava o .ANT do estado no fim). Na janela, Ctrl+S salva no arquivo da partida e
 //! Ctrl+A ("Save As") num nome novo (o de --salvar, ou SALVO01.ANT, SALVO02.ANT… na pasta atual).
 
+mod arquivos;
 mod jogo;
 mod opcoes;
 mod sessao;
@@ -287,6 +288,20 @@ fn principal() -> Result<(), String> {
                 s.abrir_menu_de_icones(i32::from(r.esq) + 2, i32::from(r.topo) + 2);
             }
             Some(_) => return Err("--menu amarela@X,Y ou icones@OBJETO".into()),
+            None => {}
+        }
+        match o.dialogo.as_deref() {
+            Some("load") => s.dialogo = Some(arquivos::Dialogo::Load(s.dialogo_arquivo(false))),
+            Some("salvar_como") => s.dialogo = Some(arquivos::Dialogo::SalvarComo(s.dialogo_arquivo(true))),
+            Some("pergunta") => {
+                s.partida.estado.precisa_salvar = true;
+                s.abrir_load();
+            }
+            Some("salvo") => {
+                let m = engine::core::dialogos::CaixaMensagem::salvo(&s.dialogos_cfg, "QUICK1.ANT");
+                s.dialogo = Some(arquivos::Dialogo::Salvo(m, false));
+            }
+            Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como ou salvo")),
             None => {}
         }
         for _ in 0..o.fechar_avisos {

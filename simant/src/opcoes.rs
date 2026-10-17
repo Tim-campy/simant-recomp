@@ -38,6 +38,8 @@ pub(crate) struct Opcoes {
     pub(crate) menu: Option<String>,
     /// Sem janela: Ctrl+clique no marcador N (1–7) antes de exportar.
     pub(crate) marcar: Option<usize>,
+    /// Sem janela: abre um diálogo antes de exportar (load, pergunta, salvar_como, salvo).
+    pub(crate) dialogo: Option<String>,
     pub(crate) som: som::OpcoesSom,
 }
 
@@ -72,6 +74,7 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         botoes: Vec::new(),
         menu: None,
         marcar: None,
+        dialogo: None,
         som: som::OpcoesSom::default(),
     };
     let mut args = std::env::args().skip(1);
@@ -101,6 +104,7 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
             }
             "--salvar" => o.salvar = Some(valor()?.into()),
             "--menu" => o.menu = Some(valor()?),
+            "--dialogo" => o.dialogo = Some(valor()?),
             "--marcar" => o.marcar = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
             "--botoes" => {
                 o.botoes = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| format!("{a}: número inválido"))).collect::<Result<_, _>>()?

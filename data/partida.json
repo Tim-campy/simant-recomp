@@ -14,7 +14,7 @@
     "_redesenho_sem_foco_a_cada": "MYTIMERFUNC: sem foco, _UpdateWindows só quando (quadros & 7) == 0.",
     "redesenho_sem_foco_a_cada": 8
   },
-  "_teclas": "Aceleradores do menu Speed e Options (ACCELERATORTABLE do SIMANTW.EXE, formiga-amarela.md §11.7): Shift+0 Pause (0x41, alterna _GamePaused), Shift+1..4 Slow/Normal/Fast/Ultra (0x43–0x46, _GameSpeed = 0..3), também com Shift + NumPad 0–4; Ctrl+G AutoTrack (0x31, alterna _OptionStates[0]); Ctrl+S File → Save (5) e Ctrl+A Save As (6). Ações: pausa, velocidade_lenta, velocidade_normal, velocidade_rapida, velocidade_ultra, auto_track, salvar, salvar_como.",
+  "_teclas": "Aceleradores do menu Speed e Options (ACCELERATORTABLE do SIMANTW.EXE, formiga-amarela.md §11.7): Shift+0 Pause (0x41, alterna _GamePaused), Shift+1..4 Slow/Normal/Fast/Ultra (0x43–0x46, _GameSpeed = 0..3), também com Shift + NumPad 0–4; Ctrl+G AutoTrack (0x31, alterna _OptionStates[0]); Ctrl+S File → Save (5) e Ctrl+A Save As (6); Ctrl+L File → Load é extensão do port (o port não tem barra de menus). Ações: pausa, velocidade_lenta, velocidade_normal, velocidade_rapida, velocidade_ultra, auto_track, salvar, salvar_como, carregar.",
   "teclas": [
     {"tecla": "0", "shift": true, "acao": "pausa"},
     {"tecla": "1", "shift": true, "acao": "velocidade_lenta"},
@@ -29,6 +29,7 @@
     {"tecla": "G", "ctrl": true, "acao": "auto_track"},
     {"tecla": "S", "ctrl": true, "acao": "salvar"},
     {"tecla": "A", "ctrl": true, "acao": "salvar_como"},
+    {"tecla": "L", "ctrl": true, "acao": "carregar"},
     {"tecla": "E", "ctrl": true, "acao": "janela_edicao"},
     {"tecla": "B", "ctrl": true, "acao": "janela_comportamento"},
     {"tecla": "C", "ctrl": true, "acao": "janela_castas"},

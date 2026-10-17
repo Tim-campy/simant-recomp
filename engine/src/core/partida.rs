@@ -63,6 +63,8 @@ pub enum AcaoPartida {
     /// File → Save (5, Ctrl+S) e Save As (6, Ctrl+A): tratados pela interface (arquivo).
     Salvar,
     SalvarComo,
+    /// File → Load (`_LoadGame`): pergunta, diálogo e nova sessão, a cargo da interface.
+    Carregar,
     /// Window → Edit/Behavior/Caste/History (0x11, 0x13–0x15; Ctrl+E/B/C/H): abre ou traz para a
     /// frente, a cargo da interface.
     JanelaEdicao,
@@ -565,6 +567,7 @@ impl Partida {
             AcaoPartida::AutoTrack => p.opcoes[0] = if p.opcoes[0] == 0 { 1 } else { 0 },
             AcaoPartida::Salvar
             | AcaoPartida::SalvarComo
+            | AcaoPartida::Carregar
             | AcaoPartida::JanelaEdicao
             | AcaoPartida::JanelaComportamento
             | AcaoPartida::JanelaCastas

@@ -34,6 +34,9 @@ pub(crate) struct Sessao<'a> {
     pub(crate) menu: Option<(MenuAberto, AlvoMenu)>,
     /// Clique simples no mapa esperando o fim da espera de `_processEdit`: instante, ponto, célula.
     pub(crate) clique_pendente: Option<(Instant, i32, i32, (i32, i32))>,
+    /// Diálogos do Windows (data/dialogos.json) e o aberto agora (simant/src/arquivos.rs).
+    pub(crate) dialogos_cfg: engine::core::dialogos::ConfigDialogos,
+    pub(crate) dialogo: Option<arquivos::Dialogo>,
 }
 
 /// Para quem vai a escolha do menu aberto.
@@ -109,6 +112,7 @@ impl Sessao<'_> {
         let modos = modos::Modos::carregar(recursos, &interface)?;
         let janelas = JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?, &interface);
         let menus_cfg: ConfigMenus = recursos.dados(menus::ARQUIVO_CONFIG)?;
+        let dialogos_cfg = recursos.dados(engine::core::dialogos::ARQUIVO_CONFIG)?;
         Ok(Sessao {
             recursos,
             interface,
@@ -124,6 +128,8 @@ impl Sessao<'_> {
             menus_cfg,
             menu: None,
             clique_pendente: None,
+            dialogos_cfg,
+            dialogo: None,
         })
     }
 
@@ -173,6 +179,7 @@ impl Sessao<'_> {
         if let Some((m, _)) = &self.menu {
             pendentes.extend(m.desenhar(&mut q, self.recursos, &self.interface)?);
         }
+        self.desenhar_dialogo(&mut q);
         if !pendentes.is_empty() {
             eprintln!("tela de jogo: não desenhado ainda: {}", pendentes.join(", "));
         }

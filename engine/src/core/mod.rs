@@ -2,6 +2,7 @@
 
 pub mod avisos;
 pub mod carregar;
+pub mod dialogos;
 pub mod edicao;
 pub mod historico;
 pub mod janelas;
