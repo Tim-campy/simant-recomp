@@ -20,7 +20,7 @@ mod som;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use engine::core::avisos::{self, ConfigAvisos, Modal};
+use engine::core::avisos::{self, ConfigAvisos, Escolha, Modal};
 use engine::core::navegacao::{Acao, ConfigNavegacao, Evento as EventoNav, Repeticao};
 use engine::core::partida::{self, AcaoPartida, BotaoTeclado, ConfigPartida, Partida, RespostaBotao};
 use engine::formats::janela::Retangulo;
@@ -265,7 +265,7 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
 enum Origem<'o> {
     Save(&'o Path),
     /// Quick Game gerado pelo port com a semente dada.
-    Novo(u32),
+    Novo(u32, TipoJogo),
 }
 
 /// Tudo o que a tela de jogo ao vivo precisa: a tela carregada (layouts e tilesets), a configuração
@@ -299,13 +299,13 @@ impl Sessao<'_> {
                 let estado = Estado::de_save(&jogo)?;
                 (jogo, estado)
             }
-            Origem::Novo(semente) => {
+            Origem::Novo(semente, tipo) => {
                 // _initStuff: _SeedSRand e _SeedRRand com o relógio; o port usa a semente nas duas
                 // leituras do relógio. Depois _NewGame → _RandYard (geracao-mundo.md).
                 let mut s = GeradorS::new(0);
                 let mut r = GeradorR::default();
                 r.semear_com_ticks(&mut s, semente, semente);
-                let m = Mundo::novo_jogo(TipoJogo::Rapido, &mut r, &mut s, &geracao)?;
+                let m = Mundo::novo_jogo(tipo, &mut r, &mut s, &geracao)?;
                 let estado = Estado::de_mundo(&m, s, r, &cfg_sim)?;
                 (estado.para_save(&layout)?, estado)
             }
@@ -314,7 +314,7 @@ impl Sessao<'_> {
         tela.atualizar(&estado);
         // Jogo novo: _NewGame faz _SetMapPlane(_MePlane) e _CenterEdit na amarela, o mesmo que a
         // posição "ao carregar"; um save segue data/navegacao.json.
-        let posicao = if matches!(origem, Origem::Novo(_)) { PosicaoVista::AoCarregar } else { nav_cfg.posicao_inicial };
+        let posicao = if matches!(origem, Origem::Novo(..)) { PosicaoVista::AoCarregar } else { nav_cfg.posicao_inicial };
         let nav = tela.navegacao(&jogo, posicao)?;
         // Tabelas de todas as partes com mods (data/*.json); o seno da geração já foi lido do banco.
         let regras = RegrasOriginais { geracao: Some(geracao), ..RegrasOriginais::carregar_sem_banco(recursos)? };
@@ -327,7 +327,7 @@ impl Sessao<'_> {
         }
         let arquivo = match origem {
             Origem::Save(p) => Some(p.to_path_buf()),
-            Origem::Novo(_) => None,
+            Origem::Novo(..) => None,
         };
         Ok(Sessao { recursos, interface, tela, nav_cfg, partida, cores, layout, arquivo, clique_modal: None })
     }
@@ -472,10 +472,31 @@ fn salvar_e_avisar(s: &mut Sessao, como: bool, o: &Opcoes) {
 
 /// Entrada com um aviso modal na tela (`_PictureDialog`, `_EndGameDialog`): só o clique no
 /// retângulo do aviso e (no quadro) Espaço o fecham. Devolve o aviso fechado.
-fn tratar_modal(s: &mut Sessao, ev: &sdl2::event::Event) -> Option<Modal> {
+enum Fechado {
+    Aviso(Modal),
+    Escolha(Escolha),
+}
+
+fn tratar_modal(s: &mut Sessao, ev: &sdl2::event::Event) -> Option<Fechado> {
     use sdl2::event::Event;
     use sdl2::mouse::MouseButton;
     let r = s.clique_modal?;
+    if let Some(Modal::SelecaoDeJogo) = s.partida.avisos.modal() {
+        // _DoScenario: clique num objeto, Enter (Full Game) ou Esc (Cancel).
+        let cfg = s.partida.avisos.cfg.selecao_de_jogo.clone();
+        let escolha = match ev {
+            Event::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => {
+                avisos::escolha_em(s.recursos, &s.interface, &cfg, *x, *y).ok().flatten()
+            }
+            Event::KeyDown { keycode: Some(sdl2::keyboard::Keycode::Return), .. } => Some(cfg.tecla_enter),
+            Event::KeyDown { keycode: Some(sdl2::keyboard::Keycode::Escape), .. } => Some(cfg.tecla_esc),
+            _ => None,
+        }?;
+        if escolha != Escolha::Carregar {
+            s.partida.fechar_modal();
+        }
+        return Some(Fechado::Escolha(escolha));
+    }
     let tecla = s.partida.avisos.cfg.quadro.tecla_continuar.clone();
     let quadro = matches!(s.partida.avisos.modal(), Some(Modal::Quadro { .. }));
     let fecha = match ev {
@@ -491,7 +512,7 @@ fn tratar_modal(s: &mut Sessao, ev: &sdl2::event::Event) -> Option<Modal> {
         _ => false,
     };
     if fecha {
-        s.partida.fechar_modal()
+        s.partida.fechar_modal().map(Fechado::Aviso)
     } else {
         None
     }
@@ -526,18 +547,44 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) ->
     loop {
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
-            if s.partida.avisos.tem_modal() && !matches!(ev, Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } | Event::Window { .. }) {
+            let selecao = matches!(s.partida.avisos.modal(), Some(Modal::SelecaoDeJogo));
+            let escape = matches!(ev, Event::KeyDown { keycode: Some(Keycode::Escape), .. });
+            if s.partida.avisos.tem_modal() && !matches!(ev, Event::Quit { .. } | Event::Window { .. }) && (selecao || !escape) {
                 if let Event::MouseMotion { x, y, .. } = ev {
                     cursor = (x, y);
                 }
-                if let Some(Modal::FimDeJogo { .. }) = tratar_modal(&mut s, &ev) {
-                    // _EndGameDialog → _NewGame(0): o original abre o "Select a Game"; o port começa
-                    // um Quick Game novo (divergencias.md).
-                    let n = semente(o);
-                    println!("fim de jogo: novo Quick Game com semente {n}");
-                    let (recursos, cores) = (s.recursos, s.cores.clone());
-                    s = Sessao::abrir(recursos, &o.dados, Origem::Novo(n), cores)?;
-                    audio.musica_jogo_novo();
+                match tratar_modal(&mut s, &ev) {
+                    // _EndGameDialog → _NewGame(0): o "Select a Game".
+                    Some(Fechado::Aviso(Modal::FimDeJogo { .. })) => s.partida.avisos.abrir_selecao_de_jogo(),
+                    Some(Fechado::Escolha(e)) => {
+                        let (recursos, cores) = (s.recursos, s.cores.clone());
+                        let tipo = match e {
+                            // Cancel depois do fim de jogo: _CleanUp e PostQuitMessage.
+                            Escolha::Cancelar => return Ok(()),
+                            Escolha::Carregar => {
+                                // Sem o diálogo de arquivo: recarrega o arquivo da partida, se houver.
+                                match s.arquivo.clone() {
+                                    Some(arq) => {
+                                        s.partida.fechar_modal();
+                                        s = Sessao::abrir(recursos, &o.dados, Origem::Save(&arq), cores)?;
+                                        println!("Load: {}", arq.display());
+                                    }
+                                    None => println!("Load: o port não tem o diálogo de arquivo; use --save"),
+                                }
+                                redesenhar = true;
+                                continue;
+                            }
+                            Escolha::Tutorial => TipoJogo::Tutorial,
+                            Escolha::Rapido => TipoJogo::Rapido,
+                            Escolha::Completo => TipoJogo::Completo,
+                            Escolha::Experimental => TipoJogo::Experimental,
+                        };
+                        let n = semente(o);
+                        println!("novo jogo {tipo:?} com semente {n}");
+                        s = Sessao::abrir(recursos, &o.dados, Origem::Novo(n, tipo), cores)?;
+                        audio.musica_jogo_novo();
+                    }
+                    _ => {}
                 }
                 redesenhar = true;
                 continue;
@@ -670,14 +717,14 @@ fn principal() -> Result<(), String> {
         (None, true) => {
             let n = semente(&o);
             println!("Quick Game com semente {n}");
-            Some(Origem::Novo(n))
+            Some(Origem::Novo(n, TipoJogo::Rapido))
         }
         _ => None,
     };
     if let Some(origem) = origem {
         let nome = match &origem {
             Origem::Save(save) => save.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
-            Origem::Novo(_) => "Quick Game".to_string(),
+            Origem::Novo(..) => "Quick Game".to_string(),
         };
         let mut s = Sessao::abrir(&recursos, &o.dados, origem, cores)?;
         for &a in &o.acoes {
@@ -695,7 +742,9 @@ fn principal() -> Result<(), String> {
             println!("botão {b}: {:?}", s.partida.botao_usuario(b));
         }
         for _ in 0..o.fechar_avisos {
-            s.partida.fechar_modal();
+            if let Some(Modal::FimDeJogo { .. }) = s.partida.fechar_modal() {
+                s.partida.avisos.abrir_selecao_de_jogo();
+            }
         }
         if let Some(Modal::FimDeJogo { pontos, .. }) = s.partida.avisos.modal() {
             println!("fim de jogo: {pontos} pontos");

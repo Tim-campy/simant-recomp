@@ -139,3 +139,21 @@ fn botoes_da_faixa_e_outros_planos_do_quick2() {
 }
 
 const HASH_TELA_JOGO: &str = "2bdd46f9280642b70c36b1fd5f74aa78efad63dc208760e5b87a3cd19312c1c8";
+
+/// "Select a Game" na tela de jogo (tabela 9/0): os objetos levam às escolhas de `_NewGame`; a
+/// posição bate com a captura m10 da bancada (mensagens.md §4).
+#[test]
+fn selecao_de_jogo_na_tela_de_jogo() {
+    use engine::core::avisos::{escolha_em, ConfigAvisos, Escolha};
+    let Some(r) = recursos() else { return };
+    let cfg: ConfigTelaJogo = r.dados("tela_jogo.json").unwrap();
+    let interface = Interface::carregar(&r, cfg.tabela_posicoes).unwrap();
+    let av: ConfigAvisos = r.dados("mensagens.json").unwrap();
+    let s = &av.selecao_de_jogo;
+    // Na captura (tela 640×480, área cliente a partir da linha 38): Quick Game em (345, 228),
+    // Load em (345, 380), Cancel em (412, 175).
+    assert_eq!(escolha_em(&r, &interface, s, 345, 228 - 38).unwrap(), Some(Escolha::Rapido));
+    assert_eq!(escolha_em(&r, &interface, s, 345, 380 - 38).unwrap(), Some(Escolha::Carregar));
+    assert_eq!(escolha_em(&r, &interface, s, 412, 175 - 38).unwrap(), Some(Escolha::Cancelar));
+    assert_eq!(escolha_em(&r, &interface, s, 20, 20).unwrap(), None);
+}

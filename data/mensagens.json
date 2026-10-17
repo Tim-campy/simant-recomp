@@ -76,6 +76,13 @@
     "_ajuste": "Medido na bancada QEMU (640×480, captura m8 de tests/referencias/roteiros/qemu_mensagens.txt): a janela fica 1 pixel à esquerda da posição calculada pela tabela 9/0 + faixa [causa em aberto].",
     "ajuste": [-1, 0]
   },
+  "selecao_de_jogo": {
+    "_comentario": "_DoScenario (1000:5998) abre a janela 2 (scenarioWin) e devolve o id do objeto clicado; _NewGame (1000:d6dc): 0x202 Quick (tipo 1), 0x203 Full (2), 0x204 Experimental (3), 0x206 Tutorial (0), 0x207 Load (_LoadGame), 0x205 Cancel (devolve −1; depois do fim de jogo, _CleanUp e PostQuitMessage: o jogo fecha). Enter (VK_RETURN) devolve 0x203 e Esc (_DialogAbort) 0x205.",
+    "janela": 2,
+    "opcoes": {"scenQuickGame": "rapido", "scenFullGame": "completo", "scenExperimental": "experimental", "scenTutorial": "tutorial", "scenLoad": "carregar", "scenCancel": "cancelar"},
+    "tecla_enter": "completo",
+    "tecla_esc": "cancelar"
+  },
   "pontuacao": {
     "_comentario": "_CalcScore (1000:5530). Oito parciais p[0..7] em porcentagem, somadas com os pesos do DGROUP 1048:0948 (bytes 13, 17, 19, 23, 29, 31, 37, 41) vezes 51, mais _MeHealth; depois a escala por tipo de jogo e o _GameTime. Ver docs/spec/telas/mensagens.md, 'Pontuação'.",
     "pesos": [13, 17, 19, 23, 29, 31, 37, 41],
