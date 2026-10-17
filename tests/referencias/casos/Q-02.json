@@ -1,0 +1,48 @@
+{
+ "id": "Q-02",
+ "spec": "docs/spec/regras/quintal.md#10-colônias-do-quintal-_simcolonies-103035f8",
+ "descricao": "Uma passada de _SimColonies (tick 97, _YardCycle = 96) sobre colônias postas à mão no mapa 12 × 16 do QUICK2.ANT. Confere o crescimento sem sorteio (população < 250), o placar de vizinhos com a tabela de deslocamentos lida sem sinal (os vizinhos de cima e da esquerda não contam; o próprio patch conta duas vezes) e o decaimento do enxame. Um _BirdDelay enorme impede o pássaro de comer o enxame.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "Q02.ANT",
+ "operacoes": [
+  {"op": "escrever", "nome": "BirdDelay", "valor": 2147418112},
+  {"op": "escrever", "nome": "SwarmCntB", "valor": 40},
+  {"op": "escrever", "nome": "SwarmCntR", "valor": 3},
+  {"op": "escrever", "nome": "YMapPopB", "indice": 34, "valor": 10},
+  {"op": "escrever", "nome": "YMapPopB", "indice": 85, "valor": 10},
+  {"op": "escrever", "nome": "YMapPopB", "indice": 101, "valor": 20},
+  {"op": "escrever", "nome": "YMapPopR", "indice": 138, "valor": 10},
+  {"op": "escrever", "nome": "YMapPopB", "indice": 156, "valor": 5},
+  {"op": "escrever", "nome": "YMapPopR", "indice": 156, "valor": 5},
+  {"op": "escrever", "nome": "YMapPopB", "indice": 29, "valor": 3},
+  {"op": "escrever", "nome": "YMapPopR", "indice": 30, "valor": 10}
+ ],
+ "rodar": {"ate_gametime": 100, "timeout": 120},
+ "esperado": [
+  "(2,2) preta 10 sozinha: placar +6 (o próprio patch duas vezes) → 16",
+  "(5,5) preta 10 com (6,5) preta logo depois em x: +6 +3 → 19; (6,5) preta 20: o vizinho (5,5) não conta → 26 (com deslocamentos com sinal seria 29)",
+  "(8,10) vermelha 10 sozinha: placar −6, a vermelha soma −placar → 16",
+  "(9,12) preta 5 e vermelha 5 no mesmo patch: placar 0 → as duas +1 → 6 e 6",
+  "(1,13) preta 3 com vermelha em (1,14): 6 − 3 = 3 → 6; (1,14) vermelha 10: o vizinho (1,13) não conta → 16",
+  "_ColonyTotalBlack = 1 (patch atual) + 5 = 6; _ColonyTotalRed = 1 + 3 = 4",
+  "_SwarmCntB 40 → 40 − (40 >> 2) = 30; _SwarmCntR 3 → 2; _SwarmDelayB/R 3 → 4"
+ ],
+ "conferir": [
+  {"nome": "GameTime", "op": ">=", "valor": 97},
+  {"nome": "GameTime", "op": "<", "valor": 129},
+  {"nome": "YMapPopB", "indice": 34, "op": "==", "valor": 16},
+  {"nome": "YMapPopB", "indice": 85, "op": "==", "valor": 19},
+  {"nome": "YMapPopB", "indice": 101, "op": "==", "valor": 26},
+  {"nome": "YMapPopR", "indice": 138, "op": "==", "valor": 16},
+  {"nome": "YMapPopB", "indice": 156, "op": "==", "valor": 6},
+  {"nome": "YMapPopR", "indice": 156, "op": "==", "valor": 6},
+  {"nome": "YMapPopB", "indice": 29, "op": "==", "valor": 6},
+  {"nome": "YMapPopR", "indice": 30, "op": "==", "valor": 16},
+  {"nome": "ColonyTotalBlack", "op": "==", "valor": 6},
+  {"nome": "ColonyTotalRed", "op": "==", "valor": 4},
+  {"nome": "SwarmCntB", "op": "==", "valor": 30},
+  {"nome": "SwarmCntR", "op": "==", "valor": 2},
+  {"nome": "SwarmDelayB", "op": "==", "valor": 4},
+  {"nome": "SwarmDelayR", "op": "==", "valor": 4}
+ ]
+}

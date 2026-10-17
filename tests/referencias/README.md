@@ -39,6 +39,8 @@ Cada caso é um JSON em `casos/` (save de partida, patch de `tools/ant_editar.py
 | SUP-04 (`casos/SUP-04.json`) | etapas de feromônio do tick ([feromonios.md](../../docs/spec/regras/feromonios.md) §3) e P7 | trilha vermelha 210 em (40, 5), preta 210 em (45, 5), alarme 200 em (50, 25); formiga M 17 em (20, 10) | RT 105 (tick 96); BT 210; alarme 100/25 (tick 128); RN do buraco 254; formiga parada | 2026-10-17, tick 130: 11 de 11 conferências; igual ao port. `saves/SUP04_*.ANT` | confirmado (`sup04_...`) |
 
 Vetores de tick do original (`ticks/`, [testes-tick.md](../../docs/spec/regras/testes-tick.md)): a superfície do port (lista A, vida e mapas de cheiro) é conferida contra os ticks 79–83 em `engine/tests/regras_superficie.rs` (`vetores_de_tick_do_original`).
+| Q-01 (`casos/Q-01.json`) | chuva e água ([quintal.md](../../docs/spec/regras/quintal.md) §9) | `QUICK2.ANT` com `_RainOn` = 1, `_RainCnt` = 600, `_ClearRainFlag` = 0 | `_RainCnt` cai 1 por tick; `_ClearRainFlag` = 1; `_WaterTable` < 64 | 2026-10-17, parado no tick 140: `_RainCnt` = 538, `_RainOn` = 1, `_ClearRainFlag` = 1, `_WaterTable` = 61. 8 de 8 conferências. Estado: `saves/Q01_T140.ANT` (as linhas 61–63 dos ninhos batem com o port em `engine/tests/regras_quintal.rs`) | confirmado |
+| Q-02 (`casos/Q-02.json`) | uma passada de `_SimColonies` (quintal.md §10) | `QUICK2.ANT` com 7 colônias postas à mão, `_SwarmCntB/R` = 40/3 e `_BirdDelay` enorme | crescimento sem sorteio, vizinhos lidos sem sinal, decaimento do enxame | 2026-10-17, parado no tick 100: os dois mapas e os contadores como esperado, inclusive (6,5) = 26 (com sinal seria 29). 16 de 16 conferências. Estado: `saves/Q02_T100.ANT` | confirmado |
 
 ## Como capturar e comparar
 
