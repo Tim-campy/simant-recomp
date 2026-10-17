@@ -191,19 +191,21 @@ fn contagem_completa(e: &mut Estado, regras: &mut dyn Regras) {
 }
 
 /// Fase 1 (tick ≡ 32 mod 128): `_FillHolesBN`, `_ColonySmellBN`, `_ColonySmellBT`.
-fn feromonios_fase_preta(_e: &mut Estado) {
-    // TODO(feromonios.md §2–3): chamar as funções de rules/feromonios.rs (agente paralelo):
-    // preencher buracos pretos, decair cheiro de ninho preto e trilha preta, nessa ordem.
+fn feromonios_fase_preta(e: &mut Estado) {
+    // Buracos pretos, decaimento do ninho preto e da trilha preta, nessa ordem (feromonios.md §2–3).
+    super::superficie::rodar_fase_de_cheiro(e, super::feromonios::FaseCheiro::Pretos);
 }
 
 /// Fase 3 (tick ≡ 96 mod 128): `_FillHolesRN`, `_ColonySmellRN`, `_ColonySmellRT`.
-fn feromonios_fase_vermelha(_e: &mut Estado) {
-    // TODO(feromonios.md §2–3): idem, para a cor vermelha.
+fn feromonios_fase_vermelha(e: &mut Estado) {
+    // Idem, para a cor vermelha.
+    super::superficie::rodar_fase_de_cheiro(e, super::feromonios::FaseCheiro::Vermelhos);
 }
 
 /// `_SmoothAlarm` (`1028:9380`), ticks ≡ 0 e 64 (mod 128), depois de `_HistUpdate`.
-fn suavizar_alarme(_e: &mut Estado) {
-    // TODO(feromonios.md §3, "Suavização do alarme"): chamar rules/feromonios.rs.
+fn suavizar_alarme(e: &mut Estado) {
+    // feromonios.md §3, "Suavização do alarme".
+    super::superficie::rodar_fase_de_cheiro(e, super::feromonios::FaseCheiro::Alarme);
 }
 
 // ---------------------------------------------------------------------------------------------

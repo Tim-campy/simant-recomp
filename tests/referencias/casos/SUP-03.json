@@ -1,0 +1,353 @@
+{
+ "id": "SUP-03",
+ "spec": "docs/spec/regras/superficie.md#92-formiga-vermelha-líder-avenger-modo-19",
+ "descricao": "30 operárias pretas paradas (M = 17) no canto de baixo, para que o load reconte _BpopT ≥ 30, e uma vermelha parada (M = 17) em (100, 30) no fim da lista A. No fim do tick 79, _MakeRedInitiator a transforma em líder (T = 0xB0, M = 19); a partir do tick 80, _DoRedInitiator põe o destino em _LastFoodDrop − (5, 0) = (59, 38) e _GetRedBestDirs a leva para lá sem sorteio. Aranha desligada.",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "arquivo_dos": "SUP03.ANT",
+ "operacoes": [
+  {
+   "op": "escrever",
+   "nome": "SpidOn",
+   "valor": 0
+  },
+  {
+   "op": "retangulo",
+   "mapa": "MapA",
+   "x0": 60,
+   "y0": 60,
+   "x1": 69,
+   "y1": 62,
+   "valor": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 60,
+   "Y": 60,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 61,
+   "Y": 60,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 62,
+   "Y": 60,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 63,
+   "Y": 60,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 64,
+   "Y": 60,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 65,
+   "Y": 60,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 66,
+   "Y": 60,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 67,
+   "Y": 60,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 68,
+   "Y": 60,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 69,
+   "Y": 60,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 60,
+   "Y": 61,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 61,
+   "Y": 61,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 62,
+   "Y": 61,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 63,
+   "Y": 61,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 64,
+   "Y": 61,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 65,
+   "Y": 61,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 66,
+   "Y": 61,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 67,
+   "Y": 61,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 68,
+   "Y": 61,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 69,
+   "Y": 61,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 60,
+   "Y": 62,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 61,
+   "Y": 62,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 62,
+   "Y": 62,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 63,
+   "Y": 62,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 64,
+   "Y": 62,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 65,
+   "Y": 62,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 66,
+   "Y": 62,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 67,
+   "Y": 62,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 68,
+   "Y": 62,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 69,
+   "Y": 62,
+   "M": 17,
+   "T": 18,
+   "S": 0
+  },
+  {
+   "op": "formiga_adicionar",
+   "lista": "A",
+   "X": 100,
+   "Y": 30,
+   "M": 17,
+   "T": 146,
+   "S": 0
+  }
+ ],
+ "rodar": {
+  "ate_gametime": 90,
+  "timeout": 120
+ },
+ "esperado": [
+  "A[32]: M = 19, T & 0xF8 = 0xB0",
+  "_RedInitOn = 1, _RedTask = 1, _RedDestX/Y = (59, 38)",
+  "posição da líder igual à do port no mesmo GameTime"
+ ],
+ "conferir": [
+  {
+   "nome": "GameTime",
+   "op": ">=",
+   "valor": 90
+  },
+  {
+   "formiga": "A",
+   "indice": 32,
+   "campo": "M",
+   "op": "==",
+   "valor": 19
+  },
+  {
+   "formiga": "A",
+   "indice": 32,
+   "campo": "T",
+   "mascara": 248,
+   "op": "==",
+   "valor": 176
+  },
+  {
+   "nome": "RedInitOn",
+   "op": "==",
+   "valor": 1
+  },
+  {
+   "nome": "RedTask",
+   "op": "==",
+   "valor": 1
+  },
+  {
+   "nome": "RedDestX",
+   "op": "==",
+   "valor": 59
+  },
+  {
+   "nome": "RedDestY",
+   "op": "==",
+   "valor": 38
+  }
+ ]
+}

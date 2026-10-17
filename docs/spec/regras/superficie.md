@@ -631,4 +631,42 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md). Ferramenta de leitura do
 - Queda de comida na casa (`_DropFoodA`, tabela `10:22be/22c2` indexada por `9:9c66`).
 - Significado prático dos modos 17/18 na superfície (se alguma formiga sai do ninho com eles).
 - `_ForceModeA/B`, `_StartAttack`, `_GetNewRedTask` e demais funções sem chamador: confirmar se há chamadas indiretas (tabela de ponteiros) com o Ghidra.
-- Nenhuma regra deste documento foi ainda conferida no original rodando; os testes T1–T12 estão por executar.
+- Ainda não conferidos no original: morte natural (T1), luta e proporção de vitórias (T5, T6), revoada (T8), estratégia vermelha (T9), recrutamento pelo jogador (T11). As regras foram conferidas só pelos casos da seção "Observado no original".
+- `_YellowFight` e `_DoTroph` estão no port só na parte que toca a superfície; `_YellowDeath(0)`, `_ResetYellowVars`, mensagens e balões (`_RestBalloons`, `_FightBalloons`) faltam (formiga amarela e interface).
+
+## Observado no original
+
+**Vetores de tick** ([testes-tick.md](testes-tick.md), `tests/referencias/ticks/`, ticks 79–83 do Quick Game): para cada tick, o port parte do `estado_antes`, procura quantos passos de S as sub-rotinas anteriores (quintal, água, formiga-leão, aranha, estratégia) gastaram e roda só `_DoAntSimA`. Nos 5 ticks existe um ponto de partida (1, 4, 2, 15 e 2 passos depois da semente de entrada) com o qual a lista A, a vida da superfície nas células das formigas e os 5 mapas de cheiro ficam **iguais** aos do `estado_depois`, e a semente de saída do original é alcançável de onde a superfície parou. As formigas da superfície nesses ticks são um macho preto em Pre-Flight (modo 14) e uma operária vermelha em Foraging (modo 2). `_GetStrategy` (modos estratégicos, `_MakeMe`, `_ModeMe`) também bate. Teste: `vetores_de_tick_do_original` em `engine/tests/regras_superficie.rs`. Fato verificado (2026-10-17).
+
+**Casos da bancada** (2026-10-17, `tools/caso_ant.py`; todas as conferências passaram, e o port, partindo do `carregado.ANT` e rodando até o mesmo `GameTime`, dá o mesmo resultado; ver `tests/referencias/README.md`):
+
+| Caso | Regra | Observado no original |
+|---|---|---|
+| SUP-01 | 3.5 (carregadora, trilha, P2) e `_GetNestDir` com a maior vizinha na própria direção | parado no tick 94: a formiga em (24, 40), T 0x1E, M 3, S 184 (16 passos para oeste, S − 1 por passo); `_PherMapBT` igual ao port célula a célula |
+| SUP-02 | 7 (`_GoInNest`) | vaga da lista A com T = 0; a formiga é a vaga 5 da lista B, grupo 2, S 55 preservado; `_MapB(32, 1)` escavado |
+| SUP-03 | 9.2 (`_MakeRedInitiator`, `_DoRedInitiator`, `_GetRedBestDirs`) | com `_BpopT` ≥ 30, a vermelha do fim da lista virou líder (M 19); destino (59, 38) = `_LastFoodDrop` − (5, 0); no tick 90 a líder está em (89, 38), T 0xB6, igual ao port |
+| SUP-04 | feromônios no tick e P7 | trilha vermelha 210 → 105 no tick 96; trilha preta 210 intacta até o tick 130; alarme 200 → 100 no centro e 25 nas vizinhas no tick 128; buraco vermelho (59, 16) = 254; formiga com M = 17 parada |
+
+Nenhuma divergência entre esta especificação e o original apareceu nesses casos.
+
+## Implementação no port
+
+Código: `engine/src/rules/superficie.rs`. Dados: `data/superficie.json`, gerado por `tools/extrair_superficie.py SIMANTW.EXE --json data/superficie.json` (endereços no topo do script: `_IsCarryCaste`, `_UnCarryCaste`, `_CasteTabB`, `_ModeTabB`, `_ModeTabWB`, `_ModeTabSB`, `_CasteModeTabB`, classe e matriz de luta; e as constantes do bloco `regras`, com a origem de cada uma em `_origem`). Direções e `_TurnTab` vêm de `data/feromonios.json`.
+
+| Original | Port |
+|---|---|
+| `_DoAntSimA` e os modos | `simular_superficie` (trait: `RegrasSuperficie::simular_superficie`) |
+| `_AddFood` | `adicionar_comida` (precisa das `TabelasGeracao`, por causa do seno) |
+| `_GetStrategy`, `_GstrR`, `_SetCasteProd`, `_SetModeProd` | `escolher_estrategia` |
+| `_MakeRedInitiator` | `criar_lider_vermelha` |
+| `_GetNewMode`, `_GetWinner`, `_DeadAntHere` | `modo_novo`, `vencedor_da_luta`, `cadaver_aqui` (públicas: o ninho usa as mesmas regras) |
+| `_Recruit`, `_UnRecruit`, `_RecruitRed`, `_UnRecruitRed` | `recrutar`, `desrecrutar`, `recrutar_vermelhas`, `desrecrutar_vermelhas` |
+| `_GetForageDir`, `_GetNestDir`, `_GetAlarmDir` | as de `feromonios.rs`, sobre uma cópia dos mapas feita no começo do laço e devolvida no fim |
+| `_Bounce`, `_GetRandDir`, `_GetDefendDir`, `_GetRedDefendDir`, `_GetDir`, `_GetDis`, `_GetRedBestDirs`, `_TileCanBeMovedOn`/`_IsClearTile` (superfície), `_DigTileB/R`, `_SmoothEdges`, `_FixExitMap`, `_GoInNest`, `_PickupFoodA` | funções privadas de `superficie.rs` |
+
+Decisões do port:
+
+- Enquanto `RegrasOriginais` não guarda as tabelas desta parte, a implementação da trait usa as cópias embutidas de `superficie.json` e `feromonios.json` (`tabelas_padrao`): um mod que sobrescreva esses arquivos ainda não tem efeito no tick. As funções públicas recebem as tabelas explícitas.
+- Sem `TabelasGeracao` (sem os arquivos do jogo), `adicionar_comida` da trait não faz nada.
+- Leituras fora do mapa (que o original faria em memória vizinha) contam como obstáculo; índices de tabela fora da faixa (modo estratégico > 5, modo ≥ 20 na contagem) usam 0 ou são ignorados.
+- O som de `_AddFood` e o `_EditMessage` do ataque vermelho não geram evento (falta variante em `Evento`); a música 0x2B0A gera `Evento::Musica`.
