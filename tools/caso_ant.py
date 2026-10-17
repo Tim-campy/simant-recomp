@@ -23,6 +23,7 @@ Conferências ("conferir" no caso), avaliadas sobre o estado final:
     {"formiga": "B", "indice": 2, "campo": "T", "op": "==", "valor": 50}
     {"formigas": "B", "onde": {"X": 34, "Y": 9, "M": 8}, "campo": "T", "op": "todos==", "valor": 2}
     {"contar": "B", "onde": {"T": 2}, "op": ">=", "valor": 3}
+    {"celula": "MapA", "x": 14, "y": 58, "op": "==", "valor": 107}   célula (x, y) de um mapa
 op: ==, !=, >=, <=, >, <, "em" (valor = lista), e para "formigas": "todos==" / "todos_em".
 "mascara": N aplica valor & N antes de comparar (ex.: 248 = classe de T, sem os bits de direção).
 """
@@ -101,6 +102,8 @@ def _valor_conf(s: Save, c):
         return [s.formiga(c["formigas"], i)[c["campo"]] for i in s.procurar(c["formigas"], c.get("onde", {}))]
     if "contar" in c:
         return len(s.procurar(c["contar"], c.get("onde", {})))
+    if "celula" in c:
+        return s.celula(c["celula"], c["x"], c["y"])
     raise ValueError(f"conferência sem alvo: {c}")
 
 

@@ -17,7 +17,7 @@ O menino, o cachorro, o gato, o pássaro, o cortador de grama e o inseticida tam
 | `_LionListX/Y` | `9:809c` / `9:80bc` | centro da armadilha |
 | `_LionListM` | `9:7a68` | estado: 0 esperando, 1 comendo, 2 voltando a esperar |
 | `_LionListS` | `9:7d34` | contador de tempo do estado 1 |
-| `_LionListT` | `9:7d4e` | quadro da animação (0–4); o tile do centro é `0x38 + T` |
+| `_LionListT` | `9:7d4e` | quadro da animação (0–6: 0–4 ao entrar e sair do estado 1, 3–6 sorteado durante a refeição); o tile do centro é `0x38 + T` (0x38–0x3E) |
 | `_LionIndex` | `8:8a88` | quantas existem (0–9; o incremento para em 9) |
 | `_InitialLions` | `9:9e8c` | quantas o patch tinha ao ser criado (0 na casa) |
 
@@ -58,7 +58,8 @@ senão, para k = 0 .. _LionIndex − 1:
         n = número de vizinhas (8 direções) com Vida ≠ 0
         se n ≥ 7:                                         ← as formigas cercaram e mataram a formiga-leão
             mensagem 10050 ; Mapa(x, y) = 0x3F ; remove a k da lista (desloca as seguintes) ; _LionIndex −= 1
-            (o laço continua no mesmo k, que agora é a próxima)
+            (o laço segue para k + 1: a formiga-leão deslocada para a vaga k NÃO roda neste tick;
+             fato visto na desmontagem, 1030:48ce → 4ac8 `inc di`)
         senão:
             se T[k] < 4: T[k] += 1
             senão se S[k] == 0: M[k] = 2 ; T[k] = 4
@@ -373,10 +374,37 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md). Leitura do save pelos of
 | I11 | Vingança (2.4) | repetir I10 três e cinco vezes | `_MeSMode = 7` e depois 8 (laser visível na tela) | campo 48194 + captura |
 | I12 | Port × original | `.ANT` com bichos em vários estados, N ticks | posições, estados e tiles idênticos | comparação dos blocos citados |
 
+## Implementação no port
+
+Código: `engine/src/rules/inimigos.rs`. Funções públicas: `formigas_leao` (`_DoAntLions`), `aranha` (`_MoveSpider`, com `_SFoundAnt`, `_SpiderScan`, cerco e aranha do jogador), `lagarta` (`_DoPillar`, que chama `bichos_de_conta` = `_DoSow`), `matar_aranha` (`_KillSpider`), `matar_formiga_leao` (`_KillAntLion`) e `achar_formiga_leao` (`_FindInLionList`). `impl RegrasInimigos for RegrasOriginais` liga as três primeiras ao tick.
+
+Dados: `data/inimigos.json` (`TabelasInimigos`), gerado por `python tools/extrair_inimigos.py SIMANTW.EXE --json data/inimigos.json` (endereços no topo do script): `_Dx8/_Dy8`, `_Dx9/_Dy9`, `_TurnTab`, `_SpX/_SpY`, `_SeatX/_SeatY`, `_SowTab`, a borda da armadilha (`DGROUP:25e8`) e, no bloco `regras`, as constantes (chances, tempos, tiles, limites), com a função de origem em `_origem`. Como `RegrasOriginais` (em `tick.rs`) ainda não tem campo para estas tabelas, o tick usa a cópia embutida na compilação (`TabelasInimigos::padrao()`); `TabelasInimigos::carregar(&Recursos)` já lê com mods, falta só guardar o resultado em `RegrasOriginais`. O seno do laser vem de `RegrasOriginais::geracao` (objeto 9/1000); sem ele, usa `trunc(sin(i·π/128)·32767)`, que coincide com os 64 valores do banco (verificado: teste `seno_calculado_igual_ao_do_banco`).
+
+Decisões e detalhes reproduzidos (fato visto no código, salvo indicação):
+
+- `_DoAntLions` lê o `_LifeA` das vizinhas pelo índice linear `x·64 + y` sem testar a validade (na borda de cima/baixo cai na coluna vizinha). O port faz o mesmo; fora do bloco de 8 KB devolve 0 [hipótese: no original seria memória de outra variável].
+- Morte da formiga-leão por cerco: a seguinte (deslocada para a vaga k) não roda no mesmo tick (correção desta spec, ver 1.3).
+- Uma formiga-leão criada no estado 2 (a cada 16 refeições) roda no mesmo tick, porque o laço relê `_LionIndex`.
+- `_RemoveFromAList` deixa a última vaga usada repetida (como o `_BlockMove` do original).
+- Sons, o desenho do laser e o centralizar da vista (AutoTrack) não são reproduzidos; os sorteios ligados a sons (`S8()` da formiga-leão, `S2()`/`S256()` da mastigação, `S2()` do arroto) são feitos e descartados.
+- Mensagens 10050 e 10046 vão para `Estado::eventos` (`Evento::Mensagem`).
+- `_DropFoodA` na casa, no caso "a comida cai" (tabela `10:22be/22c2` por `_DROPdir` `9:9c66`, que não está no save), devolve falha [em aberto].
+- **Provisório:** `_MoveMyLife` (sem a escavação de `_SetLife` nos ninhos) e `_YellowDeath` (só o contador da causa, o sorteio `S1(5)` da música nas causas 1 e 2 e apagar a marca da amarela; sem animações, diálogos nem reencarnação) são versões locais, a trocar pelas de `rules/amarela.rs`.
+- Também locais e privados, candidatos a um módulo comum: `_IsClearTile`/`_IsClear3x3`, `_IsNotObstacle`, `_IsThisPebble`, `_IsItFood`, `_GetDis`, `_GetDir`, `_GetBestDir`, `_FindInAList`, `_FindAntIndex`, `_RemoveFromAList`, `_DeadAntHere`, `_DropFoodA`.
+
+Verificado:
+
+- Testes de unidade em `engine/tests/regras_inimigos.rs` para I1–I11 (bicho fantasma e andar do bicho-de-conta; lagarta avançando, saindo e nascendo, cercada e virando comida; formiga-leão comendo, olhando a vizinha sorteada, pegando a amarela, cercada, cuspindo a pedrinha, nascendo; aranha aparecendo, saindo pela borda, vendo e por faro, perseguindo e comendo, desistindo, cerco e vingança, fuga, agonia e comida, laser, aranha do jogador), incluindo a ordem e o número de sorteios onde ela é determinada pela spec.
+- **Contra o original** (bancada QEMU, casos em `tests/referencias/casos/`, saves em `tests/referencias/saves/I0n_INICIO.ANT` = estado logo depois do load e `I0n_FIM.ANT` = estado final): I-01 (lagarta: cabeça de (7, 58) a (14, 58) no tick 140), I-02 (formiga-leão come a operária posta no centro; no tick 200 voltou a esperar, `_AntsEatenByLions = 1`), I-03 (aranha com `_DeathCnt = 40` em (100, 10): no tick 130, `_DeathCnt = 0` e 0x4A na célula). Todas as conferências passaram (2026-10-17). Os testes `caso_i0n_*` rodam o port do estado inicial até o mesmo `_GameTime` e comparam o que não depende do gerador S: lagarta (campos, `_PillarMap` e a linha do mapa), formiga-leão (estado, quadro, `_AntsEatenByLions`, centro) e agonia + célula da aranha. Todos iguais.
+- **Vetores de tick** (`tests/referencias/ticks/`, [testes-tick.md](testes-tick.md)), ticks 79–83: partindo do "estado antes", formigas-leão, aranha (andando, sem virar) e lagarta saem iguais ao "estado depois". Como quintal e água sorteiam antes dos inimigos no tick, a semente S no momento dos inimigos não é conhecida; a comparação de sorteios exige as outras partes do tick.
+
+Não verificado contra o original: a sequência exata de sorteios dos inimigos dentro de um tick completo (depende das outras partes), o cerco (diálogo modal), laser, faro, aranha do jogador, pedrinha cuspida, morte da amarela.
+
 ## Lacunas
 
 - O sentido de andar de ré (`_RevSpider`) não é ligado por nenhuma rotina vista [em aberto].
 - `_DoLaserFire` e a animação das pernas (`_Scycle`) são só desenho; os sorteios dentro de `_DrawSpider` consomem o gerador S ([rng.md](rng.md)) e precisam ser medidos.
 - Menino, cachorro, gato, pássaro, cortador, chuva e inseticida: documento próprio.
 - Queda de comida na casa ao morrer a aranha dentro de casa (`_DropFoodA` com a tabela de queda).
-- Nenhuma regra deste documento foi conferida rodando o original; só o `QUICK2.ANT` (I1 e o desenho da lagarta) foi checado.
+- Conferido rodando o original: a lagarta andando (I-01), a formiga-leão comendo uma formiga (I-02) e a aranha em agonia virando comida (I-03), mais os vetores de tick 79–83 (aranha andando, formigas-leão paradas, lagarta). Falta: cerco da formiga-leão e da aranha (mostram diálogo modal), pedrinha cuspida, laser, faro, aranha do jogador e a morte da amarela pelos inimigos.
+- `_YellowDeath` e `_MoveMyLife` são da amarela ([formiga-amarela.md](formiga-amarela.md)); o port de inimigos usa versões provisórias (ver "Implementação no port").
