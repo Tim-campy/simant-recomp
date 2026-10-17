@@ -112,7 +112,7 @@ FIM:
         casa e superfície e tile sob a amarela = 0x76 ou 0x78: _YellowDeath(10)   ← choque elétrico
 ```
 
-`_ResetYellowVars` (`1000:72ba`): destino = posição atual, `_MeLast` = posição, `_MeCmd = 0`, `_MeMoveMe = 0`, `_MeDis = _MePrevDis = _MeSteps = 0`, `_MeCrazyCnt = −2`.
+`_ResetYellowVars(plano, x, y)` (`1000:72ba`): `_MePlane` e `_MeLoc` = argumentos (correção: a versão anterior desta spec omitia), destino = posição, `_MeLast` = posição, `_MeCmd = 0`, `_MeMoveMe = 0`, `_MeDis = _MePrevDis = _MeSteps = 0`, `_MeCrazyCnt = −2`.
 
 `D9` = `_Dx9/_Dy9` (índice 0 = parado). Sem sorteio em todo este fluxo, exceto o `S8()` de `_ExitNest` (6.2) e os sorteios das ações chamadas.
 
@@ -252,7 +252,7 @@ senão:
 
 | Função | Endereço | Condição | Efeito |
 |---|---|---|---|
-| PEGA_OVO (embutido; igual a `_PickupMyEgg` `1020:8e96`) | — | operária vazia (0x10) ou vida < 10; ovo (T & 0x7F de 1 a 7) na célula | `_MeEggCarried = 0xFD`; remove o ovo da lista; se vida < 10: **come o ovo** (`_MeFoodInType = 3`); senão `_MeEggCarried = T do ovo`, `_MeType = 8`, som |
+| PEGA_OVO (embutido; igual a `_PickupMyEgg` `1020:8e96`) | — | operária vazia (0x10) ou vida < 10; ovo (T & 0x7F de 1 a 7) na célula (`_FindEggAt` `1020:88a2`: pelo mapa de vida, ou, se a célula tem 0xFF/0xFE ou nada, pela lista; devolve o T da vaga, conferido na desmontagem `1020:8a55`–`8a80`) | `_MeEggCarried = 0xFD`; remove o ovo da lista; se vida < 10: **come o ovo** (`_MeFoodInType = 3`); senão `_MeEggCarried = T do ovo`, `_MeType = 8`, som |
 | `_PickupMyRock` | `1020:85ee` | 0x10 ou 0x30 vazia; pedrinha (superfície 0x51–0x53; ninho 0x30–0x31) | superfície: se a pedrinha tampava um buraco (a coluna/linha consta em `_HoleMap`), reabre (`_MapB/R` linha 0 = 0x18; superfície = 0x50 no quintal, `S1(7) + 0x59` na casa); senão o chão vira `S16()` (quintal) ou 0 (casa). Ninho: 0x30 → `S8()` (túnel); 0x31 (tampa) → 0x18 e o buraco da superfície volta a 0x50. `_MeType` → 0x28 (operária) ou 0x48 (soldado) |
 | `_PickupMyFood` | `1020:8f4c` | comida na célula; se sem fome, só 0x10/0x30 vazia | superfície: `_PickupFoodA`; se vai carregar: `_MeScent = 200`, `_MeDis = _GetDis(célula, _LastNewHoleB)`, `_MePrevDis = _MeDis + 1`, deposita 200 na **trilha preta** (sempre `_JamScentBT`). Ninho: 0x10 → `S8()`, senão tile − 1; `_FoodB/R` −1. Com fome: `_MeFoodInType = 0` (come na hora); senão som e `_MeType += 8` |
 | `_DropMyFood` | `1020:7576` | carrega comida | procura onde largar começando na direção do destino (`_GetDir − 1`, ou `_MeDir`) com os desvios `_absSearchDirs`; serve uma célula sem formiga que seja comida com menos de 3 unidades (+1), ou livre (`_IsClearTile`), ou o centro de uma formiga-leão (0x38); se nenhuma vizinha serve, tenta a própria célula. Superfície: `_DropFoodA`; ninho: grava o tile (0x10 numa célula livre) e `_FoodB/R` +1. `_MeType &= ~8`, som |
@@ -344,7 +344,7 @@ Sem corpo: Tutorial e Quick → **derrota** (`_IsGameOver = 1`, `_BlackWon = 0`)
 
 **Fato visto no código.** Para a simulação durante a animação (tempo real, não ticks).
 
-- **Renascer como ovo** (`rainha = 0`, chamado pela reencarnação 9.2.1 com `tipo = _MeType`, e 0x10 se era rainha): a amarela aparece como ovo na célula do ovo (`_MeEgg` 1 → 7, um estágio a cada ~10 ticks do relógio do Mac), depois vira `tipo` virada para 2 (se era rainha) ou 6. Mensagem 24 "You have been reborn!".
+- **Renascer como ovo** (`rainha = 0`, chamado pela reencarnação 9.2.1 com `tipo = _MeType`, e 0x10 se era rainha): a amarela aparece como ovo na célula do ovo (`_MeEgg` 1 → 7, um estágio a cada ~10 ticks do relógio do Mac), depois vira `tipo` virada para 2 (se era rainha) ou 6. Na prática sempre 6: `_YellowDeath` já trocou 0x60 por 0x10 antes de chamar (fato visto no código; ver divergencias.md). Mensagem 24 "You have been reborn!".
 - **Fundar a colônia** (`rainha = 1`, comando 9): a amarela vira rainha (0x60) na própria célula, um ovo aparece em `x, y` (2 células atrás) e passa pelos estágios; no fim, a rainha vira uma rainha comum da simulação (`_MakeBlkQueen`/`_MakeRedQueen`, `_CastePop[5] += 1`) e a amarela renasce como **operária** (0x10) na célula do ovo, virada para trás; `_CastePop[1] += 1`, `_CastePop[4] −= 1`, `_BpopT/_RpopT += 1`. Mensagem 25 "You are now a worker!".
 - Em ambos: destino = posição, ordem zerada, `_MeNestStarted = 1`, vida 100.
 
@@ -563,6 +563,44 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md) (comandos `clicar_em`, `t
 | Y16 | Teclado como mouse (11.1) | posicionar o cursor e apertar Espaço duas vezes rapidamente | mesmo efeito de um duplo clique |
 | Y17 | Aceleradores (11.7) | Shift+3, Ctrl+9, Ctrl+G | velocidade "fast", vista do ninho preto, AutoTrack alternado (`_GameSpeed`, `_MapPlane`, `_OptionStates[0]` no save) |
 
+## 14. Implementação no port
+
+**Onde:** `engine/src/rules/amarela.rs`. Dados: `data/amarela.json`, gerado por `tools/extrair_amarela.py` a partir do `SIMANTW.EXE` (`_Dx8/_Dy8` 8:0000/0008, `_Dx9/_Dy9` 8:0010/001a, `_absSearchDirs` 8:006c, `_UnCarryCaste` 8:0094, classe e matriz de luta 10:22c6/22d6, borda do buraco 10:230c), mais as constantes das regras, os quadros das animações, as músicas e as mensagens (origem de cada valor em `_origem`).
+
+- Tick: `impl RegrasAmarela for RegrasOriginais` chama `simular_amarela` (§3) e `mover_amarela` (§4) com `TabelasAmarela::padrao()` (cópia embutida de `data/amarela.json`). [lacuna] `RegrasOriginais` (em `tick.rs`) não tem campo para as tabelas da amarela: um mod que mude `amarela.json` só vale nas funções públicas que recebem `&TabelasAmarela`.
+- Usadas por outras regras: `lutar_com_amarela(e, t, plano, i)` (`_YellowFight`; plano < 2 = lista A, 2 = B, 3 = R), `trofalaxia(e, t, x, y, d)` (`_DoTroph`) e `matar_amarela(e, t, CausaMorte)` (`_YellowDeath`, códigos 0–10).
+- Comandos do jogador (sem SDL; a interface converte pixel → célula, §11.3, e chama):
+
+| Função | Original | Uso |
+|---|---|---|
+| `clicar_no_mapa(e, t, ctl, plano_vista, x, y, duplo, segurando)` | `_processEdit` | clique completo: Experimental, ferramentas 10/11, clique na amarela (centralizar ou menu), Examine, ordem. Devolve `RespostaClique` |
+| `ordem_ir(e, plano_vista, x, y)` | ORDEM(0) | "ir para (x, y)" (clique simples) |
+| `ordem_agir(e, plano_vista, x, y)` | duplo clique | atacar ou pedir comida a uma formiga (ordens 3/4); senão ir e pegar/largar/cavar (1/2) |
+| `comando(e, t, ctl, c)` | `_YellowCommand` | comandos 0–12 (§10.3), também os itens dos menus da §11.5; `false` = som de erro |
+| `tecla_de_comando(e, t, ctl, vk, Modificadores)` | `_YellowCommandKey` | teclas virtuais do Windows (módulo `vk`): 1–4, 0, X/F9, J/NumPad* com Tab, Backspace, Home; devolve `RespostaTecla` |
+| `trocar_de_corpo(e, t, ctl, plano, x, y)` | `_ExchangeLives` | clique com a ferramenta 10 |
+
+`ControleJogador` guarda o que não vai para o save (`_SaveGamePaused`). Sons de efeito, diálogos, mensagens de vento (4/1010) e o movimento da vista não são simulados: as músicas viram `Evento::Musica`, os quadros da §9.1 viram `Evento::Mensagem`, e "centralizar" só grava `_LessonTemp = 1` (a interface move a vista).
+
+**Sorteios e animações.** Todos os sorteios acontecem na ordem do original, inclusive os das animações: `_AnimYellowFight` (S2 por quadro na luta ou no choque, S8 sempre; na formiga-leão o tile do centro oscila 0x3B–0x3D e fica no último valor) e `_AnimYellowInsane` (gerador R para o alvo, S8 quando trava; a amarela anda de verdade pelo mapa de vida e volta). O número de quadros usa `animacao.janela_edicao_na_frente` (padrão: verdadeiro) e `_OptionStates[1]` (música); o fim antecipado pela música não é reproduzido (divergencias.md). `_YellowBirth` é em tempo real e não sorteia: o port aplica só o estado final.
+
+**Escolhas e lacunas do port:** `_CommandKey` (8:85e2) não está no estado: tratado como 0. A queda da comida na casa (`_DROPdir`, 9:9c66) não está no estado: a comida some. `_SpecialXfer` (escolher outra colônia no Jogo Completo) só emite a mensagem 10058. Ao morrer com a ferramenta 10/11 ligada, a ferramenta é desligada mas a pausa salva não é restaurada (está na interface; pela regra da pausa a amarela não morre pelo tick com essas ferramentas). As peças de terreno comuns com o ninho e a superfície (`_DigTileB/R`, `_SmoothEdges*`, `_FixExitMap*`, `_MakeNewHole*`, `_CreateNewHole`, `_PlaceEgg*`, `_DecEat*`, `_PickupFoodA`, `_DropFoodA`, `_DeadAntHere`, `_GetWinner`, `_Recruit`, `_UnRecruit`) estão como funções privadas em `amarela.rs`, a unificar com `ninho.rs`/`superficie.rs`.
+
+**Verificado:**
+
+- `engine/tests/regras_amarela.rs`: casos Y1–Y15 da §13 que não precisam de interface (Y16/Y17 são da interface), postura da rainha, Backspace e clique na própria amarela; testes de unidade em `amarela.rs` (`_TileCanBeMovedOn`, `_GetDir`).
+- Vetores de tick do original (`tests/referencias/ticks`, ticks 79–83, amarela parada no ninho; [testes-tick.md](testes-tick.md)): campos `_Me*` e a marca 0xFF iguais.
+- Casos na bancada QEMU (2026-10-17), `tests/referencias/casos/Y-01..Y-04.json`, saves `tests/referencias/saves/Ynn_{ENTRADA,CARREGADO,FIM}.ANT`. No original a amarela com ordem anda durante a pausa do load, então o port parte do arquivo injetado (tick 78) e roda ticks completos; os campos `_Me*` (posição, tipo, direção, vida, ordem, último passo, passos, contorno, rastro) batem com o original no `GameTime` do estado lido logo após o load e no final:
+
+| Caso | Entrada | Original | Port |
+|---|---|---|---|
+| Y-01 andar em linha reta | (10, 20) → (50, 20) | tick 100: x = 32, vida 88, 22 passos; tick 108: x = 40, vida 84, 30 passos | igual |
+| Y-02 contorno | parede 0x5C em x = 30, y 15–25; (25, 20) → (35, 20) | chegou a (35, 20) antes do tick 94, vida 91 | igual |
+| Y-03 comer com fome | (59, 36), ordem 1 na comida (62, 36) = 0x49; vida 50, aviso 60, `_HealthB` 40 | tick 81: (61, 36), vida 100, `_HealthB` 88 (40 + 49, −1 do ovo da rainha), tile 0x48 | igual (o −1 do ovo vem das regras do ninho, ainda vazias neste ramo) |
+| Y-04 entrar no ninho | (8, 32) → ninho preto (31, 4) | tick 86: plano 2, (31, 4), vida 95, ordem encerrada | igual |
+
+Não verificado no original: luta, troca de corpo, morte e reencarnação, recrutamento, alarme, fundação da colônia e os comandos por tecla (só testes a partir da spec).
+
 ## Lacunas
 
 - Efeitos dos códigos de trapaça (`_CheatKeys` `1018:67de`) e de `_CommandKey`.
@@ -570,4 +608,5 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md) (comandos `clicar_em`, `t
 - `_SpecialXfer`/`_XferPatch` (mudar de colônia no Jogo Completo) e a revoada controlada pelo jogador (rainha alada voando, `_FlyAwayB`): documento de ciclo de vida.
 - Uso de `_MeDis`, `_MePrevDis` e `_MeBase`.
 - Detalhes de desenho das janelas Examine (`_MagnifyMenu`), de recrutamento e dos diálogos de morte (posições, bitmaps).
-- Nenhuma regra foi conferida rodando o original; só os valores iniciais do `QUICK2.ANT` (tabela da seção 1), os textos do banco e as tabelas do executável foram verificados.
+- Conferidos no original só os casos Y-01..Y-04 (andar, contorno, comer, entrar no ninho; seção 14) e os vetores de tick 79–83; o resto da seção 13 continua por rodar.
+- `RegrasOriginais` sem campo para `TabelasAmarela` (mods de `amarela.json` não chegam ao tick).
