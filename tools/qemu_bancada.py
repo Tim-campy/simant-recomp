@@ -405,7 +405,7 @@ class Memoria:
         for nome in ("CS", "SS", "DS", "ES"):
             m = re.search(nome + r" =([0-9a-f]{4}) ([0-9a-f]{8})", regs)
             out[nome] = (int(m.group(1), 16), int(m.group(2), 16))
-        for nome in ("EIP", "ESP", "EAX"):
+        for nome in ("EIP", "ESP", "EAX", "EDX"):
             out[nome] = int(re.search(nome + r"=([0-9a-f]{8})", regs).group(1), 16)
         return out
 
@@ -672,6 +672,10 @@ def valor_para_bytes(valor: str, n):
 
 # _DoAntSim @ 1028:0000 = segmento de código 6 do NE, offset 0 (SIMANTW.SYM; docs/spec/regras/simulacao-visao-geral.md)
 DOANTSIM = (6, 0x0000)
+# _MacTickCount @ 1000:9694 = segmento de código 1: CALL _TickCount (GetTickCount() / 55); DX:AX × 3; RETF em
+# 1000:96a5. É o relógio do gato, do latido e do balão do menino (docs/spec/regras/quintal.md, "Relógios").
+MACTICKCOUNT = (1, 0x9694)
+MACTICKCOUNT_RETF = (1, 0x96A5)
 # Variáveis fora do save capturadas junto com cada estado (docs/spec/regras/testes-tick.md, pergunta 3):
 # nome -> (endereço ou símbolo, bytes)
 EXTRAS = {
@@ -738,10 +742,37 @@ class Depurador:
         base, _, _ = self.mj.descritor(cs)
         self.retorno, self.retorno_far = base + ip, (cs, ip)
 
-    def ir_saida(self, timeout=60):
-        """Da entrada de _DoAntSim até o retorno (exatamente um tick)."""
+    def ir_saida(self, timeout=60, relogio=None):
+        """Da entrada de _DoAntSim até o retorno (exatamente um tick).
+
+        Com `relogio` (uma lista), anota nela o valor devolvido por cada chamada de _MacTickCount durante
+        o tick (DX:AX no RETF). Para nunca continuar de um breakpoint ativo, alterna dois breakpoints na
+        função: a entrada (rearma o RETF) e o RETF (lê o valor e rearma a entrada)."""
         self.ir_entrada()
-        self._rodar_ate(self.retorno, timeout)
+        if relogio is None:
+            self._rodar_ate(self.retorno, timeout)
+            return
+        g = self.mj.sessao_gdb()
+        mac_ini, mac_ret = (self.mj.linear_codigo(*MACTICKCOUNT), self.mj.linear_codigo(*MACTICKCOUNT_RETF))
+        armado = mac_ini
+        g.breakpoint(self.retorno)
+        g.breakpoint(armado)
+        try:
+            while True:
+                r = g.continuar_ate_parar(timeout)
+                pc, regs = self.pc()
+                if pc == self.retorno:
+                    return
+                if pc != armado:
+                    raise RuntimeError(f"parada inesperada ({r!r}): pc linear {pc:#x}")
+                if pc == mac_ret:
+                    relogio.append((regs["EDX"] & 0xFFFF) << 16 | (regs["EAX"] & 0xFFFF))
+                g.breakpoint(armado, False)
+                armado = mac_ret if armado == mac_ini else mac_ini
+                g.breakpoint(armado)
+        finally:
+            g.breakpoint(self.retorno, False)
+            g.breakpoint(armado, False)
 
     def ate_gametime(self, alvo, timeout=120):
         """Para na entrada de _DoAntSim com GameTime (antes do incremento) >= alvo."""
@@ -768,7 +799,8 @@ class Depurador:
         out = {}
         self.ir_entrada()
         ex = {}
-        for fase, ir in (("antes", None), ("depois", self.ir_saida)):
+        relogio = []
+        for fase, ir in (("antes", None), ("depois", lambda: self.ir_saida(relogio=relogio))):
             if ir:
                 ir()
             out[f"estado_{fase}.bin"] = self.mj.estado()
@@ -777,6 +809,10 @@ class Depurador:
             if segmentos:
                 for seg, d in self.segmentos().items():
                     out[f"seg{seg}_{fase}.bin"] = d
+        # Relógio do Mac lido pelo tick: o primeiro valor (null se o tick não chamou _MacTickCount) e todos
+        # os valores, na ordem das chamadas (ver docs/spec/regras/quintal.md, "Relógios").
+        ex["antes"]["MacTickCount"] = relogio[0] if relogio else None
+        ex["MacTickCount_lidos"] = relogio
         out["extras.json"] = ex
         return out
 

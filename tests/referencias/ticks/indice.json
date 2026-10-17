@@ -1,6 +1,7 @@
 {
  "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
  "gerado_em": "2026-10-16",
+ "_regravado": "2026-10-17, mesmos ticks, com o relógio do Mac (MacTickCount) em extras.json; só _BirdDelay difere da gravação anterior",
  "cenarios": [
   "fases",
   "amarela_andando",
