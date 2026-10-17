@@ -11,7 +11,7 @@ use engine::core::avisos::{ConfigAvisos, Modal};
 use engine::core::navegacao::Navegacao;
 use engine::core::partida::{ConfigPartida, Partida};
 use engine::core::tela_jogo::PosicaoVista;
-use engine::formats::save::{JogoSalvo, LayoutSave};
+use engine::formats::save::LayoutSave;
 use engine::recursos::Recursos;
 use engine::rules::amarela::TabelasAmarela;
 use engine::rules::estado::{ConfigSimulacao, Estado, Evento};
