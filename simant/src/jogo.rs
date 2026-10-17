@@ -201,7 +201,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     if let Some(i) = s.marcador_em(x, y) {
                         s.partida.marcador(i, ctrl);
                     } else if let Some(f) = s.botao_usuario_em(x, y) {
-                        match s.partida.botao_usuario(f) {
+                        match s.botao_usuario(f) {
                             RespostaBotao::Feito => println!("botão {f}: {}", s.situacao()),
                             RespostaBotao::Salvar => salvar_e_avisar(&mut s, false, o),
                             RespostaBotao::NaoImplementado(n) => println!("botão {n}: janela ainda não implementada"),

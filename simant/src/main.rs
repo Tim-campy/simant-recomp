@@ -27,6 +27,8 @@ use sessao::*;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use engine::core::janelas::{self, Controle, JanelasControle};
+use engine::core::quadro::Quadro;
 use engine::core::avisos::{self, ConfigAvisos, Escolha, Modal};
 use engine::core::navegacao::{Acao, ConfigNavegacao, Evento as EventoNav, Repeticao};
 use engine::core::partida::{self, AcaoPartida, BotaoTeclado, ConfigPartida, Partida, RespostaBotao};
@@ -212,7 +214,7 @@ fn principal() -> Result<(), String> {
             println!("{n} ticks: GameTime {antes} -> {}", s.partida.estado.partida.tempo);
         }
         for &b in &o.botoes {
-            println!("botão {b}: {:?}", s.partida.botao_usuario(b));
+            println!("botão {b}: {:?}", s.botao_usuario(b));
         }
         for _ in 0..o.fechar_avisos {
             if let Some(Modal::FimDeJogo { .. }) = s.partida.fechar_modal() {

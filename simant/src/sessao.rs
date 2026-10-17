@@ -23,6 +23,8 @@ pub(crate) struct Sessao<'a> {
     pub(crate) arquivo: Option<PathBuf>,
     /// Retângulo que fecha o aviso modal da frente, como desenhado no último quadro.
     pub(crate) clique_modal: Option<Retangulo>,
+    /// Janelas de controle (Caste/Behavior) e a ordem delas em relação à janela de edição.
+    pub(crate) janelas: JanelasControle,
 }
 
 impl Sessao<'_> {
@@ -70,7 +72,8 @@ impl Sessao<'_> {
             Origem::Save(p) => Some(p.to_path_buf()),
             Origem::Novo(..) => None,
         };
-        Ok(Sessao { recursos, interface, tela, nav_cfg, partida, cores, layout, arquivo, clique_modal: None })
+        let janelas = JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?);
+        Ok(Sessao { recursos, interface, tela, nav_cfg, partida, cores, layout, arquivo, clique_modal: None, janelas })
     }
 
     /// File → Save (`_SaveGame(1)`): grava no arquivo da partida; sem arquivo, ou em "Save As"
@@ -92,7 +95,20 @@ impl Sessao<'_> {
     pub(crate) fn quadro_rgb(&mut self) -> Result<Vec<u8>, String> {
         self.tela.atualizar(&self.partida.estado);
         self.tela.bitmaps_da_faixa = self.partida.bitmaps_dos_marcadores();
-        let (mut q, mut pendentes) = self.tela.compor(self.recursos, &self.interface, &self.partida.nav)?;
+        // Janelas de controle: as que estão antes da de edição na pilha ficam atrás dela.
+        let edicao = self.janelas.pilha.iter().position(|j| j.is_none()).unwrap_or(self.janelas.pilha.len());
+        let (atras, frente) = self.janelas.pilha.split_at(edicao);
+        let (recursos, interface, estado, janelas) = (self.recursos, &self.interface, &self.partida.estado, &self.janelas);
+        let desenhar = |q: &mut Quadro, lista: &[Option<Controle>]| -> Result<Vec<String>, String> {
+            let mut p = Vec::new();
+            for c in lista.iter().flatten() {
+                p.extend(janelas.desenhar(q, recursos, interface, estado, *c)?);
+            }
+            Ok(p)
+        };
+        let (mut q, mut pendentes) =
+            self.tela.compor_com(self.recursos, &self.interface, &self.partida.nav, &mut |q| desenhar(q, atras))?;
+        pendentes.extend(desenhar(&mut q, frente)?);
         let agora = self.partida.agora();
         let (clique, p) = self.tela.desenhar_avisos(&mut q, self.recursos, &self.interface, &mut self.partida.avisos, agora)?;
         self.clique_modal = clique;
@@ -103,13 +119,29 @@ impl Sessao<'_> {
         Ok(para_rgb(&q.pixels, &self.cores))
     }
 
-    /// Botão configurável da faixa sob (x, y): a função dele (`_DoUserButton`).
+    /// `_DoUserButton`: as funções de janela que o port já tem (0 Behavior, 1 Caste) abrem aqui;
+    /// o resto vai para a `Partida`.
+    pub(crate) fn botao_usuario(&mut self, f: u16) -> RespostaBotao {
+        match f {
+            0 => self.janelas.trazer_para_frente(Some(Controle::Tarefas)),
+            1 => self.janelas.trazer_para_frente(Some(Controle::Castas)),
+            15 => {
+                // _GotoMyAnt depois de abrir a janela de edição e trazê-la para a frente.
+                self.janelas.trazer_para_frente(None);
+                return self.partida.botao_usuario(f);
+            }
+            _ => return self.partida.botao_usuario(f),
+        }
+        RespostaBotao::Feito
+    }
+
     /// Marcador da faixa (`ribBM1`–`7`) sob (x, y).
     pub(crate) fn marcador_em(&self, x: i32, y: i32) -> Option<usize> {
         let nomes = &self.partida.cfg.marcadores.objetos;
         self.tela.objetos_da_faixa_em(x, y).iter().find_map(|n| nomes.iter().position(|m| m == n))
     }
 
+    /// Botão configurável da faixa sob (x, y): a função dele (`_DoUserButton`).
     pub(crate) fn botao_usuario_em(&self, x: i32, y: i32) -> Option<u16> {
         self.tela.objetos_da_faixa_em(x, y).iter().find_map(|n| self.partida.cfg.funcao_do_botao(n))
     }

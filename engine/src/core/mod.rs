@@ -2,10 +2,12 @@
 
 pub mod avisos;
 pub mod edicao;
+pub mod janelas;
 pub mod mapa;
 pub mod navegacao;
 pub mod partida;
 pub mod quadro;
 pub mod tela_jogo;
 pub mod telas;
+pub mod triangulo;
 pub mod vida;

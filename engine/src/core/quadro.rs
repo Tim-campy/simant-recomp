@@ -100,6 +100,18 @@ impl Quadro {
         }
     }
 
+    /// Bitmap com um índice transparente (objetos animados, como o botão do triângulo).
+    pub fn bitmap_transparente(&mut self, bm: &Bitmap, x: i32, y: i32, transparente: u8) {
+        for j in 0..bm.altura {
+            for i in 0..bm.largura {
+                let c = bm.pixels[j * bm.largura + i];
+                if c != transparente {
+                    self.ponto(x + i as i32, y + j as i32, c);
+                }
+            }
+        }
+    }
+
     pub fn bitmap(&mut self, bm: &Bitmap, x: i32, y: i32) {
         for j in 0..bm.altura {
             for i in 0..bm.largura {

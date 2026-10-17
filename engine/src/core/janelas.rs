@@ -1,0 +1,403 @@
+//! Janelas de controle da partida: Caste Control (janela 19) e Behavior Control (janela 18), com o
+//! triângulo que regula `_casteLevels`/`_modeLevels`, os botões Auto/Manual/Set e os níveis.
+//!
+//! Especificação: docs/spec/telas/janelas.md. Dados: data/janelas.json. Sem SDL: a interface só
+//! repassa cliques, arrastos e o desenho.
+
+use serde::Deserialize;
+
+use super::quadro::Quadro;
+use super::telas::{carregar_janela, desenhar_objetos, Interface};
+use super::triangulo::{castas_ideais, texto_do_nivel, Triangulo};
+use crate::formats::banco::Chave;
+use crate::formats::bitmap::{Bitmap, TIPO_BITMAP};
+use crate::formats::janela::{Cor, Janela, Retangulo};
+use crate::recursos::Recursos;
+use crate::rules::estado::Estado;
+
+/// Nome do arquivo de dados (sobrescrevível por mod).
+pub const ARQUIVO_CONFIG: &str = "janelas.json";
+
+/// Qual janela de controle.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum Controle {
+    /// Caste Control (`_OpenCasteWindow`, janela 19): `_casteLevels`.
+    Castas,
+    /// Behavior Control (`_OpenModeWindow`, janela 18): `_modeLevels`.
+    Tarefas,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ConfigControle {
+    pub janela: u16,
+    pub titulo: String,
+    pub objeto_triangulo: String,
+    pub objeto_graficos: String,
+    /// Objetos onde os três níveis são escritos (`_DrawControlLevels`), na ordem dos níveis.
+    pub objetos_niveis: [String; 3],
+    pub objeto_auto: String,
+    pub objeto_manual: String,
+    pub objetos_conjuntos: [String; 3],
+    /// Áreas que alternam porcentagem/número (`_DrawControlLevels` com `!_ShowPercent`).
+    pub objetos_alternar: [String; 3],
+    /// Cor (índice da paleta) de cada barra; no original vêm de `_casteColors`/`_modeColors` por
+    /// `_ConvColor`, cuja tabela não foi lida [medido nas capturas].
+    pub cores_barras: [u8; 3],
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ConfigJanelas {
+    pub castas: ConfigControle,
+    pub tarefas: ConfigControle,
+    /// Coordenadas do layout → área cliente (bancada QEMU 640×480) [medido].
+    pub deslocamento: [i16; 2],
+    pub altura_titulo: i16,
+    pub fonte_titulo: usize,
+    /// Cores do título: [fundo, texto] da janela ativa e da inativa (índices da paleta).
+    pub titulo_ativo: [u8; 2],
+    pub titulo_inativo: [u8; 2],
+    pub cor_linha: u8,
+    pub cor_fundo: u8,
+    pub cor_caixa_sistema: u8,
+    /// Botão do triângulo (`_knobSize`, bitmap 0x578).
+    pub bitmap_botao: u16,
+    /// Índice transparente do botão (como o 13 dos tiles de vida).
+    pub cor_transparente: u8,
+    /// Deslocamento do botão em relação à conta de `_UpdateCasteWindow` [medido].
+    pub ajuste_botao: [i16; 2],
+    pub fonte_niveis: usize,
+    /// Cor do contorno das barras (`_ConvColor(0xf)`) e do fundo do gráfico (`_ConvColor(0)`).
+    pub cor_contorno_barra: u8,
+    pub cor_fundo_grafico: u8,
+}
+
+impl ConfigJanelas {
+    pub fn de(&self, c: Controle) -> &ConfigControle {
+        match c {
+            Controle::Castas => &self.castas,
+            Controle::Tarefas => &self.tarefas,
+        }
+    }
+}
+
+/// Estado de interface das janelas de controle (fora do save, como no original).
+#[derive(Clone, Debug)]
+pub struct JanelasControle {
+    pub cfg: ConfigJanelas,
+    /// Ordem de empilhamento das janelas abertas, a última por cima. A janela de edição entra na
+    /// mesma pilha como `None`.
+    pub pilha: Vec<Option<Controle>>,
+    /// `_casteSet` / `_modeSet` (DGROUP `1048:159e`/`15a0`): conjunto escolhido (0..2).
+    pub conjunto: [usize; 2],
+    /// `1048:15b4`/`15b2`: mostrar porcentagem (1) ou número de formigas.
+    pub porcentagem: [bool; 2],
+    /// Arrasto em andamento no triângulo.
+    pub arrastando: Option<Controle>,
+}
+
+fn indice(c: Controle) -> usize {
+    match c {
+        Controle::Castas => 0,
+        Controle::Tarefas => 1,
+    }
+}
+
+/// Geometria de uma janela de controle na área cliente.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GeometriaControle {
+    pub externo: Retangulo,
+    pub titulo: Retangulo,
+    pub cliente: Retangulo,
+    /// Deslocamento layout → área cliente.
+    pub dx: i16,
+    pub dy: i16,
+}
+
+fn mover(r: Retangulo, dx: i16, dy: i16) -> Retangulo {
+    Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy }
+}
+
+fn contem(r: Retangulo, x: i32, y: i32) -> bool {
+    x >= i32::from(r.esq) && x < i32::from(r.dir) && y >= i32::from(r.topo) && y < i32::from(r.base)
+}
+
+impl JanelasControle {
+    /// Como num Quick Game ou depois do Load (`_SetDefaultWindows`): as duas janelas abertas atrás
+    /// da janela de edição, Behavior antes de Caste.
+    pub fn new(cfg: ConfigJanelas) -> JanelasControle {
+        JanelasControle {
+            cfg,
+            pilha: vec![Some(Controle::Tarefas), Some(Controle::Castas), None],
+            conjunto: [0, 0],
+            porcentagem: [true, true],
+            arrastando: None,
+        }
+    }
+
+    /// Abre (ou traz para a frente) a janela (`_OpenCasteWindow`/`_OpenModeWindow` pelos botões da faixa).
+    pub fn trazer_para_frente(&mut self, c: Option<Controle>) {
+        self.pilha.retain(|j| *j != c);
+        self.pilha.push(c);
+    }
+
+    /// A janela de cima (a ativa).
+    pub fn ativa(&self) -> Option<Controle> {
+        self.pilha.last().copied().flatten()
+    }
+
+    /// Geometria da janela `c` (layout + deslocamento medido; título do Windows de 18 + 1 linhas).
+    pub fn geometria(&self, recursos: &Recursos, c: Controle) -> Result<GeometriaControle, String> {
+        let j = carregar_janela(recursos, self.cfg.de(c).janela)?;
+        Ok(self.geometria_de(&j))
+    }
+
+    fn geometria_de(&self, j: &Janela) -> GeometriaControle {
+        let ob0 = &j.objetos[0];
+        let t = ob0.byte_28 as i16;
+        let r = ob0.retangulo;
+        // _win_Recalc: com contorno de espessura t a janela encolhe (L+t, T+t, R−(t+1), B−(t+1)).
+        let enc = Retangulo { esq: r.esq + t, topo: r.topo + t, dir: r.dir - (t + 1), base: r.base - (t + 1) };
+        let [dx, dy] = self.cfg.deslocamento;
+        let h = self.cfg.altura_titulo;
+        let cliente = Retangulo { esq: enc.esq + dx, topo: enc.topo + h + dy, dir: enc.dir + dx, base: enc.base + dy + 1 };
+        let titulo = Retangulo { esq: cliente.esq, topo: cliente.topo - h - 1, dir: cliente.dir, base: cliente.topo - 1 };
+        let externo = Retangulo { esq: cliente.esq - 1, topo: titulo.topo - 1, dir: cliente.dir + 1, base: cliente.base + 1 };
+        GeometriaControle { externo, titulo, cliente, dx, dy }
+    }
+
+    /// Retângulo de um objeto da janela na área cliente; com `mais_um`, o pixel a mais à direita e
+    /// embaixo de `_win_GetObjRect` com faixa.
+    fn objeto(j: &Janela, g: &GeometriaControle, nome: &str, mais_um: bool) -> Option<(Retangulo, u8)> {
+        let o = j.objetos.iter().find(|o| o.nome == nome)?;
+        let r = mover(o.retangulo, g.dx, g.dy);
+        let k = i16::from(mais_um);
+        Some((Retangulo { dir: r.dir + k, base: r.base + k, ..r }, o.cor))
+    }
+
+    fn triangulo(j: &Janela, g: &GeometriaControle, cfg: &ConfigControle) -> Option<Triangulo> {
+        let (r, _) = Self::objeto(j, g, &cfg.objeto_triangulo, true)?;
+        Some(Triangulo { esq: r.esq.into(), topo: r.topo.into(), dir: r.dir.into(), base: r.base.into() })
+    }
+
+    /// Clique do botão esquerdo em (x, y). Devolve `true` se caiu numa janela de controle visível
+    /// (por cima da janela de edição e das outras) e foi tratado aqui.
+    pub fn clicar(&mut self, recursos: &Recursos, e: &mut Estado, x: i32, y: i32) -> Result<bool, String> {
+        // De cima para baixo: a primeira janela que contém o ponto recebe o clique.
+        let pilha: Vec<Option<Controle>> = self.pilha.iter().rev().copied().collect();
+        for j in pilha {
+            let Some(c) = j else {
+                // A janela de edição: quem decide se o ponto é dela é a interface.
+                return Ok(false);
+            };
+            let janela = carregar_janela(recursos, self.cfg.de(c).janela)?;
+            let g = self.geometria_de(&janela);
+            if !contem(g.externo, x, y) {
+                continue;
+            }
+            self.trazer_para_frente(Some(c));
+            self.clique_na_janela(&janela, &g, c, e, x, y);
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// Ponto (x, y) dentro de alguma janela de controle que esteja por cima da de edição.
+    pub fn cobre(&self, recursos: &Recursos, x: i32, y: i32) -> bool {
+        for j in self.pilha.iter().rev() {
+            let Some(c) = j else { return false };
+            if let Ok(g) = self.geometria(recursos, *c) {
+                if contem(g.externo, x, y) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn clique_na_janela(&mut self, j: &Janela, g: &GeometriaControle, c: Controle, e: &mut Estado, x: i32, y: i32) {
+        let cfg = self.cfg.de(c).clone();
+        let k = indice(c);
+        let dentro = |nome: &str| Self::objeto(j, g, nome, false).is_some_and(|(r, _)| contem(r, x, y));
+        if dentro(&cfg.objeto_auto) {
+            // 0x1304: Auto.
+            *self.auto_mut(e, c) = 1;
+        } else if dentro(&cfg.objeto_manual) {
+            *self.auto_mut(e, c) = 0;
+        } else if let Some(n) = cfg.objetos_conjuntos.iter().position(|o| dentro(o)) {
+            // 0x1306–0x1308: guarda os níveis no conjunto atual, carrega o escolhido e vai para Manual.
+            let (niveis, sets) = niveis_e_conjuntos(e, c);
+            let atual = self.conjunto[k];
+            sets[atual * 3..atual * 3 + 3].copy_from_slice(niveis);
+            self.conjunto[k] = n;
+            let novo: [u16; 3] = sets[n * 3..n * 3 + 3].try_into().unwrap_or([0; 3]);
+            *niveis = novo;
+            *self.auto_mut(e, c) = 0;
+        } else if cfg.objetos_alternar.iter().any(|o| dentro(o)) {
+            // 0x130f–0x1311: alterna porcentagem / número.
+            self.porcentagem[k] = !self.porcentagem[k];
+        } else if let Some(t) = Self::triangulo(j, g, &cfg) {
+            if t.contem(x, y) {
+                *self.auto_mut(e, c) = 0;
+                self.arrastando = Some(c);
+                self.arrastar(j, g, c, e, x, y);
+            }
+        }
+    }
+
+    fn auto_mut<'e>(&self, e: &'e mut Estado, c: Controle) -> &'e mut i16 {
+        match c {
+            Controle::Castas => &mut e.controles.casta_automatica,
+            Controle::Tarefas => &mut e.controles.modo_automatico,
+        }
+    }
+
+    fn arrastar(&mut self, j: &Janela, g: &GeometriaControle, c: Controle, e: &mut Estado, x: i32, y: i32) {
+        let cfg = self.cfg.de(c).clone();
+        let Some(t) = Self::triangulo(j, g, &cfg) else { return };
+        let (px, py) = t.limitar(x, y);
+        let n = t.niveis(px, py);
+        let k = indice(c);
+        let atual = self.conjunto[k];
+        let (niveis, sets) = niveis_e_conjuntos(e, c);
+        *niveis = n;
+        sets[atual * 3..atual * 3 + 3].copy_from_slice(&n);
+        if c == Controle::Castas {
+            e.controles.castas_ideais = castas_ideais(n);
+        }
+    }
+
+    /// Movimento do mouse com o botão apertado: continua o arrasto no triângulo.
+    pub fn mover(&mut self, recursos: &Recursos, e: &mut Estado, x: i32, y: i32) -> Result<bool, String> {
+        let Some(c) = self.arrastando else { return Ok(false) };
+        let j = carregar_janela(recursos, self.cfg.de(c).janela)?;
+        let g = self.geometria_de(&j);
+        self.arrastar(&j, &g, c, e, x, y);
+        Ok(true)
+    }
+
+    /// Botão solto: termina o arrasto.
+    pub fn soltar(&mut self) -> bool {
+        self.arrastando.take().is_some()
+    }
+
+    /// Desenha a janela `c` (moldura com título, objetos do layout, botão do triângulo, níveis e
+    /// barras). `ativa` = título da janela ativa.
+    pub fn desenhar(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, e: &Estado, c: Controle) -> Result<Vec<String>, String> {
+        let cfg = self.cfg.de(c);
+        let k = indice(c);
+        let mut janela = carregar_janela(recursos, cfg.janela)?;
+        let g = self.geometria_de(&janela);
+        let ativa = self.ativa() == Some(c);
+        // Estado dos botões Auto/Manual e do conjunto (grupos 3 e 4 do layout).
+        let auto = match c {
+            Controle::Castas => e.controles.casta_automatica != 0,
+            Controle::Tarefas => e.controles.modo_automatico != 0,
+        };
+        for o in janela.objetos.iter_mut() {
+            let sel = if o.nome == cfg.objeto_auto {
+                Some(auto)
+            } else if o.nome == cfg.objeto_manual {
+                Some(!auto)
+            } else {
+                // Com Auto, nenhum conjunto aparece escolhido (grupo 4 "invisível") [medido].
+                cfg.objetos_conjuntos.iter().position(|n| *n == o.nome).map(|i| !auto && i == self.conjunto[k])
+            };
+            if let Some(s) = sel {
+                if s {
+                    o.flags |= 4;
+                } else {
+                    o.flags &= !4;
+                }
+            }
+        }
+        let jc = &self.cfg;
+        q.preencher(g.externo, jc.cor_fundo, jc.cor_fundo);
+        q.contorno(Retangulo { dir: g.externo.dir - 1, base: g.externo.base - 1, ..g.externo }, jc.cor_linha);
+        // Título do Windows: caixa do menu de sistema, linha, faixa com o nome, linha embaixo.
+        let [fundo, texto] = if ativa { jc.titulo_ativo } else { jc.titulo_inativo };
+        let h = jc.altura_titulo;
+        let caixa = Retangulo { dir: g.titulo.esq + h, ..g.titulo };
+        q.preencher(g.titulo, fundo, fundo);
+        q.preencher(caixa, jc.cor_caixa_sistema, jc.cor_caixa_sistema);
+        let traco = Retangulo { esq: caixa.esq + 3, topo: caixa.topo + 8, dir: caixa.dir - 3, base: caixa.topo + 10 };
+        q.preencher(traco, jc.cor_linha, jc.cor_linha);
+        q.preencher(Retangulo { esq: caixa.dir, dir: caixa.dir + 1, ..g.titulo }, jc.cor_linha, jc.cor_linha);
+        q.preencher(Retangulo { topo: g.titulo.base, base: g.titulo.base + 1, ..g.externo }, jc.cor_linha, jc.cor_linha);
+        if let Some(Some(f)) = interface.fontes.get(jc.fonte_titulo) {
+            let r = Retangulo { esq: caixa.dir + 1, ..g.titulo };
+            q.texto(r, f, cfg.titulo.as_bytes(), 0, texto, fundo);
+        }
+        let base = janela.retangulo();
+        let origem = (base.esq + g.dx, base.topo + g.dy);
+        let mut pendentes = desenhar_objetos(q, recursos, interface, &janela, origem, Some(g.cliente));
+        pendentes.retain(|p| !p.ends_with("Title"));
+        // Botão do triângulo.
+        let niveis = match c {
+            Controle::Castas => e.controles.castas,
+            Controle::Tarefas => e.controles.tarefas,
+        };
+        if let Some(t) = Self::triangulo(&janela, &g, cfg) {
+            if let Ok(bm) = recursos.objeto(Chave { tipo: TIPO_BITMAP, id: jc.bitmap_botao }).and_then(|d| Bitmap::decodificar(&d)) {
+                let (x, y) = t.ponto(niveis);
+                let (x, y) = (x + i32::from(jc.ajuste_botao[0]), y + i32::from(jc.ajuste_botao[1]));
+                let antes = q.recorte.replace(g.cliente);
+                q.bitmap_transparente(&bm, x - bm.largura as i32 / 2, y - bm.altura as i32 / 2, jc.cor_transparente);
+                q.recorte = antes;
+            }
+        }
+        // Níveis e barras (_DrawControlLevels).
+        let total = match c {
+            Controle::Castas => i32::from(e.preta.castas[0]),
+            Controle::Tarefas => e.preta.modos[..3].iter().map(|&v| i32::from(v)).sum(),
+        };
+        let cor = |i: u8| interface.cores.get(i as usize).copied().unwrap_or(Cor { frente: 0, fundo: 15, fundo2: 15 });
+        let fonte = interface.fontes.get(jc.fonte_niveis).and_then(|f| f.as_ref());
+        for (i, nome) in cfg.objetos_niveis.iter().enumerate() {
+            if let (Some((r, ci)), Some(f)) = (Self::objeto(&janela, &g, nome, true), fonte) {
+                let c = cor(ci);
+                let antes = q.recorte.replace(r);
+                let t = texto_do_nivel(niveis[i], self.porcentagem[k], total);
+                q.texto(Retangulo { dir: r.dir - 1, ..r }, f, t.as_bytes(), 3, c.frente, c.fundo);
+                q.recorte = antes;
+            }
+        }
+        if let Some((gr, _)) = Self::objeto(&janela, &g, &cfg.objeto_graficos, true) {
+            let (l, t, r, b) = (i32::from(gr.esq), i32::from(gr.topo), i32::from(gr.dir), i32::from(gr.base));
+            let bw = (r - l) / 5;
+            let h = b - t;
+            for (i, &nivel) in niveis.iter().enumerate() {
+                let x0 = l + i as i32 * 2 * bw;
+                let x1 = x0 + bw - 1;
+                let topo_barra = (b - 1) - (nivel as i64 * h as i64 / 0xFFFF) as i32;
+                let topo_barra = if topo_barra + 1 < b - 1 {
+                    let c = cfg.cores_barras[i];
+                    let barra = ret(x0, topo_barra, x1, b - 1);
+                    q.preencher(barra, c, c);
+                    q.contorno(barra, jc.cor_contorno_barra);
+                    topo_barra
+                } else {
+                    b
+                };
+                if topo_barra - 1 > t - 1 {
+                    let vazio = ret(x0, t, x1 + 1, topo_barra);
+                    q.preencher(vazio, jc.cor_fundo_grafico, jc.cor_fundo_grafico);
+                }
+            }
+        }
+        Ok(pendentes)
+    }
+}
+
+fn ret(x0: i32, y0: i32, x1: i32, y1: i32) -> Retangulo {
+    Retangulo { esq: x0 as i16, topo: y0 as i16, dir: x1 as i16, base: y1 as i16 }
+}
+
+/// Os três níveis e os quatro conjuntos de três do controle.
+fn niveis_e_conjuntos(e: &mut Estado, c: Controle) -> (&mut [u16; 3], &mut [u16; 12]) {
+    let k = &mut e.controles;
+    match c {
+        Controle::Castas => (&mut k.castas, &mut k.castas_memorizadas),
+        Controle::Tarefas => (&mut k.tarefas, &mut k.tarefas_memorizadas),
+    }
+}
