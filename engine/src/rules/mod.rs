@@ -12,3 +12,4 @@ pub mod quintal;
 pub mod rng;
 pub mod superficie;
 pub mod tick;
+pub mod vetor_tick;

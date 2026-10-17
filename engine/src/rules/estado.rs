@@ -1087,6 +1087,9 @@ pub struct Estado {
     pub baloes: Baloes,
     /// `_GlobalKey`: última tecla especial (0xA8 faz chover).
     pub tecla_global: i16,
+    /// `_gameCycles` (`9:9b2c`): voltas do laço do temporizador (não é contador de ticks; depende do
+    /// relógio). Entrada do tick: `_SimBird` o usa para `_BirdDelay` (testes-tick.md, "Pergunta 1").
+    pub ciclos_jogo: u32,
     /// `_gGameNeedsSaving`.
     pub precisa_salvar: bool,
     /// Pedidos à interface acumulados desde a última vez que foram retirados.
@@ -1144,6 +1147,7 @@ impl Estado {
             tindex: 0,
             baloes: Baloes::default(),
             tecla_global: 0,
+            ciclos_jogo: 0,
             precisa_salvar: false,
             eventos: Vec::new(),
         }

@@ -133,7 +133,7 @@ Conclusão: o caminho por breakpoints é **suficiente para determinismo** na ban
 | `GameTime`, `Cycle` | (redundantes com o save, para conferência) | — |
 | `posicao` | `entrada` ou `saida` | — |
 
-Mais `vida_antes.bin` / `vida_depois.bin`: `_LifeA` (8.192) + `_LifeB` (4.096) + `_LifeR` (4.096) = 16.384 bytes. Pela [especificação do save](../formatos/save-ant.md), `_DoLoadInitializations` reconstrói esses mapas das listas ao carregar; o port pode reconstruí-los do mesmo jeito e usar o arquivo só para conferir [hipótese: a reconstrução dá o mesmo mapa no meio da simulação; conferir com os vetores].
+Mais `vida_antes.bin` / `vida_depois.bin`: `_LifeA` (8.192) + `_LifeB` (4.096) + `_LifeR` (4.096) = 16.384 bytes. Pela [especificação do save](../formatos/save-ant.md), `_DoLoadInitializations` reconstrói esses mapas das listas ao carregar; o port pode reconstruí-los do mesmo jeito e usar o arquivo só para conferir (verificado nos 5 vetores versionados: a reconstrução dá o mesmo mapa no meio da simulação, antes e depois do tick; ver "Comparar o port").
 
 ## Protocolo de teste
 
@@ -169,7 +169,38 @@ Para cada `tick_NNNNNN`:
 3. rodar **um** `_DoAntSim`;
 4. gravar o estado no formato `.ANT` e comparar com `estado_depois.bin` (`tools/estado_diff.py`); comparar S e R com `extras.json["depois"]` e a vida com `vida_depois.bin`.
 
+No port, os passos 1–4 estão em `engine/src/rules/vetor_tick.rs` (`VetorTick::ler`, `montar_entrada`, `comparar_tick`):
+
+```
+cargo run -p engine --example comparar_tick -- tests/referencias/ticks/tick_000079   # um tick, relatório completo
+cargo run -p engine --example comparar_tick -- tests/referencias/ticks               # todos, mais o placar
+```
+
+O relatório traz: blocos iguais/diferentes (com bytes diferentes e quem mudou o bloco: o original, o port ou os dois); as primeiras diferenças de cada bloco, por formiga e campo nas listas (`formiga 5 campo T`), por célula `(x, y)` nos mapas (`MapA/B/R`, `ExitMap*`, `PherMap*`, células do próprio mapa) e por elemento nos demais; S, R, `_gameCycles`, `_Tindex` e `_GlobalKey` depois do tick; a vida depois do tick; e duas conferências da reconstrução da vida (abaixo). O teste `engine/tests/ticks_originais.rs` roda todos os vetores de `indice.json`.
+
+**Reconstrução da vida (verificado, 2026-10-17, nos 5 vetores):** os mapas `_LifeA/B/R` reconstruídos das listas como `_DoLoadInitializations` (`core/vida.rs`, o mesmo que `Estado::de_save` usa) são **idênticos** a `vida_antes.bin` e, reconstruídos do `estado_depois`, a `vida_depois.bin`. A hipótese da seção "Lista de captura adotada" fica confirmada para esses ticks (sem amarela rainha; a segunda célula dela continua sem reconstrução). O comparador usa a vida gravada mesmo assim, e o teste exige que a reconstrução continue batendo.
+
 Os ticks consecutivos são encadeáveis: verificado que o `estado_depois` do tick N é igual ao `estado_antes` do N+1 (só `_gameCycles` muda no intervalo). Assim, um teste de N ticks pode partir do primeiro `estado_antes` e conferir cada `estado_depois`, desde que use o `_gameCycles` de cada `extras.json["antes"]`.
+
+## Placar do port
+
+Um tick do port (`RegrasOriginais` sem tabelas de geração) sobre cada vetor de `tests/referencias/ticks/`, comparado com o `estado_depois` do original. "Mudados" = blocos que o original alterou no tick; "extras" = S, R, `_gameCycles`, `_Tindex`, `_GlobalKey`.
+
+**2026-10-17** (só o esqueleto do tick; quintal, inimigos, superfície, ninho, amarela e conselhos ainda vazios):
+
+| Tick | Blocos iguais | Mudados pelo original | Mudados e iguais | Extras iguais | Células de vida diferentes |
+|---|---|---|---|---|---|
+| 79 | 280/307 | 28 | 2 (`GameTime`, `Cycle`) | 3/5 | 4 |
+| 80 | 286/307 | 22 | 2 | 3/5 | 4 |
+| 81 | 289/307 | 19 | 2 | 3/5 | 4 |
+| 82 | 287/307 | 21 | 2 | 3/5 | 4 |
+| 83 | 289/307 | 19 | 2 | 3/5 | 4 |
+
+Diferenças nos 5 ticks, por bloco (quantos ticks): `AlistX/Y/T` (5; duas formigas andam na superfície), `YardCycle`, `Scycle`, `Scycle2`, `SpidY`, `FootTog`, `BoyStandCnt`, `BoyTurnCnt`, `CatX`, `CatFrame`, `CatCycle`, `DogX`, `DogFrame`, `DogTurnCnt`, `BirdDelay` (5 cada; quintal e aranha), `ModePopR` (5; o port zera porque nenhuma formiga é contada no tick), `PillarSeg` e `MapA` (2), e só no tick 79 a postura do ovo (`BlistX/Y/M/T`, `ListIndexB`, `TotalEggsLaidB`), `HealthB`, `BoyFrame`, `DogDir`, `DogPx`. Sementes S e R diferem em todos (nenhum sorteio no port). Nenhum tick de 79 a 83 cai nas fases de 32 ticks, então compactação, `_CountAnts`, `_HistUpdate` e feromônios não são exercitados por esses vetores.
+
+`BirdDelay` só pode bater com o `_gameCycles` do vetor (já carregado em `Estado::ciclos_jogo`).
+
+**Blocos exigidos pelo teste** (`ESPERADOS_IGUAIS` em `engine/tests/ticks_originais.rs`): `GameTime`, `Cycle`, `FlyAwayB`, `FlyAwayR`, `CastePopB`, `CastePopR`, `BpopT`, `RpopT`; extras `gameCycles`, `Tindex`, `GlobalKey`. Cada parte implementada acrescenta os blocos que passaram a bater e atualiza esta tabela.
 
 ## Limitações
 
