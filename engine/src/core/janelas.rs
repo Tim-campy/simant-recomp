@@ -6,6 +6,7 @@
 
 use serde::Deserialize;
 
+use super::historico::{ConfigHistorico, JanelaHistorico};
 use super::quadro::Quadro;
 use super::telas::{carregar_janela, desenhar_objetos, Interface};
 use super::triangulo::{castas_ideais, texto_do_nivel, Triangulo};
@@ -26,6 +27,8 @@ pub enum Controle {
     Castas,
     /// Behavior Control (`_OpenModeWindow`, janela 18): `_modeLevels`.
     Tarefas,
+    /// History (`_OpenHistoryWindow`, janela 21): gráficos do histórico (core/historico.rs).
+    Historico,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -71,13 +74,23 @@ pub struct ConfigJanelas {
     /// Cor do contorno das barras (`_ConvColor(0xf)`) e do fundo do gráfico (`_ConvColor(0)`).
     pub cor_contorno_barra: u8,
     pub cor_fundo_grafico: u8,
+    pub historico: ConfigHistorico,
 }
 
 impl ConfigJanelas {
+    /// Configuração da janela de controle (a History não tem: devolve a de castas, nunca usada).
     pub fn de(&self, c: Controle) -> &ConfigControle {
         match c {
-            Controle::Castas => &self.castas,
+            Controle::Castas | Controle::Historico => &self.castas,
             Controle::Tarefas => &self.tarefas,
+        }
+    }
+
+    /// Id da janela do layout.
+    pub fn id(&self, c: Controle) -> u16 {
+        match c {
+            Controle::Historico => self.historico.janela,
+            _ => self.de(c).janela,
         }
     }
 }
@@ -98,11 +111,13 @@ pub struct JanelasControle {
     /// Tabela de posições das janelas (tipo 9) e altura da faixa, da `Interface`.
     posicoes: Vec<[i16; 4]>,
     faixa: i16,
+    /// Estado da janela History.
+    pub historico: JanelaHistorico,
 }
 
 fn indice(c: Controle) -> usize {
     match c {
-        Controle::Castas => 0,
+        Controle::Castas | Controle::Historico => 0,
         Controle::Tarefas => 1,
     }
 }
@@ -130,7 +145,9 @@ impl JanelasControle {
     /// Como num Quick Game ou depois do Load (`_SetDefaultWindows`): as duas janelas abertas atrás
     /// da janela de edição, Behavior antes de Caste.
     pub fn new(cfg: ConfigJanelas, interface: &Interface) -> JanelasControle {
+        let historico = JanelaHistorico::new(cfg.historico.clone());
         JanelasControle {
+            historico,
             cfg,
             pilha: vec![Some(Controle::Tarefas), Some(Controle::Castas), None],
             conjunto: [0, 0],
@@ -154,7 +171,7 @@ impl JanelasControle {
 
     /// Geometria da janela `c` (layout + deslocamento medido; título do Windows de 18 + 1 linhas).
     pub fn geometria(&self, recursos: &Recursos, c: Controle) -> Result<GeometriaControle, String> {
-        let id = self.cfg.de(c).janela;
+        let id = self.cfg.id(c);
         let j = carregar_janela(recursos, id)?;
         Ok(self.geometria_de(&j, id))
     }
@@ -193,13 +210,18 @@ impl JanelasControle {
                 }
                 continue;
             };
-            let janela = carregar_janela(recursos, self.cfg.de(c).janela)?;
-            let g = self.geometria_de(&janela, self.cfg.de(c).janela);
+            let id = self.cfg.id(c);
+            let janela = carregar_janela(recursos, id)?;
+            let g = self.geometria_de(&janela, id);
             if !contem(g.externo, x, y) {
                 continue;
             }
             self.trazer_para_frente(Some(c));
-            self.clique_na_janela(&janela, &g, c, e, x, y);
+            if c == Controle::Historico {
+                self.historico.clicar(&janela, &g, x, y);
+            } else {
+                self.clique_na_janela(&janela, &g, c, e, x, y);
+            }
             return Ok(true);
         }
         Ok(false)
@@ -255,7 +277,7 @@ impl JanelasControle {
 
     fn auto_mut<'e>(&self, e: &'e mut Estado, c: Controle) -> &'e mut i16 {
         match c {
-            Controle::Castas => &mut e.controles.casta_automatica,
+            Controle::Castas | Controle::Historico => &mut e.controles.casta_automatica,
             Controle::Tarefas => &mut e.controles.modo_automatico,
         }
     }
@@ -292,6 +314,9 @@ impl JanelasControle {
     /// Desenha a janela `c` (moldura com título, objetos do layout, botão do triângulo, níveis e
     /// barras). `ativa` = título da janela ativa.
     pub fn desenhar(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, e: &Estado, c: Controle) -> Result<Vec<String>, String> {
+        if c == Controle::Historico {
+            return self.desenhar_historico(q, recursos, interface, e);
+        }
         let cfg = self.cfg.de(c);
         let k = indice(c);
         let mut janela = carregar_janela(recursos, cfg.janela)?;
@@ -299,7 +324,7 @@ impl JanelasControle {
         let ativa = self.ativa() == Some(c);
         // Estado dos botões Auto/Manual e do conjunto (grupos 3 e 4 do layout).
         let auto = match c {
-            Controle::Castas => e.controles.casta_automatica != 0,
+            Controle::Castas | Controle::Historico => e.controles.casta_automatica != 0,
             Controle::Tarefas => e.controles.modo_automatico != 0,
         };
         for o in janela.objetos.iter_mut() {
@@ -327,7 +352,7 @@ impl JanelasControle {
         pendentes.retain(|p| !p.ends_with("Title"));
         // Botão do triângulo.
         let niveis = match c {
-            Controle::Castas => e.controles.castas,
+            Controle::Castas | Controle::Historico => e.controles.castas,
             Controle::Tarefas => e.controles.tarefas,
         };
         // O botão bate com as capturas (j01, j02) usando o retângulo do triângulo com 1 pixel a menos
@@ -349,7 +374,7 @@ impl JanelasControle {
         }
         // Níveis e barras (_DrawControlLevels).
         let total = match c {
-            Controle::Castas => i32::from(e.preta.castas[0]),
+            Controle::Castas | Controle::Historico => i32::from(e.preta.castas[0]),
             Controle::Tarefas => e.preta.modos[..3].iter().map(|&v| i32::from(v)).sum(),
         };
         let cor = |i: u8| interface.cores.get(i as usize).copied().unwrap_or(Cor { frente: 0, fundo: 15, fundo2: 15 });
@@ -390,6 +415,25 @@ impl JanelasControle {
             }
         }
         Ok(pendentes)
+    }
+}
+
+impl JanelasControle {
+    /// A janela History: moldura, layout com os botões ligados marcados e os gráficos.
+    fn desenhar_historico(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, e: &Estado) -> Result<Vec<String>, String> {
+        let id = self.cfg.historico.janela;
+        let mut janela = carregar_janela(recursos, id)?;
+        let g = self.geometria_de(&janela, id);
+        self.historico.marcar_botoes(&mut janela);
+        let ativa = self.ativa() == Some(Controle::Historico);
+        desenhar_moldura_com_titulo(q, interface, &self.cfg, &g, &self.cfg.historico.titulo, ativa);
+        let base = janela.retangulo();
+        let mut p = desenhar_objetos(q, recursos, interface, &janela, (base.esq + g.dx, base.topo + g.dy), Some(g.cliente));
+        p.retain(|n| !n.ends_with("Title"));
+        let antes = q.recorte.replace(g.cliente);
+        self.historico.desenhar_graficos(q, recursos, interface, &janela, &g, e);
+        q.recorte = antes;
+        Ok(p)
     }
 }
 
@@ -439,7 +483,7 @@ fn ret(x0: i32, y0: i32, x1: i32, y1: i32) -> Retangulo {
 fn niveis_e_conjuntos(e: &mut Estado, c: Controle) -> (&mut [u16; 3], &mut [u16; 12]) {
     let k = &mut e.controles;
     match c {
-        Controle::Castas => (&mut k.castas, &mut k.castas_memorizadas),
+        Controle::Castas | Controle::Historico => (&mut k.castas, &mut k.castas_memorizadas),
         Controle::Tarefas => (&mut k.tarefas, &mut k.tarefas_memorizadas),
     }
 }

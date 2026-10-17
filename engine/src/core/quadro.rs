@@ -100,6 +100,28 @@ impl Quadro {
         }
     }
 
+    /// Reta de (x0, y0) a (x1, y1), inclusive (`_GLine`, Bresenham).
+    pub fn linha(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, cor: u8) {
+        let (dx, dy) = ((x1 - x0).abs(), -(y1 - y0).abs());
+        let (sx, sy) = (if x0 < x1 { 1 } else { -1 }, if y0 < y1 { 1 } else { -1 });
+        let (mut x, mut y, mut err) = (x0, y0, dx + dy);
+        loop {
+            self.ponto(x, y, cor);
+            if x == x1 && y == y1 {
+                break;
+            }
+            let e2 = 2 * err;
+            if e2 >= dy {
+                err += dy;
+                x += sx;
+            }
+            if e2 <= dx {
+                err += dx;
+                y += sy;
+            }
+        }
+    }
+
     /// Inverte as cores do retângulo (`_GRectInv`: na paleta de 16 cores, índice XOR 15).
     pub fn inverter(&mut self, r: Retangulo) {
         for y in r.topo as i32..r.base as i32 {

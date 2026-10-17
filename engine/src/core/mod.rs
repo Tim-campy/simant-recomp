@@ -2,6 +2,7 @@
 
 pub mod avisos;
 pub mod edicao;
+pub mod historico;
 pub mod janelas;
 pub mod mapa;
 pub mod menus;

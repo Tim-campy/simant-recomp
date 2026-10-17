@@ -478,6 +478,7 @@ impl Sessao<'_> {
         match f {
             0 => self.janelas.trazer_para_frente(Some(Controle::Tarefas)),
             1 => self.janelas.trazer_para_frente(Some(Controle::Castas)),
+            2 => self.janelas.trazer_para_frente(Some(Controle::Historico)),
             15 => {
                 // _GotoMyAnt depois de abrir a janela de edição e trazê-la para a frente.
                 self.janelas.trazer_para_frente(None);
@@ -648,8 +649,19 @@ fn evento_de_tecla(k: sdl2::keyboard::Keycode, m: sdl2::keyboard::Mod) -> Evento
 /// o caso.
 fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool, o: &Opcoes) -> Option<BotaoTeclado> {
     if let Some(a) = s.partida.cfg.acao_da_tecla(ev) {
-        if let AcaoPartida::Salvar | AcaoPartida::SalvarComo = a {
-            salvar_e_avisar(s, a == AcaoPartida::SalvarComo, o);
+        let janela = match a {
+            AcaoPartida::Salvar | AcaoPartida::SalvarComo => {
+                salvar_e_avisar(s, a == AcaoPartida::SalvarComo, o);
+                return None;
+            }
+            AcaoPartida::JanelaEdicao => Some(None),
+            AcaoPartida::JanelaComportamento => Some(Some(Controle::Tarefas)),
+            AcaoPartida::JanelaCastas => Some(Some(Controle::Castas)),
+            AcaoPartida::JanelaHistorico => Some(Some(Controle::Historico)),
+            _ => None,
+        };
+        if let Some(j) = janela {
+            s.janelas.trazer_para_frente(j);
             return None;
         }
         s.partida.aplicar(a);

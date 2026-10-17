@@ -63,6 +63,12 @@ pub enum AcaoPartida {
     /// File → Save (5, Ctrl+S) e Save As (6, Ctrl+A): tratados pela interface (arquivo).
     Salvar,
     SalvarComo,
+    /// Window → Edit/Behavior/Caste/History (0x11, 0x13–0x15; Ctrl+E/B/C/H): abre ou traz para a
+    /// frente, a cargo da interface.
+    JanelaEdicao,
+    JanelaComportamento,
+    JanelaCastas,
+    JanelaHistorico,
 }
 
 /// Resultado de um botão configurável da faixa (`_DoUserButton`, `1000:04c4`).
@@ -552,7 +558,12 @@ impl Partida {
             AcaoPartida::VelocidadeRapida => p.velocidade = 2,
             AcaoPartida::VelocidadeUltra => p.velocidade = 3,
             AcaoPartida::AutoTrack => p.opcoes[0] = if p.opcoes[0] == 0 { 1 } else { 0 },
-            AcaoPartida::Salvar | AcaoPartida::SalvarComo => {}
+            AcaoPartida::Salvar
+            | AcaoPartida::SalvarComo
+            | AcaoPartida::JanelaEdicao
+            | AcaoPartida::JanelaComportamento
+            | AcaoPartida::JanelaCastas
+            | AcaoPartida::JanelaHistorico => {}
         }
         self.redesenhar = true;
     }
