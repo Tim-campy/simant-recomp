@@ -1,0 +1,18 @@
+{
+  "_comentario": "Escolha do jogo no 'Select a Game' (janela 2, _DoScenario 1000:5998 / _NewGame 1000:d6dc). Objeto clicado -> escolha; Enter = Full Game (GetAsyncKeyState(VK_RETURN) em _DoScenario). Ctrl+N = File > New Game (_ProcMenu caso 3) volta a esta tela durante a partida. Ver docs/spec/telas/abertura.md, 'Escolha do jogo'.",
+  "tela": "selecao",
+  "janela": 2,
+  "botoes": {
+    "scenTutorial": "tutorial",
+    "scenQuickGame": "rapido",
+    "scenFullGame": "completo",
+    "scenExperimental": "experimental",
+    "scenLoad": "carregar",
+    "scenCancel": "cancelar"
+  },
+  "teclas": [
+    [{"tecla": "Return"}, "completo"],
+    [{"tecla": "Keypad Enter"}, "completo"]
+  ],
+  "novo_jogo": {"tecla": "N", "ctrl": true}
+}

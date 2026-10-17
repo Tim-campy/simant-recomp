@@ -116,7 +116,6 @@ pub struct ConfigAvisos {
     pub faixa: ConfigFaixa,
     pub fim_de_jogo: ConfigFimDeJogo,
     pub pontuacao: ConfigPontuacao,
-    pub selecao_de_jogo: ConfigSelecao,
 }
 
 impl ConfigAvisos {
@@ -139,31 +138,6 @@ pub enum Modal {
     Quadro { texto: u16, imagem: Option<u16> },
     /// `_EndGameDialog`.
     FimDeJogo { tipo_jogo: i16, pretas_venceram: bool, pontos: i64 },
-    /// `_DoScenario` (janela 2, "Select a Game"), aberto por `_NewGame(0)` depois do fim de jogo.
-    SelecaoDeJogo,
-}
-
-/// Escolha no "Select a Game" (`_DoScenario` devolve o id do objeto; `_NewGame` converte).
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum Escolha {
-    Tutorial,
-    Rapido,
-    Completo,
-    Experimental,
-    Carregar,
-    Cancelar,
-}
-
-/// Bloco `selecao_de_jogo` de data/mensagens.json.
-#[derive(Clone, Debug, Deserialize)]
-pub struct ConfigSelecao {
-    pub janela: u16,
-    /// Nome do objeto → escolha.
-    pub opcoes: HashMap<String, Escolha>,
-    /// Enter (`GetAsyncKeyState(VK_RETURN)`) e Esc (`_DialogAbort`).
-    pub tecla_enter: Escolha,
-    pub tecla_esc: Escolha,
 }
 
 /// Mensagens da faixa e fila de avisos modais.
@@ -252,12 +226,6 @@ impl Avisos {
         let imagem = imagem_do_texto(&self.cfg, licoes, texto);
         self.modais.push_back(Modal::Quadro { texto, imagem });
         true
-    }
-
-    /// `_NewGame(0)` depois do fim de jogo: o "Select a Game" na frente da fila.
-    pub fn abrir_selecao_de_jogo(&mut self) {
-        self.modais.push_front(Modal::SelecaoDeJogo);
-        self.aberto_em = None;
     }
 
     /// `_EndGameDialog`: limpa a faixa e põe o diálogo de fim de jogo na fila, com a pontuação.
@@ -605,26 +573,7 @@ pub fn desenhar_modal(q: &mut Quadro, recursos: &Recursos, interface: &Interface
             let (r, p) = desenhar_fim_de_jogo(q, recursos, interface, &avisos.cfg.fim_de_jogo, *tipo_jogo, *pretas_venceram, *pontos)?;
             Ok((Some(r), p))
         }
-        Some(Modal::SelecaoDeJogo) => {
-            let id = avisos.cfg.selecao_de_jogo.janela;
-            let janela = carregar_janela(recursos, id)?;
-            let p = desenhar_janela_deslocada(q, recursos, interface, id, &janela, (0, 0))?;
-            let g = interface.posicionar(id, &janela).ok_or(format!("janela {id} sem posição"))?;
-            Ok((g.externo, p))
-        }
     }
-}
-
-/// Opção do "Select a Game" sob o ponto (x, y) da área cliente.
-pub fn escolha_em(recursos: &Recursos, interface: &Interface, cfg: &ConfigSelecao, x: i32, y: i32) -> Result<Option<Escolha>, String> {
-    let janela = carregar_janela(recursos, cfg.janela)?;
-    for (nome, e) in &cfg.opcoes {
-        let (r, _) = objeto_na_tela(interface, cfg.janela, &janela, nome, [0, 0])?;
-        if x >= i32::from(r.esq) && x < i32::from(r.dir) && y >= i32::from(r.topo) && y < i32::from(r.base) {
-            return Ok(Some(*e));
-        }
-    }
-    Ok(None)
 }
 
 #[cfg(test)]

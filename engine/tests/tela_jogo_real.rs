@@ -140,20 +140,32 @@ fn botoes_da_faixa_e_outros_planos_do_quick2() {
 
 const HASH_TELA_JOGO: &str = "2bdd46f9280642b70c36b1fd5f74aa78efad63dc208760e5b87a3cd19312c1c8";
 
-/// "Select a Game" na tela de jogo (tabela 9/0): os objetos levam às escolhas de `_NewGame`; a
-/// posição bate com a captura m10 da bancada (mensagens.md §4).
+/// Janelas de controle (janelas.md): o clique no triângulo do Caste Control (na frente) muda
+/// `_casteLevels`, passa para Manual e recalcula `_IdealCaste`; Auto e os conjuntos.
 #[test]
-fn selecao_de_jogo_na_tela_de_jogo() {
-    use engine::core::avisos::{escolha_em, ConfigAvisos, Escolha};
+fn janela_de_castas_muda_os_niveis() {
+    use engine::core::janelas::{Controle, JanelasControle};
+    use engine::rules::estado::Estado;
     let Some(r) = recursos() else { return };
-    let cfg: ConfigTelaJogo = r.dados("tela_jogo.json").unwrap();
-    let interface = Interface::carregar(&r, cfg.tabela_posicoes).unwrap();
-    let av: ConfigAvisos = r.dados("mensagens.json").unwrap();
-    let s = &av.selecao_de_jogo;
-    // Na captura (tela 640×480, área cliente a partir da linha 38): Quick Game em (345, 228),
-    // Load em (345, 380), Cancel em (412, 175).
-    assert_eq!(escolha_em(&r, &interface, s, 345, 228 - 38).unwrap(), Some(Escolha::Rapido));
-    assert_eq!(escolha_em(&r, &interface, s, 345, 380 - 38).unwrap(), Some(Escolha::Carregar));
-    assert_eq!(escolha_em(&r, &interface, s, 412, 175 - 38).unwrap(), Some(Escolha::Cancelar));
-    assert_eq!(escolha_em(&r, &interface, s, 20, 20).unwrap(), None);
+    let mut e = Estado::de_save(&quick2()).unwrap();
+    let mut j = JanelasControle::new(r.dados("janelas.json").unwrap());
+    j.trazer_para_frente(Some(Controle::Castas));
+    let edicao = engine::formats::janela::Retangulo { esq: 20, topo: 97, dir: 444, base: 444 };
+    // Ápice do triângulo (casteTriangle (392, 342) no layout, deslocamento (0, −52)): reprodutores 100%.
+    assert!(j.clicar(&r, &mut e, edicao, 447, 290).unwrap());
+    assert!(j.soltar());
+    assert_eq!(e.controles.castas[0], 0xFFFF);
+    assert_eq!(e.controles.casta_automatica, 0);
+    assert_eq!(e.controles.castas_ideais, [0, 0, 50, 50]);
+    assert_eq!(e.controles.castas_memorizadas[..3], [0xFFFF, 0, 0]);
+    // Set 2 (348, 359)–(391, 373): guarda o atual no conjunto 0 e carrega o 1.
+    assert!(j.clicar(&r, &mut e, edicao, 360, 359 - 52 + 5).unwrap());
+    assert_eq!(j.conjunto[0], 1);
+    assert_eq!(e.controles.castas[..], e.controles.castas_memorizadas[3..6]);
+    // Auto (348, 309)–(390, 323).
+    assert!(j.clicar(&r, &mut e, edicao, 360, 309 - 52 + 5).unwrap());
+    assert_eq!(e.controles.casta_automatica, 1);
+    // Fora das janelas e dentro da de edição: é da janela de edição, que vem para a frente.
+    assert!(!j.clicar(&r, &mut e, edicao, 100, 200).unwrap());
+    assert_eq!(j.ativa(), None);
 }

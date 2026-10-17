@@ -1,0 +1,59 @@
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_experimental_e01.txt --overlay re_trabalho/qemu/ov_exp.qcow2
+# (ov_exp.qcow2 = cópia do c_overlay.qcow2). Ver docs/spec/telas/experimental.md, seção 9.
+# Experimental: ferramentas aplicadas com o jogo pausado; estado antes e depois de cada clique.
+esperar 50
+teclas spc
+esperar 6
+teclas spc
+esperar 10
+mouse_canto
+mover 185 375
+esperar 2
+clicar
+esperar_variavel CurGameType 3 60
+esperar 10
+capturar re_trabalho/exp/e00_experimental.png
+teclas shift+0
+esperar 2
+capturar re_trabalho/exp/e01_pausado.png
+# Comida, um pedaço, na célula (col 5, lin 5)
+escrever_variavel CurExpTool 4
+escrever_variavel 8:8604 0 1
+ler_variavel SementeS re_trabalho/exp/s_comida.bin
+estado re_trabalho/exp/comida_antes.ANT
+clicar_em 112 246
+esperar 3
+estado re_trabalho/exp/comida_depois.ANT
+# Formiga preta na célula (col 7, lin 5)
+escrever_variavel CurExpTool 3
+escrever_variavel 8:8603 0 1
+ler_variavel SementeS re_trabalho/exp/s_formiga.bin
+estado re_trabalho/exp/formiga_antes.ANT
+clicar_em 144 246
+esperar 3
+estado re_trabalho/exp/formiga_depois.ANT
+# Muro na célula (col 9, lin 5)
+escrever_variavel CurExpTool 1
+escrever_variavel 8:8601 0 1
+estado re_trabalho/exp/muro_antes.ANT
+clicar_em 176 246
+esperar 3
+estado re_trabalho/exp/muro_depois.ANT
+# Pedrinha na célula (col 10, lin 5)
+escrever_variavel 8:8601 1 1
+ler_variavel SementeS re_trabalho/exp/s_pedra.bin
+estado re_trabalho/exp/pedra_antes.ANT
+clicar_em 192 246
+esperar 3
+estado re_trabalho/exp/pedra_depois.ANT
+# Inseticida em jato na formiga posta (col 7, lin 5)
+escrever_variavel CurExpTool 6
+escrever_variavel 8:8606 1 1
+ler_variavel SementeS re_trabalho/exp/s_inseticida.bin
+estado re_trabalho/exp/inseticida_antes.ANT
+clicar_em 144 246
+esperar 3
+estado re_trabalho/exp/inseticida_depois.ANT
+ler_variavel SementeS re_trabalho/exp/s_fim.bin
+capturar re_trabalho/exp/e02_fim.png
+fim

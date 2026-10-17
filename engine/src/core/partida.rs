@@ -359,6 +359,13 @@ impl Partida {
         std::mem::take(&mut self.redesenhar)
     }
 
+    /// Depois de uma mudança no estado feita fora do tick (troca de patch, ferramentas do
+    /// Experimental): trata a fila de eventos do estado como depois de um tick e pede redesenho.
+    pub fn processar_eventos_do_estado(&mut self) {
+        self.tratar_eventos();
+        self.redesenhar = true;
+    }
+
     /// Retira os pedidos das regras à interface (mensagens, músicas, fim de jogo), em ordem.
     pub fn retirar_eventos(&mut self) -> Vec<Evento> {
         self.eventos.drain(..).collect()

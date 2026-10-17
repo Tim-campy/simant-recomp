@@ -182,13 +182,18 @@ impl JanelasControle {
 
     /// Clique do botão esquerdo em (x, y). Devolve `true` se caiu numa janela de controle visível
     /// (por cima da janela de edição e das outras) e foi tratado aqui.
-    pub fn clicar(&mut self, recursos: &Recursos, e: &mut Estado, x: i32, y: i32) -> Result<bool, String> {
+    /// `edicao`: contorno externo da janela de edição (o clique nela a traz para a frente e segue
+    /// para a interface).
+    pub fn clicar(&mut self, recursos: &Recursos, e: &mut Estado, edicao: Retangulo, x: i32, y: i32) -> Result<bool, String> {
         // De cima para baixo: a primeira janela que contém o ponto recebe o clique.
         let pilha: Vec<Option<Controle>> = self.pilha.iter().rev().copied().collect();
         for j in pilha {
             let Some(c) = j else {
-                // A janela de edição: quem decide se o ponto é dela é a interface.
-                return Ok(false);
+                if contem(edicao, x, y) {
+                    self.trazer_para_frente(None);
+                    return Ok(false);
+                }
+                continue;
             };
             let janela = carregar_janela(recursos, self.cfg.de(c).janela)?;
             let g = self.geometria_de(&janela);
@@ -203,9 +208,14 @@ impl JanelasControle {
     }
 
     /// Ponto (x, y) dentro de alguma janela de controle que esteja por cima da de edição.
-    pub fn cobre(&self, recursos: &Recursos, x: i32, y: i32) -> bool {
+    pub fn cobre(&self, recursos: &Recursos, edicao: Retangulo, x: i32, y: i32) -> bool {
         for j in self.pilha.iter().rev() {
-            let Some(c) = j else { return false };
+            let Some(c) = j else {
+                if contem(edicao, x, y) {
+                    return false;
+                }
+                continue;
+            };
             if let Ok(g) = self.geometria(recursos, *c) {
                 if contem(g.externo, x, y) {
                     return true;
@@ -337,7 +347,15 @@ impl JanelasControle {
             Controle::Castas => e.controles.castas,
             Controle::Tarefas => e.controles.tarefas,
         };
-        if let Some(t) = Self::triangulo(&janela, &g, cfg) {
+        // O botão bate com as capturas (j01, j02) usando o retângulo do triângulo com 1 pixel a menos
+        // à direita e embaixo (em vez do pixel a mais de `_win_GetObjRect`) [medido; causa em aberto].
+        let triangulo_do_botao = Self::objeto(&janela, &g, &cfg.objeto_triangulo, false).map(|(r, _)| Triangulo {
+            esq: r.esq.into(),
+            topo: r.topo.into(),
+            dir: (r.dir - 1).into(),
+            base: (r.base - 1).into(),
+        });
+        if let Some(t) = triangulo_do_botao {
             if let Ok(bm) = recursos.objeto(Chave { tipo: TIPO_BITMAP, id: jc.bitmap_botao }).and_then(|d| Bitmap::decodificar(&d)) {
                 let (x, y) = t.ponto(niveis);
                 let (x, y) = (x + i32::from(jc.ajuste_botao[0]), y + i32::from(jc.ajuste_botao[1]));
@@ -354,7 +372,7 @@ impl JanelasControle {
         let cor = |i: u8| interface.cores.get(i as usize).copied().unwrap_or(Cor { frente: 0, fundo: 15, fundo2: 15 });
         let fonte = interface.fontes.get(jc.fonte_niveis).and_then(|f| f.as_ref());
         for (i, nome) in cfg.objetos_niveis.iter().enumerate() {
-            if let (Some((r, ci)), Some(f)) = (Self::objeto(&janela, &g, nome, true), fonte) {
+            if let (Some((r, ci)), Some(f)) = (Self::objeto(&janela, &g, nome, false), fonte) {
                 let c = cor(ci);
                 let antes = q.recorte.replace(r);
                 let t = texto_do_nivel(niveis[i], self.porcentagem[k], total);
@@ -363,16 +381,19 @@ impl JanelasControle {
             }
         }
         if let Some((gr, _)) = Self::objeto(&janela, &g, &cfg.objeto_graficos, true) {
-            let (l, t, r, b) = (i32::from(gr.esq), i32::from(gr.topo), i32::from(gr.dir), i32::from(gr.base));
+            // Largura de cada barra = (dir − esq + 1) / 5, uma a cada duas larguras. Na vertical,
+            // medido (j01): a barra vai da base do objeto − 2 até essa base menos nível × (altura − 2).
+            let (l, t, r, b) = (i32::from(gr.esq), i32::from(gr.topo), i32::from(gr.dir), i32::from(gr.base) - 1);
             let bw = (r - l) / 5;
-            let h = b - t;
+            let base = b - 2;
+            let h = b - t - 2;
             for (i, &nivel) in niveis.iter().enumerate() {
                 let x0 = l + i as i32 * 2 * bw;
                 let x1 = x0 + bw - 1;
-                let topo_barra = (b - 1) - (nivel as i64 * h as i64 / 0xFFFF) as i32;
-                let topo_barra = if topo_barra + 1 < b - 1 {
+                let topo_barra = base - (nivel as i64 * h as i64 / 0xFFFF) as i32;
+                let topo_barra = if topo_barra < base {
                     let c = cfg.cores_barras[i];
-                    let barra = ret(x0, topo_barra, x1, b - 1);
+                    let barra = ret(x0, topo_barra, x1, base);
                     q.preencher(barra, c, c);
                     q.contorno(barra, jc.cor_contorno_barra);
                     topo_barra

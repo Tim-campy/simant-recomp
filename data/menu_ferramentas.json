@@ -1,0 +1,11 @@
+{
+  "_comentario": "Menu de ferramentas do Experimental (janela 9, _DoExpMenu 1010:6ee2) aberto pelo botão ribTools da faixa (_RibbonToolsMenu 1010:de76). submenus: janela do submenu por ferramenta 0-7 (_ExpSubStates = item - 2): barreira 12 wallRockMenu, cavar 15 digFillMenu, formiga 16 blackRedMenu, comida 17 foodMenu, cheiro 13 placeScentMenu, inseticida 14 cideMenu. bitmaps_botao_experimental: _NewGame troca os bitmaps do ribTools para (0x38d6, 0x38a4) no Experimental. 'deslocamento' (canto do menu abaixo do botão) e 'cor_item_atual' são escolhas do port [hipótese]. Ver docs/spec/telas/experimental.md.",
+  "botao": "ribTools",
+  "bitmaps_botao_experimental": [14550, 14500],
+  "janela": 9,
+  "primeiro_item": 2,
+  "submenus": [0, 12, 15, 16, 17, 13, 14, 0],
+  "primeiro_item_submenu": 2,
+  "deslocamento": [0, 2],
+  "cor_item_atual": 9
+}
