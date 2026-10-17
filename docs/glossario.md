@@ -70,3 +70,11 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `_AntMenu` / `_win_DoProxMenu` | menu da formiga amarela ao segurar o botão sobre ela; itens viram `_YellowCommand` | `1010:6d24`, `1030:de62`; [telas/janelas.md](spec/telas/janelas.md) |
 | `_casteLevels` / `_modeLevels` | os três níveis (0–65535) dos triângulos Caste e Behavior Control | `9:9b64`, `9:9c74`; janelas.md §2 |
 | `_DoBookMark` | marcadores 1–7 da faixa (Ctrl+clique guarda a vista) | `1000:08a6`; mensagens.md §2.3 |
+| `_LoadGame` / `_SaveGame` / `_FileSelect` | File → Load (pergunta, diálogo, `_RandYard`, blocos), Save/Save As e o diálogo comum de arquivo | `1010:9fa0`, `1010:a23e`, `1010:9920`; [telas/arquivos.md](spec/telas/arquivos.md) |
+| `_gGameNeedsSaving` | partida mudada desde o último Save/Load (1 a cada tick) | `8:8370`; arquivos.md |
+| `_StopSimulation` / `_RestartSimulation` | `KillTimer`/`SetTimer` aninhados em volta das caixas modais | `1000:0000`, `1000:0034`; mensagens.md §3.5 |
+| `_MysteryButton`, `_AddRedAnts`, `_KillSomeAnts` | botão Mystery (`_RRand(15)`), vermelhas novas, matar até 51 da lista A | `1000:b0bc`, `1030:6cfe`, `1000:9d5e`; [regras/misterio.md](spec/regras/misterio.md) |
+| `_MagnifyMenu` | Examine: janela 29 enquanto o botão fica apertado | `1010:6b4c`; janelas.md §4.3 |
+| `_SetMapModeAnt`, `_MapMode`, `_showTrails` | modo da janela do mapa (planos e feromônios) e as trilhas | `1000:9e82`, `8:8610`, DGROUP `1998`; [telas/mapa.md](spec/telas/mapa.md) |
+| `_OpenInfoWindow`, `_DisplayCard` | Info ("Top Card"): cartões dos tipos 17/19/10/21 | `1018:60da`, `1018:5a1c`; [telas/info.md](spec/telas/info.md) |
+| `_MakeBalloon` | balão de fala (peças 8×8 do DGROUP) do menino | `1008:59e4`; telas/quintal.md §2.3 |
