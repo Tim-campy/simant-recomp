@@ -453,7 +453,7 @@ Casos no original (bancada QEMU): Q-01 (chuva e água) e Q-02 (colônias), ambos
 
 ## Implementação no port
 
-- `engine/src/rules/quintal.rs`: `TabelasQuintal` (`data/quintal.json`), `simular_quintal_com(e, tabelas, relogios)` (`_DoSimYard`), `simular_agua` (`_DoWater`), `iniciar_quintal` (`_InitSimYard`), `simular_colonias`, `placar_vizinhos`, `reproduzir`, `manter_enxame`, `iniciar_migracao`/`terminar_migracao`, `por_gota`/`iniciar_agua`. `impl RegrasQuintal for RegrasOriginais` usa as tabelas embutidas (cópia de `data/quintal.json` no binário) [lacuna: `RegrasOriginais` ainda não tem um campo para as tabelas carregadas com mods; ver "Lacunas"].
+- `engine/src/rules/quintal.rs`: `TabelasQuintal` (`data/quintal.json`), `simular_quintal_com(e, tabelas, vitimas, relogios)` (`_DoSimYard`; `Vitimas` = tabelas da amarela e agonia da aranha, para `_YellowDeath` e `_KillSpider`), `simular_agua` (`_DoWater`), `iniciar_quintal` (`_InitSimYard`), `simular_colonias`, `placar_vizinhos`, `reproduzir`, `manter_enxame`, `iniciar_migracao`/`terminar_migracao`, `por_gota`/`iniciar_agua`. `impl RegrasQuintal for RegrasOriginais` usa `RegrasOriginais::quintal` (carregado de `data/quintal.json` com mods).
 - **Relógios do port** (decisão registrada em [../../divergencias.md](../../divergencias.md)): quando `Estado::ciclos_jogo` ≠ 0 (o laço de jogo conta as mensagens de timer; os vetores de tick trazem o `_gameCycles` do original), ele é usado como `_gameCycles` e como relógio do Mac [hipótese: 17 ms ≈ 1/60 s] — assim os 5 vetores de tick batem inteiros, inclusive `_BirdDelay` e `_CatDelay`. Senão: `_gameCycles` = `_GameTime` (1 por tick, como no original em "fast"/"ultra" [hipótese]); relógio do Mac = `_GameTime × mac_por_tick` (padrão 6, [hipótese] ≈ velocidade normal). Um atraso vindo de um save do original maior que "agora + o maior atraso que a regra grava" é considerado vencido.
 - **Verificado** (`engine/tests/regras_quintal.rs`): Q-U2 dá os dois mapas `_YMapPop*` do `Q02_T100.ANT` byte a byte; Q-U8 dá as linhas 61–63 de `_MapB/_MapR` do `Q01_T140.ANT`; Q-U10 reproduz, nos ticks 79–83 dos vetores do original, todos os campos do menino, do gato, do cachorro e do pássaro (inclusive `_BirdDelay`, com o `_gameCycles` do vetor), exceto `_BoyMsgCnt`/`_CatDelay`/`_DogBarkDelay` (relógio do Mac, não capturado). Nesses ticks o menino está lá fora parado, o cachorro anda e senta e o gato anda: o menino cortando, o inseticida e as colônias com sorteio não foram exercitados contra o original.
 - O teste `tick_vazio_sobre_o_quick2` (`engine/tests/estado_simulacao.rs`) supõe sub-rotinas vazias e passa a falhar com o quintal ligado (mudam os campos do quintal); precisa ser ajustado na integração.
@@ -461,8 +461,8 @@ Casos no original (bancada QEMU): Q-01 (chuva e água) e Q-02 (colônias), ambos
 
 ## Lacunas
 
-- `_YellowDeath` (causas 5, 6 e 9) ainda não é chamado: o port marca o ponto (`morte_da_amarela`, sem efeito) até a regra da amarela existir em `rules/amarela.rs`.
-- `_DeadAntHere`, `_FindInAList` e `_KillSpider` têm cópias locais em `quintal.rs`, a unificar com `superficie.rs`/`inimigos.rs`.
+- `_YellowDeath` (causas 5 pisada, 6 cortador, 9 inseticida) chama `matar_amarela` de `rules/amarela.rs` (teste `pisada_mata_a_amarela`); não foi conferido contra o original.
+- `_DeadAntHere`, `_FindInAList` e `_KillSpider` são os de `engine/src/rules/comum.rs` (ver [../../decisoes.md](../../decisoes.md), "Módulo comum das regras"); a agonia da aranha vem de `inimigos.json` (`regras.aranha_agonia`), não mais de uma constante do quintal.
 - Textos do balão do menino (lista 4/1200) e dos sons: não conferidos.
 - `_LastColonyPop*` não está no save nem no `Estado`: o port usa o `_ColonyTotal*` da passada anterior, que é o mesmo valor exceto logo depois de `_InitSimYard` (1 no original).
 - Taxa do relógio do Mac por tick (`mac_por_tick`) não medida.

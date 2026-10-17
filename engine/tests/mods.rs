@@ -83,3 +83,84 @@ fn dependencia_ausente_e_erro() {
     criar_mod(&mods, "orfao", &["nao-existe"]);
     assert!(carregar_mods(&mods).is_err());
 }
+
+/// Banco com um único objeto (tipo, id) sem compressão, no mesmo formato de [`banco_minimo`].
+fn banco_com(dir: &Path, nome: &str, tipo: u8, id: u16, conteudo: &[u8]) {
+    let mut dat = Vec::new();
+    dat.extend_from_slice(&0x1234_5678u32.to_le_bytes());
+    dat.extend_from_slice(&[0; 10]);
+    dat.extend_from_slice(&0x1234_5678u32.to_le_bytes());
+    dat.extend_from_slice(&0u16.to_le_bytes());
+    dat.extend_from_slice(&(conteudo.len() as u32).to_le_bytes());
+    dat.extend_from_slice(conteudo);
+    let mut ndx = Vec::new();
+    ndx.extend_from_slice(&1u32.to_le_bytes());
+    ndx.extend_from_slice(&[0; 16]);
+    ndx.extend_from_slice(&0u32.to_le_bytes());
+    ndx.extend_from_slice(&id.to_le_bytes());
+    ndx.extend_from_slice(&[tipo, 0]);
+    fs::write(dir.join(format!("{nome}.NDX")), ndx).unwrap();
+    fs::write(dir.join(format!("{nome}.DAT")), dat).unwrap();
+}
+
+fn dados_do_port() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data")
+}
+
+/// Cópia de `data/<arquivo>` do port com uma alteração, gravada em `<mod>/data/<arquivo>`.
+fn sobrescrever(m: &Path, arquivo: &str, mudar: impl FnOnce(&mut serde_json::Value)) {
+    let texto = fs::read_to_string(dados_do_port().join(arquivo)).unwrap();
+    let mut v: serde_json::Value = serde_json::from_str(&texto).unwrap();
+    mudar(&mut v);
+    fs::create_dir_all(m.join("data")).unwrap();
+    fs::write(m.join("data").join(arquivo), v.to_string()).unwrap();
+}
+
+/// API de mods 0.4: os `data/*.json` das regras do tick, sobrescritos por um mod, chegam a
+/// `RegrasOriginais` (e daí ao tick).
+#[test]
+fn mod_das_regras_chega_ao_tick() {
+    use engine::rules::estado::Estado;
+    use engine::rules::tick::{tick, RegrasOriginais};
+
+    let raiz = tmp("regras");
+    let (jogo, mods) = (raiz.join("jogo"), raiz.join("mods"));
+    fs::create_dir_all(&jogo).unwrap();
+    // O seno da geração (objeto 9/1000: 64 palavras big-endian).
+    let seno: Vec<u8> = (0..64)
+        .flat_map(|i| (((i as f64 * std::f64::consts::PI / 128.0).sin() * 32767.0) as i16).to_be_bytes())
+        .collect();
+    banco_com(&jogo, "SENO", 9, 1000, &seno);
+    let bancos = ["SENO".to_string()];
+
+    // Sem mod: as tabelas são as de `data/`, iguais às embutidas.
+    let r = Recursos::abrir(&jogo, &bancos, &dados_do_port(), Some(&mods)).unwrap();
+    let regras = RegrasOriginais::carregar(&r).unwrap();
+    let padrao = RegrasOriginais::default();
+    assert_eq!(regras.superficie.casta_por_escolha, padrao.superficie.casta_por_escolha);
+    assert!(regras.geracao.is_some());
+
+    let m = criar_mod(&mods, "regras-mod", &[]);
+    sobrescrever(&m, "superficie.json", |v| v["casta_por_escolha"][0] = 5.into());
+    sobrescrever(&m, "ninho.json", |v| v["vitoria_vermelha"][0] = 7.into());
+    sobrescrever(&m, "quintal.json", |v| v["regras"]["gato_chance"] = 64.into());
+    sobrescrever(&m, "inimigos.json", |v| v["regras"]["aranha_agonia"] = 123.into());
+    sobrescrever(&m, "amarela.json", |v| v["regras"]["vida_maxima"] = 90.into());
+    sobrescrever(&m, "feromonios.json", |v| v["regras"]["limiar_trilha"] = 9.into());
+    let r = Recursos::abrir(&jogo, &bancos, &dados_do_port(), Some(&mods)).unwrap();
+    let mut regras = RegrasOriginais::carregar(&r).unwrap();
+    assert_eq!(regras.superficie.casta_por_escolha[0], 5);
+    assert_eq!(regras.ninho.vitoria_vermelha[0], 7);
+    assert_eq!(regras.quintal.regras.gato_chance, 64);
+    assert_eq!(regras.inimigos.regras.aranha_agonia, 123);
+    assert_eq!(regras.amarela.regras.vida_maxima, 90);
+    assert_eq!(regras.feromonios.regras.limiar_trilha, 9);
+
+    // No tick: `_SetCasteProd` escolhe a entrada 0 de `casta_por_escolha` num estado vazio.
+    let mut e = Estado::vazio();
+    tick(&mut e, &mut regras);
+    assert_eq!(e.controles.proxima_casta, 5);
+    let mut e = Estado::vazio();
+    tick(&mut e, &mut RegrasOriginais::default());
+    assert_eq!(e.controles.proxima_casta, padrao.superficie.casta_por_escolha[0]);
+}

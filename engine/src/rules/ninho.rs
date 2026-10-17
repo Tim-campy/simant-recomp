@@ -5,12 +5,15 @@
 //! ordem do original). Este arquivo segue as seções da spec; cada função cita a rotina do original.
 //!
 //! - As tabelas (direções, giro, modos, castas vermelhas, luta, borda do buraco) vêm de
-//!   `data/ninho.json` ([`TabelasNinho`]), gerado por `tools/extrair_ninho.py`.
+//!   `data/ninho.json` ([`TabelasNinho`]), gerado por `tools/extrair_ninho.py`, e ficam em
+//!   `RegrasOriginais::ninho` (com mods).
 //! - A ordem e o tipo de cada sorteio (`S(n)` = [`GeradorS::rand1`], `Sk(K)` = [`GeradorS::mascara`],
 //!   `SG(n)` = [`GeradorS::sg_rand`], `RR(n)` = [`GeradorR::rrand`]) é parte da regra: um sorteio só
 //!   acontece se o ramo em que está for executado.
-//! - O que é da formiga amarela (`_YellowFight`, `_DoTroph`) fica em pontos de extensão vazios
-//!   ([`luta_com_amarela`], [`trofalaxia`]) até a parte da amarela existir.
+//! - As rotinas que o original compartilha com outras partes (escavação `_DigTile*`, `_SmoothEdges*`,
+//!   `_FixExitMap*`, `_MakeNewHole*`, `_PlaceEgg*`, `_GetNewMode*`, `_GetWinner`, comida, `_ExitHole`)
+//!   estão em `rules/comum.rs`; as da formiga amarela (`_YellowFight`, `_DoTroph`), em
+//!   `rules/amarela.rs`.
 //!
 //! [`GeradorS::rand1`]: super::rng::GeradorS::rand1
 //! [`GeradorS::mascara`]: super::rng::GeradorS::mascara
@@ -21,7 +24,13 @@ use std::sync::OnceLock;
 
 use serde::Deserialize;
 
-use super::estado::{indice_cor, Colonia, Estado, Evento, CAPACIDADE_NINHO};
+use super::amarela::{self, TabelasAmarela};
+use super::comum::{
+    self, e_amarela, e_comida_ninho as e_comida, e_terra, e_vermelha as vermelha, grupo, lista_do_ninho,
+    plano_do_ninho, Direcoes, TabelaDeGiro, TabelaLuta, TabelaModos, ABERTURA_NINHO as ABERTURA, COMIDA_NINHO_CHEIA as COMIDA_CHEIA,
+    COMIDA_NINHO_UMA as COMIDA_UMA, LADO_NINHO as LADO, PASSAGEM_ENTRE_NINHOS as PASSAGEM, VIDA_AMARELA,
+};
+use super::estado::{indice_cor, Colonia, Estado, Evento};
 use super::geracao::Cor;
 use super::tick::{RegrasNinho, RegrasOriginais};
 use crate::formats::save::{Formiga, Lista};
@@ -30,24 +39,11 @@ use crate::recursos::Recursos;
 /// Nome do arquivo de dados (em `data/` ou num mod).
 pub const ARQUIVO_TABELAS: &str = "ninho.json";
 
-// Valores de célula dos ninhos (tiles-valores.md, "Ninhos").
+// Valores de célula dos ninhos (tiles-valores.md, "Ninhos"); os comuns estão em `comum.rs`.
 /// `MOVER` só entra em células abaixo disto (túnel, comida, passagem, abertura).
 const LIMITE_PASSAVEL: u8 = 0x1C;
 /// `PASSO` e os modos de escavação param diante de células a partir disto (terra inundada, pedrinha…).
 const LIMITE_BLOQUEIO: u8 = 0x30;
-const COMIDA_UMA: u8 = 0x10;
-const COMIDA_CHEIA: u8 = 0x13;
-const PASSAGEM: u8 = 0x14;
-const ABERTURA: u8 = 0x18;
-const TUNEL_INUNDADO: u8 = 0x4E;
-/// Buraco na superfície (quintal) e limite das células onde a formiga pode sair (`_ExitHole`).
-const BURACO_SUPERFICIE: u8 = 0x50;
-/// Byte de vida da formiga amarela e da segunda metade dela.
-const VIDA_AMARELA: u8 = 0xFF;
-const VIDA_AMARELA_2: u8 = 0xFE;
-/// Lado do ninho (64 × 64) e capacidade da lista A.
-const LADO: i32 = 64;
-const CAPACIDADE_A: usize = 1000;
 
 // ---------------------------------------------------------------------------------------------
 // Tabelas (dados)
@@ -93,8 +89,7 @@ impl TabelasNinho {
         Ok(t)
     }
 
-    /// As tabelas do original, embutidas de `data/ninho.json` (usadas por [`RegrasOriginais`],
-    /// que ainda não guarda as tabelas do ninho; ver a nota no fim do arquivo).
+    /// Cópia embutida de `data/ninho.json` (sem mods), para `RegrasOriginais::default` e testes.
     pub fn padrao() -> &'static TabelasNinho {
         static PADRAO: OnceLock<TabelasNinho> = OnceLock::new();
         PADRAO.get_or_init(|| {
@@ -104,9 +99,7 @@ impl TabelasNinho {
 
     fn validar(&self) -> Result<(), String> {
         let erro = |m: &str| Err(format!("{ARQUIVO_TABELAS}: {m}"));
-        if self.dx8.iter().chain(&self.dy8).any(|d| !(-1..=1).contains(d)) {
-            return erro("dx8/dy8 devem estar em −1..1");
-        }
+        comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx8, &self.dy8)?;
         if self.turn_tab.iter().flatten().any(|&d| d > 7) {
             return erro("turn_tab com direção fora de 0..7");
         }
@@ -119,10 +112,26 @@ impl TabelasNinho {
         Ok(())
     }
 
-    /// Deslocamento da direção `d` (0..7).
-    fn d8(&self, d: i32) -> (i32, i32) {
-        let k = (d & 7) as usize;
-        (self.dx8[k] as i32, self.dy8[k] as i32)
+    /// Tabelas de `_GetNewModeB/R`.
+    pub fn modos(&self) -> TabelaModos<'_> {
+        TabelaModos { operaria: &self.modos_operaria, soldado: &self.modos_soldado, por_grupo: &self.modo_por_grupo }
+    }
+
+    /// Tabelas de `_GetWinner`.
+    pub fn luta(&self) -> TabelaLuta<'_> {
+        TabelaLuta { classe: &self.classe_luta, chance: &self.chance_vitoria }
+    }
+}
+
+impl Direcoes for TabelasNinho {
+    fn deslocamentos(&self) -> (&[i8; 8], &[i8; 8]) {
+        (&self.dx8, &self.dy8)
+    }
+}
+
+impl TabelaDeGiro for TabelasNinho {
+    fn turn_tab(&self) -> &[[u8; 8]; 8] {
+        &self.turn_tab
     }
 }
 
@@ -132,422 +141,76 @@ impl TabelasNinho {
 
 impl RegrasNinho for RegrasOriginais {
     fn simular_ninho(&mut self, e: &mut Estado, cor: Cor) {
-        simular_ninho(e, cor, TabelasNinho::padrao());
+        simular_ninho(e, cor, &self.ninho, &self.amarela);
     }
 }
 
 /// `_DoAntSimB` (`1028:2d4e`) para `Cor::Preta` e `_DoAntSimR` (`1028:5344`) para `Cor::Vermelha`
 /// (ninho.md §2): percorre a lista do ninho de `_ListIndex − 1` até 0, lido uma vez no começo, e
 /// processa as vagas com T ≠ 0. Vagas vazias não sorteiam nada. Entradas acrescentadas durante o
-/// laço só são processadas no tick seguinte.
-pub fn simular_ninho(e: &mut Estado, cor: Cor, tab: &TabelasNinho) {
+/// laço só são processadas no tick seguinte. `ta` são as tabelas da amarela (luta e trofalaxia).
+pub fn simular_ninho(e: &mut Estado, cor: Cor, tab: &TabelasNinho, ta: &TabelasAmarela) {
     let n = e.ninho(cor).lista.usadas();
     for i in (0..n).rev() {
         e.tindex = i as i32;
         let f = e.ninho(cor).lista.vagas[i];
         if f.tipo != 0 {
-            let mut fm = Formigueiro { e, tab, cor, i, t0: f.tipo, x0: f.x as i32, y0: f.y as i32, m0: f.modo };
+            let mut fm = Formigueiro { e, tab, ta, cor, i, t0: f.tipo, x0: f.x as i32, y0: f.y as i32, m0: f.modo };
             fm.processar();
         }
     }
 }
 
 // ---------------------------------------------------------------------------------------------
-// Utilitários de tipo e de célula
+// Rotinas comuns, com as tabelas do ninho (implementação em `comum.rs`)
 // ---------------------------------------------------------------------------------------------
-
-/// Grupo (casta + carga) de um T: bits 3..6.
-fn grupo(t: u8) -> u8 {
-    (t & 0x78) >> 3
-}
-
-fn vermelha(t: u8) -> bool {
-    t & 0x80 != 0
-}
-
-/// `_IsYellowAnt`.
-fn e_amarela(v: u8) -> bool {
-    v == VIDA_AMARELA || v == VIDA_AMARELA_2
-}
-
-/// `_IsItDirt`: terra 0x20–0x2E.
-fn e_terra(v: u8) -> bool {
-    (0x20..=0x2E).contains(&v)
-}
-
-/// Comida guardada: 0x10–0x13.
-fn e_comida(v: u8) -> bool {
-    (COMIDA_UMA..=COMIDA_CHEIA).contains(&v)
-}
-
-/// Sólido para o alisamento: ≥ 0x20 e fora de 0x30–0x4E.
-fn e_solido(v: u8) -> bool {
-    v >= 0x20 && !(0x30..=0x4E).contains(&v)
-}
 
 fn no_ninho(x: i32, y: i32) -> bool {
     (0..LADO).contains(&x) && (0..LADO).contains(&y)
 }
 
-fn lista_do_ninho(cor: Cor) -> Lista {
-    match cor {
-        Cor::Preta => Lista::B,
-        Cor::Vermelha => Lista::R,
-    }
-}
-
-/// Número do plano (`_MePlane`) do ninho: 2 preto, 3 vermelho.
-fn plano_do_ninho(cor: Cor) -> i16 {
-    match cor {
-        Cor::Preta => 2,
-        Cor::Vermelha => 3,
-    }
-}
-
-/// `_FindInBList/RList(x, y, t)` (`1020:2c86`/`2cce`): de trás para frente, a primeira vaga em uso
-/// com a mesma posição e o mesmo T.
+/// `_FindInBList/RList(x, y, t)` (`1020:2c86`/`2cce`).
 fn procurar(e: &Estado, cor: Cor, x: i32, y: i32, t: u8) -> Option<usize> {
-    let l = &e.ninho(cor).lista;
-    (0..l.usadas()).rev().find(|&j| {
-        let f = &l.vagas[j];
-        f.x as i32 == x && f.y as i32 == y && f.tipo == t
-    })
+    comum::achar_formiga(e, lista_do_ninho(cor), x, y, t)
 }
 
-/// Soma uma célula escavada nos totais da colônia e recalcula o centro de massa (alvo da rainha).
-/// Somas de 32 bits, contagem e centro de 16 bits, divisão com sinal (ninho.md §7.3).
-fn somar_escavacao(c: &mut Colonia, x: i32, y: i32) {
-    c.soma_x_escavada = c.soma_x_escavada.wrapping_add(x);
-    c.soma_y_escavada = c.soma_y_escavada.wrapping_add(y);
-    c.tiles_escavados = c.tiles_escavados.wrapping_add(1);
-    let n = c.tiles_escavados as i32;
-    if n > 0 {
-        c.centro_x = (c.soma_x_escavada / n) as i16;
-        c.centro_y = (c.soma_y_escavada / n) as i16;
-    }
-}
-
-// ---------------------------------------------------------------------------------------------
-// Escavação, alisamento e mapa de saída (ninho.md §7.3–7.6)
-// ---------------------------------------------------------------------------------------------
-
-/// `_SmoothEdgesB/R(x, y)` (`1020:255a`/`26e4`).
-fn alisar(e: &mut Estado, cor: Cor, x: i32, y: i32) {
-    // O original não filtra y < 0 (leria a coluna anterior); só aconteceria cavando a linha 0 com
-    // `_DigTileB`, o que nenhuma regra deste arquivo faz.
-    if !(0..LADO).contains(&x) || !(0..LADO).contains(&y) {
-        return;
-    }
-    let mapa = &e.ninho(cor).mapa;
-    let m = |x: i32, y: i32| mapa.em(x, y).unwrap_or(0);
-    if y == 0 {
-        if m(x, 0) <= 0x2F {
-            e.ninho_mut(cor).mapa.definir(x, 0, ABERTURA);
-        }
-        return;
-    }
-    let v = m(x, y);
-    if !e_solido(v) {
-        return;
-    }
-    let inundada = v >= TUNEL_INUNDADO;
-    let mut mascara = 0u8;
-    if y < 2 || e_solido(m(x, y - 1)) {
-        mascara |= 1;
-    }
-    if x >= LADO - 1 || e_solido(m(x + 1, y)) {
-        mascara |= 2;
-    }
-    if y >= LADO - 1 || e_solido(m(x, y + 1)) {
-        mascara |= 4;
-    }
-    if x <= 0 || e_solido(m(x - 1, y)) {
-        mascara |= 8;
-    }
-    let novo = if mascara != 0 {
-        0x1F + mascara + if inundada { 0x2F } else { 0 }
-    } else if inundada {
-        TUNEL_INUNDADO
-    } else {
-        e.s.mascara(8) as u8
-    };
-    e.ninho_mut(cor).mapa.definir(x, y, novo);
-}
-
-/// `_FixExitMapB/R(x, y)` (`1020:284e`/`2914`, ninho.md §7.4): atualiza uma célula do mapa de saída.
-fn corrigir_saida(e: &mut Estado, tab: &TabelasNinho, cor: Cor, x: i32, y: i32) {
-    let n = e.ninho_mut(cor);
-    if y < 2 {
-        let v = if n.mapa.em(x, y) == Some(ABERTURA) { 0xFF } else { 0xFE };
-        n.saida.definir(x, y, v);
-        return;
-    }
-    let maior = (0..8).filter_map(|k| {
-        let (dx, dy) = tab.d8(k);
-        n.saida.em(x + dx, y + dy)
-    });
-    let maior = maior.max().unwrap_or(0);
-    n.saida.definir(x, y, maior.saturating_sub(1));
-}
-
-/// As quatro chamadas a `_SmoothEdges?` (cima, direita, baixo, esquerda) e `_FixExitMap?`.
-fn alisar_vizinhas(e: &mut Estado, tab: &TabelasNinho, cor: Cor, x: i32, y: i32) {
-    alisar(e, cor, x, y - 1);
-    alisar(e, cor, x + 1, y);
-    alisar(e, cor, x, y + 1);
-    alisar(e, cor, x - 1, y);
-    corrigir_saida(e, tab, cor, x, y);
-}
-
-/// `_DigTileB(x, y)` (`1020:1fe4`) e `_DigTileR` (`1020:21de`): cava se for terra; no ninho preto,
-/// abaixo de y = 53, 1/64 de chance de abrir a passagem 0x14 nos dois ninhos. Sempre alisa e refaz
-/// a saída da célula.
-fn cavar(e: &mut Estado, tab: &TabelasNinho, cor: Cor, x: i32, y: i32) {
-    if e.ninho(cor).mapa.em(x, y).is_some_and(e_terra) {
-        let v = e.s.mascara(8) as u8;
-        e.ninho_mut(cor).mapa.definir(x, y, v);
-        somar_escavacao(e.colonia_mut(cor), x, y);
-        if cor == Cor::Preta && y > 53 && e.s.rand1(64) == 0 {
-            e.ninho_b.mapa.definir(x, y, PASSAGEM);
-            if e.ninho_r.mapa.em(x, y).is_some_and(e_terra) {
-                let v = e.s.mascara(8) as u8;
-                e.ninho_r.mapa.definir(x, y, v);
-                somar_escavacao(&mut e.vermelha, x, y);
-            }
-            alisar_vizinhas(e, tab, Cor::Vermelha, x, y);
-            e.ninho_r.mapa.definir(x, y, PASSAGEM);
-        }
-    }
-    alisar_vizinhas(e, tab, cor, x, y);
-}
-
-/// `_DigTileThemB/R(x, y)` (`1020:22d4`/`241c`): a escavação da operária. Só cava com 0 < x < 63,
-/// terra embaixo (ou y > 62) e terra em cima (ou y < 3); não exige que a própria célula seja terra.
-/// Devolve se cavou.
+/// `_DigTileThemB/R(x, y)` ([`comum::cavar_tunel`]). Devolve se cavou.
 fn cavar_tunel(e: &mut Estado, tab: &TabelasNinho, cor: Cor, x: i32, y: i32) -> bool {
-    let mapa = &e.ninho(cor).mapa;
-    let terra_em = |x: i32, y: i32| mapa.em(x, y).is_some_and(e_terra);
-    let baixo = y > 62 || terra_em(x, y + 1);
-    let cima = y < 3 || terra_em(x, y - 1);
-    if !(baixo && cima && x != 0 && x < 63) {
-        return false;
-    }
-    if y == 0 {
-        e.ninho_mut(cor).mapa.definir(x, 0, ABERTURA);
-        novo_buraco(e, tab, cor, x);
-    } else {
-        let v = e.s.mascara(8) as u8;
-        e.ninho_mut(cor).mapa.definir(x, y, v);
-    }
-    somar_escavacao(e.colonia_mut(cor), x, y);
-    alisar_vizinhas(e, tab, cor, x, y);
-    true
+    comum::cavar_tunel(e, tab, &tab.borda_buraco, cor, x, y)
 }
 
-/// `_IsClearTile(1, x, y)`: célula da superfície dentro do mapa, sem formiga (a amarela conta como
-/// livre) e com chão (< 0x10).
-fn livre_na_superficie(e: &Estado, x: i32, y: i32) -> bool {
-    match (e.superficie.mapa.em(x, y), e.superficie.vida.em(x, y)) {
-        (Some(m), Some(v)) => (v == 0 || e_amarela(v)) && m < 0x10,
-        _ => false,
-    }
-}
-
-/// `_IsClear3x3(1, x, y)`.
-fn livre_3x3(e: &Estado, tab: &TabelasNinho, x: i32, y: i32) -> bool {
-    livre_na_superficie(e, x, y)
-        && (0..8).all(|k| {
-            let (dx, dy) = tab.d8(k);
-            livre_na_superficie(e, x + dx, y + dy)
-        })
-}
-
-/// `_MakeNewHoleB(c)` (`1020:1b06`) e `_MakeNewHoleR(c)` (`1020:1d02`): buraco novo na linha `c` da
-/// superfície, ligado à coluna `c` do ninho (geracao-mundo.md §3.A). Um sorteio `S(31)`; depois cava
-/// (c, 1) no ninho. Sem lugar em 34 tentativas, nada muda.
+/// `_MakeNewHoleB/R(c)` ([`comum::novo_buraco`]).
 fn novo_buraco(e: &mut Estado, tab: &TabelasNinho, cor: Cor, c: i32) {
-    let r = e.s.rand1(31);
-    let x_de = |t: i32| {
-        let k = (r + t) % 32;
-        match cor {
-            Cor::Preta => k + 2,
-            Cor::Vermelha => 126 - k,
-        }
-    };
-    let mut achado = None;
-    if e.ambiente.terreno == 0 {
-        if let Some(x) = (0..34).map(x_de).find(|&x| livre_3x3(e, tab, x, c)) {
-            e.superficie.mapa.definir(x, c, BURACO_SUPERFICIE);
-            for k in 0..8 {
-                let (dx, dy) = tab.d8(k);
-                if e.superficie.mapa.em(x + dx, c + dy).is_some_and(|v| v < BURACO_SUPERFICIE) {
-                    e.superficie.mapa.definir(x + dx, c + dy, tab.borda_buraco[k as usize]);
-                }
-            }
-            achado = Some(x);
-        }
-    } else {
-        // Casa: a primeira célula que tenha versão "com buraco" (`_CanBeHouseHole` embutido).
-        for x in (0..34).map(x_de) {
-            let novo = match e.superficie.mapa.em(x, c).unwrap_or(0xFF) {
-                0 => 0x86,
-                2 | 3 => 0x8A,
-                v @ 0x5E..=0x61 => v + 0x22,
-                0x66 => 0x85,
-                0x68 => 0x84,
-                _ => 0,
-            };
-            if novo != 0 {
-                e.superficie.mapa.definir(x, c, novo);
-                achado = Some(x);
-                break;
-            }
-        }
-    }
-    let Some(x) = achado else { return };
-    let col = e.colonia_mut(cor);
-    col.ultimo_buraco = (x as i16, c as i16);
-    col.ultima_saida = (c as i16, 0);
-    if let Some(b) = col.buracos.get_mut(c as usize) {
-        *b = x as u8;
-    }
-    // O vermelho tem a escavação de (c, 1) embutida; é a mesma conta de `_DigTileR(c, 1)`.
-    cavar(e, tab, cor, c, 1);
-}
-
-/// `_PlaceEggB/R(x, y, t)` (`1020:1004`/`1068`, ninho.md §7.6): cava a célula (se for terra) e
-/// acrescenta o ovo no fim da lista, sem testar ocupação.
-fn por_ovo(e: &mut Estado, tab: &TabelasNinho, cor: Cor, x: i32, y: i32, t: u8) {
-    if (e.ninho(cor).lista.indice as i32) >= CAPACIDADE_NINHO as i32 {
-        return;
-    }
-    if !(0..LADO).contains(&x) || !(1..LADO).contains(&y) {
-        return;
-    }
-    cavar(e, tab, cor, x, y);
-    let f = Formiga { x: x as u8, y: y as u8, modo: 8, tipo: t, s: 0 };
-    e.adicionar_formiga(lista_do_ninho(cor), f);
-    e.ninho_mut(cor).vida.definir(x, y, t);
-}
-
-// ---------------------------------------------------------------------------------------------
-// Modos, luta e comida (compartilhados)
-// ---------------------------------------------------------------------------------------------
-
-/// Linha `m` de uma tabela por modo estratégico. O original não confere o índice; fora da tabela o
-/// port usa a última linha [divergência só em estado inválido].
-fn linha<T: Copy>(tabela: &[T], m: i16) -> T {
-    tabela[(m.max(0) as usize).min(tabela.len() - 1)]
+    comum::novo_buraco(e, tab, &tab.borda_buraco, cor, c);
 }
 
 /// `_GetNewModeB(grupo)` (`1030:09d0`).
 fn novo_modo_preto(e: &mut Estado, tab: &TabelasNinho, g: u8) -> u8 {
-    let auto = e.controles.modo_automatico;
-    let estrategia = e.preta.modo_estrategico;
-    if auto == 1 {
-        if g == 2 {
-            let k = e.s.mascara(8) as usize;
-            return linha(&tab.modos_operaria, estrategia)[k];
-        }
-        if g == 6 {
-            let k = e.s.mascara(8) as usize;
-            return linha(&tab.modos_soldado, estrategia)[k];
-        }
-    } else if g == 2 || g == 6 {
-        return e.controles.proximo_modo as u8;
-    }
-    tab.modo_por_grupo[(g & 0xF) as usize]
+    comum::novo_modo_preto(e, tab.modos(), g)
 }
 
-/// `_GetNewModeR(grupo)` (`1030:0a50`): sempre pelas tabelas, com `_StrategicModeR`.
+/// `_GetNewModeR(grupo)` (`1030:0a50`).
 fn novo_modo_vermelho(e: &mut Estado, tab: &TabelasNinho, g: u8) -> u8 {
-    let estrategia = e.vermelha.modo_estrategico;
-    match g {
-        2 => {
-            let k = e.s.mascara(8) as usize;
-            linha(&tab.modos_operaria, estrategia)[k]
-        }
-        6 => {
-            let k = e.s.mascara(8) as usize;
-            linha(&tab.modos_soldado, estrategia)[k]
-        }
-        _ => tab.modo_por_grupo[(g & 0xF) as usize],
-    }
+    comum::novo_modo_vermelho(e, tab.modos(), g)
 }
 
-/// `_GetNewMode(grupo, T)` (`1030:0910`): a versão do preto ou do vermelho, pela cor de T.
+/// `_GetNewMode(grupo, T)` (`1030:0910`).
 fn novo_modo_pela_cor(e: &mut Estado, tab: &TabelasNinho, g: u8, t: u8) -> u8 {
-    if vermelha(t) {
-        novo_modo_vermelho(e, tab, g)
-    } else {
-        novo_modo_preto(e, tab, g)
-    }
+    comum::novo_modo(e, tab.modos(), g, t)
 }
 
-/// `_GetWinner(ocupante, atacante)` (`1028:26f4`, formigas.md §6): `RR(10)` contra a matriz de
-/// classes; conta a perdedora em `_BlackLost/_RedLost` e `_BAntsKilled/_RAntsKilled` pela cor da
-/// vencedora. Com `_Invincible` = 1 não sorteia: conta uma vermelha morta e a preta vence.
+/// `_GetWinner(ocupante, atacante)` (`1028:26f4`, formigas.md §6; [`comum::vencedor_da_luta`]) com as
+/// tabelas do ninho.
 pub fn vencedor_da_luta(e: &mut Estado, tab: &TabelasNinho, ocupante: u8, atacante: u8) -> u8 {
-    if e.partida.invencivel == 1 {
-        e.vermelha.mortas_em_luta = e.vermelha.mortas_em_luta.wrapping_add(1);
-        return if vermelha(ocupante) { atacante } else { ocupante };
-    }
-    let classe = |t: u8| tab.classe_luta[grupo(t) as usize] as usize;
-    let chance = tab.chance_vitoria[classe(ocupante)][classe(atacante)] as i32;
-    let w = if e.r.rrand(10) < chance { ocupante } else { atacante };
-    let perdedora = if vermelha(w) { &mut e.preta } else { &mut e.vermelha };
-    perdedora.perdas = perdedora.perdas.wrapping_add(1);
-    perdedora.mortas_em_luta = perdedora.mortas_em_luta.wrapping_add(1);
-    w
+    comum::vencedor_da_luta(e, tab.luta(), ocupante, atacante)
 }
 
-/// `_EatFoodB/R` (`1028:4844`/`6bb6`, ninho.md §6.1) sem o teste de faixa: tira uma unidade da
-/// célula (0x10 vira túnel `Sk(8)`), baixa a comida guardada e soma 5 à reserva; quando a reserva
-/// passa de (adultos + soldados) / 16, zera e a saúde sobe 1 (até 100).
-fn comer(e: &mut Estado, cor: Cor, x: i32, y: i32) {
-    let v = e.ninho(cor).mapa.em(x, y).unwrap_or(0);
-    let novo = if v == COMIDA_UMA { e.s.mascara(8) as u8 } else { v.wrapping_sub(1) };
-    e.ninho_mut(cor).mapa.definir(x, y, novo);
-    let c = e.colonia_mut(cor);
-    if c.comida > 0 {
-        c.comida -= 1;
-    }
-    let limite = c.populacao.wrapping_add(c.castas[2]) >> 4;
-    c.reserva_comer = c.reserva_comer.wrapping_add(5);
-    if limite < c.reserva_comer {
-        c.reserva_comer = 0;
-        if c.saude < 100 {
-            c.saude += 1;
-        }
-    }
-}
-
-/// `_TryEatFoodB/R`: [`comer`] só se a célula tiver comida (0x10–0x13).
+/// `_TryEatFoodB/R`: [`comum::comer_no_ninho`] só se a célula tiver comida (0x10–0x13).
 fn comer_se_houver(e: &mut Estado, cor: Cor, x: i32, y: i32) {
     if e.ninho(cor).mapa.em(x, y).is_some_and(e_comida) {
-        comer(e, cor, x, y);
+        comum::comer_no_ninho(e, cor, x, y);
     }
 }
-
-/// `_StealFoodB/R` embutido: tira uma unidade sem mexer na saúde.
-fn roubar_comida(e: &mut Estado, cor: Cor, x: i32, y: i32) {
-    let v = e.ninho(cor).mapa.em(x, y).unwrap_or(0);
-    let novo = if v == COMIDA_UMA { e.s.mascara(8) as u8 } else { v.wrapping_sub(1) };
-    e.ninho_mut(cor).mapa.definir(x, y, novo);
-    let c = e.colonia_mut(cor);
-    if c.comida > 0 {
-        c.comida -= 1;
-    }
-}
-
-/// Ponto de extensão: `_YellowFight(plano, índice)` (`1028:823e`), a luta de uma formiga do ninho
-/// com a formiga amarela. Fica com a parte da amarela (formiga-amarela.md); aqui não faz nada.
-/// TODO(formiga-amarela.md): ligar à implementação da amarela.
-fn luta_com_amarela(_e: &mut Estado, _plano: i16, _indice: usize) {}
-
-/// Ponto de extensão: `_DoTroph(x, y, d)` (`1000:846e`), a formiga que alimenta a amarela.
-/// TODO(formiga-amarela.md): ligar à implementação da amarela.
-fn trofalaxia(_e: &mut Estado, _x: i32, _y: i32, _d: i32) {}
 
 // ---------------------------------------------------------------------------------------------
 // A formiga em processamento
@@ -558,6 +221,7 @@ fn trofalaxia(_e: &mut Estado, _x: i32, _y: i32, _d: i32) {}
 struct Formigueiro<'a> {
     e: &'a mut Estado,
     tab: &'a TabelasNinho,
+    ta: &'a TabelasAmarela,
     cor: Cor,
     i: usize,
     t0: u8,
@@ -720,7 +384,7 @@ impl Formigueiro<'_> {
             && self.eu().x < 0x80
         {
             self.definir_vida(x, y, novo);
-            trofalaxia(self.e, x, y, d);
+            amarela::trofalaxia(self.e, self.ta, x, y, d);
         }
         self.definir_vida(nx, ny, novo);
         self.definir_vida(x, y, 0);
@@ -799,8 +463,8 @@ impl Formigueiro<'_> {
 
     /// `_RandTurn(d)` (`1028:2a22`).
     fn giro_aleatorio(&mut self, d: i32) -> i32 {
-        let k = self.sk(8) as usize;
-        self.tab.turn_tab[(d & 7) as usize][k] as i32
+        let k = self.sk(8);
+        self.tab.virar(d, k) as i32
     }
 
     /// NUVEM: a inimiga `j`, na célula `c` com tipo `v`, vira nuvem de luta.
@@ -821,7 +485,7 @@ impl Formigueiro<'_> {
         match self.cor {
             Cor::Preta => {
                 if e_amarela(v) && self.e.amarela.cor != 0 {
-                    luta_com_amarela(self.e, plano_do_ninho(self.cor), self.i);
+                    amarela::lutar_com_amarela(self.e, self.ta, plano_do_ninho(self.cor), self.i as i32);
                     return true;
                 }
                 if (0x88..=0xE7).contains(&v) {
@@ -841,7 +505,7 @@ impl Formigueiro<'_> {
                     return false;
                 }
                 if e_amarela(v) && self.e.amarela.cor == 0 {
-                    luta_com_amarela(self.e, plano_do_ninho(self.cor), self.i);
+                    amarela::lutar_com_amarela(self.e, self.ta, plano_do_ninho(self.cor), self.i as i32);
                     return true;
                 }
                 false
@@ -917,7 +581,7 @@ impl Formigueiro<'_> {
             let r = self.sk(8) as u8;
             let buraco = self.colonia().buracos.get(x as usize).copied().unwrap_or(0);
             let f = self.eu();
-            if sair_pelo_buraco(self.e, self.tab, buraco as i32, x, (t & 0xF8).wrapping_add(r), f.modo, f.s) {
+            if comum::sair_pelo_buraco(self.e, self.tab, buraco as i32, x, (t & 0xF8).wrapping_add(r), f.modo, f.s) {
                 self.definir_vida(x, 1, 0);
                 return true;
             }
@@ -971,7 +635,7 @@ impl Formigueiro<'_> {
             if v == 0 || v > 8 {
                 let t = self.t().wrapping_add(8);
                 self.eu_mut().tipo = t;
-                por_ovo(self.e, self.tab, Cor::Preta, x, y, estagio);
+                comum::por_ovo(self.e, self.tab, Cor::Preta, x, y, estagio);
                 let t = self.t();
                 self.definir_vida(x, y, t);
                 self.eu_mut().s = 8;
@@ -1027,7 +691,7 @@ impl Formigueiro<'_> {
                 let t = self.t().wrapping_add(8);
                 self.eu_mut().tipo = t;
                 self.definir_vida(x, y, t);
-                por_ovo(self.e, self.tab, Cor::Vermelha, x, y, 0x82);
+                comum::por_ovo(self.e, self.tab, Cor::Vermelha, x, y, 0x82);
                 self.eu_mut().s = 0;
                 let m = self.novo_modo(1);
                 self.eu_mut().modo = m;
@@ -1097,7 +761,7 @@ impl Formigueiro<'_> {
             let r = self.s(100);
             if (self.colonia().saude as i32) < r {
                 // Sem o teste de faixa (`_EatFoodB` embutido): numa célula 0x14 isso a transforma em 0x13.
-                comer(self.e, self.cor, x, y);
+                comum::comer_no_ninho(self.e, self.cor, x, y);
             }
             // Com o grupo do T de ENTRADA (3 ou 7): a "comida dobrada" (ninho.md §6.2).
             let m = self.novo_modo(grupo(self.t0));
@@ -1163,7 +827,7 @@ impl Formigueiro<'_> {
             comer_se_houver(self.e, self.cor, c.0, c.1);
         }
         if self.sk(4) == 0 {
-            corrigir_saida(self.e, self.tab, self.cor, n.0, n.1);
+            comum::corrigir_saida(self.e, self.tab, self.cor, n.0, n.1);
         }
         if self.cor == Cor::Vermelha && self.mapa(n.0, n.1) == PASSAGEM {
             self.atravessar_passagem(n);
@@ -1344,7 +1008,7 @@ impl Formigueiro<'_> {
                     Cor::Vermelha => {
                         let k = self.sk(8) as usize;
                         let linha_c = (self.e.vermelha.modo_estrategico as i32).rem_euclid(7) as i16;
-                        let c = linha(&self.tab.castas_vermelhas, linha_c)[k];
+                        let c = comum::linha_por_modo(&self.tab.castas_vermelhas, linha_c)[k];
                         t = c.wrapping_mul(8).wrapping_add(0x82);
                         let m = novo_modo_vermelho(self.e, self.tab, c);
                         self.eu_mut().modo = m;
@@ -1413,18 +1077,10 @@ impl Formigueiro<'_> {
                 return;
             }
             let estagio = if self.cor == Cor::Preta { 1 } else { 0x81 };
-            por_ovo(self.e, self.tab, self.cor, ex, ey, estagio);
-            let sempre_saudavel = self.e.partida.sempre_saudavel;
-            let cor = self.cor;
-            let c = self.colonia_mut();
-            c.reserva_comer = c.reserva_comer.wrapping_sub(1);
-            if c.reserva_comer < 0 {
-                c.reserva_comer = c.populacao >> 5;
-                if c.saude > 0 && (cor == Cor::Vermelha || sempre_saudavel == 0) {
-                    c.saude -= 1;
-                }
-            }
-            if cor == Cor::Preta {
+            comum::por_ovo(self.e, self.tab, self.cor, ex, ey, estagio);
+            // `_DecEatB/R`.
+            comum::gastar_reserva(self.e, self.cor);
+            if self.cor == Cor::Preta {
                 self.e.partida.ovos_postos_b = self.e.partida.ovos_postos_b.wrapping_add(1);
             }
         }
@@ -1476,41 +1132,10 @@ impl Formigueiro<'_> {
         true
     }
 
-    /// `_GetBestDir(plano, x, y, alvo)` no ninho: direção que aproxima do alvo, preferindo célula
-    /// livre; −1 se já está no alvo; −2 se nenhuma vizinha aproxima.
+    /// `_GetBestDir(plano, x, y, alvo)` no ninho ([`comum::melhor_direcao`]): direção que aproxima do
+    /// alvo, preferindo célula livre; −1 se já está no alvo; −2 se nenhuma vizinha aproxima.
     fn melhor_direcao(&self, x: i32, y: i32, alvo: (i32, i32)) -> i32 {
-        let dist = |a: i32, b: i32| (alvo.0 - a) * (alvo.0 - a) + (alvo.1 - b) * (alvo.1 - b);
-        let mut lim = dist(x, y);
-        if lim <= 0 {
-            return -1;
-        }
-        let mut melhor = -1;
-        let mut reserva = -2;
-        for k in 0..8 {
-            let (dx, dy) = self.tab.d8(k);
-            let (cx, cy) = (x + dx, y + dy);
-            let Some(v) = self.e.ninho(self.cor).mapa.em(cx, cy) else { continue };
-            // `_IsNotObstacle` (v < 0x19 ou pedrinha) e não `_IsThisPebble` (0x30–0x31).
-            if v >= 0x19 {
-                continue;
-            }
-            let d = dist(cx, cy);
-            if d >= lim {
-                continue;
-            }
-            lim = d;
-            // `_GetLife` = 0 e `_IsClearTile` (v < 8).
-            if self.vida(cx, cy) == 0 && v < 8 {
-                melhor = k;
-            } else {
-                reserva = k;
-            }
-        }
-        if melhor >= 0 {
-            melhor
-        } else {
-            reserva
-        }
+        comum::melhor_direcao(self.e, self.tab, plano_do_ninho(self.cor), x, y, alvo.0, alvo.1)
     }
 
     // --- invasoras (ninho.md §3.2, §9) ---
@@ -1525,7 +1150,7 @@ impl Formigueiro<'_> {
         let (x, y) = (self.x0, self.y0);
         let v = self.vida(x, y);
         if e_amarela(v) && self.e.amarela.cor == 0 {
-            luta_com_amarela(self.e, plano_do_ninho(self.cor), self.i);
+            amarela::lutar_com_amarela(self.e, self.ta, plano_do_ninho(self.cor), self.i as i32);
             return;
         }
         if v != 0 && v < 0x68 && self.encontro_na_celula(v, 0x60, 7) {
@@ -1605,7 +1230,7 @@ impl Formigueiro<'_> {
     fn atacar_o_ninho(&mut self) {
         let (x, y) = (self.x0, self.y0);
         if e_comida(self.mapa(x, y)) {
-            roubar_comida(self.e, self.cor, x, y);
+            comum::tirar_comida_do_ninho(self.e, self.cor, x, y);
             let f = self.eu_mut();
             f.modo = 3;
             f.tipo |= 8;
@@ -1646,7 +1271,7 @@ impl Formigueiro<'_> {
     fn ficar_no_vermelho(&mut self) {
         let (x, y) = (self.x0, self.y0);
         if e_comida(self.mapa(x, y)) {
-            roubar_comida(self.e, Cor::Vermelha, x, y);
+            comum::tirar_comida_do_ninho(self.e, Cor::Vermelha, x, y);
             let f = self.eu_mut();
             f.modo = 3;
             f.tipo |= 8;
@@ -1671,38 +1296,6 @@ impl Formigueiro<'_> {
     }
 }
 
-/// `_ExitHole(buraco_x, coluna, t, m, s)` (`1020:2db6`): põe a formiga na superfície, na primeira
-/// vizinha 0..7 de (buraco_x, coluna) dentro do mapa e com `_MapA` < 0x50. S = s só se M = 6; senão
-/// 0, ou 120 se M ∉ {3, 7} e o buraco é do lado da cor (pretas: x ≤ 63; vermelhas: x ≥ 65). Não grava
-/// `_LifeA` (fato visto no código). Devolve se achou lugar.
-pub(crate) fn sair_pelo_buraco(e: &mut Estado, tab: &TabelasNinho, hx: i32, c: i32, t: u8, m: u8, s: u8) -> bool {
-    let lugar = (0..8).map(|k| tab.d8(k)).map(|(dx, dy)| (hx + dx, c + dy)).find(|&(ax, ay)| {
-        e.superficie.mapa.em(ax, ay).is_some_and(|v| v < BURACO_SUPERFICIE)
-    });
-    let Some((ax, ay)) = lugar else { return false };
-    let lado = if vermelha(t) { hx >= 65 } else { hx <= 63 };
-    let s_novo = if m == 6 {
-        s
-    } else if m != 3 && m != 7 && lado {
-        0x78
-    } else {
-        0
-    };
-    let l = &mut e.superficie.lista;
-    if l.usadas() >= CAPACIDADE_A {
-        // O original grava na vaga 1000 (fora da lista) e compacta; o port compacta e grava na
-        // primeira vaga livre. [divergência só com a lista A cheia; ninho.md, lacunas]
-        l.compactar();
-    }
-    l.adicionar(Formiga { x: ax as u8, y: ay as u8, modo: m, tipo: t, s: s_novo });
-    true
-}
-
-// Nota para a integração: `RegrasOriginais` (tick.rs) ainda não guarda as tabelas do ninho; a
-// implementação acima usa as de `data/ninho.json` embutidas ([`TabelasNinho::padrao`]). Para que um
-// mod troque `ninho.json`, falta um campo `ninho: Option<TabelasNinho>` em `RegrasOriginais`,
-// carregado com [`TabelasNinho::carregar`].
-
 #[cfg(test)]
 mod testes {
     use super::*;
@@ -1715,13 +1308,5 @@ mod testes {
         assert_eq!(t.chance_vitoria[1], [8, 5, 9, 4]);
         assert_eq!(t.castas_vermelhas[1], [4, 4, 8, 8, 2, 2, 2, 6]);
         assert_eq!(t.modos_operaria[1], [4, 1, 1, 1, 4, 2, 2, 2]);
-    }
-
-    #[test]
-    fn soma_da_escavacao_e_centro_de_massa() {
-        let mut c = Colonia::default();
-        somar_escavacao(&mut c, 30, 4);
-        somar_escavacao(&mut c, 33, 7);
-        assert_eq!((c.tiles_escavados, c.centro_x, c.centro_y), (2, 31, 5));
     }
 }

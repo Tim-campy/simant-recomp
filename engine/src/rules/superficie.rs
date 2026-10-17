@@ -10,9 +10,11 @@
 //!   formiga amarela (comandos 1–5).
 //!
 //! Tabelas e constantes: `data/superficie.json` ([`TabelasSuperficie`], extraído por
-//! `tools/extrair_superficie.py`) e `data/feromonios.json` (direções e `_TurnTab`). Enquanto
-//! `RegrasOriginais` não guarda essas tabelas, a implementação da trait usa as cópias embutidas
-//! ([`tabelas_padrao`]); as funções `*_com` recebem tabelas explícitas (por exemplo, de um mod).
+//! `tools/extrair_superficie.py`) e `data/feromonios.json` (direções e `_TurnTab`), guardadas em
+//! `RegrasOriginais` (com mods); as funções públicas recebem as tabelas explicitamente. As rotinas que
+//! o original compartilha com outras partes (`_GetWinner`, `_GetNewMode`, `_DeadAntHere`,
+//! `_DigTileB/R`...) estão em `rules/comum.rs`; as da amarela (`_YellowFight`, `_DoTroph`), em
+//! `rules/amarela.rs`.
 //!
 //! Os mapas de cheiro são lidos e gravados pelas rotinas de `rules/feromonios.rs` sobre uma cópia
 //! (`feromonios::Feromonios`) feita no começo do laço e devolvida ao `Estado` no fim; nada dentro do
@@ -22,38 +24,29 @@ use std::sync::OnceLock;
 
 use serde::Deserialize;
 
-use super::estado::{indice_cor, Colonia, Estado, Feromonios as MapasDoEstado, Grade};
-use super::feromonios::{self as fer, MapaCheiro, TabelasFeromonio};
+use super::amarela::{self, TabelasAmarela};
+use super::comum::{
+    self, cor_do_tipo as cor, e_amarela, grupo, operaria_ou_soldado, TabelaLuta, TabelaModos,
+};
+use super::estado::{indice_cor, Estado, Feromonios as MapasDoEstado, Grade};
+use super::feromonios::{self as fer, MapaCheiro, RegrasFeromonio, TabelasFeromonio};
 use super::geracao::{Cor, TabelasGeracao};
 use super::tick::{RegrasOriginais, RegrasSuperficie};
 use crate::formats::save::{Formiga, Lista};
+
+pub use super::comum::{cadaver_aqui, desrecrutar, recrutar};
 
 /// Arquivo de dados com as tabelas desta parte.
 pub const ARQUIVO_TABELAS: &str = "superficie.json";
 
 // Valores de tile e de mapa de vida (docs/spec/regras/tiles-valores.md, superficie.md).
-const BURACO_QUINTAL: u8 = 0x50;
-const BURACO_CASA: std::ops::Range<u8> = 0x80..0x90;
-const COMIDA_QUINTAL: std::ops::RangeInclusive<u8> = 0x48..=0x4B;
-const COMIDA_CASA: std::ops::RangeInclusive<u8> = 0x18..=0x27;
 const COMIDA_ULTIMA_QUINTAL: u8 = 0x48;
-const CADAVER_PRETO_QUINTAL: u8 = 0x10;
-const CADAVER_VERMELHO_QUINTAL: u8 = 0x14;
-const AMARELA: u8 = 0xFF;
-const AMARELA_2: u8 = 0xFE;
 const NUVEM_DE_LUTA: u8 = 0x70;
-const TERRA: std::ops::RangeInclusive<u8> = 0x20..=0x2E;
-const ABERTURA_NINHO: u8 = 0x18;
-const PASSAGEM_ENTRE_NINHOS: u8 = 0x14;
-const TUNEL_INUNDADO: u8 = 0x4E;
-const SAIDA_ABERTA: u8 = 0xFF;
-const SAIDA_FECHADA: u8 = 0xFE;
 /// Modos (formigas.md §5).
 const M_PASSEIO: u8 = 0;
 const M_FORRAGEAR: u8 = 2;
 const M_COM_COMIDA: u8 = 3;
 const M_DEFESA: u8 = 6;
-const M_ATAQUE: u8 = 7;
 const M_LUTA: u8 = 10;
 const M_ALARME: u8 = 11;
 const M_DESCANSO: u8 = 13;
@@ -127,21 +120,35 @@ impl TabelasSuperficie {
         Ok(t)
     }
 
-    /// Lê `superficie.json` (com mods).
+    /// Lê `superficie.json` de `data/` (com mods).
+    ///
+    /// Antes da unificação lia com `Recursos::arquivo`, que procura na pasta do jogo e em
+    /// `arquivos/` dos mods, e nunca achava o arquivo de `data/` [corrigido].
     pub fn carregar(r: &crate::recursos::Recursos) -> Result<TabelasSuperficie, String> {
-        TabelasSuperficie::de_json(&String::from_utf8_lossy(&r.arquivo(ARQUIVO_TABELAS)?))
+        let v: serde_json::Value = r.dados(ARQUIVO_TABELAS)?;
+        TabelasSuperficie::de_json(&v.to_string())
+    }
+
+    /// Cópia embutida de `data/superficie.json` (sem mods), para `RegrasOriginais::default` e testes.
+    pub fn padrao() -> &'static TabelasSuperficie {
+        static T: OnceLock<TabelasSuperficie> = OnceLock::new();
+        T.get_or_init(|| TabelasSuperficie::de_json(include_str!("../../../data/superficie.json")).expect("superficie.json"))
+    }
+
+    /// Tabelas de `_GetNewMode`.
+    pub fn modos(&self) -> TabelaModos<'_> {
+        TabelaModos { operaria: &self.modos_operaria, soldado: &self.modos_soldado, por_grupo: &self.modo_por_grupo }
+    }
+
+    /// Tabelas de `_GetWinner`.
+    pub fn luta(&self) -> TabelaLuta<'_> {
+        TabelaLuta { classe: &self.classe_luta, chance: &self.matriz_luta }
     }
 }
 
 /// Cópias embutidas de `superficie.json` e `feromonios.json` (sem mods).
-pub fn tabelas_padrao() -> &'static (TabelasSuperficie, TabelasFeromonio) {
-    static T: OnceLock<(TabelasSuperficie, TabelasFeromonio)> = OnceLock::new();
-    T.get_or_init(|| {
-        (
-            TabelasSuperficie::de_json(include_str!("../../../data/superficie.json")).expect("superficie.json"),
-            TabelasFeromonio::de_json(include_str!("../../../data/feromonios.json")).expect("feromonios.json"),
-        )
-    })
+pub fn tabelas_padrao() -> (&'static TabelasSuperficie, &'static TabelasFeromonio) {
+    (TabelasSuperficie::padrao(), TabelasFeromonio::padrao())
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -150,8 +157,7 @@ pub fn tabelas_padrao() -> &'static (TabelasSuperficie, TabelasFeromonio) {
 
 impl RegrasSuperficie for RegrasOriginais {
     fn simular_superficie(&mut self, e: &mut Estado) {
-        let (t, f) = tabelas_padrao();
-        simular_superficie(e, t, f);
+        simular_superficie(e, &self.superficie, &self.feromonios, &self.amarela);
     }
 
     fn adicionar_comida(&mut self, e: &mut Estado, quantidade: i32, som: bool) {
@@ -163,11 +169,15 @@ impl RegrasSuperficie for RegrasOriginais {
     }
 
     fn escolher_estrategia(&mut self, e: &mut Estado) {
-        escolher_estrategia(e, &tabelas_padrao().0);
+        escolher_estrategia(e, &self.superficie);
     }
 
     fn criar_lider_vermelha(&mut self, e: &mut Estado) {
-        criar_lider_vermelha(e, &tabelas_padrao().0);
+        criar_lider_vermelha(e, &self.superficie);
+    }
+
+    fn fase_de_cheiro(&mut self, e: &mut Estado, fase: fer::FaseCheiro) {
+        rodar_fase_de_cheiro(e, fase, &self.feromonios.regras);
     }
 }
 
@@ -175,40 +185,12 @@ impl RegrasSuperficie for RegrasOriginais {
 // Peças simples: tipo, cor, mapas
 // ---------------------------------------------------------------------------------------------
 
-fn grupo(t: u8) -> u8 {
-    (t & 0x78) >> 3
-}
-
 fn base(t: u8) -> u8 {
     t & 0xF8
 }
 
 fn dir(t: u8) -> u8 {
     t & 7
-}
-
-fn cor(t: u8) -> Cor {
-    if t & 0x80 != 0 {
-        Cor::Vermelha
-    } else {
-        Cor::Preta
-    }
-}
-
-fn cor_fer(c: Cor) -> fer::Cor {
-    match c {
-        Cor::Preta => fer::Cor::Preta,
-        Cor::Vermelha => fer::Cor::Vermelha,
-    }
-}
-
-fn operaria_ou_soldado(g: u8) -> bool {
-    g == 2 || g == 6
-}
-
-/// `_IsYellowAnt` (`1020:5720`).
-fn e_amarela(v: u8) -> bool {
-    v == AMARELA || v == AMARELA_2
 }
 
 /// Byte de cor da amarela (`_MeColor`, 0 ou 0x80).
@@ -230,26 +212,15 @@ fn definir_vida(e: &mut Estado, x: i32, y: i32, v: u8) {
     e.superficie.vida.definir(x, y, v);
 }
 
-/// Teste de buraco (seção 2.1): `_IsValidA` e o tile de buraco do conjunto atual.
+/// Teste de buraco (seção 2.1): `_IsValidA` e o tile de buraco do conjunto atual
+/// ([`comum::e_buraco_superficie`]).
 fn e_buraco(e: &Estado, x: i32, y: i32) -> bool {
-    if !(0..128).contains(&x) || !(0..64).contains(&y) {
-        return false;
-    }
-    let v = tile(e, x, y);
-    if e.ambiente.terreno == 0 {
-        v == BURACO_QUINTAL
-    } else {
-        BURACO_CASA.contains(&v)
-    }
+    comum::e_buraco_superficie(e, x, y)
 }
 
 /// `_IsItFood` (`1028:2d1a`).
 fn e_comida(e: &Estado, v: u8) -> bool {
-    if e.ambiente.terreno == 0 {
-        COMIDA_QUINTAL.contains(&v)
-    } else {
-        COMIDA_CASA.contains(&v)
-    }
+    comum::e_comida_superficie(comum::em_casa(e), v)
 }
 
 /// Destino acima de `_Barrier` (comparação com sinal, tile sem sinal).
@@ -257,168 +228,43 @@ fn e_barreira(e: &Estado, v: u8) -> bool {
     v as i32 > e.ambiente.barreira as i32
 }
 
-/// `_GetDis` (`1020:1122`): dx² + dy², truncado a 16 bits com sinal como nos chamadores.
+/// `_GetDis` (`1020:1122`, [`comum::get_dis`]), truncado a 16 bits com sinal como nos chamadores
+/// desta parte, que guardam o resultado num `int`.
 fn distancia(x1: i32, y1: i32, x2: i32, y2: i32) -> i32 {
-    let dx = x2.wrapping_sub(x1);
-    let dy = y2.wrapping_sub(y1);
-    (dx.wrapping_mul(dx).wrapping_add(dy.wrapping_mul(dy))) as i16 as i32
+    comum::get_dis(x1, y1, x2, y2) as i16 as i32
 }
 
-/// `_GetDir` (`1020:10cc`): 1 + direção de (x1, y1) para (x2, y2) pelos sinais; 0 se coincidem.
+/// `_GetDir` (`1020:10cc`, [`comum::get_dir`]): 1 + direção de (x1, y1) para (x2, y2); 0 se coincidem.
 fn direcao_para(x1: i32, y1: i32, x2: i32, y2: i32) -> u8 {
-    match ((x2 - x1).signum(), (y2 - y1).signum()) {
-        (0, 0) => 0,
-        (0, -1) => 1,
-        (1, -1) => 2,
-        (1, 0) => 3,
-        (1, 1) => 4,
-        (0, _) => 5,
-        (-1, 1) => 6,
-        (-1, 0) => 7,
-        _ => 8,
-    }
+    comum::get_dir(x1, y1, x2, y2) as u8
 }
 
-/// `_Bounce` (`1030:12ec`) e o mesmo teste no começo de `_GetRandDir`, `_GetDefendDir` e
-/// `_GetRedDefendDir`: na borda, um sorteio e uma direção para dentro; fora dela, nada.
+/// `_Bounce` ([`comum::quicar`]).
 fn quicar(e: &mut Estado, x: i32, y: i32) -> Option<u8> {
-    let (n, primeira) = if x == 0 {
-        if y == 0 {
-            (3, 2)
-        } else if y == 63 {
-            (3, 0)
-        } else {
-            (5, 0)
-        }
-    } else if y == 0 {
-        if x == 127 {
-            (3, 4)
-        } else {
-            (5, 2)
-        }
-    } else if x == 127 {
-        if y == 63 {
-            (3, 6)
-        } else {
-            (5, 4)
-        }
-    } else if y == 63 {
-        (5, 6)
-    } else {
-        return None;
-    };
-    Some(((e.s.rand1(n) + primeira) & 7) as u8)
+    comum::quicar(&mut e.s, x, y)
 }
 
-/// `_FindInAList` (`1020:2c42`): última vaga em uso com (x, y) e T ≠ 0.
-fn achar_na_lista_a(e: &Estado, x: i32, y: i32) -> Option<usize> {
-    let l = &e.superficie.lista;
-    (0..l.usadas()).rev().find(|&j| {
-        let f = &l.vagas[j];
-        f.x as i32 == x && f.y as i32 == y && f.tipo != 0
-    })
-}
+use comum::achar_na_lista_a;
 
 // ---------------------------------------------------------------------------------------------
 // Modo novo, luta, cadáver, comida
 // ---------------------------------------------------------------------------------------------
 
-/// `_GetNewMode(g, T)` (`1030:0910`, superficie.md 9.3). Sorteia `SRand8` só para grupo 2 ou 6
-/// e (vermelha, ou preta com `_ModeAuto` = 1).
+/// `_GetNewMode(g, T)` (`1030:0910`, superficie.md 9.3; [`comum::novo_modo`]). Sorteia `SRand8` só
+/// para grupo 2 ou 6 e (vermelha, ou preta com `_ModeAuto` = 1).
 pub fn modo_novo(e: &mut Estado, t: &TabelasSuperficie, g: u8, tipo: u8) -> u8 {
-    let preta = tipo & 0x80 == 0;
-    if preta && e.controles.modo_automatico != 1 {
-        if operaria_ou_soldado(g) {
-            return e.controles.proximo_modo as u8;
-        }
-        return t.modo_por_grupo[(g & 15) as usize];
-    }
-    let estrategico = if preta { e.preta.modo_estrategico } else { e.vermelha.modo_estrategico };
-    let tabela = match g {
-        2 => &t.modos_operaria,
-        6 => &t.modos_soldado,
-        _ => return t.modo_por_grupo[(g & 15) as usize],
-    };
-    let k = e.s.mascara(8) as usize;
-    // Índice estratégico fora de 0..5: o original leria além da tabela; o port usa 0.
-    tabela.get(estrategico as usize).map_or(0, |linha| linha[k])
+    comum::novo_modo(e, t.modos(), g, tipo)
 }
 
-/// `_GetWinner(Ta, Tb)` (`1028:26f4`, 6.2): `a` é a formiga da célula, `b` a que chega.
-/// Devolve o T completo do vencedor. Usa o gerador **R** (exceto com `_Invincible`).
+/// `_GetWinner(Ta, Tb)` (`1028:26f4`, 6.2; [`comum::vencedor_da_luta`]): `a` é a formiga da célula,
+/// `b` a que chega.
 pub fn vencedor_da_luta(e: &mut Estado, t: &TabelasSuperficie, ta: u8, tb: u8) -> u8 {
-    if e.partida.invencivel == 1 {
-        e.vermelha.mortas_em_luta = e.vermelha.mortas_em_luta.wrapping_add(1);
-        return if ta & 0x80 != 0 { tb } else { ta };
-    }
-    let ca = t.classe_luta[grupo(ta) as usize] as usize;
-    let cb = t.classe_luta[grupo(tb) as usize] as usize;
-    let p = t.matriz_luta[ca][cb] as i32;
-    let v = if e.r.rrand(10) < p { ta } else { tb };
-    if v & 0x80 == 0 {
-        e.vermelha.perdas = e.vermelha.perdas.wrapping_add(1);
-        e.vermelha.mortas_em_luta = e.vermelha.mortas_em_luta.wrapping_add(1);
-    } else {
-        e.preta.perdas = e.preta.perdas.wrapping_add(1);
-        e.preta.mortas_em_luta = e.preta.mortas_em_luta.wrapping_add(1);
-    }
-    v
-}
-
-/// `_DeadAntHere(x, y, cor)` (`1028:28c0`, 6.4): cadáver no anel de 100 e no `_MapA`.
-/// `vermelha` = cor ≠ 0.
-pub fn cadaver_aqui(e: &mut Estado, x: i32, y: i32, vermelha: bool) {
-    let mut p = e.partida.cadaver_ponteiro + 1;
-    if p > 99 {
-        p = 0;
-    }
-    e.partida.cadaver_ponteiro = p;
-    let p = p.clamp(0, 99) as usize;
-    let (ox, oy) = (e.partida.cadaveres_x[p] as i32, e.partida.cadaveres_y[p] as i32);
-    let velho = tile(e, ox, oy);
-    let casa = e.ambiente.terreno != 0;
-    if !casa {
-        if (0x10..0x18).contains(&velho) {
-            let v = e.s.mascara(16) as u8;
-            e.superficie.mapa.definir(ox, oy, v);
-        }
-    } else if (8..0x18).contains(&velho) {
-        e.superficie.mapa.definir(ox, oy, (velho - 8) >> 2);
-    }
-    e.partida.cadaveres_x[p] = x as u8;
-    e.partida.cadaveres_y[p] = y as u8;
-    let v = tile(e, x, y);
-    if !casa {
-        if v <= 0x17 {
-            let novo = if vermelha { CADAVER_VERMELHO_QUINTAL } else { CADAVER_PRETO_QUINTAL } + e.s.mascara(4) as u8;
-            e.superficie.mapa.definir(x, y, novo);
-        }
-    } else if v <= 3 {
-        let r = e.s.rand1(2) as u8;
-        let novo = if vermelha { v * 4 + 10 + r } else { (v + 2) * 4 + r };
-        e.superficie.mapa.definir(x, y, novo);
-    }
-    definir_vida(e, x, y, 0);
+    comum::vencedor_da_luta(e, t.luta(), ta, tb)
 }
 
 /// `_PickupFoodA(x, y)` (`1020:0d18`, 8.1).
 fn pegar_comida(e: &mut Estado, x: i32, y: i32) {
-    let v = tile(e, x, y);
-    let novo = if e.ambiente.terreno == 0 {
-        if v == COMIDA_ULTIMA_QUINTAL {
-            e.s.mascara(16) as u8
-        } else {
-            v.wrapping_sub(1)
-        }
-    } else if v.is_multiple_of(4) {
-        v.wrapping_sub(0x18) >> 2
-    } else {
-        v.wrapping_sub(1)
-    };
-    e.superficie.mapa.definir(x, y, novo);
-    if e.ambiente.comida_superficie > 0 {
-        e.ambiente.comida_superficie -= 1;
-    }
+    comum::pegar_comida_superficie(e, x, y);
 }
 
 /// `_AddFood(n, som)` (`1030:6a58`, 8.3 e geracao-mundo.md 3.E). `n < 0` é o caso do novo jogo
@@ -468,119 +314,8 @@ pub fn adicionar_comida(e: &mut Estado, g: &TabelasGeracao, quantidade: i32, _so
 }
 
 // ---------------------------------------------------------------------------------------------
-// Ninhos: entrada e escavação (usadas por `_GoInNest`)
+// Ninhos: entrada (`_GoInNest`; a escavação `_DigTileB/R` é [`comum::cavar`])
 // ---------------------------------------------------------------------------------------------
-
-fn colonia_mut(e: &mut Estado, c: Cor) -> &mut Colonia {
-    e.colonia_mut(c)
-}
-
-fn somar_escavacao(c: &mut Colonia, x: i32, y: i32) {
-    c.soma_x_escavada = c.soma_x_escavada.wrapping_add(x);
-    c.soma_y_escavada = c.soma_y_escavada.wrapping_add(y);
-    c.tiles_escavados = c.tiles_escavados.wrapping_add(1);
-    if c.tiles_escavados > 0 {
-        c.centro_x = (c.soma_x_escavada / c.tiles_escavados as i32) as i16;
-        c.centro_y = (c.soma_y_escavada / c.tiles_escavados as i32) as i16;
-    }
-}
-
-/// Sólido para o alisamento: ≥ 0x20 e fora de 0x30–0x4E (tiles-valores.md).
-fn e_solido(v: u8) -> bool {
-    v >= 0x20 && !(0x30..=0x4E).contains(&v)
-}
-
-/// `_SmoothEdgesB/R(x, y)` (`1020:255a`/`26e4`).
-fn alisar(e: &mut Estado, c: Cor, x: i32, y: i32) {
-    if !(0..64).contains(&x) || !(0..64).contains(&y) {
-        return;
-    }
-    let tudo = e.ninho(c);
-    let m = &tudo.mapa;
-    if y == 0 {
-        if m.em(x, 0).unwrap_or(0xFF) <= 0x2F {
-            e.ninho_mut(c).mapa.definir(x, 0, ABERTURA_NINHO);
-        }
-        return;
-    }
-    let v = m.em(x, y).unwrap_or(0);
-    if !e_solido(v) {
-        return;
-    }
-    let inundada = v >= TUNEL_INUNDADO;
-    let solido = |vx: i32, vy: i32| m.em(vx, vy).is_some_and(e_solido);
-    let mut mascara = 0u8;
-    if y < 2 || solido(x, y - 1) {
-        mascara |= 1;
-    }
-    if x >= 63 || solido(x + 1, y) {
-        mascara |= 2;
-    }
-    if y >= 63 || solido(x, y + 1) {
-        mascara |= 4;
-    }
-    if x <= 0 || solido(x - 1, y) {
-        mascara |= 8;
-    }
-    let novo = if mascara != 0 {
-        mascara + 0x1F + if inundada { 0x2F } else { 0 }
-    } else if inundada {
-        TUNEL_INUNDADO
-    } else {
-        e.s.mascara(8) as u8
-    };
-    e.ninho_mut(c).mapa.definir(x, y, novo);
-}
-
-/// `_FixExitMapB/R(x, y)` (`1020:284e`/`2914`, ninho.md 7.4).
-fn corrigir_saida(e: &mut Estado, f: &TabelasFeromonio, c: Cor, x: i32, y: i32) {
-    let n = e.ninho(c);
-    let novo = if y < 2 {
-        if n.mapa.em(x, y) == Some(ABERTURA_NINHO) {
-            SAIDA_ABERTA
-        } else {
-            SAIDA_FECHADA
-        }
-    } else {
-        let maior = (0..8)
-            .filter_map(|d| n.saida.em(x + f.dx8[d] as i32, y + f.dy8[d] as i32))
-            .max()
-            .unwrap_or(0);
-        maior.saturating_sub(1)
-    };
-    e.ninho_mut(c).saida.definir(x, y, novo);
-}
-
-fn alisar_vizinhas(e: &mut Estado, f: &TabelasFeromonio, c: Cor, x: i32, y: i32) {
-    alisar(e, c, x, y - 1);
-    alisar(e, c, x + 1, y);
-    alisar(e, c, x, y + 1);
-    alisar(e, c, x - 1, y);
-    corrigir_saida(e, f, c, x, y);
-}
-
-/// `_DigTileB/R(x, y)` (`1020:1fe4`/`21de`, ninho.md 7.3).
-fn cavar(e: &mut Estado, f: &TabelasFeromonio, c: Cor, x: i32, y: i32) {
-    if !(0..64).contains(&x) || !(0..64).contains(&y) {
-        return;
-    }
-    if e.ninho(c).mapa.em(x, y).is_some_and(|v| TERRA.contains(&v)) {
-        let v = e.s.mascara(8) as u8;
-        e.ninho_mut(c).mapa.definir(x, y, v);
-        somar_escavacao(colonia_mut(e, c), x, y);
-        if c == Cor::Preta && y > 53 && e.s.rand1(64) == 0 {
-            e.ninho_b.mapa.definir(x, y, PASSAGEM_ENTRE_NINHOS);
-            if e.ninho_r.mapa.em(x, y).is_some_and(|v| TERRA.contains(&v)) {
-                let v = e.s.mascara(8) as u8;
-                e.ninho_r.mapa.definir(x, y, v);
-                somar_escavacao(&mut e.vermelha, x, y);
-            }
-            alisar_vizinhas(e, f, Cor::Vermelha, x, y);
-            e.ninho_r.mapa.definir(x, y, PASSAGEM_ENTRE_NINHOS);
-        }
-    }
-    alisar_vizinhas(e, f, c, x, y);
-}
 
 /// `_GoInNest(x, y, i)` (`1028:257a`, seção 7): o ninho é escolhido pela coluna do buraco.
 fn entrar_no_ninho(e: &mut Estado, f: &TabelasFeromonio, x: i32, y: i32, i: usize) {
@@ -595,54 +330,10 @@ fn entrar_no_ninho(e: &mut Estado, f: &TabelasFeromonio, x: i32, y: i32, i: usiz
     let a = e.superficie.lista.vagas[i];
     e.adicionar_formiga(area, Formiga { x: y as u8, y: 1, modo: a.modo, tipo: base(a.tipo) + 4, s: a.s });
     if e.colonia(c).buracos.get(y as usize).is_some_and(|&b| b != 0) {
-        cavar(e, f, c, y, 1);
+        comum::cavar(e, f, c, y, 1);
     }
     e.superficie.lista.vagas[i].tipo = 0;
     definir_vida(e, x, y, 0);
-}
-
-// ---------------------------------------------------------------------------------------------
-// Formiga amarela (partes chamadas daqui; o resto fica com rules/amarela.rs)
-// ---------------------------------------------------------------------------------------------
-
-/// `_YellowFight(1, i)` (`1028:823e`, formiga-amarela.md 10.1), só com o que toca a superfície.
-///
-/// [lacuna] Quando a amarela perde, o original chama `_YellowDeath(0)` (reencarnação, mensagens,
-/// `_UnRecruit(1)`), que é da formiga amarela e ainda não existe no port; aqui só o cadáver é
-/// posto. O encerramento da ordem 3 (`_ResetYellowVars`) também fica de fora.
-fn luta_com_amarela(e: &mut Estado, t: &TabelasSuperficie, i: usize) {
-    let a = e.superficie.lista.vagas[i];
-    let (x, y) = (a.x as i32, a.y as i32);
-    definir_vida(e, x, y, 0);
-    let tipo_amarela = e.amarela.tipo as u8;
-    let v = vencedor_da_luta(e, t, tipo_amarela, a.tipo);
-    // `_AnimYellowFight` com código 0: 6 quadros, cada um com `SRand2()` (som) e `SRand8()`.
-    for _ in 0..6 {
-        e.s.mascara(2);
-        e.s.mascara(8);
-    }
-    let (mx, my) = (e.amarela.x as i32, e.amarela.y as i32);
-    if v == tipo_amarela {
-        definir_vida(e, mx, my, AMARELA);
-        cadaver_aqui(e, x, y, a.tipo & 0x80 != 0);
-        e.superficie.lista.vagas[i].tipo = 0;
-    } else {
-        definir_vida(e, mx, my, 0);
-        definir_vida(e, x, y, a.tipo);
-        cadaver_aqui(e, mx, my, cor_amarela(e) != 0);
-    }
-}
-
-/// `_DoTroph(x, y, d)` (`1000:846e`): a amarela come (`_EatMyFood(1)`): vida 100, contagem
-/// zerada, `_MeWantFood` recalculado como em `_SetMyHealth`.
-///
-/// [lacuna] o diálogo (mensagem 11 de 4/1010) e o giro da amarela para a formiga ficam com a
-/// formiga amarela.
-fn trofalaxia(e: &mut Estado) {
-    let a = &mut e.amarela;
-    a.saude = 100;
-    a.saude_contagem = 0;
-    a.quer_comida = if a.saude > a.aviso_saude && a.saude > 9 { 0 } else { 1 };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -689,6 +380,8 @@ struct Sim<'a> {
     e: &'a mut Estado,
     t: &'a TabelasSuperficie,
     f: &'a TabelasFeromonio,
+    /// Tabelas da amarela, para `_YellowFight` e `_DoTroph`.
+    ta: &'a TabelasAmarela,
     /// Cópia dos mapas de cheiro, lida e gravada pelas rotinas de `feromonios.rs`.
     cheiro: fer::Feromonios,
 }
@@ -716,8 +409,7 @@ pub(crate) fn devolver_cheiros(f: &fer::Feromonios, m: &mut MapasDoEstado) {
 
 /// Parte de cheiro de `_DoSmells` para o tick (`rules/tick.rs`): roda `fase` de
 /// `feromonios.rs` sobre os mapas do `Estado` (feromonios.md §2–3).
-pub(crate) fn rodar_fase_de_cheiro(e: &mut Estado, fase: fer::FaseCheiro) {
-    let regras = &tabelas_padrao().1.regras;
+pub(crate) fn rodar_fase_de_cheiro(e: &mut Estado, fase: fer::FaseCheiro, regras: &RegrasFeromonio) {
     let mut cheiro = copiar_cheiros(&e.feromonios);
     let mapa_a = crate::formats::save::Mapa {
         largura: e.superficie.mapa.largura,
@@ -729,9 +421,9 @@ pub(crate) fn rodar_fase_de_cheiro(e: &mut Estado, fase: fer::FaseCheiro) {
 }
 
 /// `_DoAntSimA` (`1028:04d8`, seção 1) com tabelas explícitas.
-pub fn simular_superficie(e: &mut Estado, t: &TabelasSuperficie, f: &TabelasFeromonio) {
+pub fn simular_superficie(e: &mut Estado, t: &TabelasSuperficie, f: &TabelasFeromonio, ta: &TabelasAmarela) {
     let cheiro = copiar_cheiros(&e.feromonios);
-    let mut sim = Sim { e, t, f, cheiro };
+    let mut sim = Sim { e, t, f, ta, cheiro };
     sim.laco();
     let Sim { e, cheiro, .. } = sim;
     devolver_cheiros(&cheiro, &mut e.feromonios);
@@ -757,7 +449,7 @@ impl Sim<'_> {
             if r == 0 && a.tipo != 0 {
                 let saude = self.e.colonia(cor(a.tipo)).saude as i32;
                 if saude < self.e.s.mascara(32) {
-                    cadaver_aqui(self.e, a.x as i32, a.y as i32, a.tipo & 0x80 != 0);
+                    comum::cadaver_aqui(self.e, a.x as i32, a.y as i32, a.tipo & 0x80 != 0);
                     self.vaga(i).tipo = 0;
                     // Também para vermelhas (peculiaridade P6).
                     self.e.preta.mortes_naturais = self.e.preta.mortes_naturais.wrapping_add(1);
@@ -825,7 +517,7 @@ impl Sim<'_> {
     }
 
     fn cheiro_de_ninho(&self, tipo: u8, x: i32, y: i32) -> u8 {
-        self.cheiro.camada(fer::Camada::ninho(cor_fer(cor(tipo)))).no_tile(x, y)
+        self.cheiro.camada(fer::Camada::ninho(cor(tipo))).no_tile(x, y)
     }
 
     fn revoada(&self, tipo: u8) -> i16 {
@@ -914,7 +606,7 @@ impl Sim<'_> {
             return;
         }
         let ocupante = vida(self.e, nx, ny);
-        let c = cor_fer(cor(tipo));
+        let c = cor(tipo);
         if ocupante == 0 {
             self.andar(i, x, y, nx, ny, d | base(tipo));
             if p.cheiro_de_ninho {
@@ -930,7 +622,7 @@ impl Sim<'_> {
         }
         if e_amarela(ocupante) {
             if (tipo ^ cor_amarela(self.e)) & 0x80 != 0 {
-                luta_com_amarela(self.e, self.t, i);
+                amarela::lutar_com_amarela(self.e, self.ta, 1, i as i32);
                 return;
             }
             let quer = self.e.amarela.quer_comida;
@@ -943,7 +635,7 @@ impl Sim<'_> {
                 let novo = d | base(tipo);
                 self.vaga(i).tipo = novo;
                 definir_vida(self.e, x, y, novo);
-                trofalaxia(self.e);
+                amarela::trofalaxia(self.e, self.ta, x, y, d as i32);
             }
             self.girar(i, x, y, tipo);
             return;
@@ -973,7 +665,7 @@ impl Sim<'_> {
     fn direcao_ninho(&mut self, x: i32, y: i32, d: u8, tipo: u8) -> u8 {
         let c = cor(tipo);
         let (bx, by) = self.e.colonia(c).ultimo_buraco;
-        fer::direcao_ninho(&self.cheiro, self.f, x, y, d, cor_fer(c), (bx as i32, by as i32), &mut self.e.s)
+        fer::direcao_ninho(&self.cheiro, self.f, x, y, d, c, (bx as i32, by as i32), &mut self.e.s)
     }
 
     /// `_GetDefendDir` (`1030:1026`): segue a amarela.
@@ -1108,7 +800,7 @@ impl Sim<'_> {
             v.s = 0;
             return;
         }
-        let c = cor_fer(cor(a.tipo));
+        let c = cor(a.tipo);
         let Some(d) = fer::direcao_forrageio(&self.cheiro, self.f, x, y, dir(a.tipo), c, &mut self.e.s) else {
             // Fim da trilha.
             let m = if self.e.s.mascara(8) == 0 { modo_novo(self.e, self.t, g, a.tipo) } else { M_PASSEIO };
@@ -1144,7 +836,7 @@ impl Sim<'_> {
             return;
         }
         self.andar(i, x, y, nx, ny, d | base(a.tipo));
-        self.deixar_rastro(i, fer::Camada::trilha(cor_fer(cor(a.tipo))), nx, ny);
+        self.deixar_rastro(i, fer::Camada::trilha(cor(a.tipo)), nx, ny);
     }
 
     /// Modo 5: `_DoDigOutAntA` (3.6). Sem teste de buraco.
@@ -1181,7 +873,7 @@ impl Sim<'_> {
             return;
         }
         self.andar(i, x, y, nx, ny, d | base(a.tipo));
-        self.deixar_rastro(i, fer::Camada::ninho(cor_fer(cor(a.tipo))), nx, ny);
+        self.deixar_rastro(i, fer::Camada::ninho(cor(a.tipo)), nx, ny);
     }
 
     /// Modo 6: `_DoRecruitAnt` (3.7).
@@ -1250,7 +942,7 @@ impl Sim<'_> {
             self.vaga(self.e.tindex as usize).modo = m;
             self.vaga(i).s = 0;
             // Cadáver com a cor do vencedor (P3).
-            cadaver_aqui(self.e, x, y, v & 0x80 != 0);
+            comum::cadaver_aqui(self.e, x, y, v & 0x80 != 0);
         }
         // [lacuna] Com a opção "Silly", `_FightBalloons` (só interface, sem sorteio).
     }
@@ -1375,7 +1067,7 @@ impl Sim<'_> {
                     return;
                 }
                 if e_amarela(ocupante) {
-                    luta_com_amarela(self.e, self.t, i);
+                    amarela::lutar_com_amarela(self.e, self.ta, 1, i as i32);
                     return;
                 }
                 if ocupante < 0x80 {
@@ -1418,66 +1110,22 @@ fn melhor_direcao_vermelha(e: &Estado, f: &TabelasFeromonio, x: i32, y: i32, tx:
     livre.or(bloqueada)
 }
 
-/// `_TileCanBeMovedOn` no plano da superfície (`1020:9342`): dentro do mapa e tile ≤ 0x53
-/// (quintal) ou ≤ 0x90 (casa).
+/// `_TileCanBeMovedOn` no plano da superfície ([`comum::pode_pisar_superficie`]).
 fn pode_pisar(e: &Estado, x: i32, y: i32) -> bool {
-    match e.superficie.mapa.em(x, y) {
-        None => false,
-        Some(v) => v <= if e.ambiente.terreno == 0 { 0x53 } else { 0x90 },
-    }
+    comum::pode_pisar_superficie(e, x, y)
 }
 
-/// `_IsClearTile` na superfície (`1020:5b2c`): dentro do mapa, sem formiga (a amarela conta como
-/// livre) e tile < 0x10.
+/// `_IsClearTile` na superfície (`1020:5b2c`, [`comum::celula_livre`]).
 fn celula_livre(e: &Estado, x: i32, y: i32) -> bool {
-    let (Some(v), Some(ocupante)) = (e.superficie.mapa.em(x, y), e.superficie.vida.em(x, y)) else {
-        return false;
-    };
-    (ocupante == 0 || e_amarela(ocupante)) && v < 0x10
+    comum::celula_livre(e, 1, x, y)
 }
 
 // ---------------------------------------------------------------------------------------------
 // Recrutamento (9.4)
 // ---------------------------------------------------------------------------------------------
 
-/// `_Recruit(n)` (`1030:06d2`): pretas de grupo 2/6 com M ≠ 6 → M = 6, S = 0; lista A de trás
-/// para frente, depois lista B, até `n`.
-pub fn recrutar(e: &mut Estado, mut n: i32) {
-    for area in [Lista::A, Lista::B] {
-        let l = e.lista_mut(area);
-        for j in (0..l.usadas()).rev() {
-            if n < 1 {
-                return;
-            }
-            let f = &mut l.vagas[j];
-            if f.tipo != 0 && f.tipo & 0x80 == 0 && operaria_ou_soldado(grupo(f.tipo)) && f.modo != M_DEFESA {
-                f.modo = M_DEFESA;
-                f.s = 0;
-                n -= 1;
-            }
-        }
-    }
-}
-
-/// `_UnRecruit(p)` (`1030:078a`): quota = metade das pretas em Defense do último tick (p = 0) ou
-/// todas + 100 (p ≠ 0). Listas A e B: M 6 → 0; lista R (invasoras pretas): M 6 → 7.
-pub fn desrecrutar(e: &mut Estado, p: i32) {
-    let em_defesa = e.modos_do_tick[0][M_DEFESA as usize] as i32;
-    let mut quota = if p == 0 { em_defesa / 2 } else { em_defesa + 100 };
-    for (area, novo) in [(Lista::A, M_PASSEIO), (Lista::B, M_PASSEIO), (Lista::R, M_ATAQUE)] {
-        let l = e.lista_mut(area);
-        for j in (0..l.usadas()).rev() {
-            if quota < 1 {
-                return;
-            }
-            let f = &mut l.vagas[j];
-            if f.tipo != 0 && f.tipo & 0x80 == 0 && f.modo == M_DEFESA {
-                f.modo = novo;
-                quota -= 1;
-            }
-        }
-    }
-}
+// `_Recruit` e `_UnRecruit` estão em `rules/comum.rs` (a amarela também os usa) e são reexportados
+// aqui como [`recrutar`] e [`desrecrutar`].
 
 /// `_RecruitRed(n)` (`1030:0866`): vermelhas de grupo 2/6 da lista A com M ≠ 19 e ≠ 6 → M = 6,
 /// S = 0, até `n`.

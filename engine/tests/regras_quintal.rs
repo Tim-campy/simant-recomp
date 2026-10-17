@@ -8,10 +8,12 @@
 use std::path::PathBuf;
 
 use engine::formats::save::{JogoSalvo, LayoutSave};
+use engine::rules::amarela::TabelasAmarela;
 use engine::rules::estado::{Estado, Evento};
 use engine::rules::geracao::Cor;
+use engine::rules::inimigos::TabelasInimigos;
 use engine::rules::quintal::{
-    placar_vizinhos, reproduzir, simular_agua, simular_colonias, simular_quintal_com, Relogios, TabelasQuintal,
+    placar_vizinhos, reproduzir, simular_agua, simular_colonias, simular_quintal_com, Relogios, TabelasQuintal, Vitimas,
 };
 
 fn raiz() -> PathBuf {
@@ -147,7 +149,7 @@ fn cortador_fora_do_patch_atual() {
     e.preta.populacao_quintal[i(5, 5)] = 100;
     e.bichos.passaro_atraso = i32::MAX;
     let rel = Relogios { ciclos: 0, mac: 0 };
-    simular_quintal_com(&mut e, &t, rel);
+    simular_quintal_com(&mut e, &t, Vitimas::de(TabelasAmarela::padrao(), TabelasInimigos::padrao()), rel);
     assert_eq!((e.menino.px, e.menino.py), (5, 5));
     assert_eq!(e.preta.populacao_quintal[i(5, 5)], 75);
 }
@@ -162,7 +164,7 @@ fn roteiro_da_casa_bate_com_o_quick2() {
     e.ambiente.patch = (11, 8);
     e.ambiente.ciclo_quintal = 0;
     e.bichos.passaro_atraso = i32::MAX;
-    simular_quintal_com(&mut e, &t, Relogios { ciclos: 0, mac: 0 });
+    simular_quintal_com(&mut e, &t, Vitimas::de(TabelasAmarela::padrao(), TabelasInimigos::padrao()), Relogios { ciclos: 0, mac: 0 });
     assert_eq!((e.menino.x, e.menino.y, e.menino.no_contagem), (126, 92, 10));
     assert_eq!((e.menino.px, e.menino.py, e.menino.presente), (0, 5, 0));
 }
@@ -176,7 +178,7 @@ fn tecla_faz_chover() {
     e.menino.no_numero = 0x26;
     e.bichos.passaro_atraso = i32::MAX;
     let r_antes = e.r;
-    simular_quintal_com(&mut e, &t, Relogios { ciclos: 0, mac: 0 });
+    simular_quintal_com(&mut e, &t, Vitimas::de(TabelasAmarela::padrao(), TabelasInimigos::padrao()), Relogios { ciclos: 0, mac: 0 });
     assert_eq!(e.ambiente.chovendo, 1);
     assert!((150..300).contains(&e.ambiente.chuva_contagem));
     assert_ne!(e.r, r_antes);
@@ -296,7 +298,7 @@ fn vetores_de_tick_do_original() {
         let vida = std::fs::read(dir.join("vida_antes.bin")).unwrap();
         e.superficie.vida.dados.copy_from_slice(&vida[..8192]);
         let rel = Relogios { ciclos: antes["gameCycles"].as_i64().unwrap(), mac: 0 };
-        simular_quintal_com(&mut e, &t, rel);
+        simular_quintal_com(&mut e, &t, Vitimas::de(TabelasAmarela::padrao(), TabelasInimigos::padrao()), rel);
         let mut m = e.menino.clone();
         m.boy_msg_cnt = fim.menino.boy_msg_cnt; // relógio do Mac (não capturado)
         assert_eq!(m, fim.menino, "tick {tick}: menino");
