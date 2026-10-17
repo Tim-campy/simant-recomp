@@ -117,7 +117,7 @@ Quando a janela do quintal está aberta no lugar do mapa, a faixa mostrada é a 
 | `0x230b`–`0x2312` | `ribUserDef2A`–`H` | `_DoUserButton` |
 | `0x2313`–`0x2319` | `ribbm1`–`7` | marcadores (`_DoBookMark`) |
 
-Dados da faixa (`_DrawYardData` `1010:acd8`, fonte 3): `ribQueens` = `_QueenStorageB`, `ribBlackCols` = `_ColonyTotalBlack`, `ribRedCols` = `_ColonyTotalRed`, e barras de saúde e população [código]. O port desenha a faixa 35 com o botão do modo selecionado (`_SetYardMode` seleciona `0x2302 + modo`… pela tabela `1048:1586`) [em aberto: conteúdo da tabela; o port seleciona `ribHouse` nos modos 0 e 1, `ribStrat` no 2 e `ribGraphic` no 3, como na captura] e ainda não desenha os números nem as barras.
+Dados da faixa (`_DrawYardData` `1010:acd8`, `_font_SetFont(3)`; na lista de fontes do port é o índice 0, Gaia8x14, o que bate 98,5% com a captura [medido]): `ribQueens` = `_QueenStorageB`, `ribBlackCols` = `_ColonyTotalBlack`, `ribRedCols` = `_ColonyTotalRed`, e barras de saúde e população [código]. O port desenha a faixa 35 com o botão do modo selecionado (`_SetYardMode` seleciona `0x2302 + modo`… pela tabela `1048:1586`) [em aberto: conteúdo da tabela; o port seleciona `ribHouse` nos modos 0 e 1, `ribStrat` no 2 e `ribGraphic` no 3, como na captura] e escreve os três números; as barras de saúde e população ainda não.
 
 ## 4. Abrir a janela e escolher o modo
 
@@ -177,11 +177,26 @@ Resumo do que o código faz (detalhes nas specs de regras) [código]:
 
 ## 7. O que o port faz
 
-- Tela de jogo com a janela do quintal (`JanelaQuintal`): aberta pelo botão `Yard`, Ctrl+M, Ctrl+Y/5/6/7; fechada pelo botão `Patch` da faixa 35 ou Esc com ela na frente [Esc: extensão do port]. Desenhada por cima da janela de edição quando está na frente; atrás dela, só a parte fora da janela de edição aparece. Clique na janela de edição a traz para a frente; clique no quintal traz o quintal.
+- Tela de jogo com a janela do quintal (`JanelaQuintal`): aberta pelo botão `Yard`, Ctrl+M, Ctrl+Y/5/6/7; fechada pelo botão `Patch` da faixa 35. Opção `--quintal N` abre no modo N (para exportar a tela). Desenhada por cima da janela de edição quando está na frente; atrás dela, só a parte fora da janela de edição aparece. Clique na janela de edição a traz para a frente; clique no quintal traz o quintal.
 - Faixa 35 no lugar da 34 enquanto o quintal está aberto; botões House/Strat/Graphic/Patch/Place/Auto/Manual.
 - Clique simples num patch: `_YMapPnt`; duplo: `trocar_patch`.
 - Teclas e botões em `data/quintal_mapa.json` (sobrescrevível por mod).
 
 ## 8. Verificação
 
-Ver a seção "Comparação com o original" no fim deste documento (preenchida com os percentuais de `tools/comparar_captura.py`).
+**Comparação com o original** (bancada QEMU, 2026-10-17; port exportado com `simant --tipo completo --semente 5 --quintal N --exportar-tela-jogo`, `python tools/comparar_captura.py PORT CAPTURA --mapear --regiao ...`; a partida do port é outra, então menino, cachorro, gato e colônias diferem):
+
+| Tela | Região (área cliente) | Pixels iguais | O que difere |
+|---|---|---|---|
+| Yard View (`full_yard.png`) | janela 25, (119, 99)–(632, 376) | **99,27%** | menino, cachorro, gato (outra partida), texto do título e do rodapé |
+| Strategic View (`yard_strat.png`) | idem | **99,59%** | título, rodapé |
+| Graphic View (`yard_graphic.png`) | idem | **99,49%** | título, rodapé, barra do patch atual |
+| faixa 35 (`full_yard.png`) | (0, 0)–(640, 73) | **93,09%** | cursor do mouse, barras de saúde/população, botões `ribUserDef2*` (do `WIN.INI`), contagem de colônias (outra partida) — a mesma faixa de diferença da faixa 34 em jogo.md |
+
+A faixa 35 com a posição da tabela 9/0 saía 1 pixel à direita (75,8%); com o canto do objeto 0 no da faixa 34 bate (acima) [medido].
+
+Testes: `engine/src/core/quintal_mapa.rs` (dados, clique → patch como `_YardArea` com truncamento do C, modos e botões, polígono), `engine/src/rules/troca_patch.rs` (rainhas), `engine/tests/troca_patch.rs` (recusas 10000/10002/10004, troca para o quintal com o mesmo `_MapA`/`_MapB` que `_RandWorld` da semente do patch, troca para a casa com `_TERRAINset` 1 e `_Barrier` da casa), `engine/tests/modos_reais.rs` (os quatro modos desenhados, cursor no pixel medido (517, 304), colônia preta no modo 2).
+
+A geração dos patches da casa foi conferida com o original em 4 patches (geracao-mundo.md §5): o fork que fez a casa levou o original a trocar de patch por duplo clique na Yard View (Full Game, colônia preta escrita na memória) e os mapas gerados bateram 100%; isso confirma também o caminho `_XferPatch` → `_RandWorld` (textos "You are transferring to this place in the house" = 10007 e "Sorry, there is not a black colony at this location" = 10004).
+
+**Não verificado contra o original:** a troca de patch completa comparada campo a campo (amarela, aranha, listas depois da troca), `_PlaceQueenInYard`, o modo House View (1) com o menino dentro de casa, os sprites (deslocamentos por quadro vêm das tabelas, sem captura com o menino andando no port e no original no mesmo instante), o cursor nos modos 0/1 desenhado como contorno (medido só na cor).

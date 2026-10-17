@@ -8,7 +8,7 @@ Implementação: `engine/src/core/vida.rs` (camada de vida), `engine/src/core/ed
 
 ## Janelas abertas num Quick Game
 
-`_NewGame` (`1000:d6dc`), depois da escolha no "Select a Game" (o botão Quick Game devolve 0x206, que vira o tipo de jogo 0) [código]:
+`_NewGame` (`1000:d6dc`), depois da escolha no "Select a Game" (o botão Quick Game, `scenQuickGame`, devolve 0x202, que vira o tipo de jogo 1; ver [abertura.md](abertura.md), "Escolha do jogo") [código]:
 
 1. abre a janela de edição (`_win_Open(0)`), quando o tipo é 0;
 2. `_OpenCasteWindow` e `_OpenModeWindow` (janelas de controle de casta e de modo);
@@ -267,7 +267,7 @@ Avisos e botões ([mensagens.md](mensagens.md)):
 | Botões `ribUserDef1A`–`1H` da faixa | `_DoUserButton` (pausa, velocidade com "Game speed now …", opções, ir até a amarela, salvar; segurando: menu de ícones) | clique simples igual, exceto as funções que abrem janelas; sem o menu de ícones |
 | Pausa (Shift+0 ou botão) | `_SetPause`: "Game Paused" na faixa, permanente; despausar limpa | igual (mensagens.md §2.3) |
 | Clique simples no mapa | espera ~6 unidades de `_TickCount` (330 ms) sem simular; segurando, `_AntMenu`/Examine | espera igual; sem os menus |
-| Quadro de mensagem / fim de jogo na tela | só clique no quadro (ou Espaço no quadro) fecha; a simulação fica parada; o quadro fecha sozinho em ~14,85 s | igual; ao fechar o fim de jogo, Quick Game novo (o original abre "Select a Game") |
+| Quadro de mensagem / fim de jogo na tela | só clique no quadro (ou Espaço no quadro) fecha; a simulação fica parada; o quadro fecha sozinho em ~14,85 s | igual; ao fechar o fim de jogo, o port abre o "Select a Game" como o original |
 
 ### Jogo novo
 

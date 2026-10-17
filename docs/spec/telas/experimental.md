@@ -156,6 +156,14 @@ O mundo (formigas, ninhos, comida) continua o mesmo. No port: `quick_para_experi
 | Inseticida | `superficie.lista/vida/mapa`, `partida.cadaver_ponteiro/cadaveres_x/y`, `aranha`, `formigas_leao`, `ninho_?.lista/vida`, `tindex`; `s` |
 | Trocas de modo | `partida.tipo_jogo`, `partida.ferramenta_experimental`, `amarela`, `aranha`, vida da amarela |
 
+## 8.1 Na interface do port
+
+`simant/src/modos.rs` e `engine/src/core/menu_ferramentas.rs` (dados em `data/menu_ferramentas.json`):
+
+- No Experimental, o botão `ribTools` da faixa mostra o bitmap 14500 (`_NewGame` troca o par para 14550/14500) e abre o menu da janela 9 abaixo do botão, com um contorno no item da ferramenta atual. Um item com submenu abre o submenu (janelas 12–17) ao lado; o clique num item do submenu grava `_ExpSubStates` e fecha o menu. Clique fora fecha sem escolher. A posição do menu é escolha do port [hipótese].
+- No Quick Game o mesmo botão passa a partida para o Experimental (`quick_para_experimental`) sem o menu de um item (janela 10); no Full Game e no Tutorial não faz nada (divergencias.md).
+- No Experimental, todo clique no mapa da janela de edição (esquerdo ou direito) vai para `experimental::pressionar`; mover o mouse com o botão apertado chama `arrastar` a cada evento de movimento (o original repete no ritmo do redesenho); soltar chama `soltar`. Ctrl é lido do estado do teclado no momento. Os sons e a música das ferramentas vão para a fila de eventos (tocados pelo som do port); avisos e o quadro de exame só aparecem no terminal.
+
 ## 9. Verificação
 
 Testes do port (`engine/tests/regras_experimental.rs`), a partir do pseudocódigo:

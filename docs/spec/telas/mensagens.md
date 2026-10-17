@@ -92,7 +92,7 @@ O port fecha com o clique esquerdo dentro da área cliente, com Espaço (`tecla_
 
 `_EndGameDialog` é chamado a cada tick enquanto `_IsGameOver` ≠ 0 (simulacao-visao-geral.md); como fica num laço modal, na prática aparece uma vez. **Bancada:** depois do Load do C-10 (jogo pausado) os quadros 10010 e 10011 apareceram, mas o fim de jogo só depois de um clique no mapa, que deu uma ordem à amarela e fez um tick rodar mesmo pausado (§4 de simulacao-visao-geral.md) [bancada, `m7`/`m8`].
 
-**Port:** o diálogo é desenhado com a janela 4; a posição medida fica 1 pixel à esquerda da calculada (`ajuste` em `data/mensagens.json`) e os textos centram sem o pixel a mais à direita, como na faixa [medido]. Ao fechar, o port começa um **Quick Game novo** (semente do relógio) em vez do "Select a Game" (divergencias.md).
+**Port:** o diálogo é desenhado com a janela 4; a posição medida fica 1 pixel à esquerda da calculada (`ajuste` em `data/mensagens.json`) e os textos centram sem o pixel a mais à direita, como na faixa [medido]. Ao fechar, o port abre o "Select a Game" sobre a partida, como `_NewGame(0)` no original (`simant/src/modos.rs`).
 
 ### 4.1 Pontuação (`_CalcScore`, `1000:5530`)
 
