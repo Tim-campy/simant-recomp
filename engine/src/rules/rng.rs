@@ -105,6 +105,11 @@ impl GeradorR {
         self.estado
     }
 
+    /// Gerador com o estado interno de 32 bits dado (para retomar um estado capturado do original).
+    pub fn de_estado(estado: u32) -> GeradorR {
+        GeradorR { estado }
+    }
+
     /// `rand()`: 0…0x7FFF.
     pub fn rand(&mut self) -> i32 {
         self.estado = self.estado.wrapping_mul(0x343FD).wrapping_add(0x269EC3);
