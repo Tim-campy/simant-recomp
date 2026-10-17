@@ -458,10 +458,23 @@ fn centralizar_edicao(ponto: (i16, i16), x: i32, y: i32, plano: i16) -> (i32, i3
 }
 
 pub fn comparar_tick(v: &VetorTick, layout: &LayoutSave, regras: &mut dyn Regras) -> Result<RelatorioTick, String> {
+    comparar_com(v, layout, |e| {
+        tick(e, regras);
+        aplicar_vista_da_bancada(e);
+        Ok(())
+    })
+}
+
+/// Como [`comparar_tick`], mas o port aplica `acao` (uma ação da interface gravada no original com o
+/// jogo pausado, ex.: `_XferPatch`) em vez de um tick. O vetor tem o mesmo formato.
+pub fn comparar_com(
+    v: &VetorTick,
+    layout: &LayoutSave,
+    acao: impl FnOnce(&mut Estado) -> Result<(), String>,
+) -> Result<RelatorioTick, String> {
     let entrada = montar_entrada(v, layout)?;
     let mut e = entrada.estado;
-    tick(&mut e, regras);
-    aplicar_vista_da_bancada(&mut e);
+    acao(&mut e)?;
     let port = e.para_save(layout)?;
 
     let mut blocos = Vec::with_capacity(layout.blocos.len());
@@ -571,6 +584,38 @@ impl fmt::Display for RelatorioTick {
         }
         Ok(())
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Ações da interface gravadas no original (tests/referencias/acoes/)
+// ---------------------------------------------------------------------------------------------
+
+/// Aplica ao estado a ação da interface descrita em `extras.json["acao"]` de um vetor de ação
+/// (`tools/cenarios_tick.py`): `{"xfer": [px, py]}` = duplo clique no patch da Yard View
+/// (`_XferPatch`); `{"place": [px, py]}` = PLACE e clique no patch (`_PlaceQueenInYard`).
+/// Devolve uma descrição do resultado.
+pub fn aplicar_acao(
+    e: &mut Estado,
+    acao: &serde_json::Value,
+    tab: &super::geracao::TabelasGeracao,
+    cfg: &super::estado::ConfigSimulacao,
+) -> Result<String, String> {
+    let par = |k: &str| acao[k].as_array().map(|p| (p[0].as_i64().unwrap_or(-1) as i16, p[1].as_i64().unwrap_or(-1) as i16));
+    if let Some((x, y)) = par("xfer") {
+        e.vistas.ponto_quintal = (x, y);
+        return Ok(format!("{:?}", super::troca_patch::trocar_patch(e, tab, cfg)?));
+    }
+    if let Some((x, y)) = par("place") {
+        return Ok(format!("{:?}", super::troca_patch::colocar_rainha(e, x, y)));
+    }
+    Err(format!("ação desconhecida: {acao}"))
+}
+
+/// `extras.json["acao"]` de um vetor de ação.
+pub fn ler_acao(dir: &Path) -> Result<serde_json::Value, String> {
+    let texto = String::from_utf8(ler_arquivo(dir, "extras.json")?).map_err(|e| e.to_string())?;
+    let v: serde_json::Value = serde_json::from_str(&texto).map_err(|e| e.to_string())?;
+    Ok(v["acao"].clone())
 }
 
 // ---------------------------------------------------------------------------------------------

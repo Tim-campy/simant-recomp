@@ -435,6 +435,84 @@ def cenario_luta_vizinha(c: Sessao, saida, n):
     return c.gravar(saida, n, parar=lambda d: d.ler("MeCmd") == 3 and d.ler("MeMoveMe") == 0)
 
 
+# ------------------------------------------------------------------------------------------------
+# Ações da interface fora do tick (jogo pausado): estado antes e depois
+# ------------------------------------------------------------------------------------------------
+
+YARD_ORIGEM = (120, 157)   # canto da área cliente da janela 25 na bancada (telas/quintal.md §1)
+
+
+def pixel_patch(px, py):
+    """Centro do patch (px, py) na tela 640x480 com a janela do quintal na posição padrão."""
+    ox, oy = YARD_ORIGEM
+    return ox + 28 * px - 10 * py + 177, oy + 10 * py + 70
+
+
+def fotografar(c: Sessao, pasta, nome):
+    """Estado (formato .ANT), vida e extras (S, R, GameTime...) em pasta/nome.*; a VM fica parada."""
+    c.mj.sessao_gdb()
+    qb.gravar(Path(pasta).resolve() / f"estado_{nome}.bin", c.mj.estado())
+    qb.gravar(Path(pasta).resolve() / f"vida_{nome}.bin", c.dep.vida())
+    ex = c.dep.extras()
+    c.log(f"{nome}: {ex}")
+    return ex
+
+
+def tela(c: Sessao, pasta, nome):
+    # o comando de roteiro separa por espaços: caminho relativo ao SIMANT_RAIZ (sem espaços)
+    rel = Path(pasta).resolve().relative_to(qb.RAIZ.resolve()).as_posix()
+    c.b.executar(f"capturar {rel}/{nome}.png")
+
+
+def clicar_tela(c: Sessao, x, y, duplo=False):
+    c.dep.retomar()
+    time.sleep(0.3)
+    qb.mouse_canto(c.q)
+    qb.mover_rel(c.q, x, y)
+    time.sleep(0.3)
+    c.botoes(duplo)
+    c.log(f"{'duplo ' if duplo else ''}clique em ({x}, {y})")
+
+
+def dispensar(c: Sessao):
+    """Fecha uma caixa de mensagem ("Click here to continue")."""
+    c.dep.retomar()
+    c.b.executar("clicar_em 320 330")
+    time.sleep(1)
+
+
+def cenario_xfer(c: Sessao, saida, n):
+    """_XferPatch pela Yard View, com o jogo pausado (Shift+0): no Jogo Completo do início, uma colônia
+    preta é escrita no patch (10, 8) e em _ColonyTotalBlack = 2; Ctrl+Y abre a Yard View e o duplo
+    clique no patch faz a troca. Grava antes/depois (estado, vida, extras) e capturas."""
+    alvo = (10, 8) if n != 2 else (1, 5)  # --ticks 2: patch da casa
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    c.escrever_elemento("YMapPopB", alvo[0] * 16 + alvo[1], 3)
+    c.escrever("ColonyTotalBlack", 2)
+    c.dep.retomar()
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    antes = fotografar(c, saida, "antes")
+    tela(c, saida, "1_yard")
+    clicar_tela(c, *pixel_patch(*alvo), duplo=True)
+    time.sleep(4)
+    tela(c, saida, "2_dialogo")
+    dispensar(c)
+    time.sleep(2)
+    tela(c, saida, "3_depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"xfer": alvo})
+    return []
+
+
+def gravar_acao(saida, antes, depois, acao):
+    """extras.json no formato dos vetores de tick (comparável com vetor_tick::comparar_com)."""
+    (Path(saida) / "extras.json").write_text(json.dumps({"antes": antes, "depois": depois, "acao": acao}, indent=1) + "\n",
+                                             encoding="utf-8")
+
+
 def cenario_inseticida(c: Sessao, saida, n):
     """Menino dentro de casa parado no nó 32 ((_BoyX, _BoyY) = (45, 166) → patch (0, 12)) com
     _CurYardPnt = (0, 12): pisada e inseticida em todo tick (quintal.md §4). No Jogo Completo, com a
