@@ -183,6 +183,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustysynth"
+version = "1.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2fafc9b46be0b8ad0a15bb17406e34b4602987c90d12509ca71710ab545b40f"
+
+[[package]]
 name = "sdl2"
 version = "0.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -265,6 +271,7 @@ version = "0.1.0"
 dependencies = [
  "engine",
  "png",
+ "rustysynth",
  "sdl2",
  "serde",
  "serde_json",

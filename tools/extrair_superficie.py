@@ -32,6 +32,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("tools", 1)[0] + "tools")
 from ne_info import parse_ne  # noqa: E402
+from sons_regras import SONS  # noqa: E402
 
 SEG8 = 8
 SEG10 = 10
@@ -130,6 +131,7 @@ def main():
         **t,
         "regras": {k: v for k, (v, _) in REGRAS.items()},
         "_origem": {k: o for k, (_, o) in REGRAS.items()},
+        "sons": SONS["superficie"],
     }
     linhas = ["{"]
     itens = list(saida.items())

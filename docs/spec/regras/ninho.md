@@ -680,7 +680,7 @@ Port: `engine/tests/regras_ninho.rs` parte de cada `ID_carregado.ANT`, roda o ti
 
 - `engine/src/rules/ninho.rs`: `impl RegrasNinho for RegrasOriginais` chama `simular_ninho(e, cor, tabelas, tabelas_amarela)` (pública, para testes com outras tabelas). A formiga em processamento é um `Formigueiro` (índice = `_Tindex`, com T, X, Y, M de entrada, como os parâmetros do original); cada método cita a rotina do original e a seção desta spec.
 - Tabelas em `data/ninho.json` (`TabelasNinho`), geradas por `tools/extrair_ninho.py` (endereços no topo do script): `_Dx8/_Dy8`, `_TurnTab`, `_ModeTabWB/SB`, `_CasteModeTabB`, `_CasteTabC`, `VitóriaR`, classe e matriz de luta, borda do buraco. Guardadas em `RegrasOriginais::ninho` (com mods); `TabelasNinho::padrao` é a cópia embutida, para testes.
-- `_YellowFight` e `_DoTroph` são os de `rules/amarela.rs` (`lutar_com_amarela`, `trofalaxia`). Balões e o som da escavação não são regra e não estão implementados.
+- `_YellowFight` e `_DoTroph` são os de `rules/amarela.rs` (`lutar_com_amarela`, `trofalaxia`). Balões não estão implementados; o som da escavação (0x11/0x12) vira `Evento::Som` ([som.md](som.md)).
 - `_DigTile*`, `_SmoothEdges*`, `_FixExitMap*`, `_MakeNewHole*`, `_PlaceEgg*`, `_GetNewMode*`, `_GetWinner`, `_EatFood*`/`_StealFood*`, `_DecEat*`, `_GetBestDir` e `_ExitHole` estão em `engine/src/rules/comum.rs` (ver [../../decisoes.md](../../decisoes.md), "Módulo comum das regras"); `vencedor_da_luta` continua pública em `ninho.rs`, com as tabelas do ninho.
 
 ## Lacunas

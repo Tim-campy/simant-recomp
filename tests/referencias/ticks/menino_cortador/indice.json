@@ -1,0 +1,72 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-17",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "rico",
+ "descricao": "Menino cortando a grama posto no patch atual (_CurYardPnt = (11, 8)) na entrada do 1711: pisada (_FootFall) e cortador no patch (_MowerFall: 38 das 56 formigas da superfície mortas no 1712), sob chuva",
+ "passos": [
+  "patch atual _CurYardPnt = (11, 8)",
+  "NodeNum <- 38",
+  "BoyHere <- 3",
+  "BoyIsMowing <- 1",
+  "BoyX <- 399",
+  "BoyY <- 123",
+  "BoyPx <- 11",
+  "BoyPy <- 8",
+  "LastMowX <- 11",
+  "LastMowY <- 8",
+  "FootHere <- 1"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_001711",
+  "tick_001712",
+  "tick_001713",
+  "tick_001714",
+  "tick_001715"
+ ],
+ "selecao": [
+  "1711-1715"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); o snapshot rico tem dezenas delas"
+ }
+}

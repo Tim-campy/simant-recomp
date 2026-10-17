@@ -34,6 +34,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("tools", 1)[0] + "tools")
 from ne_info import parse_ne  # noqa: E402
+from sons_regras import SONS  # noqa: E402
 
 SEG8 = 8
 DGROUP = 10
@@ -109,6 +110,7 @@ def main():
             "0..5; colunas: Sk(8). chance_vitoria[ocupante][atacante] = chance em 10 de a ocupante vencer."
         ),
         **t,
+        "sons": SONS["ninho"],
     }
     # Uma lista por linha, para o arquivo ficar legível e fácil de editar num mod.
     texto = ["{"]

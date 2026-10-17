@@ -100,7 +100,10 @@ ANDAR:
     ninho, linha y ≠ 0: se o tile do destino é 0x14 e não é rainha e destino == célula atual:
         troca de ninho (6.3) ; r = −1
     ninho, linha 0: SAI (6.2)
-    depois de ENTRA/SAI: se o destino era exatamente esta célula/plano e o plano novo ≠ plano exibido, centraliza
+    depois de ENTRA/SAI: se o destino era exatamente esta célula/plano e o plano novo ≠ plano exibido:
+        centraliza (se AutoTrack desligado) e r = −1 (a ordem termina; o código cai no rótulo de
+        "concluída", `1028:7b6b`)  ← verificado no vetor amarela_superficie/1852
+        (se o plano novo é o exibido, r continua 0 e a ordem segue, com destino ainda na superfície)
 FIM:
     se "AutoTrack": centraliza a vista na amarela
     se r == 0 e chegou (plano e célula do destino) e _MeCmd == 0: r = −1
@@ -580,7 +583,7 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md) (comandos `clicar_em`, `t
 | `tecla_de_comando(e, t, ctl, vk, Modificadores)` | `_YellowCommandKey` | teclas virtuais do Windows (módulo `vk`): 1–4, 0, X/F9, J/NumPad* com Tab, Backspace, Home; devolve `RespostaTecla` |
 | `trocar_de_corpo(e, t, ctl, plano, x, y)` | `_ExchangeLives` | clique com a ferramenta 10 |
 
-`ControleJogador` guarda o que não vai para o save (`_SaveGamePaused`). Sons de efeito, diálogos, mensagens de vento (4/1010) e o movimento da vista não são simulados: as músicas viram `Evento::Musica`, os quadros da §9.1 viram `Evento::Mensagem`, e "centralizar" (`_GotoMyAnt`) grava `_LessonTemp = 1` e deixa `Evento::CentralizarNaAmarela` na fila; quem move a vista é o laço de jogo (`core/partida.rs`, ver [jogo.md](../telas/jogo.md), "Simulação ao vivo").
+`ControleJogador` guarda o que não vai para o save (`_SaveGamePaused`). Diálogos, mensagens de vento (4/1010) e o movimento da vista não são simulados: as músicas viram `Evento::Musica`, os efeitos sonoros `Evento::Som` (ids em `sons` de `amarela.json`, ver [som.md](som.md)) e `_TryAntTheme` `Evento::TemaDoNinho`, os quadros da §9.1 viram `Evento::Mensagem`, e "centralizar" (`_GotoMyAnt`) grava `_LessonTemp = 1` e deixa `Evento::CentralizarNaAmarela` na fila; quem move a vista é o laço de jogo (`core/partida.rs`, ver [jogo.md](../telas/jogo.md), "Simulação ao vivo").
 
 **Sorteios e animações.** Todos os sorteios acontecem na ordem do original, inclusive os das animações: `_AnimYellowFight` (S2 por quadro na luta ou no choque, S8 sempre; na formiga-leão o tile do centro oscila 0x3B–0x3D e fica no último valor) e `_AnimYellowInsane` (gerador R para o alvo, S8 quando trava; a amarela anda de verdade pelo mapa de vida e volta). O número de quadros usa `animacao.janela_edicao_na_frente` (padrão: verdadeiro) e `_OptionStates[1]` (música); o fim antecipado pela música não é reproduzido (divergencias.md). `_YellowBirth` é em tempo real e não sorteia: o port aplica só o estado final.
 

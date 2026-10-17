@@ -18,8 +18,8 @@
 //!   [`tecla_de_comando`] e [`trocar_de_corpo`]. Estado da interface que não vai para o save fica em
 //!   [`ControleJogador`].
 //!
-//! Sons de efeito (`_myBeginSound`), redesenho e centralização da vista são da interface e não são
-//! reproduzidos; músicas e quadros de mensagem viram [`Evento`]s. Sorteios (geradores S e R) acontecem na
+//! Redesenho e centralização da vista são da interface; músicas, efeitos sonoros (ids em `sons` de
+//! `amarela.json`, docs/spec/regras/som.md), o tema do ninho e os quadros de mensagem viram [`Evento`]s. Sorteios (geradores S e R) acontecem na
 //! mesma ordem do original, inclusive os das animações (§10.2, peculiaridade A5).
 
 use std::sync::OnceLock;
@@ -141,6 +141,41 @@ pub struct TabelasAmarela {
     pub animacao: AnimacaoAmarela,
     pub musicas: MusicasAmarela,
     pub mensagens: MensagensAmarela,
+    #[serde(default)]
+    pub sons: SonsAmarela,
+}
+
+/// Ids dos efeitos sonoros (objetos tipo 5 do banco SOUND, `_myBeginSound`) pedidos por esta parte
+/// (docs/spec/regras/som.md). Seção opcional no JSON: um id ausente não toca (mods anteriores à API 0.8).
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct SonsAmarela {
+    /// Erro (1): ordem que fracassa, comando impossível, morte cercada ou em fuga.
+    pub erro: Option<u16>,
+    /// Ok/centralizar (15): Home, alarme, troca de corpo, alvo da aranha.
+    pub ok: Option<u16>,
+    /// Passagem entre os ninhos (1, em `_DoAntMoveY`).
+    pub passagem: Option<u16>,
+    /// Cavar ao entrar na terra (`_SetLife`, 19).
+    pub cavar: Option<u16>,
+    /// Pegar/largar ovo (28).
+    pub ovo: Option<u16>,
+    /// Pegar/largar comida (29).
+    pub comida: Option<u16>,
+    /// Pegar/largar pedrinha (30).
+    pub pedrinha: Option<u16>,
+    /// Comer (`_EatMyFood` 0 e 3, 44) e o arroto do canibalismo (10).
+    pub comer: Option<u16>,
+    pub arroto: Option<u16>,
+    /// Luta (`_AnimYellowFight` código 0, com `S2` ≠ 0; 37) e choque (código 10; 49).
+    pub luta: Option<u16>,
+    pub choque: Option<u16>,
+    /// `_YellowBirth`: ovo posto (28) e nascimento (49).
+    pub nascimento_ovo: Option<u16>,
+    pub nascimento: Option<u16>,
+    /// Aranha: caça por faro e desligar (2), laser (41).
+    pub aranha_faro: Option<u16>,
+    pub aranha_laser: Option<u16>,
 }
 
 impl TabelasAmarela {
@@ -388,6 +423,7 @@ fn por_vida(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, v: u
         let m = tile(e, plano, x, y);
         if e_terra(m) || e_capim(m) {
             cavar_minha_celula(e, t, plano, x, y);
+            e.pedir_som(t.sons.cavar);
         }
     }
 }
@@ -829,7 +865,7 @@ fn levantavel(e: &Estado, plano: i32, x: i32, y: i32) -> bool {
 }
 
 /// `_PickupMyRock(plano, x, y)` (§7.1).
-fn pegar_pedrinha(e: &mut Estado, plano: i32, x: i32, y: i32) -> bool {
+fn pegar_pedrinha(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32) -> bool {
     let tipo = e.amarela.tipo as i32;
     if tipo != TIPO_OPERARIA && tipo != TIPO_SOLDADO {
         return false;
@@ -861,6 +897,7 @@ fn pegar_pedrinha(e: &mut Estado, plano: i32, x: i32, y: i32) -> bool {
         return false;
     }
     e.amarela.tipo = if tipo == TIPO_OPERARIA { 0x28 } else { 0x48 };
+    e.pedir_som(t.sons.pedrinha);
     true
 }
 
@@ -898,6 +935,7 @@ fn pegar_comida(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32) 
     if com_fome {
         e.amarela.comeu_tipo = 0;
     } else {
+        e.pedir_som(t.sons.comida);
         e.amarela.tipo += 8;
     }
     true
@@ -959,6 +997,7 @@ fn largar_comida(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32,
         }
     }
     e.amarela.tipo &= !8;
+    e.pedir_som(t.sons.comida);
     true
 }
 
@@ -1001,6 +1040,7 @@ fn largar_pedrinha(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i3
     e.amarela.dir = d as i16;
     soltar_pedrinha(e, plano, cx, cy);
     e.amarela.tipo -= 0x18;
+    e.pedir_som(t.sons.pedrinha);
     true
 }
 
@@ -1025,6 +1065,7 @@ fn largar_ovo(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, ax
     if dentro(a.plano as i32, a.x as i32, a.y as i32) {
         por_vida(e, t, a.plano as i32, a.x as i32, a.y as i32, MARCA_AMARELA);
     }
+    e.pedir_som(t.sons.ovo);
     true
 }
 
@@ -1061,6 +1102,7 @@ fn tentar_largar_ou_pegar(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32
             if e.amarela.saude < t.regras.vida_canibal {
                 e.amarela.comeu_tipo = 3;
             } else {
+                e.pedir_som(t.sons.ovo);
                 e.amarela.ovo_carregado = ovo as i16;
                 e.amarela.tipo = 8;
             }
@@ -1068,7 +1110,7 @@ fn tentar_largar_ou_pegar(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32
         }
     }
     if !ok {
-        ok = pegar_pedrinha(e, plano, x, y) || pegar_comida(e, t, plano, x, y);
+        ok = pegar_pedrinha(e, t, plano, x, y) || pegar_comida(e, t, plano, x, y);
     }
     if ok {
         let k = get_dir(mx, my, x, y);
@@ -1099,6 +1141,13 @@ fn tentar_largar_ou_pegar(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32
 /// `_EatMyFood(tipo)` (§7.2).
 fn comer(e: &mut Estado, t: &TabelasAmarela, tipo: i32) {
     let maxima = t.regras.vida_maxima;
+    // Tipo 0 (comida): 0x2C; tipo 3 (ovo, canibalismo): 0x2C e o arroto 10.
+    if tipo == 0 || tipo == 3 {
+        e.pedir_som(t.sons.comer);
+    }
+    if tipo == 3 {
+        e.pedir_som(t.sons.arroto);
+    }
     if tipo == 2 {
         let a = &mut e.amarela;
         if a.saude < t.regras.custo_doar + 1 {
@@ -1134,6 +1183,7 @@ fn comer(e: &mut Estado, t: &TabelasAmarela, tipo: i32) {
 
 /// `_EnterNest` (§6.1), também embutido em `_DoAntMoveY`.
 fn entrar_no_ninho(e: &mut Estado, t: &TabelasAmarela) {
+    e.eventos.push(Evento::TemaDoNinho);
     if e.amarela.soltando_alarme != 0 {
         e.amarela.soltando_alarme = 0;
     }
@@ -1152,6 +1202,7 @@ fn entrar_no_ninho(e: &mut Estado, t: &TabelasAmarela) {
 
 /// `_ExitNest` (§6.2).
 fn sair_do_ninho(e: &mut Estado, t: &TabelasAmarela) {
+    e.eventos.push(Evento::TemaDoNinho);
     remarcar(e, t, 0);
     let plano = e.amarela.plano as i32;
     let coluna = e.amarela.x as i32;
@@ -1276,6 +1327,7 @@ pub fn mover_amarela(e: &mut Estado, t: &TabelasAmarela) {
         return;
     }
     if r == -2 {
+        e.pedir_som(t.sons.erro);
         centralizar(e);
     } else if a.comando == 3 {
         e.amarela.comecou_luta = 1;
@@ -1401,6 +1453,7 @@ fn passo_da_ordem(e: &mut Estado, t: &TabelasAmarela) -> (i32, Option<Alvo>) {
             desmarcar(e, t);
             e.amarela.plano = if plano == 2 { 3 } else { 2 };
             remarcar(e, t, MARCA_AMARELA);
+            e.pedir_som(t.sons.passagem);
             centralizar(e);
             // Entrando no vermelho: mensagem 4 de 4/1010 ("You have entered the red nest"), interface.
             return (-1, alvo);
@@ -1408,8 +1461,13 @@ fn passo_da_ordem(e: &mut Estado, t: &TabelasAmarela) -> (i32, Option<Alvo>) {
         sair_do_ninho(e, t);
     }
     let novo_plano = e.amarela.plano as i32;
-    if gp == plano && gx == mx && gy == my && novo_plano != e.vistas.plano as i32 && e.partida.opcoes[0] == 0 {
-        centralizar(e);
+    if gp == plano && gx == mx && gy == my && novo_plano != e.vistas.plano as i32 {
+        // O original cai no rótulo de "ordem concluída" (r = −1) depois do `_GotoMyAnt`: a ordem termina
+        // e `_ResetYellowVars` põe o destino na posição nova (vetor amarela_superficie, tick 1852).
+        if e.partida.opcoes[0] == 0 {
+            centralizar(e);
+        }
+        return (-1, alvo);
     }
     (0, alvo)
 }
@@ -1443,10 +1501,11 @@ fn animar_luta(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, d
     }
     let mut leao = 3;
     for _ in 0..quadros {
-        if codigo == 0 {
-            e.s.mascara(2);
+        if codigo == 0 && e.s.mascara(2) != 0 {
+            e.pedir_som(t.sons.luta);
         }
         if codigo == 10 {
+            e.pedir_som(t.sons.choque);
             let pisca = e.s.mascara(2) != 0;
             por_tile(e, 1, x, y, if pisca { tile_original.wrapping_sub(3) } else { tile_original });
         }
@@ -1631,8 +1690,14 @@ pub fn matar_amarela(e: &mut Estado, t: &TabelasAmarela, causa: CausaMorte) {
             animar_luta(e, t, a.plano as i32, a.x as i32, a.y as i32, a.dir as i32, a.tipo as i32, codigo);
             morta_em_luta = false;
         }
-        CausaMorte::Cercada => mensagem(e, m.cercada),
-        CausaMorte::Fugiu => mensagem(e, m.fugiu),
+        CausaMorte::Cercada => {
+            e.pedir_som(t.sons.erro);
+            mensagem(e, m.cercada)
+        }
+        CausaMorte::Fugiu => {
+            e.pedir_som(t.sons.erro);
+            mensagem(e, m.fugiu)
+        }
         CausaMorte::Pisada | CausaMorte::Cortador | CausaMorte::Afogada | CausaMorte::Inseticida => {
             musica(e);
             let id = match causa {
@@ -1752,7 +1817,8 @@ fn nascer_de_ovo(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32,
     e.amarela.modo = 0;
     e.amarela.ovo = 1;
     let dir = e.amarela.dir as i32;
-    marcar_amarela(e, t, plano, x, y, 0, dir, MARCA_AMARELA);
+    sem_efeitos(e, |e| marcar_amarela(e, t, plano, x, y, 0, dir, MARCA_AMARELA));
+    e.pedir_som(t.sons.nascimento_ovo);
     centralizar(e);
     depois_do_nascimento(e, t);
     // `_YellowDeath` já trocou 0x60 por 0x10, então na prática a direção é sempre 6.
@@ -1764,7 +1830,17 @@ fn nascer_de_ovo(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32,
     }
     let dir = e.amarela.dir as i32;
     marcar_amarela(e, t, plano, x, y, tipo, dir, MARCA_AMARELA);
+    e.pedir_som(t.sons.nascimento);
     e.eventos.push(Evento::Musica(t.musicas.renascer));
+}
+
+/// `_YellowBirth` desliga os efeitos sonoros (`_OptionStates[2]` = 0) até pôr o ovo: os `Evento::Som`
+/// pedidos dentro de `f` são descartados; os demais eventos ficam.
+fn sem_efeitos(e: &mut Estado, f: impl FnOnce(&mut Estado)) {
+    let n = e.eventos.len();
+    f(e);
+    let novos = e.eventos.split_off(n);
+    e.eventos.extend(novos.into_iter().filter(|ev| !matches!(ev, Evento::Som(_))));
 }
 
 /// `_MakeBlkQueen/_MakeRedQueen(x, y, d)` (ciclo-de-vida.md).
@@ -1783,10 +1859,13 @@ fn fazer_rainha(e: &mut Estado, t: &TabelasAmarela, cor: Cor, x: i32, y: i32, d:
 fn fundar_colonia(e: &mut Estado, t: &TabelasAmarela, ox: i32, oy: i32) {
     e.amarela.modo = 0;
     let plano_ovo = e.amarela.plano as i32;
-    desmarcar(e, t);
-    remarcar_como(e, t, TIPO_RAINHA);
-    e.eventos.push(Evento::Musica(t.musicas.fundar_inicio));
-    por_vida(e, t, plano_ovo, ox, oy, 1);
+    sem_efeitos(e, |e| {
+        desmarcar(e, t);
+        remarcar_como(e, t, TIPO_RAINHA);
+        e.eventos.push(Evento::Musica(t.musicas.fundar_inicio));
+        por_vida(e, t, plano_ovo, ox, oy, 1);
+    });
+    e.pedir_som(t.sons.nascimento_ovo);
     depois_do_nascimento(e, t);
     for estagio in 2..=7u8 {
         let p = e.amarela.plano as i32;
@@ -1802,6 +1881,7 @@ fn fundar_colonia(e: &mut Estado, t: &TabelasAmarela, ox: i32, oy: i32) {
     c.castas[1] += 1;
     c.castas[4] -= 1;
     c.populacao += 1;
+    e.pedir_som(t.sons.nascimento);
     e.eventos.push(Evento::Musica(t.musicas.fundar_fim));
 }
 
@@ -2113,7 +2193,8 @@ fn definir_destino(e: &mut Estado, plano_vista: i32, x: i32, y: i32) {
 }
 
 /// `_processSpider(x, y, dupla)`.
-fn ordem_aranha(e: &mut Estado, x: i32, y: i32, dupla: i32) {
+/// Devolve `true` se escolheu uma formiga como alvo.
+fn ordem_aranha(e: &mut Estado, x: i32, y: i32, dupla: i32) -> bool {
     let modo_alvo = e.partida.ferramenta == 11;
     if dupla >= 1 || modo_alvo {
         let v = vida_bruta(e, 1, x, y).unwrap_or(0) as i32;
@@ -2126,10 +2207,10 @@ fn ordem_aranha(e: &mut Estado, x: i32, y: i32, dupla: i32) {
                 e.amarela.modo_aranha = 6;
                 e.partida.ferramenta = -1;
             }
-            return;
+            return true;
         }
         if modo_alvo {
-            return;
+            return false;
         }
     }
     e.aranha.alvo = -2;
@@ -2138,6 +2219,7 @@ fn ordem_aranha(e: &mut Estado, x: i32, y: i32, dupla: i32) {
     e.aranha.destino_x = x as i16;
     e.aranha.destino_y = y as i16;
     e.amarela.comando = dupla as i16;
+    false
 }
 
 /// "Ir para (x, y)": clique simples numa célula do mapa exibido (`plano_vista` = `_MapPlane`), sem os
@@ -2198,7 +2280,8 @@ pub fn clicar_no_mapa(
             if plano_vista > 1 || e.amarela.modo != 1 {
                 return RespostaClique::Nada;
             }
-            ordem_aranha(e, x, y, duplo as i32);
+            let achou = ordem_aranha(e, x, y, duplo as i32);
+            e.pedir_som(if achou { t.sons.ok } else { t.sons.erro });
             return RespostaClique::Ordem;
         }
         _ => return RespostaClique::Nada,
@@ -2261,28 +2344,42 @@ pub fn comando(e: &mut Estado, t: &TabelasAmarela, ctl: &mut ControleJogador, c:
         7 => {
             if e.amarela.soltando_alarme == 0 {
                 if e.amarela.plano != 1 || e.amarela.modo != 0 {
+                    e.pedir_som(t.sons.erro);
                     return false;
                 }
                 e.amarela.soltando_alarme = 1;
             } else {
                 e.amarela.soltando_alarme = 0;
             }
+            e.pedir_som(t.sons.ok);
         }
         8 => {
             let a = e.amarela.clone();
-            return a.plano == 1 && tentar_largar_ou_pegar(e, t, 1, a.x as i32, a.y as i32) != -1;
+            let ok = a.plano == 1 && tentar_largar_ou_pegar(e, t, 1, a.x as i32, a.y as i32) != -1;
+            if !ok {
+                e.pedir_som(t.sons.erro);
+            }
+            return ok;
         }
         9 => {
             let a = e.amarela.clone();
             if a.plano != 2 || a.y <= 2 {
+                e.pedir_som(t.sons.erro);
                 return false;
             }
             let (dx, dy) = t.d8(a.dir as i32 ^ 4);
             fundar_colonia(e, t, a.x as i32 + 2 * dx, a.y as i32 + 2 * dy);
         }
         10 => alternar_ferramenta(e, ctl, 11),
-        11 => e.amarela.modo_aranha = if e.amarela.modo_aranha == 7 { 0 } else { 7 },
-        12 => e.amarela.modo_aranha = if e.amarela.modo_aranha == 8 { 0 } else { 8 },
+        11 => {
+            e.amarela.modo_aranha = if e.amarela.modo_aranha == 7 { 0 } else { 7 };
+            e.pedir_som(t.sons.aranha_faro);
+        }
+        12 => {
+            let liga = e.amarela.modo_aranha != 8;
+            e.amarela.modo_aranha = if liga { 8 } else { 0 };
+            e.pedir_som(if liga { t.sons.aranha_laser } else { t.sons.aranha_faro });
+        }
         _ => {}
     }
     true
@@ -2334,6 +2431,7 @@ pub fn tecla_de_comando(
         }
         vk::BACKSPACE => return parar_ou_centralizar(e, m.shift),
         vk::HOME => {
+            e.pedir_som(t.sons.ok);
             centralizar(e);
             return RespostaTecla::Centralizar;
         }
@@ -2392,12 +2490,15 @@ pub fn trocar_de_corpo(
 ) -> bool {
     e.tutorial.temporario = 1;
     if !trocar_corpo(e, t, plano, x, y) {
+        e.pedir_som(t.sons.erro);
         return false;
     }
     e.partida.ferramenta = -1;
     e.partida.pausado = ctl.pausa_salva;
     if e.amarela.tipo as i32 == TIPO_RAINHA {
         e.eventos.push(Evento::Musica(t.musicas.virou_rainha));
+    } else {
+        e.pedir_som(t.sons.ok);
     }
     true
 }

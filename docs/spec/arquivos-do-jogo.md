@@ -9,7 +9,7 @@ A pasta fornecida pelo usuário é uma instalação completa de Windows 3.1 com 
 | `MAXIS/ANTWIN/SIMANTW.SYM` | tabela de símbolos MAPSYM: 2.171 nomes de funções e variáveis |
 | `MAXIS/ANTWIN/SHARED.*`, `WINGANT.*`, `MWINNT.*`, `SOUND.*` | bancos de recursos (ver [formatos/banco-dat-ndx.md](formatos/banco-dat-ndx.md)) |
 | `MAXIS/ANTWIN/SIMANT.CFG` | modo de vídeo e de som (ver [formatos/simant-cfg.md](formatos/simant-cfg.md)) |
-| `MAXIS/ANTWIN/SOUND/*.MID` | 29 músicas em MIDI padrão. O EXE monta o caminho com `"%ssound\%s.mid"` |
+| `MAXIS/ANTWIN/SOUND/*.MID` | 29 músicas em MIDI padrão (arranjo duplo do Windows 3.1). O EXE monta o caminho com `"%ssound\%s.mid"`; ver [formatos/som.md](formatos/som.md) |
 | `MAXIS/ANTWIN/FONT1`–`FONT4`, `FONTRES.FON` | fontes. `FONTRES.FON` contém `Gaia8x8`; `FONT1`–`4` têm formato próprio, lido por `_font_ReadFont` [em aberto] |
 | `MAXIS/ANTWIN/SIMANT.HLP` | ajuda do WinHelp |
 | `MAXIS/ANTWIN/README.WRI` | leia-me em Windows Write |

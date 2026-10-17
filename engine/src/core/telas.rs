@@ -287,9 +287,26 @@ pub fn desenhar_janela_carregada_na_tela(
     id: u16,
     janela: &crate::formats::janela::Janela,
 ) -> Result<Vec<String>, String> {
+    desenhar_janela_deslocada(q, recursos, interface, id, janela, (0, 0))
+}
+
+/// Como `desenhar_janela_carregada_na_tela`, com a janela inteira deslocada de `(dx, dy)` em relação
+/// à posição calculada (ajustes medidos numa resolução, como o do fim de jogo na bancada QEMU).
+pub fn desenhar_janela_deslocada(
+    q: &mut super::quadro::Quadro,
+    recursos: &crate::recursos::Recursos,
+    interface: &Interface,
+    id: u16,
+    janela: &crate::formats::janela::Janela,
+    (dx, dy): (i16, i16),
+) -> Result<Vec<String>, String> {
     use crate::formats::janela::Retangulo;
     let m = &interface.moldura;
-    let g = interface.posicionar(id, janela).ok_or(format!("janela {id} sem posição"))?;
+    let mut g = interface.posicionar(id, janela).ok_or(format!("janela {id} sem posição"))?;
+    let mover = |r: Retangulo| Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy };
+    g.origem = (g.origem.0 + dx, g.origem.1 + dy);
+    g.externo = g.externo.map(mover);
+    g.interno = g.interno.map(mover);
     if id == m.faixa.janela {
         let faixa = Retangulo { esq: 0, topo: 0, dir: q.largura as i16, base: m.faixa.altura };
         q.preencher(faixa, m.faixa.fundo, m.faixa.fundo);

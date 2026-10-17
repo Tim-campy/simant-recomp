@@ -69,5 +69,9 @@
     "malvadeza_base": "_GstrR: _JustToBeMean = SRand1(malvadeza_sorteio) + malvadeza_base",
     "malvadeza_sorteio": "_GstrR: ver malvadeza_base",
     "musica_ataque_vermelho": "_GstrR: música tocada no ataque vermelho (_myBeginSong)"
+  },
+  "sons": {
+    "_origem": "docs/spec/regras/som.md: _AddFood(n, 1) (1030:6a58)",
+    "comida_nova": 32
   }
 }

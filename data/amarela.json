@@ -109,5 +109,12 @@
     "sem_corpo": "_YellowDeath: derrota no Jogo Completo",
     "outra_colonia": "_YellowDeath: escolher outra colônia (_SpecialXfer)",
     "transferida": "_YellowDeath: transferida para um adulto"
+  },
+  "sons": {
+    "_origem": "docs/spec/regras/som.md: _myBeginSound em _YellowCommand, _YellowCommandKey, _ExchangeLives, _YellowDeath, _DoAntMoveY, _SetLife, _Pickup*/_Drop*, _EatMyFood, _AnimYellowFight, _YellowBirth, _processSpider",
+    "erro": 1, "ok": 15, "passagem": 1, "cavar": 19,
+    "ovo": 28, "comida": 29, "pedrinha": 30, "comer": 44, "arroto": 10,
+    "luta": 37, "choque": 49, "nascimento_ovo": 28, "nascimento": 49,
+    "aranha_faro": 2, "aranha_laser": 41
   }
 }

@@ -967,8 +967,14 @@ grupo_do_save! {
 pub enum Evento {
     /// Texto de SHARED tipo 4 (`_PictStrnDialog`), pelo id decimal (ex.: 10010).
     Mensagem(u16),
-    /// Música/efeito (`_myBeginSong`), pelo id do original.
+    /// Música (`_myBeginSong`), pelo id do cabeçalho tipo 18 do banco SOUND.
     Musica(u16),
+    /// Efeito sonoro (`_myBeginSound`), pelo id do objeto tipo 5 do banco SOUND
+    /// (catálogo em docs/spec/regras/som.md).
+    Som(u16),
+    /// `_TryAntTheme` (`1020:1414`): a amarela entrou ou saiu de um ninho. Se toca um tema e qual
+    /// depende do relógio de parede (7200 ticks de `_TickCount` desde o último), que é da interface.
+    TemaDoNinho,
     /// `_EndGameDialog(0)`: pedido a cada tick enquanto `_IsGameOver` ≠ 0.
     DialogoFimDeJogo,
     /// `_GotoMyAnt` (`1000:a764`): levar a vista da janela de edição até a formiga amarela
@@ -1235,6 +1241,14 @@ impl Estado {
     /// Retira os eventos acumulados.
     pub fn retirar_eventos(&mut self) -> Vec<Evento> {
         std::mem::take(&mut self.eventos)
+    }
+
+    /// Pede o efeito sonoro `id` (tipo 5) à interface; `None` (som não definido nos dados) não faz nada.
+    /// Não sorteia nem muda o estado da simulação.
+    pub fn pedir_som(&mut self, id: Option<u16>) {
+        if let Some(id) = id {
+            self.eventos.push(Evento::Som(id));
+        }
     }
 
     // --- save ---

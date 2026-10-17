@@ -55,7 +55,7 @@ Com `L` = largura do mapa do plano: se `x < 0`, `x = 0`; senão, se `x + _editWi
 
 ### Posição ao carregar e na captura
 
-- Ao carregar, `_DoLoadInitializations` grava `(_MeLocX, _MeLocY)` no ponto lembrado do plano `_MePlane`, e `_SetDefaultWindows` → `_SetMapPlane(_MapPlane)` centraliza a vista nele; se `_MePlane = _MapPlane`, centraliza de novo em `(_MeLocX, _MeLocY)` [código]. Com 26 colunas, o `QUICK2.ANT` carregado começaria em x = 34 − 13 = 21 [hipótese: não capturado].
+- Ao carregar, `_DoLoadInitializations` grava `(_MeLocX, _MeLocY)` no ponto lembrado do plano `_MePlane`, e `_SetDefaultWindows` → `_SetMapPlane(_MapPlane)` centraliza a vista nele; se `_MePlane = _MapPlane`, centraliza de novo em `(_MeLocX, _MeLocY)` [código]. Com 26 colunas, o `QUICK2.ANT` carregado começaria em x = 34 − 13 = 21 [hipótese: não capturado]. **Bancada (2026-10-17, mensagens.md §6):** um save com a amarela e o `_BMapPnt` em (34, 9) no ninho preto (plano 2), lido da memória logo depois do Load, ficou com `_MapPnt.x` = **22**, não 21. Uma explicação é `_editWidth` = 25 no momento do Load (34 − 12 = 22), por exemplo porque a janela de edição ainda não estava no tamanho final [hipótese]; o port continua com 21 (em aberto).
 - A captura `qi_14_salvo.png` foi tirada no momento do save, sem carregar. Por isso a vista é a do `_MapPnt` salvo, (22, 0), que é o que o port usa ao reproduzir essa tela (`posicao: "salva"` em `data/tela_jogo.json`). O encaixe da captura confirma (22, 0) [medido].
 
 ## Camada de vida
@@ -236,7 +236,8 @@ Como o original roda a partida enquanto a tela de jogo está aberta, e o que o p
 As regras não chamam janela nem som: deixam pedidos em `Estado::eventos`. Depois de cada tick e de cada entrada do jogador, a `Partida` esvazia essa fila:
 
 - `CentralizarNaAmarela` (`_GotoMyAnt`, `1000:a764`, pedido por `rules/amarela.rs` com AutoTrack ligado a cada passo de `_DoAntMoveY`, com Home, Backspace sem ordem, clique na própria amarela, ordem impossível, morte...) é tratado na hora: no Experimental nada (o original toca o som de erro); se a amarela está no plano mostrado (> 0), `_CenterEdit(_MeLoc)`; senão, `_SetMapPlaneLocation(_MePlane, _MeLoc)`, que troca o plano e centraliza **uma** vez, sem ler nem gravar o ponto lembrado [código].
-- `Mensagem(id)`, `Musica(id)` e `DialogoFimDeJogo` vão para a fila da interface (`Partida::retirar_eventos`). O executável, por enquanto, só os escreve no terminal (sem texto, som nem diálogo). `_EndGameDialog` é pedido a cada tick enquanto `_IsGameOver` ≠ 0; a `Partida` repassa só o primeiro.
+- `Mensagem(id)`, `Musica(id)` e `DialogoFimDeJogo` vão para a fila da interface (`Partida::retirar_eventos`, escritos no terminal; música sem som). `Mensagem` e `DialogoFimDeJogo` também viram **avisos modais** (`Partida::avisos`): o quadro de mensagem e o diálogo de fim de jogo, que param a simulação até serem fechados, como `_StopSimulation` ([mensagens.md](mensagens.md)). `_EndGameDialog` é pedido a cada tick enquanto `_IsGameOver` ≠ 0; a `Partida` repassa só o primeiro.
+- Depois de cada tick, o conselho de `_Feedback` (`rules::conselhos::conselho`) vai para a mensagem da faixa (`_EditMessage`, mensagens.md §2).
 
 ### Vista e pontos lembrados
 
@@ -256,7 +257,17 @@ A vista segue a amarela **só** pelo `_GotoMyAnt`: com AutoTrack (Options → Au
 | Shift+0 / Shift+1..4 (também Shift + NumPad) | Speed → Pause (0x41, alterna `_GamePaused`; ao despausar encerra as ferramentas 10/11) e Slow/Normal/Fast/Ultra (0x43–0x46, `_GameSpeed` = 0..3) [código, `_ProcMenu`] | `teclas` → `AcaoPartida` |
 | Ctrl+G | Options → AutoTrack (0x31, alterna `_OptionStates[0]`) | igual |
 
-Ordem no port, como no original: aceleradores de `partida.json`, aceleradores de `navegacao.json`, `_YellowCommandKey`, teclas que imitam o mouse. Sem menus nem diálogos: o botão de velocidade da faixa (`_DoUserButton` caso 6, que cicla e mostra "Game speed now …") e as mensagens de pausa no rodapé da janela de edição (`_EditMessage`) não existem ainda; o título da janela do port mostra velocidade, pausa e AutoTrack.
+Ordem no port, como no original: aceleradores de `partida.json`, aceleradores de `navegacao.json`, `_YellowCommandKey`, teclas que imitam o mouse. O título da janela do port mostra velocidade, pausa e AutoTrack.
+
+Avisos e botões ([mensagens.md](mensagens.md)):
+
+| Entrada | Original | Port |
+|---|---|---|
+| Ctrl+S / Ctrl+A | File → Save / Save As (`_SaveGame`, diálogo de arquivo) | grava o `.ANT` no arquivo da partida / num nome novo (`--salvar` ou `SALVOnn.ANT`), sem diálogo |
+| Botões `ribUserDef1A`–`1H` da faixa | `_DoUserButton` (pausa, velocidade com "Game speed now …", opções, ir até a amarela, salvar; segurando: menu de ícones) | clique simples igual, exceto as funções que abrem janelas; sem o menu de ícones |
+| Pausa (Shift+0 ou botão) | `_SetPause`: "Game Paused" na faixa, permanente; despausar limpa | igual (mensagens.md §2.3) |
+| Clique simples no mapa | espera ~6 unidades de `_TickCount` (330 ms) sem simular; segurando, `_AntMenu`/Examine | espera igual; sem os menus |
+| Quadro de mensagem / fim de jogo na tela | só clique no quadro (ou Espaço no quadro) fecha; a simulação fica parada; o quadro fecha sozinho em ~14,85 s | igual; ao fechar o fim de jogo, Quick Game novo (o original abre "Select a Game") |
 
 ### Jogo novo
 
@@ -284,5 +295,7 @@ O teste `engine/tests/tela_jogo_real.rs` trava o resultado com um SHA-256 dos í
 Navegação (2026-10-16): testes unitários em `navegacao.rs` e `tela_jogo.rs`; `tela_jogo_real.rs` confere, com o `QUICK2.ANT`, a navegação ao carregar (vista (21, 0), ponto do ninho preto (34, 9)), que os botões de `data/navegacao.json` existem na faixa e são achados pelo clique, e que os três planos desenham sem pendências. O executável exportou as telas do ninho preto (21, 0), da superfície (51, 23) e do ninho vermelho, conferidas a olho, e abriu a janela SDL por 2 s (`--sair-apos-ms`, `--capturar-janela`). **A navegação não foi comparada com o original** (falta capturar a vista depois de Ctrl+setas e da troca de plano na bancada).
 
 Simulação ao vivo (2026-10-17): testes unitários em `core/partida.rs` (mensagens a cada 17 ms com resto, limite de mensagens, taxa por velocidade 10/30/120/120 ticks em 60 mensagens, pausa e exceção da amarela em movimento, despausar encerra a ferramenta 10, AutoTrack e velocidade pelos aceleradores, 170 ms sem foco, redesenho em fast/ultra, centralizar no mesmo plano e em outro plano, fim de jogo repassado uma vez) e em `tela_jogo.rs` (área cliente calculada = desenhada); `engine/tests/partida_quick2.rs` (50 ticks do `QUICK2.ANT`, `GameTime` + 50; 100 mensagens em normal = 50 ticks e `ciclos_jogo` = 100; clique simples dá a ordem de andar). O executável rodou `--save QUICK2.ANT --ticks 50` (78 → 128), `--novo-jogo --semente 1234 --ticks 300` e `--semente 77 --acoes superficie --ticks 2000` (telas conferidas a olho, formigas espalhadas pela superfície) e abriu a janela por 3 s (`GameTime` 78 → 165 em normal, cerca de 29 ticks/s). **Nada da simulação ao vivo foi comparado com o original**: taxa de ticks por velocidade, AutoTrack, Espaço como clique e o comportamento do clique simples (espera de 6 ticks) ficam para a bancada.
+
+Avisos (2026-10-17): os quadros de mensagem (1 e 2 linhas) e a mensagem da faixa ("Game Paused", "Game speed now fast.") batem **100%** com as capturas da bancada; o diálogo de fim de jogo, 97,95%; a pontuação do C-10 (19785) bate. Detalhes em [mensagens.md](mensagens.md) §8.
 
 **Não verificado contra o original:** a vista ao carregar um save (falta uma captura depois de "Load Game"), a superfície e o ninho vermelho na janela de edição, a formiga amarela rainha (0xFE) e a moldura em outras resoluções (800×600 do DOSBox-X).

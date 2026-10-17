@@ -9,11 +9,16 @@
 //! [`Relogio`]. Entradas do jogador (clique numa célula, tecla de comando, aceleradores) chegam já
 //! sem SDL. Os pedidos das regras à interface (mensagens, músicas, fim de jogo) ficam numa fila que a
 //! interface esvazia; o pedido de centralizar a vista na formiga amarela é tratado aqui mesmo.
+//!
+//! Avisos (core/avisos.rs, docs/spec/telas/mensagens.md): os quadros de mensagem e o fim de jogo
+//! param a simulação enquanto estão na tela (`_StopSimulation`); a mensagem da faixa segue a pausa,
+//! os conselhos de `_Feedback` e o botão de velocidade.
 
 use std::collections::{HashMap, VecDeque};
 
 use serde::Deserialize;
 
+use super::avisos::{Avisos, ConfigAvisos, Modal};
 use super::navegacao::{Acao, Evento as EventoTecla, Navegacao};
 use crate::rules::amarela::{
     clicar_no_mapa, tecla_de_comando, ControleJogador, Modificadores, RespostaClique, RespostaTecla, TabelasAmarela,
@@ -54,6 +59,27 @@ pub enum AcaoPartida {
     VelocidadeUltra,
     /// Options → AutoTrack (0x31): alterna `_OptionStates[0]`.
     AutoTrack,
+    /// File → Save (5, Ctrl+S) e Save As (6, Ctrl+A): tratados pela interface (arquivo).
+    Salvar,
+    SalvarComo,
+}
+
+/// Resultado de um botão configurável da faixa (`_DoUserButton`, `1000:04c4`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RespostaBotao {
+    /// Feito aqui (pausa, velocidade, opções, ir até a amarela).
+    Feito,
+    /// Caso 0xE: salvar o jogo (`_SaveGame(1)`), a cargo da interface.
+    Salvar,
+    /// Abre uma janela que o port ainda não tem (0–4, 8) ou número desconhecido.
+    NaoImplementado(u16),
+}
+
+/// Botões configuráveis da faixa (`ribUserDef1A`–`1H`) e a função de cada um.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct BotoesUsuario {
+    pub objetos: Vec<String>,
+    pub funcoes: Vec<u16>,
 }
 
 /// Tecla → ação de partida (mesmas regras de `navegacao::Atalho`).
@@ -88,6 +114,9 @@ pub struct ConfigPartida {
     pub teclas_clique: HashMap<String, BotaoTeclado>,
     /// Intervalo máximo entre duas dessas teclas para valer como duplo clique.
     pub duplo_clique_teclado_ms: u64,
+    /// Espera de `_processEdit` no clique simples, em unidades de `_TickCount` (6).
+    pub espera_clique_simples_tickcount: u64,
+    pub botoes_usuario: BotoesUsuario,
 }
 
 impl ConfigPartida {
@@ -107,6 +136,12 @@ impl ConfigPartida {
     /// Código de tecla virtual da tecla de comando da amarela, se houver.
     pub fn tecla_virtual(&self, nome: &str) -> Option<u16> {
         self.teclas_amarela.iter().find(|(k, _)| k.eq_ignore_ascii_case(nome)).map(|(_, &v)| v)
+    }
+
+    /// Função do botão configurável da faixa com esse nome de objeto, se for um.
+    pub fn funcao_do_botao(&self, objeto: &str) -> Option<u16> {
+        let b = &self.botoes_usuario;
+        b.objetos.iter().position(|o| o == objeto).and_then(|i| b.funcoes.get(i).copied())
     }
 
     /// Botão do mouse imitado pela tecla, se houver.
@@ -150,6 +185,11 @@ pub struct Partida {
     /// O pedido de `_EndGameDialog` já foi repassado (enquanto `_IsGameOver` ≠ 0).
     fim_anunciado: bool,
     eventos: VecDeque<Evento>,
+    /// Mensagem da faixa e avisos modais.
+    pub avisos: Avisos,
+
+    /// Tempo real em que a simulação fica parada pela espera do clique simples (ms).
+    bloqueio_ms: u64,
 }
 
 impl Partida {
@@ -160,6 +200,7 @@ impl Partida {
         tabelas_amarela: TabelasAmarela,
         cfg_simulacao: ConfigSimulacao,
         cfg: ConfigPartida,
+        cfg_avisos: ConfigAvisos,
     ) -> Partida {
         let mut p = Partida {
             estado,
@@ -178,6 +219,9 @@ impl Partida {
             redesenhar: true,
             fim_anunciado: false,
             eventos: VecDeque::new(),
+            avisos: Avisos::new(cfg_avisos),
+
+            bloqueio_ms: 0,
         };
         p.vistas_para_estado();
         p
@@ -205,12 +249,32 @@ impl Partida {
         self.ativo = ativo;
     }
 
+    /// `_TickCount` (unidades de 55 ms) do relógio real da partida.
+    pub fn agora(&self) -> u64 {
+        self.ms_total / self.avisos.cfg.ms_por_tickcount.max(1)
+    }
+
     /// Passa `ms` de tempo real: gera as mensagens de temporizador que couberem (no máximo
     /// `max_mensagens_por_avanco`, descartando o excesso) e roda os ticks que a velocidade e a
-    /// pausa liberarem.
+    /// pausa liberarem. Com um aviso modal na tela, ou durante a espera do clique simples, o tempo
+    /// passa sem mensagens (o original mata o temporizador ou fica num laço de espera).
     pub fn avancar(&mut self, ms: u64) -> Avanco {
-        let intervalo = self.intervalo_ms();
+        // O GetTickCount continua andando durante quadros modais e esperas.
         self.ms_total += ms;
+        if self.avisos.passar_tempo(self.agora()).is_some() {
+            self.redesenhar = true;
+        }
+        if self.avisos.tem_modal() {
+            self.resto_ms = 0;
+            return Avanco::default();
+        }
+        let espera = ms.min(self.bloqueio_ms);
+        self.bloqueio_ms -= espera;
+        let ms = ms - espera;
+        if self.bloqueio_ms > 0 {
+            return Avanco::default();
+        }
+        let intervalo = self.intervalo_ms();
         self.resto_ms += ms;
         let mut n = self.resto_ms / intervalo;
         self.resto_ms %= intervalo;
@@ -222,6 +286,12 @@ impl Partida {
         for _ in 0..n {
             av.mensagens += 1;
             av.ticks += self.mensagem_de_timer();
+            if self.avisos.tem_modal() {
+                // _StopSimulation: KillTimer, e as WM_TIMER pendentes são descartadas.
+                self.resto_ms = 0;
+                self.redesenhar = true;
+                break;
+            }
         }
         av
     }
@@ -255,6 +325,7 @@ impl Partida {
         tick(&mut self.estado, &mut self.regras as &mut dyn Regras);
         self.vistas_do_estado();
         self.tratar_eventos();
+        self.conselho_na_faixa();
         // _UpdateWindows: em fast/ultra o mapa só é redesenhado a cada 2/4 ticks; sem foco, a cada 8.
         self.contador_mapa = self.contador_mapa.wrapping_add(1);
         self.quadros += 1;
@@ -312,7 +383,8 @@ impl Partida {
 
     /// Esvazia a fila do estado: centralizar é feito aqui (`_GotoMyAnt`); o resto vai para a
     /// interface. `_EndGameDialog` é pedido a cada tick enquanto o jogo acabou: só o primeiro é
-    /// repassado (de novo só depois que `_IsGameOver` voltar a 0).
+    /// repassado (de novo só depois que `_IsGameOver` voltar a 0). Mensagens e fim de jogo também
+    /// entram nos avisos (quadros modais).
     fn tratar_eventos(&mut self) {
         for ev in self.estado.retirar_eventos() {
             match ev {
@@ -321,7 +393,20 @@ impl Partida {
                     if !self.fim_anunciado {
                         self.fim_anunciado = true;
                         self.eventos.push_back(ev);
+                        // _EndGameDialog: música de vitória ou derrota com Options → Music ligado.
+                        if self.estado.partida.opcoes[1] != 0 {
+                            let f = &self.avisos.cfg.fim_de_jogo;
+                            let m = if self.estado.partida.pretas_venceram != 0 { f.musica_vitoria } else { f.musica_derrota };
+                            self.eventos.push_back(Evento::Musica(m));
+                        }
+                        let agora = self.agora();
+                        self.avisos.receber_fim_de_jogo(&self.estado, agora);
                     }
+                }
+                Evento::Mensagem(id) => {
+                    let licoes = &self.regras.quintal.conselhos.licoes;
+                    self.avisos.receber_mensagem(id, self.estado.partida.opcoes[3] != 0, licoes);
+                    self.eventos.push_back(ev);
                 }
                 outro => self.eventos.push_back(outro),
             }
@@ -335,6 +420,9 @@ impl Partida {
     /// até a amarela.
     fn ir_para_amarela(&mut self) {
         if self.estado.partida.tipo_jogo == 3 {
+            if let Some(id) = self.tabelas_amarela.sons.erro {
+                self.eventos.push_back(Evento::Som(id));
+            }
             return;
         }
         let a = &self.estado.amarela;
@@ -343,27 +431,96 @@ impl Partida {
         self.vistas_para_estado();
     }
 
+    /// Conselho de `_Feedback` na faixa (conselhos.md §2), depois de cada tick.
+    fn conselho_na_faixa(&mut self) {
+        use super::avisos::TextoFaixa;
+        use crate::rules::conselhos::{conselho, Conselho};
+        let t = &self.regras.quintal.conselhos;
+        let agora = self.agora();
+        let p = &self.estado.partida;
+        let opcao = p.opcoes[4] != 0;
+        match conselho(&self.estado, t) {
+            Conselho::Nenhum => {}
+            // _SetDefaultWindPrompt(0): o texto de pausa/ferramenta, ou limpar, sem ser importante.
+            Conselho::PadraoDaJanela => self.avisos.mensagem_de_pausa(p.pausado != 0, p.ferramenta, false, opcao, agora),
+            Conselho::Texto { lista, indice, importante } => {
+                let d = self.avisos.cfg.faixa.duracao_conselho;
+                self.avisos.editar(Some(TextoFaixa::Lista { lista, indice: indice as usize }), Some(d), importante, opcao, agora);
+            }
+        }
+    }
+
+    /// `_SetPause(pausado)` / Speed → Pause: ao despausar encerra as ferramentas 10 e 11; põe ou
+    /// tira a mensagem de pausa da faixa (importante).
+    fn definir_pausa(&mut self, pausado: bool) {
+        let agora = self.agora();
+        let p = &mut self.estado.partida;
+        if !pausado && (p.ferramenta == 10 || p.ferramenta == 11) {
+            p.ferramenta = -1;
+        }
+        p.pausado = i16::from(pausado);
+        let (ferramenta, opcao) = (p.ferramenta, p.opcoes[4] != 0);
+        self.avisos.mensagem_de_pausa(pausado, ferramenta, true, opcao, agora);
+        self.redesenhar = true;
+    }
+
+    // --- avisos modais -------------------------------------------------------------------------
+
+    /// Fecha o aviso modal da frente (clique na área do quadro, Espaço, clique no fim de jogo) e
+    /// devolve qual era. Depois do fim de jogo, o original chama `_NewGame(0)`: a interface decide.
+    pub fn fechar_modal(&mut self) -> Option<Modal> {
+        self.redesenhar = true;
+        self.avisos.fechar_modal()
+    }
+
     // --- entradas do jogador -------------------------------------------------------------------
 
-    /// Acelerador de velocidade, pausa ou AutoTrack.
+    /// Acelerador de velocidade, pausa ou AutoTrack (salvar fica com a interface).
     pub fn aplicar(&mut self, a: AcaoPartida) {
         let p = &mut self.estado.partida;
         match a {
             AcaoPartida::Pausa => {
-                // _ProcMenu 0x41: alterna; ao despausar, encerra as ferramentas 10 e 11.
+                // _ProcMenu 0x41: alterna, com a mensagem de pausa na faixa.
                 let novo = p.pausado ^ 1;
-                if novo == 0 && (p.ferramenta == 10 || p.ferramenta == 11) {
-                    p.ferramenta = -1;
-                }
-                p.pausado = novo;
+                self.definir_pausa(novo != 0);
             }
             AcaoPartida::VelocidadeLenta => p.velocidade = 0,
             AcaoPartida::VelocidadeNormal => p.velocidade = 1,
             AcaoPartida::VelocidadeRapida => p.velocidade = 2,
             AcaoPartida::VelocidadeUltra => p.velocidade = 3,
             AcaoPartida::AutoTrack => p.opcoes[0] = if p.opcoes[0] == 0 { 1 } else { 0 },
+            AcaoPartida::Salvar | AcaoPartida::SalvarComo => {}
         }
         self.redesenhar = true;
+    }
+
+    /// Clique simples num botão configurável da faixa (`_DoUserButton`, sem segurar o botão).
+    pub fn botao_usuario(&mut self, funcao: u16) -> RespostaBotao {
+        let p = &mut self.estado.partida;
+        let alternar = |v: &mut i16| *v = i16::from(*v == 0);
+        match funcao {
+            5 => {
+                let novo = p.pausado ^ 1;
+                self.definir_pausa(novo != 0);
+            }
+            6 => {
+                p.velocidade = if p.velocidade == 3 { 0 } else { p.velocidade + 1 };
+                let v = p.velocidade;
+                let agora = self.agora();
+                self.avisos.mensagem_de_velocidade(v, agora);
+            }
+            7 => alternar(&mut p.opcoes[1]),
+            9 => alternar(&mut p.opcoes[2]),
+            10 => alternar(&mut p.opcoes[5]),
+            11 => alternar(&mut p.opcoes[0]),
+            12 => alternar(&mut p.opcoes[3]),
+            13 => alternar(&mut p.opcoes[4]),
+            14 => return RespostaBotao::Salvar,
+            15 => self.ir_para_amarela(),
+            outro => return RespostaBotao::NaoImplementado(outro),
+        }
+        self.redesenhar = true;
+        RespostaBotao::Feito
     }
 
     /// Ação de navegação (rolagem, troca de plano).
@@ -375,8 +532,12 @@ impl Partida {
     }
 
     /// Clique numa célula do mapa mostrado (`_processEdit`). `duplo` = duplo clique (esquerdo ou
-    /// direito). Menus de "segurar o botão" ainda não existem no port (`segurando` = falso).
+    /// direito). Menus de "segurar o botão" ainda não existem no port (`segurando` = falso). O clique
+    /// simples para a simulação por `espera_clique_simples_tickcount` (o laço de espera do original).
     pub fn clicar(&mut self, x: i32, y: i32, duplo: bool) -> RespostaClique {
+        if !duplo {
+            self.bloqueio_ms = self.cfg.espera_clique_simples_tickcount * self.avisos.cfg.ms_por_tickcount;
+        }
         self.vistas_para_estado();
         let plano = i32::from(self.nav.plano_mapa);
         let r =
@@ -409,6 +570,10 @@ mod testes {
         ConfigPartida::de_json(include_str!("../../../data/partida.json")).unwrap()
     }
 
+    fn cfg_avisos() -> ConfigAvisos {
+        ConfigAvisos::de_json(include_str!("../../../data/mensagens.json")).unwrap()
+    }
+
     fn cfg_sim() -> ConfigSimulacao {
         ConfigSimulacao::de_json(include_str!("../../../data/simulacao.json")).unwrap()
     }
@@ -428,7 +593,7 @@ mod testes {
         e.partida.velocidade = velocidade;
         e.partida.ferramenta = -1;
         e.amarela.plano = 2;
-        Partida::nova(e, nav(), RegrasOriginais::default(), TabelasAmarela::padrao().clone(), cfg_sim(), cfg())
+        Partida::nova(e, nav(), RegrasOriginais::default(), TabelasAmarela::padrao().clone(), cfg_sim(), cfg(), cfg_avisos())
     }
 
     #[test]

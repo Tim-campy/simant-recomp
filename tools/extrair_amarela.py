@@ -29,6 +29,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("tools", 1)[0] + "tools")
 from ne_info import parse_ne  # noqa: E402
+from sons_regras import SONS  # noqa: E402
 
 SEG8 = 8
 SEG10 = 10
@@ -160,6 +161,7 @@ def main():
         "musicas": secao(MUSICAS),
         "mensagens": secao(MENSAGENS),
         "_origem": origens(REGRAS, ANIMACAO, MUSICAS, MENSAGENS),
+        "sons": SONS["amarela"],
     }
     linhas = ["{"]
     itens = list(saida.items())

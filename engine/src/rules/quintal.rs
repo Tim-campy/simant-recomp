@@ -159,6 +159,27 @@ pub struct Mensagens {
     pub musica_vitoria: u16,
 }
 
+/// Ids dos efeitos sonoros (objetos tipo 5 do banco SOUND, `_myBeginSound`) pedidos por esta parte
+/// (docs/spec/regras/som.md). Seção opcional no JSON: um id ausente não toca (mods anteriores à API 0.8).
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct SonsQuintal {
+    /// Latidos do `_MakeBark` pelo sorteio `S(4)` do cachorro (0x17, 0x15, 0x17, 0x16).
+    pub latidos: Vec<u16>,
+    /// Latido quando o cachorro acompanha o menino cortando a grama (0x15).
+    pub latido_cortador: Option<u16>,
+    pub gato: Option<u16>,
+    pub passaro: Option<u16>,
+    /// Pisada do menino (`_FootFall`, 0x23) e inseticida (9).
+    pub pisada: Option<u16>,
+    pub inseticida: Option<u16>,
+    /// Menino dentro de casa (0x18) nos pares (contagem do nó, nó, quadro) do original.
+    pub menino_casa: Option<u16>,
+    pub menino_casa_quando: Vec<[i16; 3]>,
+    /// Chuva (`_DoWater`, `S(50)` = 0; 0x29).
+    pub chuva: Option<u16>,
+}
+
 /// Conteúdo de `data/quintal.json`.
 #[derive(Clone, Debug, Deserialize)]
 pub struct TabelasQuintal {
@@ -172,6 +193,8 @@ pub struct TabelasQuintal {
     pub regras: RegrasDados,
     pub valores_iniciais: ValoresIniciais,
     pub mensagens: Mensagens,
+    #[serde(default)]
+    pub sons: SonsQuintal,
     /// Tabelas do tutorial e dos conselhos (docs/spec/regras/conselhos.md).
     pub conselhos: super::conselhos::TabelasConselhos,
 }
@@ -311,7 +334,7 @@ impl RegrasQuintal for RegrasOriginais {
     }
 
     fn simular_agua(&mut self, e: &mut Estado) {
-        simular_agua(e);
+        simular_agua(e, &self.quintal);
     }
 }
 
@@ -633,6 +656,7 @@ fn menino_fora(e: &mut Estado, t: &TabelasQuintal, vt: Vitimas, rel: Relogios) {
         e.menino.cortador_x = e.menino.pe_x + tm.corte_dx[d];
         e.menino.cortador_y = e.menino.pe_y + tm.corte_dy[d];
         alternar_pe(e);
+        e.pedir_som(t.sons.pisada);
         pisada(e, vt, e.menino.pe_x as i32, e.menino.pe_y as i32);
         if e.menino.cortando_grama != 0 && e.partida.tipo_jogo != 0 {
             cortador_no_patch(e, vt);
@@ -783,6 +807,10 @@ fn menino_dentro(e: &mut Estado, t: &TabelasQuintal, vt: Vitimas, rel: Relogios)
         e.menino.y = y;
         e.menino.quadro = quadro;
     }
+    let chave = [e.menino.no_contagem, e.menino.no_numero, e.menino.quadro];
+    if vista_do_quintal(e) && t.sons.menino_casa_quando.contains(&chave) {
+        e.pedir_som(t.sons.menino_casa);
+    }
     let a = e.menino.y as i32 + e.menino.x as i32 - 200;
     let b = e.menino.y as i32 - 38;
     e.menino.px = (a / 28) as i16;
@@ -801,8 +829,10 @@ fn menino_dentro(e: &mut Estado, t: &TabelasQuintal, vt: Vitimas, rel: Relogios)
     e.menino.pe_presente = 1;
     posicionar_pe(e, a, b);
     alternar_pe(e);
+    e.pedir_som(t.sons.pisada);
     pisada(e, vt, e.menino.pe_x as i32, e.menino.pe_y as i32);
-    // Inseticida.
+    // Inseticida (`_SimKidInside` toca o som 9 depois do `_FootFall`).
+    e.pedir_som(t.sons.inseticida);
     let n = (e.vermelha.populacao as i32 + e.preta.populacao as i32) * t.regras.inseticida_por_formiga;
     for _ in 0..n.max(0) {
         let x = e.s.mascara(128);
@@ -856,6 +886,7 @@ fn cachorro(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
                 && vista_do_quintal(e)
                 && rel.mac > e.bichos.cachorro_atraso_latido as i64
             {
+                e.pedir_som(t.sons.latido_cortador);
                 latir(e, t, rel);
             }
             if dx.abs() > 1 || dy.abs() > 1 {
@@ -906,8 +937,10 @@ fn cachorro(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
         b.cachorro_dir = 1;
     }
     if (100..=103).contains(&b.cachorro_quadro) && e.s.rand1(6) == 0 {
-        let _k = e.s.mascara(4); // escolhe o som do latido (0x17, 0x15, 0x17, 0x16)
+        // `_MakeBark(k)`: o sorteio escolhe o latido (0x17, 0x15, 0x17, 0x16).
+        let k = e.s.mascara(4) as usize;
         if vista_do_quintal(e) && rel.mac > e.bichos.cachorro_atraso_latido as i64 {
+            e.pedir_som(t.sons.latidos.get(k).copied());
             latir(e, t, rel);
         }
     }
@@ -994,7 +1027,8 @@ fn gato(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
         }
     }
     if vista_do_quintal(e) && e.s.mascara(64) == 0 {
-        return; // som 0xD
+        e.pedir_som(t.sons.gato);
+        return;
     }
     if e.s.mascara(16) == 0 && e.bichos.gato_ciclo > 100 && e.bichos.cachorro_dir == 2 && e.menino.presente == 0 {
         let b = &mut e.bichos;
@@ -1054,8 +1088,8 @@ fn passaro(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
                     }
                 }
             }
-            if vista_do_quintal(e) {
-                let _ = e.s.mascara(2); // som 7 com chance 1/2
+            if vista_do_quintal(e) && e.s.mascara(2) == 0 {
+                e.pedir_som(t.sons.passaro);
             }
             e.bichos.passaro_ligado = 2;
         }
@@ -1272,12 +1306,14 @@ pub fn terminar_migracao(e: &mut Estado, origem: Option<(i32, i32)>, x: i32, y: 
 // ---------------------------------------------------------------------------------------------
 
 /// `_DoWater` (`1020:07c6`), todo tick.
-pub fn simular_agua(e: &mut Estado) {
+pub fn simular_agua(e: &mut Estado, t: &TabelasQuintal) {
     if e.ambiente.terreno != 0 {
         return;
     }
     if e.ambiente.chovendo != 0 {
-        let _som = e.s.rand1(50) == 0; // som 0x29
+        if e.s.rand1(50) == 0 {
+            e.pedir_som(t.sons.chuva);
+        }
         e.ambiente.limpar_chuva = 1;
         if e.s.rand1(10) == 0 && e.ambiente.lencol > 4 {
             e.ambiente.lencol -= 1;

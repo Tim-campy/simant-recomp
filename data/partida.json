@@ -14,7 +14,7 @@
     "_redesenho_sem_foco_a_cada": "MYTIMERFUNC: sem foco, _UpdateWindows só quando (quadros & 7) == 0.",
     "redesenho_sem_foco_a_cada": 8
   },
-  "_teclas": "Aceleradores do menu Speed e Options (ACCELERATORTABLE do SIMANTW.EXE, formiga-amarela.md §11.7): Shift+0 Pause (0x41, alterna _GamePaused), Shift+1..4 Slow/Normal/Fast/Ultra (0x43–0x46, _GameSpeed = 0..3), também com Shift + NumPad 0–4; Ctrl+G AutoTrack (0x31, alterna _OptionStates[0]). Ações: pausa, velocidade_lenta, velocidade_normal, velocidade_rapida, velocidade_ultra, auto_track.",
+  "_teclas": "Aceleradores do menu Speed e Options (ACCELERATORTABLE do SIMANTW.EXE, formiga-amarela.md §11.7): Shift+0 Pause (0x41, alterna _GamePaused), Shift+1..4 Slow/Normal/Fast/Ultra (0x43–0x46, _GameSpeed = 0..3), também com Shift + NumPad 0–4; Ctrl+G AutoTrack (0x31, alterna _OptionStates[0]); Ctrl+S File → Save (5) e Ctrl+A Save As (6). Ações: pausa, velocidade_lenta, velocidade_normal, velocidade_rapida, velocidade_ultra, auto_track, salvar, salvar_como.",
   "teclas": [
     {"tecla": "0", "shift": true, "acao": "pausa"},
     {"tecla": "1", "shift": true, "acao": "velocidade_lenta"},
@@ -26,7 +26,9 @@
     {"tecla": "Keypad 2", "shift": true, "acao": "velocidade_normal"},
     {"tecla": "Keypad 3", "shift": true, "acao": "velocidade_rapida"},
     {"tecla": "Keypad 4", "shift": true, "acao": "velocidade_ultra"},
-    {"tecla": "G", "ctrl": true, "acao": "auto_track"}
+    {"tecla": "G", "ctrl": true, "acao": "auto_track"},
+    {"tecla": "S", "ctrl": true, "acao": "salvar"},
+    {"tecla": "A", "ctrl": true, "acao": "salvar_como"}
   ],
   "_teclas_amarela": "Tecla do SDL -> código de tecla virtual do Windows (decimal) passado a _YellowCommandKey (formiga-amarela.md §11.4): 1–4 = 49–52, 0 = 48, NumPad 0–4 = 96–100, X = 88, F9 = 120, J = 74, NumPad * = 106 (J e * só com Tab apertado), Backspace = 8, Home = 36.",
   "teclas_amarela": {
@@ -38,5 +40,12 @@
   "_teclas_clique": "_DoKeyDown (formiga-amarela.md §11.1): Espaço e Insert valem como clique esquerdo na posição do cursor, Delete como clique direito; se a tecla se repete logo em seguida, vale como duplo clique.",
   "teclas_clique": {"Space": "esquerdo", "Insert": "esquerdo", "Delete": "direito"},
   "_duplo_clique_teclado_ms": "Escolha do port: no original, é duplo clique se a mensagem seguinte da fila já é outra Espaço/Insert/Delete; o port usa este intervalo entre as duas teclas.",
-  "duplo_clique_teclado_ms": 250
+  "duplo_clique_teclado_ms": 250,
+  "_espera_clique_simples_tickcount": "_processEdit (1000:6a38): no clique simples com a janela de edição na frente, espera até _TickCount = início + 6 (≈ 330 ms) num laço, sem tratar mensagens (a simulação para); depois, se o botão continua apertado, abre _AntMenu (na amarela) ou _MagnifyMenu (Examine) [os menus ainda não existem no port].",
+  "espera_clique_simples_tickcount": 6,
+  "_botoes_usuario": "Botões configuráveis da faixa 34 (ribUserDef1A–1H, ids 0x2210–0x2217 → _DoUserButton(id, id − 0x2210)) e a função de cada um: tabela do DGROUP 1048:0012 (padrão; o WIN.INI pode trocar, ver _SetUserButton). Funções: 0 Behavior, 1 Caste, 2 History, 3 Info, 4 trilhas, 5 pausa, 6 velocidade, 7 Music, 8 Mystery, 9 Sound Effects, 10 Silly, 11 AutoTrack, 12 Events, 13 Messages, 14 salvar, 15 ir até a amarela.",
+  "botoes_usuario": {
+    "objetos": ["ribUserDef1A", "ribUserDef1B", "ribUserDef1C", "ribUserDef1D", "ribUserDef1E", "ribUserDef1F", "ribUserDef1G", "ribUserDef1H"],
+    "funcoes": [15, 0, 1, 3, 7, 6, 5, 10]
+  }
 }

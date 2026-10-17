@@ -46,3 +46,12 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `_ELayerMode` | camada de feromônio sobreposta à superfície (−1 = nenhuma, 0–4 = `_PherMapA/BN/BT/RN/RT`) | `_DoCalcTile` |
 | `_LifeA/B/R` | mapa de vida (formigas e outros) por célula, desenhado sobre o chão; não está no save | `_DoCalcTile` |
 | `tilebufover`, `tilebufnest` | buffers de tiles de vida da superfície (9/15–17) e dos ninhos (9/18–20) | `_LoadTiles` |
+| `_TickCount` | relógio do Windows em unidades de 55 ms (`GetTickCount() / 55`): prazos de mensagens e quadros | `1008:18ac`; [telas/mensagens.md](spec/telas/mensagens.md) |
+| `_EditMessage` / `_DrawRibbonMessage` | mensagem curta da faixa (`ribMessageArea`), com prazo ou permanente, "importante" ou não | `1000:92c0`, `1000:0b26`; mensagens.md §2 |
+| `_PictStrnDialog` / `_PictureDialog` | quadro de mensagem modal (janela 30, `picStrWin`): texto SHARED 4, imagem opcional, para a simulação | `1000:615a`, `1000:62bc`; mensagens.md §3 |
+| `_EndGameDialog` / `_CalcScore` | diálogo de fim de jogo (janela 4) e a pontuação | `1000:6602`, `1000:5530`; mensagens.md §4 |
+| `_DoUserButton` / `ribUserDef1A`–`1H` | botões configuráveis da faixa (pausa, velocidade, opções, salvar…) | `1000:04c4`; mensagens.md §5 |
+| `_OptionStates[0..5]` | opções AutoTrack, Music, Sound Effects, Events (quadros), Messages (faixa), Silly (balões) | `8:85f2`; formiga-amarela.md §11.7 |
+| `_myBeginSong` / `_myBeginSound` | tocar música (id do cabeçalho tipo 18) / efeito (id do tipo 5) | `GR_MODULE`; [regras/som.md](spec/regras/som.md) |
+| `_songsOnFlag`, `_effectsOnFlag` | música e efeitos ligados (cópias de `_OptionStates[1]` e `[2]`, zeradas sem foco) | `_myBeginSong`, `MAINWNDPROC` |
+| DAC (`_UncompressDACInstrument`) | efeito sonoro tipo 5: 8 bits em deltas de 4 bits | [formatos/som.md](spec/formatos/som.md) |
