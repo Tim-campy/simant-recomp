@@ -85,10 +85,11 @@ Outros valores observados no byte de flags: 0, 1, 5 e 8. O bit 2 (valor 4) e o b
 | 9 | tilesets 16×16 a 4 bpp: chão (ids 9 e 10) e vida (ids 15–20), ver [tiles.md](tiles.md) | `_OverlayTileSet`, `_LoadTiles` |
 | 10 | texto corrido do sistema de informação (ASCII) | dump do `SHARED` 10/150 |
 | 17 | layout de cartão do sistema de informação (big-endian, itens `PICT`/`TEXT`) | dump do `SHARED` 17/127 |
-| 18 | cabeçalho de música (18 bytes) | `_db_LoadObject(x, 0x12, 1)` antes de tocar |
+| 18 | cabeçalho de música (18 bytes, big-endian), ver [som.md](som.md) | `_db_LoadObject(x, 0x12, 1)` antes de tocar |
 | 19 | nome do cartão do sistema de informação (ASCIIZ, ex.: `Top_Card`) | dump |
-| 20, 50 | arquivo MIDI padrão (`MThd`…) | assinatura; `_db_LoadObject(x, 0x14 / 0x32, 1)` |
-| 5, 51 | áudio digital/instrumentos [hipótese: amostras para `_UncompressDACInstrument`] | nomes do SYM |
+| 20, 50 | arquivo MIDI padrão (`MThd`…): 20 = Sound Blaster, 50 = alto-falante, ver [som.md](som.md) | assinatura; `_db_LoadObject(x, 0x14 / 0x32, 1)` |
+| 5 | efeito sonoro: amostras de 8 bits em deltas de 4 bits, 4096 Hz, ver [som.md](som.md) | `_UncompressDACInstrument`, `_myBeginSound` |
+| 51 | efeito sonoro em recurso `snd ` do Macintosh (só com `DSOUND.DLL`), ver [som.md](som.md) | dump; `_myBeginSound` |
 | 7, 8, 11, 15, 21, 22 | desconhecido | — |
 
 Os valores big-endian (contagens em listas de strings, cartões) indicam que esses dados vieram da versão Macintosh (o SYM também tem `_MacTickCount`). Já os cabeçalhos de bitmap e o próprio banco são little-endian.

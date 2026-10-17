@@ -1,0 +1,380 @@
+//! Som e música do executável: lê os efeitos e as músicas pelos `Recursos`, mistura e toca com
+//! SDL2. Especificação: docs/spec/regras/som.md e docs/spec/formatos/som.md.
+//!
+//! Opções de linha de comando (tratadas aqui): `--sem-som`, `--soundfont ARQ.sf2`,
+//! `--exportar-som DIR` (grava os efeitos e as músicas em WAV e sai, sem abrir áudio).
+
+pub mod config;
+pub mod mixer;
+pub mod sintetizador;
+
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
+use engine::formats::banco::Chave;
+use engine::formats::midi::{EventoMidi, Midi};
+use engine::formats::som::{self, CabecalhoMusica, TIPO_CABECALHO_MUSICA, TIPO_EFEITO, TIPO_MIDI_SOUNDBLASTER};
+use engine::recursos::Recursos;
+use engine::rules::estado::Evento;
+
+use config::{ConfigSom, FonteMusica};
+use mixer::Mixer;
+use sintetizador::{SintSimples, SintSoundFont, Sintetizador};
+
+/// Opções de som da linha de comando.
+#[derive(Clone, Debug, Default)]
+pub struct OpcoesSom {
+    pub desligado: bool,
+    pub soundfont: Option<PathBuf>,
+    pub exportar: Option<PathBuf>,
+}
+
+impl OpcoesSom {
+    /// Trata `arg` se for uma opção de som (pegando o valor com `valor`); `false` se não for.
+    pub fn tratar(&mut self, arg: &str, valor: &mut dyn FnMut() -> Result<String, String>) -> Result<bool, String> {
+        match arg {
+            "--sem-som" => self.desligado = true,
+            "--soundfont" => self.soundfont = Some(valor()?.into()),
+            "--exportar-som" => self.exportar = Some(valor()?.into()),
+            _ => return Ok(false),
+        }
+        Ok(true)
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Leitura (sem SDL)
+// ---------------------------------------------------------------------------------------------
+
+/// Efeito tipo 5 decodificado (PCM de 8 bits sem sinal, na taxa `taxa_efeitos`).
+pub fn efeito_pcm(recursos: &Recursos, id: u16) -> Result<Vec<u8>, String> {
+    som::decodificar_efeito(&recursos.objeto(Chave { tipo: TIPO_EFEITO, id })?)
+}
+
+/// Eventos da música `id`. O `Err` de dentro traz o motivo quando o original não tocaria nada
+/// (sem cabeçalho, fora da tabela); o de fora é erro de leitura.
+pub fn musica(recursos: &Recursos, cfg: &ConfigSom, id: u16) -> Result<Result<Vec<EventoMidi>, String>, String> {
+    let cabecalho = match recursos.objeto(Chave { tipo: TIPO_CABECALHO_MUSICA, id }) {
+        Ok(b) => Some(CabecalhoMusica::de_bytes(&b)?),
+        Err(_) => None,
+    };
+    if cfg.exigir_cabecalho && cabecalho.is_none() {
+        return Ok(Err(format!("música {id}: sem cabeçalho tipo 18")));
+    }
+    let (bytes, transposicao) = match cfg.fonte_musica {
+        FonteMusica::Arquivos => {
+            let Some(nome) = cfg.musicas.get(&id) else {
+                return Ok(Err(format!("música {id}: fora da tabela 'musicas'")));
+            };
+            (recursos.arquivo(&format!("{}/{nome}.mid", cfg.pasta_musicas))?, 0)
+        }
+        FonteMusica::Banco => {
+            let Some(c) = cabecalho else {
+                return Ok(Err(format!("música {id}: sem cabeçalho tipo 18")));
+            };
+            (recursos.objeto(Chave { tipo: TIPO_MIDI_SOUNDBLASTER, id: c.midi })?, c.transposicao)
+        }
+    };
+    let midi = Midi::de_bytes(&bytes).map_err(|e| format!("música {id}: {e}"))?;
+    Ok(Ok(midi.sequencia(&cfg.canais_midi, transposicao, cfg.canal_percussao)))
+}
+
+/// SoundFont da linha de comando, de `SIMANT_SOUNDFONT` ou de `data/som.json`, nessa ordem.
+fn caminho_soundfont(cfg: &ConfigSom, opcoes: &OpcoesSom) -> Option<PathBuf> {
+    opcoes
+        .soundfont
+        .clone()
+        .or_else(|| std::env::var_os("SIMANT_SOUNDFONT").map(PathBuf::from))
+        .or_else(|| cfg.soundfont.as_ref().map(PathBuf::from))
+}
+
+/// Sintetizador escolhido: `rustysynth` com SoundFont, ou o simples (também se a SoundFont falhar).
+pub fn sintetizador(cfg: &ConfigSom, opcoes: &OpcoesSom, taxa: u32) -> Box<dyn Sintetizador> {
+    if let Some(sf) = caminho_soundfont(cfg, opcoes) {
+        match SintSoundFont::abrir(&sf, taxa) {
+            Ok(s) => {
+                println!("som: SoundFont {}", sf.display());
+                return Box::new(s);
+            }
+            Err(e) => eprintln!("som: SoundFont não carregada ({e}); usando o sintetizador simples"),
+        }
+    }
+    Box::new(SintSimples::new(taxa, cfg.canal_percussao))
+}
+
+// ---------------------------------------------------------------------------------------------
+// Reprodução (SDL2)
+// ---------------------------------------------------------------------------------------------
+
+struct Saida(Mixer);
+
+impl sdl2::audio::AudioCallback for Saida {
+    type Channel = f32;
+    fn callback(&mut self, out: &mut [f32]) {
+        self.0.render(out);
+    }
+}
+
+/// Som de uma janela do jogo. Sem dispositivo (erro ou `--sem-som`), tudo vira no-op.
+pub struct Audio<'a> {
+    recursos: &'a Recursos,
+    cfg: Option<ConfigSom>,
+    dispositivo: Option<sdl2::audio::AudioDevice<Saida>>,
+    taxa: u32,
+    efeitos: HashMap<u16, Vec<f32>>,
+    /// `_OptionStates[1]` e `[2]` vistos por último.
+    musica_ligada: bool,
+    efeitos_ligados: bool,
+    foco: bool,
+}
+
+impl<'a> Audio<'a> {
+    pub fn abrir(sdl: &sdl2::Sdl, recursos: &'a Recursos, opcoes: &OpcoesSom) -> Audio<'a> {
+        let mut a = Audio {
+            recursos,
+            cfg: None,
+            dispositivo: None,
+            taxa: 0,
+            efeitos: HashMap::new(),
+            musica_ligada: true,
+            efeitos_ligados: true,
+            foco: true,
+        };
+        if opcoes.desligado {
+            return a;
+        }
+        if let Err(e) = a.iniciar(sdl, opcoes) {
+            eprintln!("som: desligado ({e})");
+        }
+        a
+    }
+
+    fn iniciar(&mut self, sdl: &sdl2::Sdl, opcoes: &OpcoesSom) -> Result<(), String> {
+        let cfg: ConfigSom = self.recursos.dados(config::ARQUIVO)?;
+        let audio = sdl.audio()?;
+        let pedido = sdl2::audio::AudioSpecDesired { freq: Some(cfg.taxa_saida as i32), channels: Some(2), samples: Some(1024) };
+        let mut taxa = cfg.taxa_saida;
+        let dispositivo = audio.open_playback(None, &pedido, |spec| {
+            taxa = spec.freq as u32;
+            Saida(Mixer::new(taxa, sintetizador(&cfg, opcoes, taxa), cfg.volume_musica, cfg.volume_efeitos))
+        })?;
+        dispositivo.resume();
+        self.taxa = taxa;
+        self.cfg = Some(cfg);
+        self.dispositivo = Some(dispositivo);
+        Ok(())
+    }
+
+    /// Toca a música `id` (cabeçalho tipo 18), se a música estiver ligada.
+    pub fn musica(&mut self, id: u16) {
+        let (Some(cfg), Some(_)) = (&self.cfg, &self.dispositivo) else { return };
+        if !self.musica_ligada || !self.foco {
+            return;
+        }
+        match musica(self.recursos, cfg, id) {
+            Ok(Ok(eventos)) => {
+                if let Some(d) = &mut self.dispositivo {
+                    d.lock().0.tocar_musica(eventos);
+                }
+            }
+            Ok(Err(motivo)) => println!("som: {motivo} (o original também não toca)"),
+            Err(e) => eprintln!("som: {e}"),
+        }
+    }
+
+    pub fn musica_abertura(&mut self) {
+        if let Some(id) = self.cfg.as_ref().and_then(|c| c.musica_abertura) {
+            self.musica(id);
+        }
+    }
+
+    pub fn musica_jogo_novo(&mut self) {
+        if let Some(id) = self.cfg.as_ref().and_then(|c| c.musica_jogo_novo) {
+            self.musica(id);
+        }
+    }
+
+    /// Toca o efeito `id` (tipo 5), se os efeitos estiverem ligados.
+    pub fn efeito(&mut self, id: u16) {
+        let Some(cfg) = &self.cfg else { return };
+        if !self.efeitos_ligados || !self.foco || self.dispositivo.is_none() {
+            return;
+        }
+        if !self.efeitos.contains_key(&id) {
+            match efeito_pcm(self.recursos, id) {
+                Ok(pcm) => {
+                    self.efeitos.insert(id, mixer::reamostrar(&pcm, cfg.taxa_efeitos, self.taxa));
+                }
+                Err(e) => return eprintln!("som: efeito {id}: {e}"),
+            }
+        }
+        if let (Some(d), Some(a)) = (&mut self.dispositivo, self.efeitos.get(&id)) {
+            d.lock().0.tocar_efeito(a.clone());
+        }
+    }
+
+    /// Pedidos das regras de um quadro, e as opções Music/Sound Effects da partida
+    /// (`_OptionStates[1]` e `[2]`): desligar a música para a que toca.
+    pub fn tratar(&mut self, eventos: &[Evento], opcoes: &[i16]) {
+        let musica = opcoes.get(1).is_none_or(|&v| v != 0);
+        let efeitos = opcoes.get(2).is_none_or(|&v| v != 0);
+        if self.musica_ligada && !musica {
+            self.parar_musica();
+        }
+        if self.efeitos_ligados && !efeitos {
+            if let Some(d) = &mut self.dispositivo {
+                d.lock().0.parar_efeito();
+            }
+        }
+        self.musica_ligada = musica;
+        self.efeitos_ligados = efeitos;
+        for ev in eventos {
+            match ev {
+                Evento::Musica(id) => self.musica(*id),
+                Evento::Som(id) => self.efeito(*id),
+                _ => {}
+            }
+        }
+    }
+
+    /// Janela ativa ou não (`WM_ACTIVATEAPP`): sem foco, para a música e silencia até voltar.
+    pub fn foco(&mut self, ativo: bool) {
+        if !ativo {
+            self.parar_musica();
+            if let Some(d) = &mut self.dispositivo {
+                d.lock().0.parar_efeito();
+            }
+        }
+        self.foco = ativo;
+    }
+
+    pub fn parar_musica(&mut self) {
+        if let Some(d) = &mut self.dispositivo {
+            d.lock().0.parar_musica();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Exportação para WAV (sem abrir áudio)
+// ---------------------------------------------------------------------------------------------
+
+/// Renderiza uma sequência inteira (mais a cauda) em estéreo intercalado.
+pub fn renderizar_musica(eventos: Vec<EventoMidi>, sint: Box<dyn Sintetizador>, taxa: u32, cauda_s: f32) -> Vec<f32> {
+    let mut m = Mixer::new(taxa, sint, 1.0, 0.0);
+    m.tocar_musica(eventos);
+    let mut saida = Vec::new();
+    let mut bloco = vec![0.0; 2 * 1024];
+    while m.musica_tocando() {
+        m.render(&mut bloco);
+        saida.extend_from_slice(&bloco);
+    }
+    let mut cauda = vec![0.0; 2 * (cauda_s * taxa as f32) as usize];
+    m.render(&mut cauda);
+    saida.extend_from_slice(&cauda);
+    saida
+}
+
+/// Grava `DIR/efeitos/efeito_NNN.wav` (PCM decodificado, exato, na taxa do original) e
+/// `DIR/musicas/<id>_<nome>.wav` (sintetizado). Não toca nada.
+pub fn exportar(recursos: &Recursos, opcoes: &OpcoesSom, dir: &Path) -> Result<(), String> {
+    let cfg: ConfigSom = recursos.dados(config::ARQUIVO)?;
+    let (dir_e, dir_m) = (dir.join("efeitos"), dir.join("musicas"));
+    for d in [&dir_e, &dir_m] {
+        std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
+    }
+    let gravar = |c: PathBuf, b: Vec<u8>| std::fs::write(&c, b).map_err(|e| format!("{}: {e}", c.display()));
+    let mut n = 0;
+    for id in 0..=1023u16 {
+        let Ok(pcm) = efeito_pcm(recursos, id) else { continue };
+        gravar(dir_e.join(format!("efeito_{id:03}.wav")), som::wav(&pcm, cfg.taxa_efeitos, 1, 8))?;
+        n += 1;
+    }
+    println!("{n} efeitos em {}", dir_e.display());
+    let mut ids: Vec<u16> = cfg.musicas.keys().copied().collect();
+    if cfg.fonte_musica == FonteMusica::Banco {
+        ids.extend((10000..=20999).filter(|&id| recursos.objeto(Chave { tipo: TIPO_CABECALHO_MUSICA, id }).is_ok()));
+        ids.sort();
+        ids.dedup();
+    }
+    for id in ids {
+        match musica(recursos, &cfg, id)? {
+            Ok(eventos) => {
+                let pcm = renderizar_musica(eventos, sintetizador(&cfg, opcoes, cfg.taxa_saida), cfg.taxa_saida, cfg.cauda_exportacao_s);
+                let nome = cfg.musicas.get(&id).map(String::as_str).unwrap_or("banco");
+                let c = dir_m.join(format!("{id}_{nome}.wav"));
+                println!("{} ({:.1} s)", c.display(), pcm.len() as f64 / 2.0 / cfg.taxa_saida as f64);
+                gravar(c, som::wav_estereo_f32(&pcm, cfg.taxa_saida))?;
+            }
+            Err(motivo) => println!("{motivo}: não exportada (o original não toca)"),
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    /// Recursos com os arquivos do usuário (SIMANT_DIR) e o `data/` do repositório; `None` sem eles.
+    fn recursos() -> Option<Recursos> {
+        let raiz = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or_else(|| raiz.join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SOUND.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados em {}; teste ignorado", jogo.display());
+            return None;
+        }
+        Some(Recursos::abrir(&jogo, &["SOUND".to_string()], &raiz.join("data"), None).unwrap())
+    }
+
+    #[test]
+    fn opcoes_de_som_da_linha_de_comando() {
+        let mut o = OpcoesSom::default();
+        let mut valor = || Ok("x.sf2".to_string());
+        assert!(o.tratar("--sem-som", &mut valor).unwrap());
+        assert!(o.tratar("--soundfont", &mut valor).unwrap());
+        assert!(!o.tratar("--escala", &mut valor).unwrap());
+        assert!(o.desligado);
+        assert_eq!(o.soundfont, Some(PathBuf::from("x.sf2")));
+    }
+
+    #[test]
+    fn tabela_de_musicas_aponta_para_arquivos_existentes() {
+        let Some(r) = recursos() else { return };
+        let cfg: ConfigSom = r.dados(config::ARQUIVO).unwrap();
+        assert_eq!(cfg.musicas.len(), 31);
+        for (id, nome) in &cfg.musicas {
+            assert!(r.arquivo(&format!("{}/{nome}.mid", cfg.pasta_musicas)).is_ok(), "{id} {nome}");
+            let tocaria = musica(&r, &cfg, *id).unwrap();
+            assert_eq!(tocaria.is_ok(), *id != 20006, "{id}: só jolly5 fica sem cabeçalho");
+        }
+        // 11015 tem cabeçalho mas não está na tabela MCI: não toca; no modo banco toca, transposta.
+        assert!(musica(&r, &cfg, 11015).unwrap().is_err());
+        let banco = ConfigSom { fonte_musica: FonteMusica::Banco, ..cfg.clone() };
+        let (a, b) = (musica(&r, &banco, 11013).unwrap().unwrap(), musica(&r, &banco, 11015).unwrap().unwrap());
+        let nota = |s: &[EventoMidi]| s.iter().find(|e| e.comando() == 0x90 && e.canal() != 10).unwrap().d1;
+        assert_eq!(nota(&b), nota(&a) + 12);
+    }
+
+    #[test]
+    fn exporta_musica_curta_sem_tocar() {
+        let Some(r) = recursos() else { return };
+        let cfg: ConfigSom = r.dados(config::ARQUIVO).unwrap();
+        let eventos = musica(&r, &cfg, 11007).unwrap().unwrap();
+        let fim = eventos.last().unwrap().segundos;
+        let pcm = renderizar_musica(eventos, Box::new(SintSimples::new(11025, 10)), 11025, 0.5);
+        let duracao = pcm.len() as f64 / 2.0 / 11025.0;
+        assert!(duracao >= fim + 0.4 && duracao < fim + 0.7, "{duracao} s para {fim} s de eventos");
+        assert!(pcm.iter().any(|x| x.abs() > 0.05));
+        let wav = som::wav_estereo_f32(&pcm, 11025);
+        assert_eq!(wav.len(), 44 + pcm.len() * 2);
+    }
+
+    #[test]
+    fn efeito_decodificado_e_reamostrado() {
+        let Some(r) = recursos() else { return };
+        let pcm = efeito_pcm(&r, 15).unwrap();
+        assert_eq!(pcm.len(), 102);
+        assert_eq!(mixer::reamostrar(&pcm, 4096, 44100).len(), 102 * 44100 / 4096);
+    }
+}

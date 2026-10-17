@@ -6,10 +6,13 @@
 //!   simant (--save ARQ.ANT | --novo-jogo [--semente N]) [--acoes a,b,...]
 //!          [--ticks N] [--exportar-tela-jogo ARQ.png]
 //!   opções da janela: [--escala N] [--sair-apos-ms N [--capturar-janela ARQ.png]]
+//!   som (simant/src/som): [--sem-som] [--soundfont ARQ.sf2] [--exportar-som DIR]
 //!
 //! Padrões: --jogo $SIMANT_DIR ou SimAnt-T/MAXIS/ANTWIN, --dados data, --mods mods (relativos à
 //! pasta atual). Sem --save nem --novo-jogo, mostra a abertura. Com um deles, a simulação roda ao
 //! vivo (engine::core::partida); com --ticks ou --exportar-tela-jogo, roda sem janela e sai.
+
+mod som;
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -56,6 +59,7 @@ struct Opcoes {
     semente: Option<u32>,
     /// Roda N ticks sem janela (antes de exportar).
     ticks: Option<u64>,
+    som: som::OpcoesSom,
 }
 
 fn ler_acoes(texto: &str) -> Result<Vec<Acao>, String> {
@@ -82,6 +86,7 @@ fn ler_opcoes() -> Result<Opcoes, String> {
         novo_jogo: false,
         semente: None,
         ticks: None,
+        som: som::OpcoesSom::default(),
     };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -100,6 +105,7 @@ fn ler_opcoes() -> Result<Opcoes, String> {
             "--novo-jogo" => o.novo_jogo = true,
             "--semente" => o.semente = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
             "--ticks" => o.ticks = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
+            outro if o.som.tratar(outro, &mut valor)? => {}
             _ => return Err(format!("opção desconhecida: {a}")),
         }
     }
@@ -190,6 +196,8 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
     let Janela { sdl, mut canvas } = abrir_janela("SimAnt", lw, lh, o.escala)?;
     let criador = canvas.texture_creator();
     let mut eventos = sdl.event_pump()?;
+    let mut audio = som::Audio::abrir(&sdl, recursos, &o.som);
+    audio.musica_abertura();
 
     let mut rep = Reprodutor::new(seq);
     let mut desenhada: Option<String> = None;
@@ -315,18 +323,21 @@ impl Sessao<'_> {
         }
     }
 
-    /// Escreve os pedidos das regras à interface (mensagens, músicas, fim de jogo): por enquanto só
-    /// registro, sem texto, som nem diálogo.
-    fn registrar_eventos(&mut self) {
-        for ev in self.partida.retirar_eventos() {
+    /// Escreve os pedidos das regras à interface (mensagens, músicas, fim de jogo) e os devolve
+    /// (o som é tocado por `som::Audio`); por enquanto sem texto nem diálogo.
+    fn registrar_eventos(&mut self) -> Vec<EventoRegras> {
+        let eventos = self.partida.retirar_eventos();
+        for ev in &eventos {
             let t = self.partida.estado.partida.tempo;
-            match ev {
+            match *ev {
                 EventoRegras::Mensagem(id) => println!("[tick {t}] mensagem {id} (SHARED tipo 4)"),
-                EventoRegras::Musica(id) => println!("[tick {t}] música 0x{id:04X}"),
+                EventoRegras::Musica(id) => println!("[tick {t}] música {id}"),
+                EventoRegras::Som(id) => println!("[tick {t}] som {id}"),
                 EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
                 EventoRegras::CentralizarNaAmarela => {}
             }
         }
+        eventos
     }
 
     /// Velocidade e pausa, para o título da janela.
@@ -377,7 +388,7 @@ fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool) -> Option<BotaoTeclad
     s.partida.cfg.botao_da_tecla(nome)
 }
 
-fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes) -> Result<(), String> {
+fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Result<(), String> {
     use sdl2::event::{Event, WindowEvent};
     use sdl2::keyboard::{Keycode, Scancode};
     use sdl2::mouse::MouseButton;
@@ -388,6 +399,10 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes) -> Result<(), Strin
     let criador = canvas.texture_creator();
     let mut textura = criador.create_texture_static(PixelFormatEnum::RGB24, lw, lh).map_err(|e| e.to_string())?;
     let mut eventos = sdl.event_pump()?;
+    let mut audio = som::Audio::abrir(&sdl, s.recursos, &o.som);
+    if jogo_novo {
+        audio.musica_jogo_novo();
+    }
     let mut repeticao = Repeticao::default();
     let mut redesenhar = true;
     // Posição do cursor em coordenadas lógicas (para Espaço/Insert/Delete) e a última tecla-clique.
@@ -403,8 +418,14 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes) -> Result<(), Strin
         for ev in lote {
             match ev {
                 Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return Ok(()),
-                Event::Window { win_event: WindowEvent::FocusGained, .. } => s.partida.definir_foco(true),
-                Event::Window { win_event: WindowEvent::FocusLost, .. } => s.partida.definir_foco(false),
+                Event::Window { win_event: WindowEvent::FocusGained, .. } => {
+                    s.partida.definir_foco(true);
+                    audio.foco(true);
+                }
+                Event::Window { win_event: WindowEvent::FocusLost, .. } => {
+                    s.partida.definir_foco(false);
+                    audio.foco(false);
+                }
                 Event::Window { win_event: WindowEvent::Exposed, .. } => redesenhar = true,
                 Event::MouseMotion { x, y, .. } => cursor = (x, y),
                 Event::KeyDown { keycode: Some(k), keymod, .. } => {
@@ -445,7 +466,8 @@ fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes) -> Result<(), Strin
             }
         }
         s.partida.avancar(ms);
-        s.registrar_eventos();
+        let pedidos = s.registrar_eventos();
+        audio.tratar(&pedidos, &s.partida.estado.partida.opcoes);
         redesenhar |= s.partida.tomar_redesenho();
         if redesenhar {
             let rgb = s.quadro_rgb()?;
@@ -497,6 +519,9 @@ fn principal() -> Result<(), String> {
         println!("mod carregado: {} {}", m.manifesto.nome, m.manifesto.versao);
     }
     let cores = recursos.dados::<Paleta>("paleta.json")?.rgb()?;
+    if let Some(dir) = &o.som.exportar {
+        return som::exportar(&recursos, &o.som, dir);
+    }
 
     let origem = match (&o.save, o.novo_jogo) {
         (Some(save), _) => Some(Origem::Save(save)),
@@ -533,7 +558,8 @@ fn principal() -> Result<(), String> {
         if o.ticks.is_some() || o.exportar_tela_jogo.is_some() {
             return Ok(());
         }
-        return executar_partida(s, &format!("SimAnt - {nome}"), &o);
+        let jogo_novo = o.novo_jogo;
+        return executar_partida(s, &format!("SimAnt - {nome}"), &o, jogo_novo);
     }
 
     let seq: Sequencia = recursos.dados("telas.json")?;

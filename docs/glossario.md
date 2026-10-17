@@ -46,3 +46,6 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `_ELayerMode` | camada de feromônio sobreposta à superfície (−1 = nenhuma, 0–4 = `_PherMapA/BN/BT/RN/RT`) | `_DoCalcTile` |
 | `_LifeA/B/R` | mapa de vida (formigas e outros) por célula, desenhado sobre o chão; não está no save | `_DoCalcTile` |
 | `tilebufover`, `tilebufnest` | buffers de tiles de vida da superfície (9/15–17) e dos ninhos (9/18–20) | `_LoadTiles` |
+| `_myBeginSong` / `_myBeginSound` | tocar música (id do cabeçalho tipo 18) / efeito (id do tipo 5) | `GR_MODULE`; [regras/som.md](spec/regras/som.md) |
+| `_songsOnFlag`, `_effectsOnFlag` | música e efeitos ligados (cópias de `_OptionStates[1]` e `[2]`, zeradas sem foco) | `_myBeginSong`, `MAINWNDPROC` |
+| DAC (`_UncompressDACInstrument`) | efeito sonoro tipo 5: 8 bits em deltas de 4 bits | [formatos/som.md](spec/formatos/som.md) |

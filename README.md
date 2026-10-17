@@ -21,13 +21,14 @@ cargo run -p simant -- --novo-jogo --semente 1234                               
 cargo run -p simant -- --save QUICK2.ANT --exportar-tela-jogo saida/jogo.png            # tela em PNG, sem janela
 cargo run -p simant -- --save QUICK2.ANT --acoes superficie,linha_direita --exportar-tela-jogo s.png
 cargo run -p simant -- --save QUICK2.ANT --ticks 50 --exportar-tela-jogo s.png          # 50 ticks sem janela
+cargo run -p simant -- --exportar-som saida/som/                                         # efeitos e músicas em WAV, sem tocar
 ```
 
 Opções: `--jogo DIR` (padrão: `SIMANT_DIR` ou `SimAnt-T/MAXIS/ANTWIN`), `--dados DIR` (padrão `data`), `--mods DIR` (padrão `mods`). Os testes procuram o jogo em `SIMANT_DIR` ou em `../SimAnt-T/MAXIS/ANTWIN`.
 
 ### Como jogar
 
-`--save ARQ.ANT` ou `--novo-jogo` abre a tela de jogo (faixa e janela de edição) com a simulação rodando: você é a **formiga amarela**. Ainda não há menus, diálogos, textos de mensagem nem som (mensagens e músicas aparecem no terminal), nem as janelas de mapa, castas e história. Partes das regras ainda faltam (ver `docs/spec/`).
+`--save ARQ.ANT` ou `--novo-jogo` abre a tela de jogo (faixa e janela de edição) com a simulação rodando: você é a **formiga amarela**. Ainda não há menus, diálogos nem textos de mensagem (as mensagens aparecem no terminal), nem as janelas de mapa, castas e história. As músicas pedidas pelas regras tocam (os efeitos sonoros ainda não são pedidos pelas regras). Partes das regras ainda faltam (ver `docs/spec/`).
 
 - **Clique** numa célula do mapa: a amarela vai até lá. **Duplo clique**: age (numa formiga de outra cor, ataca; da mesma cor, pede comida; em comida/pedrinha, pega ou larga; no ninho, cava). Clique direito funciona igual. **Espaço/Insert** (e **Delete**) clicam onde está o cursor; duas vezes seguidas, duplo clique.
 - Clicar no buraco do ninho leva a amarela para dentro; no ninho, clicar na linha de cima a leva para fora.
@@ -40,6 +41,7 @@ Navegação na tela de jogo:
 - **Ctrl + setas** rolam a janela de edição uma célula (como no original); as setas sozinhas e PageUp/PageDown também rolam (extensão do port). Clicar nas setas das barras de rolagem rola, repetindo enquanto o botão fica apertado.
 - **Ctrl+8 / Ctrl+9 / Ctrl+0** ou os botões *Surface*, *Nest* (preto) e *Nest* (vermelho) da faixa trocam para a superfície, o ninho preto e o ninho vermelho. Esc fecha.
 - As teclas e os botões ficam em `data/navegacao.json` (sobrescrevível por mod). Ações aceitas por `--acoes`: `linha_acima`, `linha_abaixo`, `linha_esquerda`, `linha_direita`, `pagina_acima`, `pagina_abaixo`, `pagina_esquerda`, `pagina_direita`, `superficie`, `ninho_preto`, `ninho_vermelho`.
+- Som: `--sem-som` desliga; `--soundfont ARQ.sf2` (ou `SIMANT_SOUNDFONT`) usa uma SoundFont General MIDI para as músicas; sem ela, um sintetizador simples. Volumes, taxa e a tabela de músicas ficam em `data/som.json` (sobrescrevível por mod). `--exportar-som DIR` grava os 57 efeitos (WAV de 8 bits a 4096 Hz, como o original toca) e as músicas sintetizadas, sem abrir o áudio. Ver `docs/spec/regras/som.md`.
 - Janela: `--escala N` (padrão: a maior escala inteira que cabe no monitor). Para testes sem interação: `--sair-apos-ms N` fecha sozinha e `--capturar-janela ARQ.png` grava o que a janela mostrava. `--ticks N` roda N ticks sem janela (com `--exportar-tela-jogo`, grava a tela depois) e escreve o `GameTime` antes e depois.
 
 ## Organização

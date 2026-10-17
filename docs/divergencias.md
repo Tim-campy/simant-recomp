@@ -4,6 +4,8 @@ Registro de casos em que algo documentado (manual, nomes, especificação anteri
 
 | Data | Assunto | Esperado | Observado | Como foi observado |
 |---|---|---|---|---|
+| 2026-10-17 | Timbre das músicas (port) | — | o original toca os `.MID` pelo *MIDI Mapper* do Windows, com o sintetizador da placa (no DOSBox-X de referência, o da SB16/OPL); o port usa `rustysynth` com a SoundFont que o usuário indicar ou um sintetizador simples. As notas e o andamento são os mesmos; o timbre não. Toca só os canais 1–10 (arranjo estendido) | docs/spec/formatos/som.md; não comparado de ouvido com o original |
+| 2026-10-17 | Efeitos sonoros (port) | — | o original descarta um efeito pedido no mesmo milissegundo em que outro começou; o port sempre toca o novo. Os efeitos ainda não são pedidos pelas regras (`Evento::Som` existe, mas nenhuma regra o emite) | pseudocódigo de `_myBeginSound` (`1008:98b0`) |
 | 2026-10-16 | Lançador `.ba1` da pasta do jogo | iniciar o SimAnt no DOSBox | aponta para `games\SimTower\` e o `dosbox.conf` do SimTower | leitura do arquivo |
 | 2026-10-16 | Abertura (`data/telas.json`, marco 1) | tela própria 640×480: Maxis → título centralizado em fundo preto | o título é desenhado na área cliente da janela principal, abaixo da faixa de ferramentas, com borda; não há tela Maxis antes. **Corrigido** no port (janelas 34 + 3, 99,98% igual) | DOSBox-X, capturas `abertura_titulo_dosbox.png` e `titulo_800x600.png` |
 | 2026-10-16 | Paleta (`data/paleta.json`, `bitmap.md`) | índice 7 = cinza claro, 8 = cinza escuro | 7 = cinza escuro (0x808080), 8 = cinza claro (0xC0C0C0), ordem padrão do Windows. **Corrigido** | comparação pixel a pixel com `tools/comparar_captura.py` |

@@ -5,5 +5,7 @@ pub mod bitmap;
 pub mod fonte;
 pub mod janela;
 pub mod lzss;
+pub mod midi;
 pub mod save;
+pub mod som;
 pub mod tiles;
