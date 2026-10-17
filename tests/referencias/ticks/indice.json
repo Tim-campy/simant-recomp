@@ -1,0 +1,55 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-16",
+ "snapshot": "quick",
+ "semente_s_forcada": null,
+ "semente_r_forcada": null,
+ "alvo": null,
+ "livre_segundos": null,
+ "primeira_entrada": {
+  "SementeS": 27421,
+  "SementeR": 1405178453,
+  "gameCycles": 10379,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 79,
+  "Cycle": 79,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "seletor_codigo_6": "0x1547",
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_000079",
+  "tick_000080",
+  "tick_000081",
+  "tick_000082",
+  "tick_000083"
+ ]
+}
