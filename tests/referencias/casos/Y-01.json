@@ -1,0 +1,110 @@
+{
+ "id": "Y-01",
+ "spec": "docs/spec/regras/formiga-amarela.md#4-andar-por-ordem-_doantmovey-102875f4",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "descricao": "Ordem simples na superfície (Y2): amarela em (10, 20), destino (50, 20), linha livre. Aranha desligada. Para no meio do caminho; o port parte do estado logo após o load (carregado.ANT) e roda até o mesmo GameTime.",
+ "arquivo_dos": "Y01.ANT",
+ "operacoes": [
+  {
+   "op": "escrever",
+   "nome": "MePlane",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLocX",
+   "valor": 10
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLocY",
+   "valor": 20
+  },
+  {
+   "op": "escrever",
+   "nome": "MeDir",
+   "valor": 2
+  },
+  {
+   "op": "escrever",
+   "nome": "MeMoveMe",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeCmd",
+   "valor": 0
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalPlane",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalX",
+   "valor": 50
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalY",
+   "valor": 20
+  },
+  {
+   "op": "escrever",
+   "nome": "MeCrazyCnt",
+   "valor": -2
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLastX",
+   "valor": 10
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLastY",
+   "valor": 20
+  },
+  {
+   "op": "escrever",
+   "nome": "MeSteps",
+   "valor": 0
+  },
+  {
+   "op": "escrever",
+   "nome": "SpidOn",
+   "valor": 0
+  }
+ ],
+ "rodar": {
+  "ate_gametime": 100,
+  "timeout": 120
+ },
+ "esperado": [
+  "anda 1 célula por tick para a direita (x = 10 + ticks andados), _MeSteps = ticks andados, vida −1 a cada 2 passos",
+  "_MeMoveMe = 1, _MeCrazyCnt = −2 enquanto não chega"
+ ],
+ "conferir": [
+  {
+   "nome": "MeLocY",
+   "op": "==",
+   "valor": 20
+  },
+  {
+   "nome": "MeMoveMe",
+   "op": "==",
+   "valor": 1
+  },
+  {
+   "nome": "MeLocX",
+   "op": ">",
+   "valor": 10
+  },
+  {
+   "nome": "MeCrazyCnt",
+   "sinal": true,
+   "op": "==",
+   "valor": -2
+  }
+ ]
+}

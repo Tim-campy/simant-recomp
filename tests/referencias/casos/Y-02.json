@@ -1,0 +1,112 @@
+{
+ "id": "Y-02",
+ "spec": "docs/spec/regras/formiga-amarela.md#4-andar-por-ordem-_doantmovey-102875f4",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "descricao": "Contorno (Y3): parede de pedra (0x5C) em x = 30, y = 15..25; amarela em (25, 20), destino (35, 20). O guloso trava em (29, 20) e o contorno começa (_MeCrazyCnt = 16 e decrescendo).",
+ "arquivo_dos": "Y02.ANT",
+ "operacoes": [
+  {
+   "op": "retangulo",
+   "mapa": "MapA",
+   "x0": 30,
+   "y0": 15,
+   "x1": 30,
+   "y1": 25,
+   "valor": 92
+  },
+  {
+   "op": "escrever",
+   "nome": "MePlane",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLocX",
+   "valor": 25
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLocY",
+   "valor": 20
+  },
+  {
+   "op": "escrever",
+   "nome": "MeDir",
+   "valor": 2
+  },
+  {
+   "op": "escrever",
+   "nome": "MeMoveMe",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeCmd",
+   "valor": 0
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalPlane",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalX",
+   "valor": 35
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalY",
+   "valor": 20
+  },
+  {
+   "op": "escrever",
+   "nome": "MeCrazyCnt",
+   "valor": -2
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLastX",
+   "valor": 25
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLastY",
+   "valor": 20
+  },
+  {
+   "op": "escrever",
+   "nome": "MeSteps",
+   "valor": 0
+  },
+  {
+   "op": "escrever",
+   "nome": "SpidOn",
+   "valor": 0
+  }
+ ],
+ "rodar": {
+  "ate_gametime": 110,
+  "timeout": 150
+ },
+ "esperado": [
+  "a amarela contorna a parede por cima ou por baixo e chega a (35, 20); depois a ordem termina (_MeMoveMe = 0)"
+ ],
+ "conferir": [
+  {
+   "nome": "MeLocX",
+   "op": "==",
+   "valor": 35
+  },
+  {
+   "nome": "MeLocY",
+   "op": "==",
+   "valor": 20
+  },
+  {
+   "nome": "MeMoveMe",
+   "op": "==",
+   "valor": 0
+  }
+ ]
+}

@@ -1,0 +1,108 @@
+{
+ "id": "Y-04",
+ "spec": "docs/spec/regras/formiga-amarela.md#4-andar-por-ordem-_doantmovey-102875f4",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "descricao": "Entrar no ninho pelo buraco (Y9): amarela na superfície em (8, 32), destino no ninho preto (31, 4). Vai ao _LastNewHoleB (3, 32), entra em (32, 1) virada para 4 e desce o túnel até (31, 4).",
+ "arquivo_dos": "Y04.ANT",
+ "operacoes": [
+  {
+   "op": "escrever",
+   "nome": "MePlane",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLocX",
+   "valor": 8
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLocY",
+   "valor": 32
+  },
+  {
+   "op": "escrever",
+   "nome": "MeDir",
+   "valor": 6
+  },
+  {
+   "op": "escrever",
+   "nome": "MeMoveMe",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeCmd",
+   "valor": 0
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalPlane",
+   "valor": 2
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalX",
+   "valor": 31
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalY",
+   "valor": 4
+  },
+  {
+   "op": "escrever",
+   "nome": "MeCrazyCnt",
+   "valor": -2
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLastX",
+   "valor": 8
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLastY",
+   "valor": 32
+  },
+  {
+   "op": "escrever",
+   "nome": "MeSteps",
+   "valor": 0
+  },
+  {
+   "op": "escrever",
+   "nome": "SpidOn",
+   "valor": 0
+  }
+ ],
+ "rodar": {
+  "ate_gametime": 100,
+  "timeout": 120
+ },
+ "esperado": [
+  "_MePlane 1 → 2 com (x, y) = (32, 1), dir 4; chega a (31, 4) e a ordem termina"
+ ],
+ "conferir": [
+  {
+   "nome": "MePlane",
+   "op": "==",
+   "valor": 2
+  },
+  {
+   "nome": "MeLocX",
+   "op": "==",
+   "valor": 31
+  },
+  {
+   "nome": "MeLocY",
+   "op": "==",
+   "valor": 4
+  },
+  {
+   "nome": "MeMoveMe",
+   "op": "==",
+   "valor": 0
+  }
+ ]
+}

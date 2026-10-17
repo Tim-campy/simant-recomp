@@ -1,0 +1,135 @@
+{
+ "id": "Y-03",
+ "spec": "docs/spec/regras/formiga-amarela.md#4-andar-por-ordem-_doantmovey-102875f4",
+ "base": "tests/referencias/saves/QUICK2.ANT",
+ "descricao": "Comer com fome (Y5): amarela em (59, 36), duplo clique (ordem 1) na comida (62, 36) = 0x49; vida 50, _MeWarnHealth 60 (com fome), _HealthB 40. A operária preta da superfície é removida para _BpopT = 2.",
+ "arquivo_dos": "Y03.ANT",
+ "operacoes": [
+  {
+   "op": "formiga_remover",
+   "lista": "A",
+   "onde": {
+    "T": 17
+   }
+  },
+  {
+   "op": "escrever",
+   "nome": "MeHealth",
+   "valor": 50
+  },
+  {
+   "op": "escrever",
+   "nome": "MeWarnHealth",
+   "valor": 60
+  },
+  {
+   "op": "escrever",
+   "nome": "MeWantFood",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "HealthB",
+   "valor": 40
+  },
+  {
+   "op": "escrever",
+   "nome": "MePlane",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLocX",
+   "valor": 59
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLocY",
+   "valor": 36
+  },
+  {
+   "op": "escrever",
+   "nome": "MeDir",
+   "valor": 2
+  },
+  {
+   "op": "escrever",
+   "nome": "MeMoveMe",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeCmd",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalPlane",
+   "valor": 1
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalX",
+   "valor": 62
+  },
+  {
+   "op": "escrever",
+   "nome": "MeGoalY",
+   "valor": 36
+  },
+  {
+   "op": "escrever",
+   "nome": "MeCrazyCnt",
+   "valor": -2
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLastX",
+   "valor": 59
+  },
+  {
+   "op": "escrever",
+   "nome": "MeLastY",
+   "valor": 36
+  },
+  {
+   "op": "escrever",
+   "nome": "MeSteps",
+   "valor": 0
+  },
+  {
+   "op": "escrever",
+   "nome": "SpidOn",
+   "valor": 0
+  }
+ ],
+ "rodar": {
+  "ate_gametime": 95,
+  "timeout": 120
+ },
+ "esperado": [
+  "dois passos até (61, 36); no terceiro tick pega a comida: tile 0x49 → 0x48, come na hora (_MeFoodInType 0): _HealthB += vida / (_BpopT − 1), _MeHealth = 100, ordem encerrada"
+ ],
+ "conferir": [
+  {
+   "nome": "MeHealth",
+   "op": ">=",
+   "valor": 99
+  },
+  {
+   "nome": "MeMoveMe",
+   "op": "==",
+   "valor": 0
+  },
+  {
+   "nome": "MeLocX",
+   "op": "==",
+   "valor": 61
+  },
+  {
+   "nome": "MeLocY",
+   "op": "==",
+   "valor": 36
+  }
+ ]
+}
