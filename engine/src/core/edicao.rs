@@ -160,10 +160,11 @@ mod testes {
 
     #[test]
     fn centralizar_no_quick2_ao_carregar() {
-        // jogo.md: _MapPnt (22, 0) salvo, formiga amarela em (34, 9), 26 × 19 tiles -> x = 21.
-        let mut v = vista(22, 0);
+        // jogo.md: formiga amarela em (34, 9); com 25 × 19 tiles (_editWidth do original na
+        // bancada) o canto fica em x = 22, o _MapPnt do original depois do Load.
+        let mut v = VistaEdicao { largura: 25, ..vista(21, 0) };
         assert!(v.centralizar(34, 9));
-        assert_eq!((v.x, v.y), (21, 0));
+        assert_eq!((v.x, v.y), (22, 0));
         assert!(!v.centralizar(34, 9));
     }
 

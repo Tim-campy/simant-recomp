@@ -790,7 +790,7 @@ mod testes {
     fn nav() -> Navegacao {
         Navegacao {
             plano_mapa: 2,
-            vista: VistaEdicao { plano: Plano::NinhoPreto, x: 0, y: 0, largura: 26, altura: 19 },
+            vista: VistaEdicao { plano: Plano::NinhoPreto, x: 0, y: 0, largura: 25, altura: 19 },
             pontos: [(0, 0); 4],
         }
     }
@@ -1005,9 +1005,9 @@ mod testes {
             tick(&mut p.estado, &mut r);
             p.tratar_eventos();
         }
-        // _CenterEdit em (43, 30) com 26 × 19: canto (30, 21).
-        assert_eq!((p.nav.vista.x, p.nav.vista.y), (30, 21));
-        assert_eq!(p.estado.vistas.ponto, (30, 21));
+        // _CenterEdit em (43, 30) com 25 × 19 (_editWidth da bancada): canto (31, 21).
+        assert_eq!((p.nav.vista.x, p.nav.vista.y), (31, 21));
+        assert_eq!(p.estado.vistas.ponto, (31, 21));
         assert_eq!(
             p.retirar_eventos(),
             vec![Evento::Musica(7), Evento::DialogoFimDeJogo, Evento::Musica(7), Evento::Musica(7)]
@@ -1024,8 +1024,9 @@ mod testes {
         p.tratar_eventos();
         assert_eq!(p.nav.plano_mapa, 1);
         assert_eq!(p.nav.vista.plano, Plano::Superficie);
-        // dx = 87, dy = 1: a fração 65536/87 truncada nunca liga o bit 16; y não anda (jogo.md).
-        assert_eq!((p.nav.vista.x, p.nav.vista.y), (87, 0));
+        // dx = 88, dy = 1 (meia largura 12): a fração 65536/88 truncada nunca liga o bit 16; y não
+        // anda (jogo.md).
+        assert_eq!((p.nav.vista.x, p.nav.vista.y), (88, 0));
         assert_eq!(p.estado.vistas.plano, 1);
     }
 }
