@@ -360,15 +360,16 @@ pub fn clicar(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Partida, x
     let Some((px, py)) = cfg.patch_em(x, y) else {
         return Ok(RespostaQuintal::Nada);
     };
+    // _YardArea: _YMapPnt = patch (a navegação é a dona dos pontos lembrados). O clique que encerra
+    // o PLACE também chega aqui, dentro ou fora do alcance (bancada: acoes/place e place_fora).
+    p.nav.pontos[0] = (i32::from(px), i32::from(py));
+    p.estado.vistas.ponto_quintal = (px, py);
     if j.colocando_rainha {
         j.colocando_rainha = false;
         let r = troca_patch::colocar_rainha(&mut p.estado, px, py);
         p.processar_eventos_do_estado();
         return Ok(RespostaQuintal::Rainha(r));
     }
-    // _YardArea: _YMapPnt = patch (a navegação é a dona dos pontos lembrados).
-    p.nav.pontos[0] = (i32::from(px), i32::from(py));
-    p.estado.vistas.ponto_quintal = (px, py);
     if !duplo {
         return Ok(RespostaQuintal::Escolheu(px, py));
     }

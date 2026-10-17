@@ -337,6 +337,22 @@ impl Sessao<'_> {
         eventos
     }
 
+    /// Diz à partida quais janelas estão abertas e na frente (sorteios do desenho depois de cada
+    /// tick, `rules::desenho`): a de edição está na frente se nenhuma janela de controle está acima
+    /// dela e o quintal não está na frente [hipótese: a ordem entre o quintal e as de controle não é
+    /// modelada].
+    pub(crate) fn atualizar_janelas_desenho(&mut self, minimizada: bool) {
+        let quintal_aberto = self.modos.janela.aberta;
+        let quintal_na_frente = quintal_aberto && self.modos.janela.na_frente;
+        let edicao_no_topo = self.janelas.pilha.last().is_none_or(|j| j.is_none());
+        let j = &mut self.partida.janelas_desenho;
+        j.minimizada = minimizada;
+        j.quintal_aberto = quintal_aberto;
+        j.quintal_na_frente = quintal_na_frente;
+        j.edicao_aberta = true;
+        j.edicao_na_frente = edicao_no_topo && !quintal_na_frente;
+    }
+
     /// Velocidade e pausa, para o título da janela.
     pub(crate) fn situacao(&self) -> String {
         let p = &self.partida.estado.partida;

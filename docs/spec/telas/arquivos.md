@@ -59,7 +59,7 @@ Medida com "SimAnt Load" [bancada l1]: 348×129 em (144, 138) da área cliente, 
 ## 5. No port
 
 - `engine/src/core/dialogos.rs` desenha e trata a caixa de mensagem e o diálogo de arquivo; `data/dialogos.json` tem a geometria, as cores, os textos e as fontes (índices de `interface.json`: 6 = `VGASYS.FON#System`, 7 = `SSERIFE.FON#MS Sans Serif@13+negrito`, ambas lidas da instalação do Windows do usuário; sem elas, a fonte 0 do jogo).
-- `simant/src/arquivos.rs`: o fluxo (pergunta → Save As → "Saved correctly" → Load; Save; Save As) e a nova sessão do Load. Os diálogos são modais: a simulação não anda com um deles aberto. Teclas: Ctrl+L (Load, extensão do port, que não tem barra de menus), Ctrl+S, Ctrl+A; no diálogo, Enter = OK/padrão, Esc = Cancel, letras sublinhadas nos botões da caixa, digitação no campo do nome, clique duplo na lista.
+- `simant/src/arquivos.rs`: o fluxo (pergunta → Save As → "Saved correctly" → Load; Save; Save As) e a nova sessão do Load. Os diálogos são modais: a simulação não anda com um deles aberto [hipótese: o laço de mensagens do diálogo do Windows poderia despachar o `WM_TIMER`; nas capturas o jogo estava pausado]. Teclas: Ctrl+L (Load, extensão do port, que não tem barra de menus), Ctrl+S, Ctrl+A; no diálogo, Enter = OK/padrão, Esc = Cancel, letras sublinhadas nos botões da caixa, digitação no campo do nome, clique duplo na lista.
 - A árvore de pastas mostra o caminho real (ancestrais e subpastas) com ícones próprios; a unidade é sempre "c:"; "Read Only" e as combinações não fazem nada.
 - Sem janela: `--dialogo load|pergunta|salvar_como|salvo` abre o diálogo antes de `--exportar-tela-jogo`.
 

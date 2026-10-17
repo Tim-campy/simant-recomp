@@ -108,6 +108,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
     let mut ultima_tecla_clique: Option<(BotaoTeclado, Instant)> = None;
     let mut situacao = String::new();
     let mut faixa = None;
+    let mut minimizada = false;
     let inicio = Instant::now();
     let mut antes = inicio;
     println!("partida: {} (Shift+0 pausa, Shift+1..4 velocidade, Ctrl+G AutoTrack)", s.situacao());
@@ -115,7 +116,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
     loop {
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
-            if s.dialogo.is_some() {
+            if s.dialogo.is_some() && !matches!(ev, Event::Window { .. }) {
                 // Diálogo do Windows aberto: modal, recebe toda a entrada.
                 let r = match ev {
                     Event::Quit { .. } => return Ok(()),
@@ -163,6 +164,11 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     audio.foco(false);
                 }
                 Event::Window { win_event: WindowEvent::Exposed, .. } => redesenhar = true,
+                Event::Window { win_event: WindowEvent::Minimized, .. } => minimizada = true,
+                Event::Window { win_event: WindowEvent::Restored | WindowEvent::Maximized, .. } => {
+                    minimizada = false;
+                    redesenhar = true;
+                }
                 Event::MouseMotion { x, y, mousestate, .. } => {
                     cursor = (x, y);
                     if let Some((m, _)) = &mut s.menu {
@@ -297,6 +303,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
             }
         }
         // Com o "Select a Game" aberto (Ctrl+N), a simulação fica parada (_SetPause(1) em _NewGame).
+        s.atualizar_janelas_desenho(minimizada);
         if !s.modos.escolhendo && s.dialogo.is_none() {
             s.partida.avancar(ms);
         }

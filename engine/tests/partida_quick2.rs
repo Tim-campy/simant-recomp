@@ -250,3 +250,21 @@ fn ordem_de_andar_pelo_clique() {
     assert_eq!(p.estado.amarela.mover, 1);
     assert_eq!((p.estado.amarela.alvo_x as i32, p.estado.amarela.alvo_y as i32), (x, y + 1));
 }
+
+#[test]
+fn clique_do_place_tambem_grava_o_patch_escolhido() {
+    // No original, o clique que encerra o PLACE também passa por _YardArea: _YMapPnt = patch
+    // clicado, dentro ou fora do alcance (bancada: acoes/place e place_fora; telas/quintal.md §8).
+    use engine::core::quintal_mapa::{clicar, ConfigQuintalMapa, JanelaQuintal};
+    let cfg = ConfigQuintalMapa::de_json(&ler("quintal_mapa.json")).unwrap();
+    let ponto = (0..640)
+        .flat_map(|x| (0..442).map(move |y| (x, y)))
+        .find(|&(x, y)| cfg.patch_em(x, y) == Some((5, 8)))
+        .unwrap();
+    let mut p = partida();
+    let mut j = JanelaQuintal { aberta: true, na_frente: true, colocando_rainha: true };
+    clicar(&mut j, &cfg, &mut p, ponto.0, ponto.1, false).unwrap();
+    assert!(!j.colocando_rainha);
+    assert_eq!(p.estado.vistas.ponto_quintal, (5, 8));
+    assert_eq!(p.nav.pontos[0], (5, 8));
+}
