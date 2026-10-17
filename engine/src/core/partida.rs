@@ -145,6 +145,8 @@ pub struct Partida {
     contador_mapa: u32,
     /// Algo mudou na tela desde a última vez que a interface perguntou.
     redesenhar: bool,
+    /// O pedido de `_EndGameDialog` já foi repassado (enquanto `_IsGameOver` ≠ 0).
+    fim_anunciado: bool,
     eventos: VecDeque<Evento>,
 }
 
@@ -171,6 +173,7 @@ impl Partida {
             quadros: 0,
             contador_mapa: 0,
             redesenhar: true,
+            fim_anunciado: false,
             eventos: VecDeque::new(),
         };
         p.vistas_para_estado();
@@ -222,6 +225,11 @@ impl Partida {
     /// Uma chamada de `MYTIMERFUNC` com uma mensagem: atraso + 1 e as voltas do laço (cada uma
     /// roda no máximo um tick, se `Relogio::liberar_tick` deixar). Devolve os ticks rodados.
     pub fn mensagem_de_timer(&mut self) -> u32 {
+        // `_gameCycles` (9:9b2c) conta o laço do temporizador mesmo sem tick (pausa, velocidade).
+        // O port conta uma vez por mensagem: o quintal o usa também como relógio do Mac (1/60 s ≈
+        // 17 ms) [hipótese; o original soma 1 por volta do laço, ver jogo.md "Simulação ao vivo"].
+        // Zero significa "sem relógio do laço" para `quintal::Relogios`: pula o 0 na volta.
+        self.estado.ciclos_jogo = self.estado.ciclos_jogo.wrapping_add(1).max(1);
         self.relogio.contar_mensagem();
         let voltas = self.indice_velocidade(&self.cfg.relogio.iteracoes_por_mensagem.clone(), 1).max(1);
         let mut ticks = 0;
@@ -245,9 +253,9 @@ impl Partida {
         self.contador_mapa = self.contador_mapa.wrapping_add(1);
         self.quadros += 1;
         let a_cada = self.indice_velocidade(&self.cfg.relogio.redesenho_mapa_a_cada.clone(), 1).max(1);
-        let mut desenha = self.contador_mapa % a_cada == 0;
+        let mut desenha = self.contador_mapa.is_multiple_of(a_cada);
         if !self.ativo {
-            desenha &= self.quadros % u64::from(self.cfg.relogio.redesenho_sem_foco_a_cada.max(1)) == 0;
+            desenha &= self.quadros.is_multiple_of(u64::from(self.cfg.relogio.redesenho_sem_foco_a_cada.max(1)));
         }
         self.redesenhar |= desenha;
     }
@@ -290,15 +298,23 @@ impl Partida {
     }
 
     /// Esvazia a fila do estado: centralizar é feito aqui (`_GotoMyAnt`); o resto vai para a
-    /// interface. `_EndGameDialog` é pedido a cada tick enquanto o jogo acabou: só o primeiro de
-    /// uma sequência é repassado.
+    /// interface. `_EndGameDialog` é pedido a cada tick enquanto o jogo acabou: só o primeiro é
+    /// repassado (de novo só depois que `_IsGameOver` voltar a 0).
     fn tratar_eventos(&mut self) {
         for ev in self.estado.retirar_eventos() {
             match ev {
                 Evento::CentralizarNaAmarela => self.ir_para_amarela(),
-                Evento::DialogoFimDeJogo if self.eventos.back() == Some(&Evento::DialogoFimDeJogo) => {}
+                Evento::DialogoFimDeJogo => {
+                    if !self.fim_anunciado {
+                        self.fim_anunciado = true;
+                        self.eventos.push_back(ev);
+                    }
+                }
                 outro => self.eventos.push_back(outro),
             }
+        }
+        if self.estado.partida.fim_de_jogo == 0 {
+            self.fim_anunciado = false;
         }
     }
 
@@ -549,7 +565,7 @@ mod testes {
         assert_eq!(p.estado.vistas.ponto, (30, 21));
         assert_eq!(
             p.retirar_eventos(),
-            vec![Evento::Musica(7), Evento::DialogoFimDeJogo, Evento::Musica(7), Evento::Musica(7), Evento::DialogoFimDeJogo]
+            vec![Evento::Musica(7), Evento::DialogoFimDeJogo, Evento::Musica(7), Evento::Musica(7)]
         );
     }
 
@@ -563,7 +579,8 @@ mod testes {
         p.tratar_eventos();
         assert_eq!(p.nav.plano_mapa, 1);
         assert_eq!(p.nav.vista.plano, Plano::Superficie);
-        assert_eq!((p.nav.vista.x, p.nav.vista.y), (87, 1));
+        // dx = 87, dy = 1: a fração 65536/87 truncada nunca liga o bit 16; y não anda (jogo.md).
+        assert_eq!((p.nav.vista.x, p.nav.vista.y), (87, 0));
         assert_eq!(p.estado.vistas.plano, 1);
     }
 }

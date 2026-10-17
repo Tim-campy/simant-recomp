@@ -296,7 +296,7 @@ Onde está (crate `engine`, módulo `rules`):
 
   **Para plugar uma parte:** em `rules/<assunto>.rs` (por exemplo, `ninho.rs`), escreva `impl RegrasNinho for RegrasOriginais { fn simular_ninho(...) {...} }`. Depois apague a linha vazia correspondente em `tick.rs` e acrescente `pub mod <assunto>;` em `rules/mod.rs`. Tabelas de dados de que as regras precisarem entram como campos de `RegrasOriginais` (hoje: `geracao`, com o seno de `_AddFood`).
   - Os pontos de feromônio do tick (`_FillHoles*`, `_ColonySmell*`, `_SmoothAlarm`) são funções privadas vazias marcadas com `TODO(feromonios.md)`, a ligar a `rules/feromonios.rs`.
-  - `simulacao_liberada` (pausa, §4) e `Relogio` (atraso contado em mensagens de temporizador e `_SpeedDelayVals`, §2–3) decidem **quando** rodar um tick. A lógica do tick não depende da velocidade.
+  - `simulacao_liberada` (pausa, §4) e `Relogio` (atraso contado em mensagens de temporizador e `_SpeedDelayVals`, §2–3) decidem **quando** rodar um tick. A lógica do tick não depende da velocidade. Quem os usa é o laço de jogo `core/partida.rs` (`Partida::avancar`): mensagens de 17 ms (170 ms sem foco), `_gameCycles` (`Estado::ciclos_jogo`) + 1 por mensagem, voltas do laço por velocidade e redesenho de `_UpdateWindows`, com os valores de `data/partida.json`; descrição em [jogo.md](../telas/jogo.md), "Simulação ao vivo".
 - **Dados:** `data/simulacao.json` (`ConfigSimulacao`). Contém `atrasos_velocidade` (`_SpeedDelayVals` = 6, 2, 0, −1) e os valores iniciais de jogo novo que não saem da geração:
   - triângulos e conjuntos memorizados, `_ModeAuto`/`_CasteAuto`, botões e porcentagens de `_initControls` (`1000:cc84`);
   - `_GameSpeed` e os avisos de saúde de `_InitSimVars`;

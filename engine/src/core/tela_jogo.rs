@@ -476,4 +476,16 @@ mod testes {
         assert_eq!(r(Acao::LinhaEsquerda), Retangulo { esq: 24, topo: 425, dir: 39, base: 440 });
         assert_eq!(r(Acao::LinhaDireita), Retangulo { esq: 409, topo: 425, dir: 424, base: 440 });
     }
+
+    #[test]
+    fn cliente_calculado_e_o_mesmo_do_desenho() {
+        let m: MolduraWindows = serde_json::from_str(
+            r#"{"externo": [20, 97, 424, 347], "espessura": 4, "altura_titulo": 18, "barra_rolagem": 16,
+                "cor_linha": 0, "cor_moldura": 8, "cor_titulo": 4, "cor_botao": 8,
+                "cor_relevo_claro": 15, "cor_relevo_escuro": 7, "cor_trilho": 8}"#,
+        )
+        .unwrap();
+        let mut q = Quadro::new(640, 480, 0);
+        assert_eq!(desenhar_moldura(&mut q, &m).cliente, cliente_da_moldura(&m));
+    }
 }

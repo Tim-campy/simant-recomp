@@ -178,7 +178,7 @@ O laço de mensagens de `WINMAIN` (`1000:3fda`) carrega a tabela de aceleradores
 | 6 `SB_TOP` / 7 `SB_BOTTOM` | o pseudocódigo grava o mínimo (ou máximo) em **x e y** ao mesmo tempo [código; pode ser leitura errada do Ghidra, em aberto] |
 
 - Nas linhas, o mapa já desenhado é deslocado (`_EditScroll*Asm` ou `_DoEditScrollLine` + `_EditScroll*Color`) e só a faixa nova é desenhada; nos outros códigos, `_UpdateEdit` redesenha com `ScrollWindow` [código]. O resultado na tela é o mesmo: a vista começa em `_MapPnt`.
-- `_DoEditScroll` **não** atualiza o ponto lembrado do plano (`_AMapPnt` etc.) [código]. Quem atualiza são os `_goStep*` (`1030:6efe`ss.), que andam a vista junto com a formiga amarela e gravam `_editWidth / 2 + _MapPnt` [código].
+- `_DoEditScroll` **não** atualiza o ponto lembrado do plano (`_AMapPnt` etc.) [código]. Quem atualiza são os `_goStep*` (`1030:6efe`ss.), que andam a vista um passo e gravam `_editWidth / 2 + _MapPnt` [código]. Porém nenhuma função do pseudocódigo chama os `_goStep*` nem os `_Finish*Step` [código: busca por referências em `Code*.c`; chamada indireta não procurada]: [hipótese] são restos da versão Mac, e a vista só segue a amarela por `_GotoMyAnt` (seção "Simulação ao vivo").
 - Os símbolos `_ScrollUp`, `_ScrollDown`, `_ScrollLeft`, `_ScrollRight`, `_ScrollUpS`, `_ScrollDownS` e `_ScrollRightS` (`1000:96b8`–`96c6`) são funções vazias na versão Windows (só `return`); são chamadas pelos `_goStep*` quando o passo é 1 [código]. Provavelmente restos da versão Mac [hipótese].
 
 ### Faixa: botões de plano (`_ProcMapRibbonEvent`, `1010:c3d4`)
@@ -217,7 +217,54 @@ Consequências:
 - Estado: `Navegacao { plano_mapa, vista, pontos }`, iniciado do save. Com `posicao_inicial: "ao_carregar"` (padrão em `data/navegacao.json`) a vista é a de depois do "Load Game" (seção "Posição ao carregar") e o ponto do plano de `_MePlane` recebe `(_MeLocX, _MeLocY)`, como em `_DoLoadInitializations`; com `"salva"`, ficam os valores gravados.
 - Ações: `linha_*` e `pagina_*` seguem a tabela de `_DoEditScroll` (sem mexer nos pontos lembrados); `superficie`, `ninho_preto` e `ninho_vermelho` seguem `_SetMapPlane(1/2/3)` com as duas centralizações. O resultado é limitado com `_BoundEditPosition` também quando `_CenterEdit` não anda, como faz o desenho (`FUN_1010_16d4`).
 - Entradas ligadas por padrão: os aceleradores do original (Ctrl+setas, Ctrl+8/9/0), os botões `ribToSurface`, `ribToBNest` e `ribToRNest` da faixa e as setas das barras de rolagem (clique, com repetição enquanto o botão fica apertado). **Extensões do port**, marcadas em `data/navegacao.json` e em [divergencias.md](../../divergencias.md): setas sem Ctrl rolam (no original movem o cursor) e PageUp/PageDown rolam uma página na vertical.
-- Ainda não implementado: polegar e trilho das barras (arrasto, página pelo clique no trilho, `SB_TOP/BOTTOM`), botão Yard e plano 0 (janela do mapa/quintal), `_ClearMapScentButtons`, `_GotoMapPoint` e o movimento da vista pela formiga amarela (`_goStep*`), que depende da simulação.
+- Ainda não implementado: polegar e trilho das barras (arrasto, página pelo clique no trilho, `SB_TOP/BOTTOM`), botão Yard e plano 0 (janela do mapa/quintal), `_ClearMapScentButtons` e `_GotoMapPoint` vindo do mapa pequeno. A vista seguindo a amarela está na seção seguinte.
+
+## Simulação ao vivo
+
+Como o original roda a partida enquanto a tela de jogo está aberta, e o que o port reproduz. Regras do temporizador, da velocidade e da pausa: [simulacao-visao-geral.md](../regras/simulacao-visao-geral.md) §1–4; controles da amarela: [formiga-amarela.md](../regras/formiga-amarela.md) §11. Implementação: `engine/src/core/partida.rs` (`Partida`, sem janela), dados em `data/partida.json`; o executável (`simant --save` / `--novo-jogo`) só traduz SDL em chamadas da `Partida` e redesenha.
+
+### Relógio
+
+- Fonte de tempo: o `SetTimer` de 17 ms (`MYTIMERFUNC`), 170 ms com o aplicativo sem foco (`WM_ACTIVATEAPP`) [código]. No port, `Partida::avancar(ms)` transforma o tempo real em **mensagens de temporizador** de `intervalo_mensagem_ms` (17) ou `intervalo_sem_foco_ms` (170), guardando o resto. Como as `WM_TIMER` não se acumulam no Windows, no máximo `max_mensagens_por_avanco` (3) mensagens saem de uma chamada; o tempo excedente é descartado [escolha do port].
+- Cada mensagem é uma chamada de `MYTIMERFUNC`: `_gameCycles` (`Estado::ciclos_jogo`) + 1, atraso (DGROUP `0x02EE`) + 1 e `iteracoes_por_mensagem[_GameSpeed]` voltas do laço; em cada volta, `Relogio::liberar_tick` aplica a pausa (§4: roda se não está pausado, ou se `_MeMoveMe` ≠ 0 e `_CurGameTool` < 10) e a velocidade (§3: `_SpeedDelayVals` = 6, 2, 0, −1 de `data/simulacao.json`; roda se o limite ≤ 0 ou ≤ atraso, e zera o atraso). Resultado com o padrão: slow = 1 tick a cada 6 mensagens (≈ 9,8/s), normal = 1 a cada 2 (≈ 29/s), fast e ultra = 2 por mensagem (≈ 118/s) [o número de voltas em fast/ultra é escolha do port: no original depende da CPU, ver divergencias.md].
+- `_gameCycles` conta toda mensagem, rode ou não o tick (pausa, velocidade). O quintal (`rules/quintal.rs`, `Relogios::do_port`) usa esse contador como `_gameCycles` e como relógio do Mac quando ele é ≠ 0; por isso o port soma 1 por mensagem (e pula o 0 na volta dos 32 bits), não por volta do laço como o original [decisão do port, divergencias.md].
+- O atraso continua contando durante a pausa: ao despausar, o primeiro tick sai na mensagem seguinte [código: o +1 vem antes do teste].
+- Redesenho (`_UpdateWindows`, `1000:2224`): todo tick em slow/normal, 1 a cada 2 em fast e 1 a cada 4 em ultra (`redesenho_mapa_a_cada`); sem foco, só quando o contador de quadros é múltiplo de 8 (`redesenho_sem_foco_a_cada`) [código]. [hipótese] O port incrementa o contador antes do teste (no original a ordem não foi conferida). Rolagem, troca de plano, cliques e teclas pedem redesenho na hora.
+
+### Fila de eventos
+
+As regras não chamam janela nem som: deixam pedidos em `Estado::eventos`. Depois de cada tick e de cada entrada do jogador, a `Partida` esvazia essa fila:
+
+- `CentralizarNaAmarela` (`_GotoMyAnt`, `1000:a764`, pedido por `rules/amarela.rs` com AutoTrack ligado a cada passo de `_DoAntMoveY`, com Home, Backspace sem ordem, clique na própria amarela, ordem impossível, morte...) é tratado na hora: no Experimental nada (o original toca o som de erro); se a amarela está no plano mostrado (> 0), `_CenterEdit(_MeLoc)`; senão, `_SetMapPlaneLocation(_MePlane, _MeLoc)`, que troca o plano e centraliza **uma** vez, sem ler nem gravar o ponto lembrado [código].
+- `Mensagem(id)`, `Musica(id)` e `DialogoFimDeJogo` vão para a fila da interface (`Partida::retirar_eventos`). O executável, por enquanto, só os escreve no terminal (sem texto, som nem diálogo). `_EndGameDialog` é pedido a cada tick enquanto `_IsGameOver` ≠ 0; a `Partida` repassa só o primeiro.
+
+### Vista e pontos lembrados
+
+A `Navegacao` é a dona do plano mostrado e da vista. Antes de cada tick e de cada entrada, `_MapPlane`, `_MapPnt` e os pontos lembrados vão para o `Estado` (as regras leem `_MapPlane`, por exemplo ao decidir se centralizam quando a amarela entra num ninho); depois do tick, os pontos lembrados voltam (as regras podem gravá-los).
+
+A vista segue a amarela **só** pelo `_GotoMyAnt`: com AutoTrack (Options → AutoTrack, Ctrl+G, `_OptionStates[0]`) ligado, a cada passo de uma ordem; desligado (padrão de um jogo novo e do `QUICK2.ANT`), a vista fica parada e o jogador rola ou aperta Home. Os `_goStep*` não têm quem os chame no pseudocódigo (seção "Barras de rolagem").
+
+### Entradas do jogador
+
+| Entrada | Original | Port |
+|---|---|---|
+| Clique esquerdo na área do mapa | `_processEdit` com 0x200; duplo clique (`WM_LBUTTONDBLCLK`) com 0x2000 [código] | célula = `((x − área.x) / 16 + _MapPnt.x, (y − área.y) / 16 + _MapPnt.y)` (com a volta de `FUN_1010_6250` depois da linha 63), só dentro da área cliente visível; `clicks` = 1 → `clicar_no_mapa(..., duplo = falso)`, `clicks` = 2 → duplo |
+| Clique direito | 0x800 (simples) ou 0x4000 (duplo), tratados como esquerdo em `_processEdit` [código] | igual |
+| Clique nas setas das barras e nos botões da faixa | seção "Navegação" | como antes; o clique nunca vira ordem |
+| Espaço / Insert / Delete | clique esquerdo / direito na posição do cursor; duplo se a mensagem seguinte é a mesma tecla [código] | posição do último movimento do mouse; duplo se a mesma tecla vier em até `duplo_clique_teclado_ms` (250) [escolha do port] |
+| Teclas de comando (1–4, 0, X/F9, J e NumPad * com Tab, Backspace, Home, NumPad 0–4) | `_YellowCommandKey`, depois dos aceleradores [código] | `teclas_amarela` (nome da tecla do SDL → código de tecla virtual) → `tecla_de_comando`; Tab lido do estado do teclado |
+| Shift+0 / Shift+1..4 (também Shift + NumPad) | Speed → Pause (0x41, alterna `_GamePaused`; ao despausar encerra as ferramentas 10/11) e Slow/Normal/Fast/Ultra (0x43–0x46, `_GameSpeed` = 0..3) [código, `_ProcMenu`] | `teclas` → `AcaoPartida` |
+| Ctrl+G | Options → AutoTrack (0x31, alterna `_OptionStates[0]`) | igual |
+
+Ordem no port, como no original: aceleradores de `partida.json`, aceleradores de `navegacao.json`, `_YellowCommandKey`, teclas que imitam o mouse. Sem menus nem diálogos: o botão de velocidade da faixa (`_DoUserButton` caso 6, que cicla e mostra "Game speed now …") e as mensagens de pausa no rodapé da janela de edição (`_EditMessage`) não existem ainda; o título da janela do port mostra velocidade, pausa e AutoTrack.
+
+### Jogo novo
+
+`--novo-jogo` cria um Quick Game como `_initStuff` + `_NewGame`: geradores semeados pelo relógio (`_SeedSRand`/`_SeedRRand`; no port, a mesma semente nas duas leituras do relógio: a de `--semente N` ou os milissegundos do relógio do sistema), `Mundo::novo_jogo(Rapido)` e `Estado::de_mundo`. A tela abre como em `_NewGame` passos 4 e 6: plano da amarela e vista centralizada nela (o mesmo cálculo da posição "ao carregar"). A janela não é maximizada nem há as janelas de casta/modo.
+
+### Fora do laço
+
+`--ticks N` roda N ticks seguidos (`Partida::rodar_tick`, sem relógio, velocidade nem pausa) e sai; com `--exportar-tela-jogo`, grava a tela depois deles. Serve de teste de regressão sem janela (ex.: 50 ticks do `QUICK2.ANT`: `GameTime` 78 → 128).
 
 ## Verificação
 
@@ -235,5 +282,7 @@ Mapeamento de cores inferido (índice do port → cor da captura) igual ao da se
 O teste `engine/tests/tela_jogo_real.rs` trava o resultado com um SHA-256 dos índices e confere a reconstrução de `_LifeA/B/R` do `QUICK2.ANT` (sem precisar dos bancos do jogo) e a vista salva (22, 0) e ao carregar (21, 0).
 
 Navegação (2026-10-16): testes unitários em `navegacao.rs` e `tela_jogo.rs`; `tela_jogo_real.rs` confere, com o `QUICK2.ANT`, a navegação ao carregar (vista (21, 0), ponto do ninho preto (34, 9)), que os botões de `data/navegacao.json` existem na faixa e são achados pelo clique, e que os três planos desenham sem pendências. O executável exportou as telas do ninho preto (21, 0), da superfície (51, 23) e do ninho vermelho, conferidas a olho, e abriu a janela SDL por 2 s (`--sair-apos-ms`, `--capturar-janela`). **A navegação não foi comparada com o original** (falta capturar a vista depois de Ctrl+setas e da troca de plano na bancada).
+
+Simulação ao vivo (2026-10-17): testes unitários em `core/partida.rs` (mensagens a cada 17 ms com resto, limite de mensagens, taxa por velocidade 10/30/120/120 ticks em 60 mensagens, pausa e exceção da amarela em movimento, despausar encerra a ferramenta 10, AutoTrack e velocidade pelos aceleradores, 170 ms sem foco, redesenho em fast/ultra, centralizar no mesmo plano e em outro plano, fim de jogo repassado uma vez) e em `tela_jogo.rs` (área cliente calculada = desenhada); `engine/tests/partida_quick2.rs` (50 ticks do `QUICK2.ANT`, `GameTime` + 50; 100 mensagens em normal = 50 ticks e `ciclos_jogo` = 100; clique simples dá a ordem de andar). O executável rodou `--save QUICK2.ANT --ticks 50` (78 → 128), `--novo-jogo --semente 1234 --ticks 300` e `--semente 77 --acoes superficie --ticks 2000` (telas conferidas a olho, formigas espalhadas pela superfície) e abriu a janela por 3 s (`GameTime` 78 → 165 em normal, cerca de 29 ticks/s). **Nada da simulação ao vivo foi comparado com o original**: taxa de ticks por velocidade, AutoTrack, Espaço como clique e o comportamento do clique simples (espera de 6 ticks) ficam para a bancada.
 
 **Não verificado contra o original:** a vista ao carregar um save (falta uma captura depois de "Load Game"), a superfície e o ninho vermelho na janela de edição, a formiga amarela rainha (0xFE) e a moldura em outras resoluções (800×600 do DOSBox-X).
