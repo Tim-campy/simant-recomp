@@ -460,6 +460,7 @@ def fotografar(c: Sessao, pasta, nome):
 
 def tela(c: Sessao, pasta, nome):
     # o comando de roteiro separa por espaços: caminho relativo ao SIMANT_RAIZ (sem espaços)
+    Path(pasta).resolve().mkdir(parents=True, exist_ok=True)
     rel = Path(pasta).resolve().relative_to(qb.RAIZ.resolve()).as_posix()
     c.b.executar(f"capturar {rel}/{nome}.png")
 
@@ -528,6 +529,62 @@ def cenario_place(c: Sessao, saida, n):
     tela(c, saida, "3_depois")
     depois = fotografar(c, saida, "depois")
     gravar_acao(saida, antes, depois, {"place": alvo})
+    return []
+
+
+def cenario_special(c: Sessao, saida, n):
+    """_SpecialXfer: Jogo Completo; na entrada de um tick, _ColonyTotalBlack = 2, colônia preta no
+    patch (10, 8), e a amarela sem vida há 99 ticks (_MeHealth = 0, _MeHealthCntDwn = 99): no tick ela
+    morre de fome sem corpo e, com mais de uma colônia preta, o jogo pede um patch no mapa do quintal.
+    Cada parada do tick (caixa modal) é resolvida por uma ação da lista: clicar no centro (caixa de
+    mensagem) e depois clicar no patch (10, 8) da Yard View; captura a tela a cada parada."""
+    alvo = (10, 8)
+    c.entrada()
+    c.escrever_elemento("YMapPopB", alvo[0] * 16 + alvo[1], 3)
+    for nome, v in (("ColonyTotalBlack", 2), ("MeHealth", 0), ("MeHealthCntDwn", 99)):
+        c.escrever(nome, v)
+    dep, mj = c.dep, c.mj
+    out = {"estado_antes.bin": mj.estado(), "vida_antes.bin": dep.vida()}
+    ex = {"antes": dep.extras()}
+    acoes = [("tela",), ("centro",), ("tela",), ("patch",), ("tela",), ("centro",), ("tela",), ("centro",), ("ret",)]
+    relogio = []
+    try:
+        dep.ir_saida(timeout=15, relogio=relogio)
+    except RuntimeError:
+        k = 0
+        while True:
+            parada = True
+            while parada and acoes:
+                a = acoes.pop(0)
+                if a[0] == "tela":
+                    tela(c, saida, f"parada_{k}")
+                    k += 1
+                    continue
+                if a[0] == "centro":
+                    dispensar(c)
+                elif a[0] == "patch":
+                    clicar_tela(c, *pixel_patch(*alvo))
+                    time.sleep(1)
+                else:
+                    dep.retomar()
+                    c.b.executar("teclas ret")
+                c.log(f"ação {a}")
+                parada = False
+            try:
+                dep._rodar_ate(dep.retorno, 15)
+                break
+            except RuntimeError:
+                if not acoes:
+                    raise
+    out["estado_depois.bin"] = mj.estado()
+    out["vida_depois.bin"] = dep.vida()
+    ex["depois"] = dep.extras()
+    ex["antes"]["MacTickCount"] = relogio[0] if relogio and relogio[0] is not None else None
+    ex["MacTickCount_lidos"] = relogio
+    ex["acao"] = {"special": alvo}
+    pasta = Path(saida).resolve()
+    for nome_arq, conteudo in dict(out, **{"extras.json": ex}).items():
+        qb.gravar(pasta / nome_arq, conteudo)
     return []
 
 

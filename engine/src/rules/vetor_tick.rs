@@ -611,7 +611,34 @@ pub fn aplicar_acao(
         e.vistas.ponto_quintal = (x, y);
         return Ok(format!("{:?}", super::troca_patch::colocar_rainha(e, x, y)));
     }
+    if let Some((x, y)) = par("special") {
+        // Um tick em que a amarela morre sem corpo no Jogo Completo com mais de uma colônia preta: o
+        // original chama `_SpecialXfer` (`1000:7eb6`) DENTRO do tick e o jogador escolhe a colônia.
+        // Aqui: o tick do port (que só pede a escolha) e depois o efeito de `_SpecialXfer` com o patch
+        // escolhido na bancada. Ver testes-tick.md (o que difere é a ordem: no original o resto do tick
+        // já roda no patch novo).
+        let mut regras = super::tick::RegrasOriginais::default();
+        tick(e, &mut regras);
+        transferencia_especial(e, x, y);
+        return Ok(format!("{:?}", super::troca_patch::trocar_patch(e, tab, cfg)?));
+    }
     Err(format!("ação desconhecida: {acao}"))
+}
+
+/// O que `_SpecialXfer` (`1000:7eb6`) faz no estado antes do `_XferPatch` do patch escolhido:
+/// zera a colônia preta do patch atual no mapa do quintal, abre a Strategic View (`_YardMode = 2`,
+/// `_ColonyUpdateFlag = 1`), `_SetMapPlane(0)` (`_OldMapPlane`, `_MapPlane = 0`, `_YMapPnt` = patch
+/// atual) e grava `_YMapPnt` = escolhido.
+pub fn transferencia_especial(e: &mut Estado, x: i16, y: i16) {
+    let (cx, cy) = e.ambiente.patch;
+    e.preta.populacao_quintal.0[(cx * 16 + cy) as usize] = 0;
+    e.vistas.modo_quintal = 2;
+    e.ambiente.atualizar_colonias = 1;
+    // `_SetMapPlane(0)`: plano e modo do mapa 0. Na bancada `_OldMapPlane` terminou como estava (0),
+    // e não com o plano anterior [em aberto: quem o repõe].
+    e.vistas.plano = 0;
+    e.vistas.modo_mapa = 0;
+    e.vistas.ponto_quintal = (x, y);
 }
 
 /// `extras.json["acao"]` de um vetor de ação.

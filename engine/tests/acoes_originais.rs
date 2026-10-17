@@ -43,7 +43,15 @@ fn acoes_do_original() {
         let acao = ler_acao(&d).unwrap();
         let r = comparar_com(&v, &layout, |e| aplicar_acao(e, &acao, &tab, &cfg).map(|_| ())).unwrap();
         println!("{nome}: {}", r.placar());
+        // `extras.json["ignorar"]`: {bloco: motivo} — blocos que o original muda por um efeito que o
+        // port não reproduz nesta comparação (ex.: desenho), sempre com o motivo.
+        let ex: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(d.join("extras.json")).unwrap()).unwrap();
         for b in r.diferentes() {
+            if let Some(m) = ex["ignorar"][b.simbolo.as_str()].as_str() {
+                println!("  {} ignorado: {m}", b.simbolo);
+                continue;
+            }
             falhas.push(format!("{nome} {}: {:?}", b.simbolo, b.detalhes));
         }
         for x in r.extras.iter().filter(|x| x.original != x.port && x.nome != "gameCycles") {

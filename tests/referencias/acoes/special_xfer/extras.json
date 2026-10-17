@@ -1,0 +1,42 @@
+{
+ "antes": {
+  "SementeS": 60730,
+  "SementeR": 2578188780,
+  "gameCycles": 271,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 17,
+  "Cycle": 17,
+  "posicao": "entrada",
+  "MacTickCount": 3108
+ },
+ "depois": {
+  "SementeS": 60152,
+  "SementeR": 3661433759,
+  "gameCycles": 504,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "GameTime": 18,
+  "Cycle": 0,
+  "posicao": "saida"
+ },
+ "MacTickCount_lidos": [
+  3108,
+  3108,
+  3108,
+  3108,
+  3108
+ ],
+ "acao": {
+  "special": [
+   10,
+   8
+  ]
+ },
+ "ignorar": {
+  "SwarmCentX": "efeito do DESENHO da Strategic View que _SpecialXfer abre dentro do tick (interface, não regra): _DrawSwarm (1010:bb0e) grava _SwarmCentX = 28*px - 10*py + 0xB2 com o patch atual ANTES da troca, (11, 8)",
+  "SwarmCentY": "efeito do DESENHO da Strategic View que _SpecialXfer abre dentro do tick (interface, não regra): _DrawSwarm grava _SwarmCentY = 10*py + 0x2E",
+  "ColonyUpdateFlag": "efeito do DESENHO da Strategic View que _SpecialXfer abre dentro do tick (interface, não regra): o desenho das colônias zera _ColonyUpdateFlag (1 -> 0)"
+ },
+ "MacTickCount_lidos_total": 201
+}
