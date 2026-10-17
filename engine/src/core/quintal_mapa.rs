@@ -200,6 +200,17 @@ pub struct ConfigQuintalMapa {
     /// [automático, manual] (`_LayDownQueenMode` 1 e 0).
     pub botoes_rainhas: [String; 2],
     pub teclas: Vec<AtalhoQuintal>,
+    /// Números da faixa 35 (`_DrawYardData`).
+    pub dados_faixa: DadosFaixa,
+}
+
+/// Objetos da faixa 35 onde `_DrawYardData` escreve, e a fonte.
+#[derive(Clone, Debug, Deserialize)]
+pub struct DadosFaixa {
+    pub fonte: u8,
+    pub rainhas: String,
+    pub colonias_pretas: String,
+    pub colonias_vermelhas: String,
 }
 
 impl ConfigQuintalMapa {
@@ -388,9 +399,11 @@ const FLAG_SELECIONADO: u16 = 4;
 impl DesenhoQuintal {
     pub fn carregar(cfg: ConfigQuintalMapa, recursos: &Recursos, interface: &Interface) -> Result<DesenhoQuintal, String> {
         let faixa = carregar_janela(recursos, cfg.faixa)?;
-        // A faixa 35 ocupa o lugar da 34: mesma posição da tabela (janela.md, "Faixa").
-        let [x, y, _, _] = *interface.posicoes.get(usize::from(cfg.faixa)).ok_or(format!("janela {} sem posição", cfg.faixa))?;
-        let origem_faixa = (x, y - interface.moldura.faixa.y_tabela);
+        // A faixa 35 ocupa o lugar da 34, com o objeto 0 no mesmo canto [medido: com a posição da
+        // tabela para a janela 35, tudo sairia 1 pixel à direita da captura `full_yard.png`].
+        let id34 = interface.moldura.faixa.janela;
+        let j34 = carregar_janela(recursos, id34)?;
+        let origem_faixa = interface.posicionar(id34, &j34).ok_or(format!("janela {id34} sem posição"))?.origem;
         let mut ids: Vec<u16> = cfg.modos.iter().flat_map(|m| m.bitmaps.iter().map(|b| b.id)).collect();
         ids.push(cfg.rodape.id);
         let s = &cfg.sprites;
@@ -596,7 +609,27 @@ impl DesenhoQuintal {
                 }
             }
         }
-        desenhar_objetos(q, recursos, interface, &faixa, self.origem_faixa, None)
+        let pendentes = desenhar_objetos(q, recursos, interface, &faixa, self.origem_faixa, None);
+        // _DrawYardData (fonte 3): rainhas guardadas e colônias pretas e vermelhas no quintal.
+        let base = faixa.retangulo();
+        let (dx, dy) = (self.origem_faixa.0 - base.esq, self.origem_faixa.1 - base.topo);
+        let valores = [
+            (c.dados_faixa.rainhas.as_str(), e.preta.rainhas_guardadas.max(0)),
+            (c.dados_faixa.colonias_pretas.as_str(), e.preta.total_colonias),
+            (c.dados_faixa.colonias_vermelhas.as_str(), e.vermelha.total_colonias),
+        ];
+        if let Some(Some(fonte)) = interface.fontes.get(usize::from(c.dados_faixa.fonte)) {
+            for (nome, v) in valores {
+                let Some(ob) = faixa.objetos.iter().find(|o| o.nome == nome) else { continue };
+                let r = ob.retangulo;
+                let r = Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy };
+                let cor = interface.cores.get(usize::from(ob.cor)).copied();
+                let (frente, fundo) = cor.map(|k| (k.frente, k.fundo)).unwrap_or((0, 15));
+                q.preencher(r, fundo, fundo);
+                q.texto(r, fonte, v.to_string().as_bytes(), 0, frente, fundo);
+            }
+        }
+        pendentes
     }
 
     /// Nomes dos objetos visíveis da faixa 35 sob o ponto (x, y).

@@ -528,5 +528,12 @@
    "acao": "abrir"
   }
  ],
+ "dados_faixa": {
+  "fonte": 0,
+  "rainhas": "ribQueens",
+  "colonias_pretas": "ribBlackCols",
+  "colonias_vermelhas": "ribRedCols"
+ },
+ "_origem_dados_faixa": "_DrawYardData 1010:acd8: _font_SetFont(3) [a lista de fontes do port numera diferente: medido, o índice 0 (Gaia8x14) bate 98,5% em full_yard.png], _QueenStorageB em 0x231a, _ColonyTotalBlack/Red em 0x231d/0x231e",
  "_origem_teclas": "ACCELERATORTABLE do SIMANTW.EXE: Ctrl+Y/5/6/7 = comandos 0xFD21-0xFD24 (_ProcMenu: modo 0-3 e abre o quintal), Ctrl+M = 0xFD12 (_OpenMapYard)"
 }
