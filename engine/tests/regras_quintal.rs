@@ -200,7 +200,7 @@ fn inundacao_igual_ao_original_q01() {
     // Sobe a água até 61 pelo próprio `_DoWater` (S(10) == 0 três vezes).
     let mut ticks = 0;
     while e.ambiente.lencol > 61 {
-        simular_agua(&mut e);
+        simular_agua(&mut e, TabelasQuintal::padrao());
         ticks += 1;
         assert!(ticks < 10_000);
     }
@@ -218,7 +218,7 @@ fn inundacao_igual_ao_original_q01() {
     // Secando: as linhas voltam (0x4E vira túnel S(8); o resto −0x2F) e o lençol desce.
     e.ambiente.chovendo = 0;
     while e.ambiente.lencol < 64 {
-        simular_agua(&mut e);
+        simular_agua(&mut e, TabelasQuintal::padrao());
     }
     for x in 0..64 {
         for y in 61..64 {

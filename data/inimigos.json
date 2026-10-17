@@ -113,5 +113,9 @@
     "tiles_lagarta_corpo_2": "segmento 'atrás(s)': vertical, horizontal",
     "lagarta_limites": "fora de [xmin, xmax] x [ymin, ymax] a lagarta some",
     "bicho_chao": "_DoSow: só anda para tile menor que isto"
+  },
+  "sons": {
+    "_origem": "docs/spec/regras/som.md: _DoAntLions (1030:43fa), _MoveSpider (1020:4704), _DoLaserFire (1000:6ec8)",
+    "leao_cospe": 30, "aranha_corre": 47, "aranha_mastiga": 44, "aranha_arroto": 10, "aranha_laser": 55
   }
 }

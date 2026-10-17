@@ -46,5 +46,9 @@
     [3, 1, 5, 2],
     [7, 6, 8, 5]
   ],
-  "borda_buraco": [25, 26, 28, 31, 30, 29, 27, 24]
+  "borda_buraco": [25, 26, 28, 31, 30, 29, 27, 24],
+  "sons": {
+    "_origem": "docs/spec/regras/som.md: _DoDigInB (1028:4bd0) / _DoDigInR (1028:6f0c)",
+    "cavar_preta": 17, "cavar_vermelha": 18
+  }
 }

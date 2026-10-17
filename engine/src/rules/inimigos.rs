@@ -15,8 +15,8 @@
 //! (`_IsClearTile`, `_GetBestDir`, `_FindInAList`, `_DeadAntHere`, `_DropFoodA`...) estão em
 //! `rules/comum.rs`; a morte da amarela (`_YellowDeath`, `_MoveMyLife`), em `rules/amarela.rs`.
 //!
-//! As regras não tocam som nem janela: as mensagens vão para `Estado::eventos`; sons e o desenho do
-//! laser são omitidos (não consomem sorteio).
+//! As regras não tocam som nem janela: mensagens e sons (`Evento::Som`, ids em `sons` de
+//! `inimigos.json`) vão para `Estado::eventos`; o desenho do laser é omitido (não consome sorteio).
 
 use std::sync::OnceLock;
 
@@ -119,6 +119,22 @@ pub struct TabelasInimigos {
     /// Borda da armadilha por direção (somada a `tile_leao_borda`).
     pub borda_formiga_leao: [u8; 8],
     pub regras: RegrasInimigosDados,
+    #[serde(default)]
+    pub sons: SonsInimigos,
+}
+
+/// Ids dos efeitos sonoros (objetos tipo 5 do banco SOUND, `_myBeginSound`) pedidos por esta parte
+/// (docs/spec/regras/som.md). Seção opcional no JSON: um id ausente não toca (mods anteriores à API 0.8).
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct SonsInimigos {
+    /// Formiga-leão cospe uma pedrinha ou comida (0x1E).
+    pub leao_cospe: Option<u16>,
+    /// Aranha corre atrás da presa (0x2F), mastiga (0x2C), arrota (10, opção Silly), laser (0x37).
+    pub aranha_corre: Option<u16>,
+    pub aranha_mastiga: Option<u16>,
+    pub aranha_arroto: Option<u16>,
+    pub aranha_laser: Option<u16>,
 }
 
 impl TabelasInimigos {
@@ -486,6 +502,7 @@ fn formiga_leao_esperando(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmare
                 let (ax, ay) = (x + 2 * dx, y + 2 * dy);
                 if livre(e, ax, ay) {
                     gravar_mapa(e, ax, ay, v);
+                    e.pedir_som(t.sons.leao_cospe);
                     break;
                 }
                 d = (d + 1) & 7;
@@ -506,7 +523,8 @@ fn formiga_leao_esperando(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmare
                 amarela::mover_marca(e, ta, 1, x, y, tipo, dir);
                 amarela::matar_amarela(e, ta, CausaMorte::FormigaLeao);
             } else {
-                let _som = e.s.mascara(8) == 0;
+                // `S8() == 0` chama `_myBeginSoundSection`, vazia no Windows: só o sorteio.
+                let _sem_som = e.s.mascara(8) == 0;
                 if let Some(j) = achar_na_lista_a(e, cx, cy) {
                     remover_da_lista_a(e, j);
                 }
@@ -774,6 +792,7 @@ fn aranha_perseguir(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmarela, cx
     if dist > 1 {
         let d = direcao_para(cx, cy, px, py) - 1;
         e.aranha.dir = t.giro(e.aranha.dir, d);
+        e.pedir_som(t.sons.aranha_corre);
         passo_aranha(e, t, r.aranha_corrida, true);
         if e.amarela.modo == 1 {
             e.amarela.x = e.aranha.x >> 4;
@@ -846,15 +865,17 @@ fn aranha_comer(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmarela, cx: i3
     if e.aranha.mastigando > 0 {
         e.aranha.mastigando -= 1;
         if e.aranha.mastigando % 10 == 0 && e.s.mascara(2) != 0 {
-            let _som = e.s.mascara(256);
+            // O `S256()` só escolhe a taxa do som com `DSOUND.DLL`; o sorteio acontece sempre.
+            let _taxa = e.s.mascara(256);
+            e.pedir_som(t.sons.aranha_mastiga);
         }
         return;
     }
     e.aranha.arrotos -= 1;
     if e.aranha.arrotos == 0 {
         e.aranha.arrotos = r.aranha_arroto;
-        if e.partida.opcoes[5] != 0 {
-            let _arroto = e.s.mascara(2) == 0;
+        if e.partida.opcoes[5] != 0 && e.s.mascara(2) == 0 {
+            e.pedir_som(t.sons.aranha_arroto);
         }
     }
     let base = e.aranha.base_cadaver as i32;
@@ -976,7 +997,8 @@ fn laser(e: &mut Estado, t: &TabelasInimigos, seno: &Seno) -> i32 {
                 continue;
             }
             if let Some(j) = achar_formiga(e, px, py, v) {
-                // (_DoLaserFire: só desenho.)
+                // `_DoLaserFire`: som 0x37 e o desenho do raio (interface).
+                e.pedir_som(t.sons.aranha_laser);
                 if e.s.mascara(4) != 0 {
                     e.superficie.vida.definir(px, py, 0);
                     e.superficie.lista.vagas[j].tipo = 0;

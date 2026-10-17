@@ -404,10 +404,64 @@ fn comparar_bloco(
 }
 
 /// Roda um tick do port sobre o vetor e compara com o original.
+/// Largura e altura da janela de edição em tiles na bancada QEMU (640×480; telas/jogo.md).
+const VISTA_BANCADA: (i32, i32) = (25, 19);
+
+/// O original move a vista dentro do tick (`_GotoMyAnt` → `_CenterEdit` / `_SetMapPlaneLocation`,
+/// `1000:a764`), e `_MapPnt`, `_MapPlane` e `_MapMode` vão no save. No port isso é da interface
+/// (`Evento::CentralizarNaAmarela`, tratado por `core::partida`); o comparador reproduz só o efeito no
+/// save, com a geometria da bancada: centraliza `_MapPnt` na amarela e, se ela está noutro plano, troca
+/// `_MapPlane` e `_MapMode` (`_SetMapModeAnt`). Fora do Experimental, como `core::partida`.
+fn aplicar_vista_da_bancada(e: &mut Estado) {
+    let pedidos = e.eventos.iter().filter(|ev| matches!(ev, crate::rules::estado::Evento::CentralizarNaAmarela)).count();
+    if pedidos == 0 || e.partida.tipo_jogo == 3 {
+        return;
+    }
+    let (plano, x, y) = (e.amarela.plano, e.amarela.x as i32, e.amarela.y as i32);
+    if plano <= 0 {
+        return;
+    }
+    if e.vistas.plano != plano {
+        e.vistas.plano = plano;
+        e.vistas.modo_mapa = plano;
+    }
+    let (px, py) = centralizar_edicao(e.vistas.ponto, x, y, plano);
+    e.vistas.ponto = (px as i16, py as i16);
+}
+
+/// `_CenterEdit` (`1010:1620`, telas/jogo.md "Centralizar"): anda `_MapPnt` até (x − w/2, y − h/2)
+/// como uma reta de Bresenham em ponto fixo (o eixo menor pode ficar um passo aquém) e aplica os limites.
+fn centralizar_edicao(ponto: (i16, i16), x: i32, y: i32, plano: i16) -> (i32, i32) {
+    let (w, h) = VISTA_BANCADA;
+    let (mut px, mut py) = (ponto.0 as i32, ponto.1 as i32);
+    let (dx, dy) = (x - px - w / 2, y - py - h / 2);
+    let (ax, ay) = (dx.unsigned_abs(), dy.unsigned_abs());
+    let (sx, sy) = (dx.signum(), dy.signum());
+    let (maior, menor) = (ax.max(ay), ax.min(ay));
+    if let Some(fracao) = (menor << 16).checked_div(maior) {
+        let mut acum: u32 = 0;
+        for _ in 0..maior {
+            acum += fracao;
+            let anda_menor = acum & 0x1_0000 != 0;
+            acum &= !0x1_0000;
+            if ax >= ay {
+                px += sx;
+                py += if anda_menor { sy } else { 0 };
+            } else {
+                py += sy;
+                px += if anda_menor { sx } else { 0 };
+            }
+        }
+    }
+    let largura = if plano == 1 { 128 } else { 64 };
+    (px.clamp(0, largura - w), py.clamp(0, 64 - h))
+}
+
 pub fn comparar_tick(v: &VetorTick, layout: &LayoutSave, regras: &mut dyn Regras) -> Result<RelatorioTick, String> {
     let entrada = montar_entrada(v, layout)?;
     let mut e = entrada.estado;
     tick(&mut e, regras);
+    aplicar_vista_da_bancada(&mut e);
     let port = e.para_save(layout)?;
 
     let mut blocos = Vec::with_capacity(layout.blocos.len());

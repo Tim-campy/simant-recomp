@@ -386,7 +386,7 @@ Decisões e detalhes reproduzidos (fato visto no código, salvo indicação):
 - Morte da formiga-leão por cerco: a seguinte (deslocada para a vaga k) não roda no mesmo tick (correção desta spec, ver 1.3).
 - Uma formiga-leão criada no estado 2 (a cada 16 refeições) roda no mesmo tick, porque o laço relê `_LionIndex`.
 - `_RemoveFromAList` deixa a última vaga usada repetida (como o `_BlockMove` do original).
-- Sons, o desenho do laser e o centralizar da vista (AutoTrack) não são reproduzidos; os sorteios ligados a sons (`S8()` da formiga-leão, `S2()`/`S256()` da mastigação, `S2()` do arroto) são feitos e descartados.
+- O desenho do laser e o centralizar da vista (AutoTrack) não são reproduzidos. Os sons viram `Evento::Som` (ver [som.md](som.md)); os sorteios ligados a sons (`S8()` da formiga-leão, `S2()`/`S256()` da mastigação, `S2()` do arroto) são feitos no mesmo lugar, com ou sem o pedido.
 - Mensagens 10050 e 10046 vão para `Estado::eventos` (`Evento::Mensagem`).
 - `_DropFoodA` na casa, no caso "a comida cai" (tabela `10:22be/22c2` por `_DROPdir` `9:9c66`, que não está no save): a comida some [em aberto]. A aranha morta não usa o resultado.
 - `_MoveMyLife` e `_YellowDeath` (causas 1 aranha, 2 formiga-leão, 3 cercada, 4 fugiu do mapa) são os de `rules/amarela.rs` (`mover_marca`, `matar_amarela`), com animações que sorteiam, mensagens e reencarnação (formiga-amarela.md §9). `aranha` e `formigas_leao` recebem as tabelas da amarela.

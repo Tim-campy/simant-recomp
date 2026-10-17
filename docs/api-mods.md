@@ -1,6 +1,6 @@
 # API de mods
 
-Versão da API: **0.7**. Até aqui só há sobrescrita de dados. Scripts Lua ainda não existem.
+Versão da API: **0.8**. Até aqui só há sobrescrita de dados. Scripts Lua ainda não existem.
 
 ## Estrutura
 
@@ -61,6 +61,7 @@ mods/
 | 0.5 | Os arquivos das regras do tick (`quintal.json`, `inimigos.json`, `superficie.json`, `feromonios.json`, `ninho.json`, `amarela.json`, além de `geracao.json`) passam a chegar à simulação quando um mod os sobrescreve (antes o tick usava as cópias embutidas no executável). Novas validações ao carregar (`regras.gato_chance` potência de 2; direções e giros em `inimigos.json`). | Compatível com 0.4: os formatos não mudaram. Um mod anterior que já trazia um desses arquivos passa a ter efeito no tick; se o arquivo tiver valor inválido, o jogo não inicia (antes era ignorado). |
 | 0.6 | Novo arquivo sobrescrevível `data/som.json`; `arquivos/<subpasta>/<nome>` (músicas em `arquivos/sound/`); efeitos sonoros substituíveis em `objetos/5/<id>.bin` (formato DAC de som.md). | Compatível com 0.5: só acrescenta. Como o arquivo é trocado inteiro, um `som.json` de mod precisa de todas as chaves (exceto `soundfont`). |
 | 0.7 | Novo arquivo sobrescrevível `data/mensagens.json`; `partida.json` ganhou as chaves `espera_clique_simples_tickcount` e `botoes_usuario` e as ações `salvar`/`salvar_como`. | Arquivo novo: compatível. Um `partida.json` de mod anterior **precisa das duas chaves novas** (o arquivo é trocado inteiro); sem elas o jogo não inicia. |
+| 0.8 | Seção opcional `sons` em `amarela.json`, `quintal.json`, `ninho.json`, `inimigos.json` e `superficie.json` (ids dos efeitos sonoros tipo 5 pedidos pelas regras; ver `docs/spec/regras/som.md`) e chave opcional `tema_ninho` em `som.json` (`musicas`, `intervalo_ms`). | Compatível com 0.7: as chaves são opcionais; num arquivo de mod sem elas, aquela parte fica sem efeitos sonoros (ou sem tema do ninho). |
 
 ## Planejado
 
