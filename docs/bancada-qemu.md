@@ -36,6 +36,8 @@ python tools/estado_diff.py re_trabalho/QUICK3.ANT re_trabalho/estado_quick3_sal
 
 Opções de `roteiro`: `--overlay ARQ.qcow2` (abre o disco C: por esse overlay; caminho relativo à raiz) e `--mem MB` (RAM da VM, padrão 16). A variável de ambiente `SIMANT_RAIZ` aponta a raiz com `referencia/` e `re_trabalho/` (para rodar o script de um worktree do git); os caminhos de saída dos comandos são relativos a ela. As portas do QMP e do gdbstub são escolhidas livres a cada execução, então duas bancadas podem rodar ao mesmo tempo, desde que não gravem no mesmo disco.
 
+`tools/medir_abertura.py OVERLAY [--espaco]` liga a VM, classifica a tela a cada ~0,2 s (título, registro, outro) e lê a pilha de esperas do jogo (`_DialogWaitInit`, `DGROUP:150a`/`cad4`/`caf4`) e o contador de ticks do BIOS (`0040:006C`): mede as esperas em ticks da VM, que não dependem da carga do host (telas/abertura.md). Capturas de telas com o jogo pausado: cenários `navegacao`, `examine_sessao`, `menu_amarela`, `historico` e `triangulo` de `tools/cenarios_tick.py` (tests/referencias/README.md).
+
 `tools/estado_diff.py A B` compara dois arquivos no formato do `.ANT` (save, `estado` ou dump do port) bloco a bloco, com os nomes do layout e os valores dos blocos de até 4 bytes.
 
 ### Comandos de roteiro

@@ -84,7 +84,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 | Mapa (`mapWin`) | 90% | 75% | 93,78–99,89% por modo; `_ELayerMode` da edição e `_win_Swap` ligados; faltam Shift+clique dar ordem e o redesenho alternado atrás (o port gera a cada tick); cores de `_ConvColor` [hipótese] |
 | Quintal (Yard View, faixa 35) | 90% | 85% | 99,27–99,59% nos três modos, faixa 93,09%; botões configuráveis da faixa 35 não existem |
 | Info (cartões) | 90% | 70% | 11 de 53 cartões contra capturas (96,36–99,75%); os outros 42 só por conferência automática |
-| Examine (`_MagnifyMenu`) | 85% | 30% | sem captura do original com a janela aberta; alinhamento e cor dos textos [hipótese] |
+| Examine (`_MagnifyMenu`) | 95% | 90% | conferido na bancada (2026-10-18): 97,6–99,4% na região da janela, inclusive o deslocamento de 3 pixels da primeira abertura da sessão |
 | Ajuda (visor do WinHelp) | 75% | 70% | 99,94–99,97%; Search, History, menus e popups pequenos não existem; desenhada na área cliente, 2 linhas acima |
 | Diálogos de arquivo | 85% | 85% | 99,28–99,97% nas partes comparáveis; é uma imitação (unidade fixa "c:", "Read Only" sem efeito) |
 | Menu de ferramentas do Experimental | 100% | 100% | 100% na bancada |
@@ -190,14 +190,12 @@ Jogo ao vivo
 - `_editWidth` = 25 também em outras resoluções (`testes-tick.md`, [hipótese]).
 
 Telas
-- Navegação (Ctrl+setas, troca de plano), superfície e ninho vermelho na edição, rainha amarela 0xFE, outras resoluções (`telas/jogo.md`, "Não verificado").
-- Arrasto no triângulo, gráficos do History com dados, menus da rainha e da aranha (`telas/janelas.md` §7).
+- Rainha amarela 0xFE e outras resoluções (`telas/jogo.md`, "Não verificado"). Navegação, superfície e ninho vermelho na edição: verificados em 2026-10-18 (`telas/jogo.md`, "Verificação").
+- Desenho da aranha na janela de edição (`_DrawSpider`: o port não desenha a aranha; visto na captura do menu da aranha, `telas/janelas.md` §7).
 - Altura mínima da edição e clique comido na janela de trás (`telas/janelas.md` §8, [hipótese]).
-- Examine: sem captura do original (`telas/janelas.md` §4.3, `divergencias.md`).
 - Cores do mapa (`_ConvColor`) (`telas/mapa.md`, [hipótese]).
-- 42 dos 53 cartões do Info e clique em palavra em negrito (`telas/info.md` §6).
+- Cartões 127 e 129 do Info (não alcançáveis por clique a partir do Top Card) e clique em palavra em negrito (`telas/info.md` §6).
 - Clique direito no Experimental e nas janelas de controle, F1 com janela de controle, Shift+F1, Delete, `yardHelpBut`, cursor das ferramentas (`telas/ajuda-contexto.md` §6).
-- Duração da abertura e Espaço fechando a abertura (`tests/referencias/README.md`).
 - Posição do menu de ferramentas no Quick Game (`divergencias.md`).
 - O que o original mostra depois de `_XferPatch` (`divergencias.md`).
 
@@ -255,7 +253,7 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 |---|---|
 | Vetores para cerco, laser, aranha do jogador, morte da amarela por inimigos, pisada e cortador | M |
 | Casos estatísticos (C-04..C-07, N-01/07/10/12) com semente forçada | M |
-| Capturas: navegação, superfície e ninho vermelho, Examine, menus da rainha e da aranha, 42 cartões do Info, abertura (duração e Espaço) | M |
+| Capturas: cartões 127 e 129 do Info, rainha amarela 0xFE, outras resoluções (navegação, Examine, menus, History, triângulo, 51 cartões e abertura feitos em 2026-10-18) | P |
 | Tutorial completo (todas as lições) em vetores | M |
 | Comparação de áudio com o original (bancada com placa de som ou DOSBox-X com SB16) | M |
 | Ritmo fast/ultra numa máquina real ou com `icount` | P |
