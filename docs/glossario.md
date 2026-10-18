@@ -78,3 +78,5 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `_SetMapModeAnt`, `_MapMode`, `_showTrails` | modo da janela do mapa (planos e feromônios) e as trilhas | `1000:9e82`, `8:8610`, DGROUP `1998`; [telas/mapa.md](spec/telas/mapa.md) |
 | `_OpenInfoWindow`, `_DisplayCard` | Info ("Top Card"): cartões dos tipos 17/19/10/21 | `1018:60da`, `1018:5a1c`; [telas/info.md](spec/telas/info.md) |
 | `_MakeBalloon` | balão de fala (peças 8×8 do DGROUP) do menino | `1008:59e4`; telas/quintal.md §2.3 |
+| `_Cheats` (`8:83bc`) / `_CheatKeys` (`1018:67de`) | tabela dos 26 códigos de trapaça de 4 letras (bits invertidos) e a rotina que aplica cada um | `SIMANTW.SYM`; bancada ([regras/trapacas.md](spec/regras/trapacas.md)) |
+| `_GlobalKey` (`9:7866`) | "última tecla" lida por `_DoSimYard` (0xA8 liga a chuva) e `_SimCat` (0x8D); nada a grava no Windows | SYM; pseudocódigo (regras/trapacas.md §2.2) |

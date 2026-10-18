@@ -1,0 +1,59 @@
+# Códigos de trapaça do original (_DoKeyDown → _CheatKeys; docs/spec/regras/trapacas.md).
+# Pré-requisito: snapshot "quick" (qemu_snapshot_quick.txt), numa cópia do overlay:
+#   cp re_trabalho/qemu/c_overlay.qcow2 re_trabalho/qemu/ov_trapacas.qcow2
+#   python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_trapacas.txt --overlay re_trabalho/qemu/ov_trapacas.qcow2
+snapshot_carregar quick
+esperar 1
+# tabela dos códigos (bits invertidos, 4 bytes cada, terminada por 0)
+ler_variavel 8:83bc re_trabalho/trapacas/tabela.bin 108
+capturar re_trabalho/trapacas/t0.png
+# "heal" (minúsculas, sem Shift): _HealthB = 100
+escrever_variavel HealthB 40
+digitar heal
+esperar 1
+ler_variavel HealthB re_trabalho/trapacas/healthB_heal.bin
+# "HEAL" (com Shift): _HealthR = 100
+escrever_variavel HealthR 40
+teclas shift+h shift+e shift+a shift+l
+esperar 1
+ler_variavel HealthR re_trabalho/trapacas/healthR_HEAL.bin
+# "just": _QueenStorageB += 10
+ler_variavel QueenStorageB re_trabalho/trapacas/qsB_antes.bin
+digitar just
+esperar 1
+ler_variavel QueenStorageB re_trabalho/trapacas/qsB_just.bin
+# "oops": _QueenStorageR += 10
+ler_variavel QueenStorageR re_trabalho/trapacas/qsR_antes.bin
+digitar oops
+esperar 1
+ler_variavel QueenStorageR re_trabalho/trapacas/qsR_oops.bin
+# "susi": alterna _AlwaysHealthy
+ler_variavel AlwaysHealthy re_trabalho/trapacas/ah_antes.bin 2
+digitar susi
+esperar 1
+ler_variavel AlwaysHealthy re_trabalho/trapacas/ah_susi.bin 2
+# "Heal" (Shift só no H) não casa com nada: HealthB fica
+escrever_variavel HealthB 40
+teclas shift+h
+digitar eal
+esperar 1
+ler_variavel HealthB re_trabalho/trapacas/healthB_Heal.bin
+# Enter limpa o anel: "he" Enter "al" não casa
+escrever_variavel HealthB 40
+digitar he
+teclas ret
+digitar al
+esperar 1
+ler_variavel HealthB re_trabalho/trapacas/healthB_enter.bin
+# "zhea": _HealthR = 0
+escrever_variavel HealthR 40
+digitar zhea
+esperar 1
+ler_variavel HealthR re_trabalho/trapacas/healthR_zhea.bin
+# "qeen": rainha preta nova em (_MeLocX + 2, _MeLocY)
+ler_variavel BlkQueens re_trabalho/trapacas/blkq_antes.bin
+digitar qeen
+esperar 1
+ler_variavel BlkQueens re_trabalho/trapacas/blkq_qeen.bin
+capturar re_trabalho/trapacas/t1.png
+fim

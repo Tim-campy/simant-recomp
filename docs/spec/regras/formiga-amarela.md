@@ -419,7 +419,7 @@ Como `_MeType` não tem cor, com `_Invincible = 1` a amarela sempre vence (a reg
 | tecla **Delete** | como clique direito (0x800), ou duplo (0x4000) |
 | setas | movem o cursor 8 pixels (`SetCursorPos`) |
 
-Antes de chegar ao jogo, `_HelpKeyDown` e `_YellowCommandKey` (11.4) têm prioridade sobre as demais teclas. Letras A–Z alimentam um anel de 4 caracteres; se `_Cheats` (`8:83bc`) estiver habilitado e as 4 últimas letras formarem um código da tabela (guardada com os bits invertidos; lida do `SIMANTW.EXE`: `oops rand erad FUND joke hole HOLE qeen QEEN eggs EGGS heal HEAL zhea ZHEA just will mick jeff joel fred jenn susi data serv clie`), chama `_CheatKeys` [efeitos em aberto]. Enter limpa o anel.
+Antes de chegar ao jogo, `_HelpKeyDown` e `_YellowCommandKey` (11.4) têm prioridade sobre as demais teclas. Letras A–Z alimentam um anel de 4 caracteres; se `_Cheats` (`8:83bc`) estiver habilitado e as 4 últimas letras formarem um código da tabela (guardada com os bits invertidos; lida do `SIMANTW.EXE`: `oops rand erad FUND joke hole HOLE qeen QEEN eggs EGGS heal HEAL zhea ZHEA just will mick jeff joel fred jenn susi data serv clie`), chama `_CheatKeys`. Enter limpa o anel. Códigos e efeitos: [trapacas.md](trapacas.md).
 
 ### 11.2 Janela de edição: `_ProcEditEvent` (`1010:0b7a`)
 
@@ -608,7 +608,7 @@ Não verificado no original: luta, troca de corpo, morte e reencarnação, recru
 
 ## Lacunas
 
-- Efeitos dos códigos de trapaça (`_CheatKeys` `1018:67de`) e de `_CommandKey`.
+- Efeitos de `_CommandKey` (os códigos de trapaça, `_CheatKeys`, estão em [trapacas.md](trapacas.md)).
 - Quem trata os aceleradores 0xA0–0xAC.
 - `_SpecialXfer`/`_XferPatch` (mudar de colônia no Jogo Completo) e a revoada controlada pelo jogador (rainha alada voando, `_FlyAwayB`): documento de ciclo de vida.
 - Uso de `_MeDis`, `_MePrevDis` e `_MeBase`.

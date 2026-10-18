@@ -28,6 +28,7 @@ use crate::rules::amarela::{
 use crate::rules::desenho::{self, ContadoresRedesenho, JanelasDesenho};
 use crate::rules::estado::{ConfigSimulacao, Estado, Evento};
 use crate::rules::tick::{tick, Regras, RegrasOriginais, Relogio};
+use crate::rules::trapacas::{self, letra_da_tecla, AnelTrapaca, EfeitoTrapaca, TabelasTrapaca};
 use crate::scripts::{Gancho, Scripts};
 
 /// Nome do arquivo de dados (sobrescrevível por mod).
@@ -273,6 +274,10 @@ pub struct Partida {
     pub scripts: Option<Scripts>,
     /// Linhas de registro dos scripts ainda não retiradas pela interface.
     registro_scripts: Vec<String>,
+    /// Códigos de trapaça do original (`data/codigos_trapaca.json`) e o anel de letras (fora do
+    /// save; rules/trapacas.rs).
+    pub tabelas_trapaca: TabelasTrapaca,
+    anel_trapaca: AnelTrapaca,
 }
 
 impl Partida {
@@ -318,6 +323,8 @@ impl Partida {
             ultimo_misterio: None,
             scripts: None,
             registro_scripts: Vec::new(),
+            tabelas_trapaca: TabelasTrapaca::padrao().clone(),
+            anel_trapaca: AnelTrapaca::default(),
         };
         p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
         p.vistas_para_estado();
@@ -907,6 +914,23 @@ impl Partida {
                 (nome.clone(), b.bitmap_selecionado + f, b.bitmap_normal + f, ligado)
             })
             .collect()
+    }
+
+    /// Tecla que `_YellowCommandKey` não tratou, para o anel dos códigos de trapaça do original
+    /// (`_DoKeyDown`, trapacas.md §1): Enter limpa o anel; letras entram (minúsculas sem Shift,
+    /// maiúsculas com Shift) e, se as 4 últimas formam um código, `_CheatKeys` é aplicado. Devolve o
+    /// efeito aplicado.
+    pub fn tecla_de_trapaca(&mut self, nome: &str, shift: bool) -> Option<EfeitoTrapaca> {
+        if nome == "Return" || nome == "Keypad Enter" {
+            self.anel_trapaca.limpar();
+            return None;
+        }
+        let letra = letra_da_tecla(nome, shift)?;
+        let efeito = self.anel_trapaca.digitar(letra, &self.tabelas_trapaca)?;
+        self.vistas_para_estado();
+        trapacas::aplicar(&mut self.estado, &self.tabelas_trapaca, &self.tabelas_amarela, efeito);
+        self.processar_eventos_do_estado();
+        Some(efeito)
     }
 
     /// Tecla de comando da amarela (`_YellowCommandKey`), com o código de tecla virtual do Windows.

@@ -60,6 +60,12 @@ pub(crate) fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool, o: &Opcoes
             return None;
         }
     }
+    // _DoKeyDown: Enter e letras vão para o anel dos códigos de trapaça do original (trapacas.md).
+    if let Some(ef) = s.partida.tecla_de_trapaca(nome, *shift) {
+        let falta = if ef.sem_equivalente() { " (sem equivalente no port)" } else { "" };
+        println!("código de trapaça do original: {ef:?}{falta}");
+        return None;
+    }
     s.partida.cfg.botao_da_tecla(nome)
 }
 

@@ -18,4 +18,5 @@ pub mod rng;
 pub mod superficie;
 pub mod tick;
 pub mod vetor_tick;
+pub mod trapacas;
 pub mod troca_patch;

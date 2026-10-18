@@ -127,6 +127,7 @@ impl Sessao<'_> {
         let cfg_avisos: ConfigAvisos = recursos.dados(avisos::ARQUIVO_CONFIG)?;
         let mut partida =
             Partida::nova(estado, nav, regras, TabelasAmarela::carregar(recursos)?, cfg_sim, cfg_partida, cfg_avisos);
+        partida.tabelas_trapaca = engine::rules::trapacas::TabelasTrapaca::carregar(recursos)?;
         if matches!(origem, Origem::Save(..) | Origem::Tutorial(..)) {
             // File → Load: _FullCount e o jogo pausado (mensagens.md §6).
             partida.ao_carregar();
