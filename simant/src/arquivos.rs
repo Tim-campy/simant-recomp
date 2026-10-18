@@ -71,7 +71,8 @@ impl Sessao<'_> {
             Ok(p) => {
                 println!("{} Saved correctly", p.display());
                 self.partida.estado.precisa_salvar = false;
-                let nome = p.display().to_string().to_uppercase();
+                // O caminho completo, como o diálogo comum o devolve no original.
+                let nome = std::path::absolute(&p).unwrap_or_else(|_| p.clone()).display().to_string();
                 self.dialogo = Some(Dialogo::Salvo(CaixaMensagem::salvo(&self.dialogos_cfg, &nome), depois_load));
                 true
             }

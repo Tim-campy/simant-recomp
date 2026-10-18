@@ -329,7 +329,7 @@ fn principal() -> Result<(), String> {
                 s.abrir_load();
             }
             Some("salvo") => {
-                let m = engine::core::dialogos::CaixaMensagem::salvo(&s.dialogos_cfg, "QUICK1.ANT");
+                let m = engine::core::dialogos::CaixaMensagem::salvo(&s.dialogos_cfg, r"C:\MAXIS\ANTWIN\QUICK1.ANT");
                 s.dialogo = Some(arquivos::Dialogo::Salvo(m, false));
             }
             Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como ou salvo")),
