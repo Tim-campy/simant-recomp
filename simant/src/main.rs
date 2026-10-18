@@ -400,7 +400,13 @@ fn principal() -> Result<(), String> {
                     return Err(format!("--menu sistema@{id}: janela fechada"));
                 }
             }
-            Some(_) => return Err("--menu amarela@X,Y, icones@OBJETO, mod@TECLA[#ITEM] ou sistema@ID".into()),
+            Some(("barra", m)) => {
+                // Barra de menus (menus_ui.rs): menu M aberto, com o item I realçado.
+                let (m, i) = m.split_once(',').map_or((m, None), |(m, i)| (m, i.parse().ok()));
+                let menu = m.parse().map_err(|_| "--menu barra@M[,ITEM]")?;
+                s.menus.barra.estado = engine::core::barra_menus::Estado::Aberto { menu, item: i };
+            }
+            Some(_) => return Err("--menu amarela@X,Y, icones@OBJETO, mod@TECLA[#ITEM], sistema@ID ou barra@M[,ITEM]".into()),
             None => {}
         }
         match o.dialogo.as_deref() {
@@ -414,7 +420,12 @@ fn principal() -> Result<(), String> {
                 let m = engine::core::dialogos::CaixaMensagem::salvo(&s.dialogos_cfg, r"C:\MAXIS\ANTWIN\QUICK1.ANT");
                 s.dialogo = Some(arquivos::Dialogo::Salvo(m, false));
             }
-            Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como ou salvo")),
+            Some("sair") => s.abrir_pergunta_sair(),
+            Some("sobre") => {
+                menus_ui::executar(&mut s, engine::core::barra_menus::ComandoMenu::Sobre, None);
+            }
+            Some("status") => s.menus.status = true,
+            Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como, salvo, sair, sobre ou status")),
             None => {}
         }
         if let Some((x, y)) = o.examinar {

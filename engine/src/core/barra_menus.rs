@@ -560,7 +560,9 @@ mod testes {
         let menu = MenuBanco {
             titulos: vec!["&File".into(), "&Speed".into()],
             itens: vec![
-                vec!["&About".into(), SEPARADOR.into(), "&New\tCtrl+N".into(), "&Quit\tCtrl+Q".into()],
+                ["&About", SEPARADOR, "&New\tCtrl+N", "&Load...\tCtrl+L", "&Save\tCtrl+S", "Save &As...\tCtrl+A", SEPARADOR, "&Quit\tCtrl+Q"]
+                    .map(String::from)
+                    .to_vec(),
                 vec!["&Pause   \tShift+0".into(), SEPARADOR.into(), "&Slow\tShift+1".into(), "&Normal\tShift+2".into()],
             ],
         };

@@ -140,7 +140,7 @@ pub fn aceleradores(exe: &[u8]) -> Result<HashMap<String, Vec<Acelerador>>, Stri
     for r in recursos(exe)?.iter().filter(|r| r.tipo == RT_ACCELERATOR) {
         let Some(nome) = r.nome.clone().or_else(|| r.numero.map(|n| format!("#{n}"))) else { continue };
         let mut v = Vec::new();
-        for c in r.dados.chunks_exact(5) {
+        for c in r.dados.as_chunks::<5>().0 {
             v.push(Acelerador { flags: c[0] & 0x7F, tecla: u16::from_le_bytes([c[1], c[2]]), comando: u16::from_le_bytes([c[3], c[4]]) });
             if c[0] & 0x80 != 0 {
                 break;
