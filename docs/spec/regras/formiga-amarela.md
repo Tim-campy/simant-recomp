@@ -621,3 +621,4 @@ Não verificado no original: luta, troca de corpo, morte e reencarnação, recru
 - Detalhes de desenho das janelas Examine (`_MagnifyMenu`), de recrutamento e dos diálogos de morte (posições, bitmaps).
 - Conferidos no original só os casos Y-01..Y-04 (andar, contorno, comer, entrar no ninho; seção 14) e os vetores de tick 79–83; o resto da seção 13 continua por rodar.
 - `RegrasOriginais` sem campo para `TabelasAmarela` (mods de `amarela.json` não chegam ao tick).
+- Animações (§10.2): conferidos no original só os quadros da luta (`luta_quadros`); o choque elétrico, as mortes com a janela de edição atrás e a loucura (`_AnimYellowInsane`) não foram capturados. O som da luta no tempo do original não foi ouvido lado a lado com o original (a bancada não tem placa de som). O desenho de antes do laço (até 55 ms) não é mostrado. As capturas do original e do port partem do mesmo estado, mas o Load do port ressemeia S, então as direções da nuvem diferem.
