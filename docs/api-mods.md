@@ -1,6 +1,6 @@
 # API de mods
 
-Versão da API: **0.11**. Até aqui só há sobrescrita de dados. Scripts Lua ainda não existem.
+Versão da API: **0.12**. Mods sobrescrevem dados (objetos do banco, `data/*.json`, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua").
 
 ## Estrutura
 
@@ -12,13 +12,16 @@ mods/
     mod.json
     objetos/<tipo>/<id>.bin     (opcional) substitui um objeto do banco original
     data/<arquivo>.json         (opcional) substitui um arquivo de data/ do port
+    <arquivo>.lua               (opcional, API 0.12) script listado em "scripts" no mod.json
 ```
 
 `mod.json`:
 
 ```json
-{ "nome": "meu-mod", "versao": "1.0", "dependencias": ["outro-mod"] }
+{ "nome": "meu-mod", "versao": "1.0", "dependencias": ["outro-mod"], "scripts": ["principal.lua"] }
 ```
+
+`scripts` é opcional (API 0.12): lista de arquivos `.lua` do mod, em ordem de carga, com caminho relativo ao diretório do mod (subpastas valem; `..` e caminhos absolutos não).
 
 ## Regras
 
@@ -58,6 +61,78 @@ mods/
 - **Erros:** dependência ausente, nome duplicado ou ciclo de dependências impedem o jogo de iniciar, com mensagem de erro.
 - Os arquivos originais do jogo nunca são modificados.
 
+## Scripts Lua (API 0.12)
+
+Um script é código Lua 5.4 que roda numa sandbox e só fala com o jogo pelas funções abaixo. Implementação: `engine/src/scripts.rs`; exemplo completo em `mods/exemplo-lua/`.
+
+### Carga e ciclo de vida
+
+- Cada mod com `"scripts"` ganha **uma máquina Lua só sua**: os arquivos dele rodam em ordem na mesma máquina (compartilham as globais); mods diferentes não se enxergam.
+- A ordem entre mods é a mesma dos dados (dependências primeiro, depois alfabética): para o mesmo gancho, o mod que vem antes é chamado antes.
+- Os scripts recomeçam do zero a cada partida (jogo novo, Load). O estado dos scripts **não vai para o save**.
+- Mods são escolhidos como para os dados: todos os de `--mods DIR` (padrão `mods/`) estão ativos.
+
+### Ganchos
+
+O script define funções **globais** com estes nomes (no corpo do arquivo ou dentro de `ao_iniciar`); só os ganchos definidos são chamados.
+
+| Gancho | Quando |
+|---|---|
+| `ao_iniciar(estado)` | Uma vez, quando a partida começa (no Load, depois do `_FullCount`). |
+| `antes_do_tick(estado)` | Antes de cada tick da simulação (`_DoAntSim`). |
+| `depois_do_tick(estado)` | Depois de cada tick. |
+| `ao_evento(evento, estado)` | Para cada pedido das regras à interface, antes de a interface tratá-lo. `evento.tipo` é `"som"`, `"musica"`, `"mensagem"` (com `id`), `"mensagem_faixa"` (com `lista`, `indice`), `"tema_do_ninho"`, `"fim_de_jogo"` ou `"centralizar_na_amarela"`. |
+
+Os ganchos rodam **fora** do tick (antes e depois dele): a ordem interna do tick do original não muda. Sem nenhum mod com script, o laço do jogo é exatamente o mesmo de antes (os vetores de tick do original continuam iguais).
+
+### O objeto `estado`
+
+Vale só durante a chamada do gancho (guardá-lo numa global e usá-lo depois é erro). Leituras devolvem cópias; mudar uma tabela devolvida não muda o jogo. Planos: `"superficie"`, `"ninho_preto"`, `"ninho_vermelho"`. Cores: `"preta"`, `"vermelha"`. Coordenadas: x, y a partir de 0 (superfície 128 × 64, ninhos 64 × 64).
+
+Leitura:
+
+| Método | Devolve |
+|---|---|
+| `estado:tempo()` | `_GameTime` (ticks desde o começo). |
+| `estado:ciclo()` | `_Cycle` (0..4096). |
+| `estado:tipo_jogo()` | `"tutorial"`, `"rapido"`, `"completo"` ou `"experimental"`. |
+| `estado:velocidade()` | 0 lenta … 3 ultra. |
+| `estado:pausado()`, `estado:fim_de_jogo()` | booleanos. |
+| `estado:comida_superficie()` | `_FoodA`. |
+| `estado:colonia(cor)` | tabela `saude`, `comida`, `adultos`, `ovos`, `operarias`, `soldados`, `machos`, `rainhas_novas`, `rainha`, `modo_estrategico` (castas da última contagem `_CountAnts`, a cada 64 ticks). |
+| `estado:amarela()` | tabela `plano` (nome ou `nil`), `x`, `y`, `saude`, `cor`, `morreu`. |
+| `estado:dimensoes(plano)` | largura, altura. |
+| `estado:celula(plano, x, y)` | valor do tile (0..255, ver `docs/spec/regras/tiles-valores.md`) ou `nil` fora do mapa. |
+| `estado:ocupante(plano, x, y)` | byte do mapa de vida (0 = vazio; T da formiga; 0xFE/0xFF = amarela) ou `nil`. |
+| `estado:formigas(plano)` | lista das formigas da lista do plano (A, B ou R): `x`, `y`, `tipo` (T), `modo` (M), `cor`, `grupo` (`(T & 0x78) >> 3`), `direcao` (`T & 7`). |
+
+Escrita (sempre validada; uma recusa devolve `false` e não muda nada):
+
+| Método | Efeito |
+|---|---|
+| `estado:colocar_comida(plano, x, y)` | Uma unidade de comida numa célula sem formiga: chão vira comida, comida ainda não cheia ganha uma unidade (a regra da ferramenta Comida do Experimental, `_IncFoodHere` sem Ctrl), e conta em `_FoodA`/`_FoodB`/`_FoodR`. Outros tiles recusam. |
+| `estado:colocar_pedra(x, y)` | Pedrinha (`regras.pedrinha` de `experimental.json`) numa célula livre da superfície (tile abaixo de `barreira_abaixo_de`, sem formiga). |
+| `estado:colocar_formiga(cor, x, y)` | Operária (T = `formiga_tipo`, + `formiga_vermelha` se vermelha; M = `formiga_modo_superficie`) numa célula livre da superfície, no fim da lista A (cheia: `false`). |
+| `estado:definir_velocidade(v)` | `_GameSpeed` = v (0..3). |
+
+As tabelas usadas nas escritas vêm de `data/experimental.json` (com mods). Nenhuma escrita sorteia: os geradores S e R do jogo não são tocados.
+
+### Funções globais
+
+| Função | Efeito |
+|---|---|
+| `registrar(...)` / `print(...)` | Linha no registro (o `simant` escreve no console como `[script] [mod] ...`). Até 1000 linhas por mod entre duas leituras. |
+| `mostrar_mensagem(texto [, duracao])` | Mensagem na faixa, como `_EditMessage` importante. Até 120 caracteres; `duracao` em unidades de `_TickCount` (1..10000; padrão: `faixa.duracao_conselho` de `mensagens.json`). |
+| `aleatorio()`, `aleatorio(n)`, `aleatorio(a, b)` | Gerador **do script** (real em [0, 1), inteiro em 1..n ou a..b). Determinístico: começa de uma semente tirada do nome do mod. `math.random` é o mesmo gerador. |
+| `semear_aleatorio(n)` | Troca a semente (também `math.randomseed`). |
+| `API_VERSAO`, `MOD_NOME` | `"0.12"` e o nome do mod. |
+
+### Sandbox e limites
+
+- Bibliotecas: base, `table`, `string`, `math`, `utf8`. **Não existem:** `io`, `os`, `package`, `require`, `debug`, `coroutine`, `load`, `loadfile`, `dofile`, `collectgarbage`, `warn`, `string.dump`. Só código-fonte em texto é carregado (bytecode é recusado).
+- Limites por chamada (carga de um arquivo ou um gancho): 1.000.000 instruções da VM e 250 ms; memória total da máquina do mod: 16 MiB. `pcall`/`xpcall` não seguram o erro de limite.
+- **Erro:** erro de sintaxe, de execução, argumento inválido (plano ou cor desconhecidos, velocidade fora de 0..3...), limite excedido, caminho inválido ou arquivo ausente **desligam os scripts daquele mod** pelo resto da partida. O erro vai para o registro e a faixa mostra "Mod <nome>: script desligado por erro". O jogo e os outros mods continuam.
+
 ## Histórico de compatibilidade
 
 | Versão | Mudança | Compatibilidade |
@@ -74,9 +149,10 @@ mods/
 | 0.9 | Novos arquivos sobrescrevíveis `data/modos.json`, `data/quintal_mapa.json`, `data/menu_ferramentas.json`, `data/experimental.json` e `data/casa.json` (escolha do jogo, janela do quintal e troca de patch, ferramentas do Experimental, patches da casa). | Compatível com 0.8: só acrescenta arquivos; um mod que não os traz usa os do port. Como cada arquivo é trocado inteiro, um mod que traga um deles precisa de todas as chaves. |
 | 0.10 | Novos arquivos sobrescrevíveis `data/janelas.json` (Caste, Behavior e History) e `data/menus.json` (menus de segurar o botão e de ícones). `partida.json` ganhou `marcadores`, `botoes_usuario.bitmap_selecionado`/`bitmap_normal` e as ações `janela_edicao`, `janela_comportamento`, `janela_castas`, `janela_historico`; `mensagens.json` ganhou `faixa.marcador_posto`/`marcador_ausente`; `amarela.json` (`mensagens.faixa_*`) e `superficie.json` (`regras.mensagem_ataque_vermelho`) ganharam as mensagens da faixa. | Arquivos novos: compatível. Um `partida.json`, `mensagens.json`, `amarela.json` ou `superficie.json` de mod anterior precisa das chaves novas (o arquivo é trocado inteiro); sem elas o jogo não inicia. |
 | 0.11 | Novos arquivos sobrescrevíveis `data/dialogos.json`, `data/exame.json` (Examine: janela, fonte, listas), `data/info.json` (cartões do Info) e `data/mapa.json` (janela do mapa: tabelas de cor, blocos do feromônio, bitmaps, botões de cheiro); `janelas.json` ganhou `mapa` e `info` (janela, objeto da área e ajustes); `partida.json` ganhou as ações `carregar` (Ctrl+L) e `janela_info` (Ctrl+I); `quintal_mapa.json` ganhou `balao_menino` (lista, fonte, peças 8×8 e posição do balão do menino). `interface.json`: na lista de fontes, `ARQUIVO.FON#Nome` aceita `@altura` (escolhe o tamanho) e `+negrito` (negrito simulado); índice 7 = MS Sans Serif 8 em negrito, do `SSERIFE.FON` do Windows do usuário. | Arquivo novo: compatível. Um `partida.json` de mod anterior continua válido (sem Ctrl+L e Ctrl+I); um `quintal_mapa.json` de mod anterior precisa da chave `balao_menino` e um `janelas.json`, das chaves `mapa` e `info`. |
+| 0.12 | Scripts Lua: chave opcional `scripts` no `mod.json`; ganchos `ao_iniciar`, `antes_do_tick`, `depois_do_tick`, `ao_evento`; objeto `estado` (leitura e escritas validadas); `registrar`, `mostrar_mensagem`, `aleatorio`, `semear_aleatorio`; sandbox e limites (seção "Scripts Lua"). | Compatível com 0.11: só acrescenta. Um mod sem `scripts` funciona como antes, e sem scripts o laço do jogo não muda. |
 
 ## Planejado
 
 - Sobrescrita parcial (por chave) dentro dos arquivos JSON, em vez de trocar o arquivo inteiro.
 - Bitmaps de mod em PNG com conversão automática para a paleta.
-- Scripts Lua em sandbox (`mlua`) com acesso apenas a uma API pública de regras, que será documentada aqui.
+- Scripts: ganchos dentro do tick (por parte das regras), estado de script no save, mais escritas (cheiro, ninhos, castas).

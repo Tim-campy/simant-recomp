@@ -27,6 +27,7 @@ use crate::rules::amarela::{
 use crate::rules::desenho::{self, ContadoresRedesenho, JanelasDesenho};
 use crate::rules::estado::{ConfigSimulacao, Estado, Evento};
 use crate::rules::tick::{tick, Regras, RegrasOriginais, Relogio};
+use crate::scripts::{Gancho, Scripts};
 
 /// Nome do arquivo de dados (sobrescrevível por mod).
 pub const ARQUIVO_CONFIG: &str = "partida.json";
@@ -232,6 +233,11 @@ pub struct Partida {
     pub contadores_redesenho: ContadoresRedesenho,
     /// Efeito do último Mystery (para a interface escrever).
     pub ultimo_misterio: Option<crate::rules::misterio::EfeitoMisterio>,
+    /// Scripts Lua dos mods (docs/api-mods.md, "Scripts Lua"). `None`: nenhum mod com script, e o
+    /// laço é exatamente o de sempre.
+    pub scripts: Option<Scripts>,
+    /// Linhas de registro dos scripts ainda não retiradas pela interface.
+    registro_scripts: Vec<String>,
 }
 
 impl Partida {
@@ -271,6 +277,8 @@ impl Partida {
             janelas_desenho: JanelasDesenho { ativa: true, edicao_aberta: true, edicao_na_frente: true, ..Default::default() },
             contadores_redesenho: ContadoresRedesenho::default(),
             ultimo_misterio: None,
+            scripts: None,
+            registro_scripts: Vec::new(),
         };
         p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
         p.vistas_para_estado();
@@ -377,7 +385,13 @@ impl Partida {
         self.vistas_para_estado();
         // `_MacTickCount` (1000:9694) = ⌊GetTickCount / 55⌋ × 3: tempo real (quintal.md, "Relógios").
         self.estado.relogio_mac = Some(((self.ms_total / 55) * 3) as u32);
+        if let Some(s) = self.scripts.as_mut().filter(|s| s.tem_gancho(Gancho::AntesDoTick)) {
+            s.antes_do_tick(&mut self.estado);
+        }
         tick(&mut self.estado, &mut self.regras as &mut dyn Regras);
+        if let Some(s) = self.scripts.as_mut().filter(|s| s.tem_gancho(Gancho::DepoisDoTick)) {
+            s.depois_do_tick(&mut self.estado);
+        }
         self.vistas_do_estado();
         self.tratar_eventos();
         self.conselho_na_faixa();
@@ -452,6 +466,9 @@ impl Partida {
     /// entram nos avisos (quadros modais).
     fn tratar_eventos(&mut self) {
         for ev in self.estado.retirar_eventos() {
+            if let Some(s) = self.scripts.as_mut().filter(|s| s.tem_gancho(Gancho::AoEvento)) {
+                s.ao_evento(&ev, &mut self.estado);
+            }
             match ev {
                 Evento::CentralizarNaAmarela => self.ir_para_amarela(),
                 Evento::DialogoFimDeJogo => {
@@ -487,6 +504,41 @@ impl Partida {
         if self.estado.partida.fim_de_jogo == 0 {
             self.fim_anunciado = false;
         }
+        self.saidas_dos_scripts();
+    }
+
+    // --- scripts dos mods ----------------------------------------------------------------------
+
+    /// Liga os scripts dos mods a esta partida e chama `ao_iniciar`.
+    pub fn ligar_scripts(&mut self, mut scripts: Scripts) {
+        scripts.ao_iniciar(&mut self.estado);
+        self.scripts = Some(scripts);
+        self.saidas_dos_scripts();
+        self.redesenhar = true;
+    }
+
+    /// Linhas de `registrar` dos scripts (e avisos de script desligado) desde a última retirada.
+    pub fn retirar_registro_scripts(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.registro_scripts)
+    }
+
+    /// Mensagens dos scripts vão para a faixa (como `_EditMessage` importante); o registro fica
+    /// guardado para a interface.
+    fn saidas_dos_scripts(&mut self) {
+        let Some(s) = self.scripts.as_mut() else { return };
+        self.registro_scripts.extend(s.retirar_registro());
+        let mensagens = s.retirar_mensagens();
+        if mensagens.is_empty() {
+            return;
+        }
+        use super::avisos::TextoFaixa;
+        let agora = self.agora();
+        let opcao = self.estado.partida.opcoes[4] != 0;
+        for m in mensagens {
+            let d = m.duracao.unwrap_or(self.avisos.cfg.faixa.duracao_conselho);
+            self.avisos.editar(Some(TextoFaixa::Literal(m.texto)), Some(d), true, opcao, agora);
+        }
+        self.redesenhar = true;
     }
 
     /// Parte de vista de `_GotoMyAnt`: no Experimental só toca o som de erro; senão leva a vista
@@ -1060,5 +1112,40 @@ mod testes {
         // anda (jogo.md).
         assert_eq!((p.nav.vista.x, p.nav.vista.y), (88, 0));
         assert_eq!(p.estado.vistas.plano, 1);
+    }
+
+    fn scripts(codigo: &str) -> Scripts {
+        Scripts::de_fontes(
+            vec![("teste".into(), Ok(vec![("a.lua".into(), codigo.into())]))],
+            crate::rules::experimental::TabelasExperimental::padrao().clone(),
+            crate::scripts::Limites::default(),
+        )
+    }
+
+    #[test]
+    fn script_sem_ganchos_de_tick_nao_muda_o_tick() {
+        let mut sem = partida(1);
+        let mut com = partida(1);
+        com.ligar_scripts(scripts("function ao_evento(ev, estado) registrar(ev.tipo) end"));
+        for _ in 0..300 {
+            sem.rodar_tick();
+            com.rodar_tick();
+        }
+        assert_eq!(sem.estado, com.estado);
+    }
+
+    #[test]
+    fn mensagem_do_script_vai_para_a_faixa_e_registro_fica_guardado() {
+        use crate::core::avisos::TextoFaixa;
+        let mut p = partida(1);
+        p.ligar_scripts(scripts(
+            "function depois_do_tick(e) if e:tempo() == 3 then mostrar_mensagem('olá da faixa'); registrar('t', e:tempo()) end end",
+        ));
+        for _ in 0..3 {
+            p.rodar_tick();
+        }
+        let agora = p.agora();
+        assert_eq!(p.avisos.texto_da_faixa(agora), Some(&TextoFaixa::Literal("olá da faixa".into())));
+        assert_eq!(p.retirar_registro_scripts(), vec!["[teste] t\t3".to_string()]);
     }
 }

@@ -58,11 +58,35 @@ Navegação na tela de jogo:
 - Som: `--sem-som` desliga; `--soundfont ARQ.sf2` (ou `SIMANT_SOUNDFONT`) usa uma SoundFont General MIDI para as músicas; sem ela, um sintetizador simples. Volumes, taxa e a tabela de músicas ficam em `data/som.json` (sobrescrevível por mod). `--exportar-som DIR` grava os 57 efeitos (WAV de 8 bits a 4096 Hz, como o original toca) e as músicas sintetizadas, sem abrir o áudio. Ver `docs/spec/regras/som.md`.
 - Janela: `--escala N` (padrão: a maior escala inteira que cabe no monitor). Para testes sem interação: `--sair-apos-ms N` fecha sozinha e `--capturar-janela ARQ.png` grava o que a janela mostrava. `--ticks N` roda N ticks sem janela (com `--exportar-tela-jogo`, grava a tela depois) e escreve o `GameTime` antes e depois.
 
+### Mods com script (Lua)
+
+Um mod é uma pasta em `mods/` com um `mod.json`. Para ter script, liste os arquivos `.lua` em `"scripts"`:
+
+```json
+{ "nome": "meu-mod", "versao": "1.0", "dependencias": [], "scripts": ["principal.lua"] }
+```
+
+No `.lua`, defina como funções globais os ganchos que quiser (`ao_iniciar`, `antes_do_tick`, `depois_do_tick`, `ao_evento`) e use só a API de `docs/api-mods.md` (seção "Scripts Lua"):
+
+```lua
+function depois_do_tick(estado)
+  if estado:tempo() % 500 == 0 then
+    local x, y = aleatorio(0, 127), aleatorio(0, 63)   -- gerador do script, não o do jogo
+    if estado:colocar_comida("superficie", x, y) then
+      mostrar_mensagem("Caiu comida!")
+    end
+    registrar("comida da preta:", estado:colonia("preta").comida)
+  end
+end
+```
+
+O exemplo completo está em `mods/exemplo-lua/` (chuva de comida a cada 500 ticks). Todos os mods de `--mods` (padrão `mods/`) ficam ativos: use `--mods OUTRA_PASTA` para jogar sem ele. O script roda em sandbox (sem `io`, `os`, `require`, `load`), com limite de instruções, tempo e memória; se der erro, é desligado, o erro sai no console (`[script] ...`) e a faixa avisa, mas o jogo continua.
+
 ## Organização
 
 | Pasta | Conteúdo |
 |---|---|
-| `engine/` | crate sem janela: `formats` (banco NDX/DAT, LZSS, bitmap), `recursos` (original + mods), `core` (sequência de telas, tela de jogo, navegação), `paleta` |
+| `engine/` | crate sem janela: `formats` (banco NDX/DAT, LZSS, bitmap), `recursos` (original + mods), `core` (sequência de telas, tela de jogo, navegação), `paleta`, `scripts` (scripts Lua dos mods em sandbox) |
 | `simant/` | executável SDL2 (render e entrada) |
 | `data/` | dados do port (paleta, telas, bancos usados): é o que os mods sobrescrevem |
 | `mods/` | mods instalados (ver `docs/api-mods.md`) |
