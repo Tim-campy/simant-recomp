@@ -8,7 +8,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 
 - `cargo test --workspace` com `SIMANT_DIR` apontando para `SimAnt-T/MAXIS/ANTWIN`: **518 testes passaram, 0 falharam, 0 ignorados** em 35 binários de teste (unitários de `engine` e `simant` e os testes de integração de `engine/tests/`).
 - Vetores do original no repositório (`tests/referencias/`):
-  - **107 vetores de tick** em 21 grupos (`ticks/`), todos exigidos 307/307 blocos (com extras e vida) por `engine/tests/ticks_originais.rs`; nenhum em `"pendentes"` (o último, `inseticida_morte/21`, foi resolvido pela interface);
+  - **107 vetores de tick** em 21 grupos (`ticks/`), todos exigidos 307/307 blocos (com extras e vida) por `engine/tests/ticks_originais.rs`; nenhum em `"pendentes"` (o último, `inseticida_morte/21`, foi resolvido pela interface). **Atualização 2026-10-18 (quinta rodada):** +38 vetores em 25 cenários (cerco, laser, faro, aranha do jogador, mortes da amarela, N-01/07/10/12/14/15, C-04..C-07), 37 exigidos 307/307 e 1 pendente com a causa isolada (`amarela_morte_aranha`, desenho dentro do tick);
   - **2 sequências longas** (`ticks_longos/rico_200`, 200 ticks; `ticks_longos/full_600`, 600 ticks do Jogo Completo com a Yard View na frente), iguais ao original;
   - **15 ações da interface** (`acoes/`: troca de patch, PLACE, `_SpecialXfer`, Experimental, desenho da chuva e do enxame, Mystery), todas 307/307;
   - **1 Load do tutorial** (`load_tutorial/`);
@@ -28,7 +28,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 | # | Área | Implementado | Verificado no original | Comentário curto |
 |---|---|---|---|---|
 | 1 | Formatos de arquivo | 90% | 85% | banco NDX/DAT + LZSS, bitmaps, fontes, janelas, `SIMANT.CFG`, `.ANT` (byte a byte), sons, tiles, `.HLP`; restam bitmaps ~7100, `kind`/byte 3, bits 4/8 de flags |
-| 2 | Regras da simulação (tick) | 95% | 75% | 107 vetores + 2 sequências + 20 casos batem; vários ramos raros só pelo código (cerco, laser, aranha do jogador, estatísticos) |
+| 2 | Regras da simulação (tick) | 95% | 75% | 107 vetores + 2 sequências + 20 casos batem; desde 2026-10-18 também cerco, laser, faro, aranha do jogador, mortes da amarela e os casos estatísticos (+38 vetores, 1 pendente) |
 | 3 | Geração de mundo | 95% | 75% | Quick Game byte a byte; casa em 4 patches; Tutorial via Load; ramos de Full/Experimental e vários patches da casa sem caso |
 | 4 | Jogo ao vivo (laço, relógio, ritmo) | 90% | 65% | slow/normal medidos (3,0/6,0 ticks/s); fast/ultra e relógio do Mac só na bancada QEMU e com decisões do port |
 | 5 | Telas e janelas | 85% | 70% | quase todas as janelas existem e foram comparadas (93–100%); faltam balões, gráficos de saúde da edição, partes da ajuda |
@@ -168,16 +168,16 @@ Formatos
 - Classes do campo T e bits 0–2 nas crias (`formatos/save-ant.md`, [hipótese]).
 
 Regras
-- Casos estatísticos C-04 a C-07 dos ovos e a lista 4/1100 por estágio (`regras/ciclo-de-vida.md`, "Lacunas").
+- A lista 4/1100 por estágio (`regras/ciclo-de-vida.md`, "Lacunas"). (C-04 a C-07 verificados em 2026-10-18, vetores `ovos_*`.)
 - Amarela vermelha pondo ovo preto e recriação da cauda em lutas (`regras/ciclo-de-vida.md`, [hipótese]).
 - Morte natural (T1), luta e proporção de vitórias (T5, T6), revoada natural (T8), estratégia vermelha (T9), recrutamento pelo jogador (T11) (`regras/superficie.md`).
-- Cerco da formiga-leão e da aranha, pedrinha cuspida, laser, faro, aranha controlada pelo jogador, sorteios de `_DrawSpider` (`regras/inimigos.md`).
-- Morte da amarela pelos inimigos (`_YellowDeath` 1–4) (`regras/inimigos.md`); pisada e cortador (causas 5 e 6) (`regras/quintal.md`; a causa 9, inseticida, está coberta por `inseticida_morte/21`).
-- Casos estatísticos do ninho N-01, N-07, N-10, N-12 e os de ninho desenvolvido N-14, N-15 (com a amarela por perto) (`regras/ninho.md`).
+- Pedrinha cuspida pela formiga-leão (`regras/inimigos.md`). (Cerco da aranha e da formiga-leão, fuga, vingança, faro, laser e aranha do jogador verificados em 2026-10-18, testes-tick.md "Quinta rodada".)
+- Desenho dentro do tick (`_DrawPalps` e `_SpiderDialog` sorteiam S no meio do tick; medido, não implementado): deixa pendente `amarela_morte_aranha/1793`, a morte da amarela pela aranha (`regras/rng.md`, `regras/inimigos.md`).
+- Afogamento de adultas no ninho (1/100 por tick, `regras/ninho.md` 8.3) e N-02, N-04, N-05, N-08, N-11. (N-01, N-07, N-10, N-12, N-14, N-15 verificados em 2026-10-18, vetores `ninho_*`.)
 - Defeitos do original marcados [hipótese] no ninho (`regras/ninho.md`) e coluna 106 de `_CarpetFloorR` (`divergencias.md`).
 - Suavização dupla na volta de `_Cycle` e giro duplo de `_GetNestDir` (`regras/feromonios.md`).
 - Textos do balão do menino (lista 4/1200) (`regras/quintal.md`).
-- Seção 13 de `regras/formiga-amarela.md` além de Y-01..Y-04; animações de choque, morte com a edição atrás e loucura (`_AnimYellowInsane`).
+- Seção 13 de `regras/formiga-amarela.md` além de Y-01..Y-04 e Y13; quadros (imagens) do choque e da loucura e as mortes com a janela de edição atrás. (Mortes 2–10 da amarela, inclusive choque e loucura pelo estado e pelos geradores, verificadas em 2026-10-18, vetores `amarela_morte_*`.)
 - Tutorial além das lições 1–3 (`regras/conselhos.md`, `testes-tick.md`).
 - Retorno exato de `_CalcScore` e o sentido da nota 3 (`regras/simulacao-visao-geral.md`).
 
@@ -253,8 +253,7 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 
 | Item | Esforço |
 |---|---|
-| Vetores para cerco, laser, aranha do jogador, morte da amarela por inimigos, pisada e cortador | M |
-| Casos estatísticos (C-04..C-07, N-01/07/10/12) com semente forçada | M |
+| Desenho dentro do tick (`_DrawPalps`/`_SpiderDialog`) para fechar `amarela_morte_aranha` | P–M |
 | Capturas: navegação, superfície e ninho vermelho, Examine, menus da rainha e da aranha, 42 cartões do Info, abertura (duração e Espaço) | M |
 | Tutorial completo (todas as lições) em vetores | M |
 | Comparação de áudio com o original (bancada com placa de som ou DOSBox-X com SB16) | M |

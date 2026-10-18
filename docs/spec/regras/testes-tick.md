@@ -336,8 +336,10 @@ Itens da lista "Não verificado" de [../../estado-do-projeto.md](../../estado-do
 | `ninho_n12` | 1711, 1716 | N-12: a luta não remove a checadora; a nuvem termina |
 | `ninho_n14` | 1713 | N-14: passagem 0x14 do ninho vermelho para o preto |
 | `ninho_n15` | 1711 | N-15: trofalaxia pela invasora vermelha |
+| `ovos_c04_c05` | 1791 | C-04: morte na eclosão com `_ModeAuto` 0; C-05: casta vermelha com `_HealthR` 20 |
+| `ovos_c06`, `ovos_c07` | 1711; 1711 | C-06: postura com saúde 100; C-07: nenhuma com saúde 0 |
 
-**Placar: 35 vetores novos em 22 cenários, 34 batem inteiros (307/307, S, R e vida) e são exigidos; 1 pendente com a causa isolada.** Antes da seleção, as gravações brutas inteiras foram comparadas (≈ 230 ticks, inclusive 83 da aranha do jogador e 24 do faro): só os ticks abaixo diferiram, e todos por causa conhecida. Volume: 4,1 MB.
+**Placar: 38 vetores novos em 25 cenários, 37 batem inteiros (307/307, S, R e vida) e são exigidos; 1 pendente com a causa isolada.** Antes da seleção, as gravações brutas inteiras foram comparadas (≈ 230 ticks, inclusive 83 da aranha do jogador e 24 do faro): só os ticks abaixo diferiram, e todos por causa conhecida. Volume: 4,7 MB.
 
 Achados:
 

@@ -719,6 +719,47 @@ def cenario_n15(c: Sessao, saida, n):
     return c.gravar(saida, n, parar=lambda d: d.ler("MeHealth") > 50)
 
 
+# ------------------------------------------------------------------------------------------------
+# Ovos (ciclo-de-vida.md §10)
+# ------------------------------------------------------------------------------------------------
+
+def cenario_c04_c05(c: Sessao, saida, n):
+    """C-04 e C-05: na entrada do tick 1791 (o _Cycle 1792 é múltiplo de 128: os ovos avançam), todos
+    os ovos pretos com T = 7 e _ModeAuto = 0, _modeLevels[2] = 0 (morte na eclosão), e os vermelhos com
+    T = 0x87 e _HealthR = 20 (estratégia vermelha 5: casta pela _CasteTabC)."""
+    c.entrada()
+    c.dep.ate_gametime(1791)
+    s = c.save()
+    for i, f in formigas(s, "B"):
+        if (f["T"] & 0x78) == 0:
+            mover_formiga(c, s, "B", i, f["X"], f["Y"], t=7)
+    for i, f in formigas(s, "R"):
+        if (f["T"] & 0xF8) == 0x80:
+            mover_formiga(c, s, "R", i, f["X"], f["Y"], t=0x87)
+    c.escrever("ModeAuto", 0)
+    seg, off, _ = c.mj.resolver("modeLevels")
+    c.mj.escrever_variavel(f"{seg}:{off + 4:x}", bytes(2), 2)
+    c.log("modeLevels[2] <- 0")
+    c.escrever("HealthR", 20)
+    return c.gravar(saida, n)
+
+
+def cenario_c06(c: Sessao, saida, n):
+    """C-06: _HealthB = 100, _EatCountB = 0; o tick 1711 tem _Cycle 1712 (múltiplo de 16): postura."""
+    c.entrada()
+    c.escrever("HealthB", 100)
+    c.escrever("EatCountB", 0)
+    return c.gravar(saida, n)
+
+
+def cenario_c07(c: Sessao, saida, n):
+    """C-07: _HealthB = 0 e _AlwaysHealthy = 0 no tick de postura 1711: Sk(128) <= 0 só com 0."""
+    c.entrada()
+    c.escrever("AlwaysHealthy", 0)
+    c.escrever("HealthB", 0)
+    return c.gravar(saida, n)
+
+
 VIDA_RICO = ("vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução "
              "de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a "
              "preparação também escreve marcas no mapa de vida")
