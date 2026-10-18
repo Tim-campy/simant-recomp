@@ -15,11 +15,11 @@ SONS = {
     },
     "quintal": {
         "_origem": "docs/spec/regras/som.md: _MakeBark/_SimDog (1030:2dbc, 32ea), _SimCat, _SimBird, _FootFall, "
-                   "_SimKidInside (1030:20b6), _DoWater",
+                   "_SimKidInside (1030:20b6), _DoWater; gato fugindo (_SimCat, 0xE) e _DrawMower (1010:b2c4, 0x24)",
         "latidos": [23, 21, 23, 22], "latido_cortador": 21, "gato": 13, "passaro": 7,
         "pisada": 35, "inseticida": 9,
         "menino_casa": 24, "menino_casa_quando": [[3, 20, 900], [1, 21, 903], [6, 20, 6], [3, 21, 1]],
-        "chuva": 41,
+        "chuva": 41, "gato_fugindo": 14, "cortador": 36,
     },
     "superficie": {
         "_origem": "docs/spec/regras/som.md: _AddFood(n, 1) (1030:6a58)",

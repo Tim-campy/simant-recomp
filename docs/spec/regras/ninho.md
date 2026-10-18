@@ -545,6 +545,21 @@ Ela não anda (túnel inundado é intransponível) e morre com chance 1/100 por 
 
 `_AddWater(w)` (`1020:0b8a`) e `_DropWater(w)` (`1020:0c54`) são o mesmo código de inundar/secar uma linha, em função separada, **sem chamador**.
 
+### 8.4 Como a chuva se comporta no ninho e nos túneis (resumo para o jogador)
+
+Pergunta do usuário (2026-10-18): "Como a chuva deve se comportar no ninho? No momento ela acumula no fundo da terra e aparenta não ter efeito no ninho" e "Qual é o comportamento da chuva nos túneis?". Resposta, a partir de 8.1–8.3 (código) e das capturas abaixo:
+
+- **A água vem de baixo, como um lençol freático.** Enquanto chove, em cada tick há 1 chance em 10 de a água subir **uma linha inteira** dos dois ninhos (`_WaterTable` −1), começando na linha 63 (o fundo) e no máximo até a linha 4 (as linhas 0–3 nunca inundam). Uma chuva dura `S(150) + 150` ticks (150–299, quintal.md §2): em média a água sobe 15 a 30 linhas, isto é, **fica na metade de baixo do ninho**. Quando a chuva acaba, a água desce uma linha a cada ~10 ticks secos, de cima para baixo. Por isso o comportamento observado ("acumula no fundo") é o do original: na maior parte das chuvas a água não chega aos túneis, que costumam ficar perto da superfície. Só chuvas seguidas (a água não teve tempo de baixar) ou longas a levam até lá.
+- **Terra inundada quase não muda de cor.** A terra de uma linha inundada passa de 0x20–0x2D para 0x4F–0x5C (+0x2F), desenhada quase igual à terra seca (azul-escuro pontilhado); o que se vê de longe é **o túnel inundado, azul-claro** (0x4E). Sem túnel na linha, a subida da água praticamente não aparece.
+- **Túnel inundado (0x4E) vira parede de água:** nenhuma formiga entra nele (`MOVER` exige < 0x1C e `PASSO` < 0x30). A colônia perde a parte de baixo do ninho até a água descer; ao secar, o túnel volta como túnel comum (`S(8)`: um dos tiles de túnel vazio).
+- **Formigas:** no tick em que a linha delas inunda, as operárias, soldados e reprodutores (grupos 1–11) dessa linha entram em **AFOGANDO** (M = 17): não andam, giram no lugar (direção −1, 0 ou +1 por tick) e **morrem com chance 1/100 por tick**, contadas como mortas (`_BAntsExpired`/`_RAntsExpired`); se a água baixar antes, voltam ao trabalho. Formigas que entram em linha já inundada não se afogam (o tile as barra). Invasoras ignoram o afogamento e seguem saindo. Não há fuga: só a água descendo as salva.
+- **Ovos, larvas, pupas e rainha não se afogam** (grupos 0, 12, 13 ficam fora de `_DrownBList`), mesmo debaixo d'água; mas ficam ilhados (as operárias não chegam a eles pelo túnel inundado).
+- **Comida guardada** (0x10–0x13) numa linha que inunda vira água e, ao secar, túnel vazio: **a comida se perde**, sem baixar `_FoodB`.
+- **A amarela** numa célula inundada do ninho perde 1 de vida por tick; com vida 0 por mais de 99 ticks, morre **afogada** (código 7, formiga-amarela.md §3, §9).
+- **Na superfície**, as gotas viram poças (tiles 0x74–0x77) que crescem e somem e **lavam o cheiro** da célula 2×2 (trilhas, alarme, comida; o cheiro do ninho cai 20): as trilhas de comida se perdem na chuva (§8.1, quintal.md §9.2).
+
+**Verificado no original (bancada QEMU, 2026-10-18, `cenarios_tick.py gravar tela_chuva`, snapshot `rico`, `_RainCnt` = 2000):** com a água na linha 25, o ninho preto do `rico` (túneis nas linhas 0–12) aparece igual ao seco; com a água na linha 4 (depois de ~300 ticks de chuva), os túneis abaixo da linha 4 estão azul-claros e a terra continua azul-escura. O port desenha os mesmos estados (`chuva_ninho_preto_meio.ANT`, `chuva_ninho_preto.ANT` abertos com `--save`) igual: túneis inundados azul-claros a partir da mesma linha. Os efeitos de regra (linhas, afogamento, comida) já eram conferidos pelo caso Q-01 e pelos vetores de tick (quintal.md §9, Q-U8). Capturas em `re_trabalho/a51/chuva2/` (fora do git).
+
 ## 9. Invasoras
 
 ### 9.1 Atacar o ninho: `_RaidInB` (`1028:3524`) / `_RaidInR` (`1028:5b2a`) (invasora com M = 7)

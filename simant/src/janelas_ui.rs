@@ -323,6 +323,19 @@ impl Sessao<'_> {
                     m.quintal.desenhar_janela(q, estado);
                     let fonte_balao = interface.fontes.get(m.quintal.cfg.balao_menino.fonte).and_then(|f| f.as_ref());
                     m.quintal.desenhar_balao_do_menino(q, estado, fonte_balao);
+                    // _UpdateYardMessage: a mensagem da faixa também no rodapé do quintal.
+                    let texto = self.partida.avisos.texto_vigente(self.partida.agora()).map(|t| match t {
+                        engine::core::avisos::TextoFaixa::Literal(s) => m
+                            .quintal
+                            .cfg
+                            .mensagem
+                            .as_ref()
+                            .and_then(|c| interface.fontes.get(c.fonte).and_then(|f| f.as_ref()))
+                            .map(|f| f.codificar(s))
+                            .unwrap_or_default(),
+                        outro => engine::core::avisos::bytes_da_faixa(recursos, outro),
+                    });
+                    m.quintal.desenhar_mensagem(q, interface, texto.as_deref());
                     // Título do Windows por cima do desenhado pelo quintal: ativo ou não, com o nome
                     // do modo (`_SetMapTitle`, lista 4/1000 itens 9..12).
                     let modo = estado.vistas.modo_quintal.clamp(0, 3) as usize;

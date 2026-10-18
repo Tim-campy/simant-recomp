@@ -91,6 +91,19 @@ VALORES_INICIAIS = {
     "passaro_quadro": 1, "menino_msg": -1, "ciclo_quintal": -1,
 }
 
+BOTAO_REVOADA = {
+    "_origem": "_ProcYardEvent 1010:a51e, comando 0x2306 (ribMate): só com _CurGameType = 2; _CastePopB[3] + [4] "
+               "menos 1 se _MeType é 0x40 ou 0x20; >= 1: _FlyAwayB = 200 e 1010[6], senão som 1 e 1010[5]; fora do "
+               "Jogo Completo som 1 e 1010[15]. _EditMessage(texto, 0xb4, 0, 1): importante",
+    "contagem": 200,
+    "castas": [3, 4],
+    "tipos_amarela": [0x40, 0x20],
+    "som_erro": 1,
+    "faixa_armou": {"lista": 1010, "indice": 6, "duracao": 180, "importante": True},
+    "faixa_sem_reprodutores": {"lista": 1010, "indice": 5, "duracao": 180, "importante": True},
+    "faixa_so_jogo_completo": {"lista": 1010, "indice": 15, "duracao": 180, "importante": True},
+}
+
 MENSAGENS = {
     "_origem": "_SimColonies 1030:35f8 (_PictStrnDialog e _myBeginSong); SHARED tipo 4",
     "vermelhas_eliminadas": 10052, "falta_vermelhas": 10053, "casa_tomada": 10054,
@@ -258,6 +271,7 @@ def extrair(data):
             "licoes": licoes(),
         },
         "_origem": {k: o for k, (_, o) in REGRAS.items()},
+        "botao_revoada": BOTAO_REVOADA,
         "sons": SONS["quintal"],
     }
     return t

@@ -69,7 +69,8 @@ Ids do tipo 5. Os nomes são o contexto da chamada, não um rótulo do original.
 | 7 | `_SimBird` (`1030:28aa`): pássaro |
 | 9 | `_SimKidInside` (`1030:20b6`), `_ExpKillAnts` |
 | 10 | `_EatMyFood`, `_MoveSpider`, `_CheatKeys` |
-| 13 | `_SimCat` (`1030:2b24`): gato, quando `_SRand64()` = 0 no quintal |
+| 13 | `_SimCat` (`1030:2b24`): gato andando, quando `_MapMode` = 0, `_YardMode` < 2 e `_SRand64()` = 0 (0,49 s) |
+| 14 | `_SimCat`: o gato começa a fugir do cachorro (`_CatOn` = 3), com `_MapMode` = 0 e `_YardMode` < 2, sem sorteio (1,27 s) |
 | 15 | ok/centralizar: `_YellowCommandKey` (Home), `_processSpider`, `_ExchangeLives`, `_SetAlarmDropState` (ligou) |
 | 17 / 18 | escavação no ninho preto / vermelho: `_DoDigInB` (`1028:4bd0`) / `_DoDigInR` (`1028:6f0c`) (ninho.md: "som 0x11 (R: 0x12)") |
 | 19 | `_SetLife` (`1020:5d18`): a amarela cava ao entrar na terra |
@@ -81,7 +82,7 @@ Ids do tipo 5. Os nomes são o contexto da chamada, não um rótulo do original.
 | 30 | terra/pedrinha: `_DropMyRock`, `_PickupMyRock`, `_DoAntLions` |
 | 32 | `_AddFood`, `_DoTool`, `_ExpAddFood`, `_MysteryButton` |
 | 35 | passo humano: `_FootFall` (`1030:3386`) |
-| 36 | cortador de grama: `_DrawMower` (`1010:b2c4`) |
+| 36 | cortador de grama: `_DrawMower` (`1010:b2c4`), a cada redesenho do quintal (modos 0 e 1) com `_BoyHere` 3 ou 4 e o jogo não pausado |
 | 37 | luta: `_AnimYellowFight` (`1028:7e56`), `_LionDialog` |
 | 38 | formiga-leão: `_LionDialog`, `_DoAntLions` |
 | 41 | água: `_DoWater` (`1020:07c6`); aranha: comando 12 (laser) |
@@ -91,7 +92,7 @@ Ids do tipo 5. Os nomes são o contexto da chamada, não um rótulo do original.
 | 49 | `_YellowBirth`, `_AnimYellowFight` |
 | 55 | laser: `_DoLaserFire` (`1000:6ec8`) |
 
-Os ids 0, 3–6, 8, 11, 12, 14, 16, 20, 25, 26, 31, 33, 34, 39, 40, 43, 46, 48, 50–54 e 56 não aparecem como constante nas chamadas vistas [em aberto: podem vir de variáveis, como em `_MysteryButton` e `_CheatKeys`].
+Os ids 0, 3–6, 8, 11, 12, 16, 20, 25, 26, 31, 33, 34, 39, 40, 43, 46, 48, 50–54 e 56 não aparecem como constante nas chamadas vistas [em aberto: podem vir de variáveis, como em `_MysteryButton` e `_CheatKeys`].
 
 ## Port
 
@@ -102,7 +103,8 @@ Os ids 0, 3–6, 8, 11, 12, 14, 16, 20, 25, 26, 31, 33, 34, 39, 40, 43, 46, 48, 
 | Parte (`data/…json`) | Original | Pedido no port |
 |---|---|---|
 | quintal | `_SimDog`/`_MakeBark`: latido pelo sorteio `S(4)` (0x17, 0x15, 0x17, 0x16); latido 0x15 acompanhando o cortador | `cachorro` → `latir` |
-| quintal | `_SimCat`: 13 com a vista no quintal e `S(64)` = 0 | `gato` |
+| quintal | `_SimCat`: 13 com a vista no quintal e `S(64)` = 0; 14 ao começar a fugir do cachorro (desde 2026-10-18) | `gato`, `gato_fugindo` |
+| quintal | `_DrawMower`: 0x24 a cada redesenho do quintal com o menino cortando ou guardando o cortador, fora da pausa (desde 2026-10-18; pedido por `rules::desenho::desenhar_cortador`, chamado pela partida depois do tick) | `cortador` |
 | quintal | `_SimBird`: 7 quando o pássaro pega o enxame, vista no quintal e `S2` = 0 | `passaro` |
 | quintal | `_FootFall`: 0x23 a cada pisada (fora e dentro de casa); `_SimKidInside`: 9 (inseticida) e 0x18 nas combinações (contagem do nó, nó, quadro) = (3, 20, 900), (1, 21, 903), (6, 20, 6), (3, 21, 1) | `menino_fora`, `menino_dentro` |
 | quintal | `_DoWater`: 0x29 com chuva e `S(50)` = 0 | `simular_agua` |
@@ -125,7 +127,7 @@ Os ids 0, 3–6, 8, 11, 12, 14, 16, 20, 25, 26, 31, 33, 34, 39, 40, 43, 46, 48, 
 
 ### O que não está ligado
 
-- **Interface (menus, botões e diálogos), fora de `rules/`:** `_EditToolsMenu`/`_MapToolsMenu`/`_RibbonToolsMenu` (2 e 11003), `_DoTool`, `_DoBookMark`, `_CheatKeys`, `_MysteryButton`, `_LionDialog`, `_YellowDialog`, `_SpiderDialog`, `_EndGameDialog` (10008/10010 e o tema seguinte), `_DrawSimPayoff` (20003, 20004), `_ProcYardEvent`, `_XferPatch`/`_SpecialXfer`/`_PlaceQueenInYard` (1, 11002, 11003), `_StartAttack` (11018 pelo menu), `_DrawMower` (0x24, desenho do cortador). Ficam para o `simant` quando essas telas existirem.
+- **Interface (menus, botões e diálogos), fora de `rules/`:** `_EditToolsMenu`/`_MapToolsMenu`/`_RibbonToolsMenu` (2 e 11003), `_DoTool`, `_DoBookMark`, `_CheatKeys`, `_MysteryButton`, `_LionDialog`, `_YellowDialog`, `_SpiderDialog`, `_EndGameDialog` (10008/10010 e o tema seguinte), `_DrawSimPayoff` (20003, 20004), `_ProcYardEvent` (exceto o botão MATE, ligado em 2026-10-18), `_XferPatch`/`_SpecialXfer`/`_PlaceQueenInYard` (1, 11002, 11003), `_StartAttack` (11018 pelo menu). Ficam para o `simant` quando essas telas existirem.
 - **Modo Experimental** (`_ExpDig`, `_ExpAddAnt`, `_ExpAddFood`, `_ExpIncSmell`, `_ExpKillAnts`): o modo ainda não está no port.
 - `_myBeginSoundSection` (0x26 da formiga-leão) é vazia no Windows: nada a pedir (o `S8()` continua).
 

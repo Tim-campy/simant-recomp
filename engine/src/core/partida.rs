@@ -516,7 +516,8 @@ impl Partida {
         // _UpdateWindows: os sorteios do desenho (quintal com chuva/enxame, palpos da aranha).
         let v = &self.nav.vista;
         let aranha = desenho::aranha_visivel(&self.estado, self.nav.plano_mapa, v.x, v.y, v.largura, v.altura);
-        let janelas = JanelasDesenho { ativa: self.ativo, aranha_visivel: aranha, ..self.janelas_desenho };
+        let som_cortador = self.regras.quintal.sons.cortador;
+        let janelas = JanelasDesenho { ativa: self.ativo, aranha_visivel: aranha, som_cortador, ..self.janelas_desenho };
         desenho::redesenho_do_timer(&mut self.estado, &janelas, &mut self.contadores_redesenho);
         // _UpdateWindows: em fast/ultra o mapa só é redesenhado a cada 2/4 ticks; sem foco, a cada 8.
         self.contador_mapa = self.contador_mapa.wrapping_add(1);
@@ -527,6 +528,14 @@ impl Partida {
             desenha &= self.quadros.is_multiple_of(u64::from(self.cfg.relogio.redesenho_sem_foco_a_cada.max(1)));
         }
         self.redesenhar |= desenha;
+    }
+
+    /// Botão MATE do quintal (`_ProcYardEvent` 0x2306): arma a revoada preta ou recusa, com a
+    /// mensagem na faixa.
+    pub fn botao_revoada(&mut self) -> bool {
+        let armou = crate::rules::quintal::botao_revoada(&mut self.estado, &self.regras.quintal);
+        self.processar_eventos_do_estado();
+        armou
     }
 
     /// Quadro de animação da amarela a mostrar agora na janela de edição: o plano animado e o

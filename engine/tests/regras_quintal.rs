@@ -311,3 +311,51 @@ fn vetores_de_tick_do_original() {
         assert_eq!(*e.preta.populacao_quintal, *fim.preta.populacao_quintal);
     }
 }
+
+#[test]
+fn botao_mate_arma_a_revoada_so_no_jogo_completo_com_reprodutores() {
+    use engine::rules::estado::MensagemFaixa;
+    use engine::rules::quintal::botao_revoada;
+    let t = tabelas();
+    let indice = |e: &Estado| {
+        e.eventos.iter().find_map(|ev| match ev {
+            Evento::MensagemFaixa(MensagemFaixa { lista: 1010, indice, importante: true, .. }) => Some(*indice),
+            _ => None,
+        })
+    };
+    let mut e = Estado::vazio();
+    e.partida.tipo_jogo = 1;
+    assert!(!botao_revoada(&mut e, &t));
+    assert_eq!(indice(&e), Some(15), "Fertilize queens in Full Game only");
+    assert!(e.eventos.contains(&Evento::Som(1)));
+    let mut e = Estado::vazio();
+    e.partida.tipo_jogo = 2;
+    e.preta.castas[4] = 1;
+    e.amarela.tipo = 0x40; // a amarela rainha alada é a única: não conta
+    assert!(!botao_revoada(&mut e, &t));
+    assert_eq!(indice(&e), Some(5), "Produce males and new queens first");
+    assert_eq!(e.preta.revoada, 0);
+    let mut e = Estado::vazio();
+    e.partida.tipo_jogo = 2;
+    e.preta.castas[3] = 2;
+    assert!(botao_revoada(&mut e, &t));
+    assert_eq!(e.preta.revoada, 200);
+    assert_eq!(indice(&e), Some(6), "You have started the mating cycle");
+    assert!(!e.eventos.contains(&Evento::Som(1)));
+}
+
+#[test]
+fn cortador_toca_no_desenho_do_quintal_e_gato_fugindo_tem_som() {
+    use engine::rules::desenho::desenhar_cortador;
+    let mut e = Estado::vazio();
+    e.vistas.modo_quintal = 0;
+    for (presente, pausado, esperado) in [(3, 0, true), (4, 0, true), (1, 0, false), (3, 1, false)] {
+        e.eventos.clear();
+        e.menino.presente = presente;
+        e.partida.pausado = pausado;
+        desenhar_cortador(&mut e, Some(36));
+        assert_eq!(e.eventos.contains(&Evento::Som(36)), esperado, "_BoyHere {presente}, pausado {pausado}");
+    }
+    assert_eq!(tabelas().sons.gato_fugindo, Some(14));
+    assert_eq!(tabelas().sons.cortador, Some(36));
+}

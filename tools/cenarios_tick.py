@@ -955,6 +955,96 @@ def cenario_misterio(c: Sessao, saida, n):
     return []
 
 
+def capturar_vistas(c: Sessao, saida, prefixo, vistas):
+    """Para cada (nome, teclas, segundos): teclas com a VM rodando, espera, captura a tela e grava o
+    estado (.ANT, abre no port com --save) e os extras."""
+    reg = []
+    for nome, teclas, seg in vistas:
+        c.dep.retomar()
+        if teclas:
+            c.teclas(*teclas)
+        time.sleep(seg)
+        c.mj.sessao_gdb()
+        pasta = Path(saida).resolve()
+        pasta.mkdir(parents=True, exist_ok=True)
+        (pasta / f"{prefixo}_{nome}.ANT").write_bytes(c.mj.estado())
+        ex = c.dep.extras()
+        tela(c, saida, f"{prefixo}_{nome}")
+        reg.append({"captura": f"{prefixo}_{nome}", "teclas": teclas, **ex})
+    (Path(saida).resolve() / f"{prefixo}.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"{prefixo}: {[r['captura'] for r in reg]}")
+    return []
+
+
+def cenario_tela_chuva(c: Sessao, saida, n):
+    """O que o original mostra na chuva: _GlobalKey = 0xA8 na entrada de um tick; a superfície (gotas,
+    faixa), a Yard View (Ctrl+Y, depois fechada com Ctrl+F4) e, com _RainCnt alto (a água sobe uma linha a
+    cada ~10 ticks), o ninho preto depois de n/2 e n segundos, o vermelho e a superfície de novo."""
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    c.escrever("GlobalKey", 0xA8, 2)
+    c.avancar(2)
+    c.escrever("RainCnt", 2000)
+    return capturar_vistas(c, saida, "chuva", [
+        ("superficie", [], 2), ("quintal", ["ctrl+y"], 3), ("superficie2", ["ctrl+f4", "ctrl+8"], 2),
+        ("ninho_preto_meio", ["ctrl+9"], max(n // 2, 1)), ("ninho_preto", [], max(n // 2, 1)),
+        ("ninho_vermelho", ["ctrl+0"], 2), ("superficie3", ["ctrl+8"], 2)])
+
+
+def cenario_tela_menino(c: Sessao, saida, n):
+    """O menino cortando a grama no patch atual (como `menino`): superfície, Yard View e mapa."""
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    p = c.ler("CurYardPnt")
+    px, py = p & 0xFFFF, p >> 16
+    boy_y = 38 + py * 10 + 5
+    boy_x = px * 28 + 14 + 200 - boy_y
+    for nome, v in (("NodeNum", 0x26), ("BoyHere", 3), ("BoyIsMowing", 1), ("BoyX", boy_x), ("BoyY", boy_y),
+                    ("BoyPx", px), ("BoyPy", py), ("LastMowX", px), ("LastMowY", py), ("FootHere", 1)):
+        c.escrever(nome, v)
+    return capturar_vistas(c, saida, "menino", [
+        ("superficie", [], 1), ("superficie_b", [], 1), ("quintal", ["ctrl+y"], 2), ("quintal_b", [], 1),
+        ("mapa", ["ctrl+8", "ctrl+m"], 2)])
+
+
+def cenario_tela_revoada(c: Sessao, saida, n):
+    """Revoada (como `revoada`: formigas da superfície em M = 15 e _FlyAway = 3) com enxame e rainhas
+    guardadas para o desenho do enxame: superfície e Yard View."""
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    s = c.save()
+    pretas = [i for i, f in formigas(s, "A") if not f["T"] & 0x80][:6]
+    verms = [i for i, f in formigas(s, "A") if f["T"] & 0x80][:12]
+    for i in pretas + verms:
+        c.escrever_elemento("AlistM", i, 15)
+    for nome, v in (("FlyAwayB", 3), ("FlyAwayR", 3), ("SwarmCntB", 8), ("QueenStorageB", 8), ("SwarmCntR", 6),
+                    ("QueenStorageR", 6)):
+        c.escrever(nome, v)
+    return capturar_vistas(c, saida, "revoada", [
+        ("superficie", [], 1), ("superficie_b", [], 2), ("quintal", ["ctrl+y"], 2), ("quintal_b", [], 1)])
+
+
+def cenario_tela_mate(c: Sessao, saida, n):
+    """Botão MATE da faixa do quintal (Ctrl+Y; ribMate em (214, 50) na tela da bancada): captura a faixa
+    e grava _FlyAwayB antes e depois."""
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    c.mj.sessao_gdb()
+    antes = c.ler("FlyAwayB", sinal=True)
+    clicar_tela(c, 214, 50)
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    depois = c.ler("FlyAwayB", sinal=True)
+    tela(c, saida, "mate")
+    reg = {"FlyAwayB": [antes, depois], "CurGameType": c.ler("CurGameType", sinal=True)}
+    (Path(saida).resolve() / "mate.json").write_text(json.dumps(reg) + "\n", encoding="utf-8")
+    c.log(f"MATE: {reg}")
+    return []
+
+
 def cenario_capturas(c: Sessao, saida, n):
     """Capturas do original para comparar com o port (jogo pausado, snapshot rico): o estado vira
     `capt.ANT` (o port o abre com --save); Examine sobre três formigas diferentes da vista do ninho;
