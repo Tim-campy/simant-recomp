@@ -419,20 +419,30 @@ const VISTA_BANCADA: (i32, i32) = (25, 19);
 /// save, com a geometria da bancada: centraliza `_MapPnt` na amarela e, se ela está noutro plano, troca
 /// `_MapPlane` e `_MapMode` (`_SetMapModeAnt`). Fora do Experimental, como `core::partida`.
 fn aplicar_vista_da_bancada(e: &mut Estado) {
-    let pedidos = e.eventos.iter().filter(|ev| matches!(ev, crate::rules::estado::Evento::CentralizarNaAmarela)).count();
-    if pedidos == 0 || e.partida.tipo_jogo == 3 {
+    if e.partida.tipo_jogo == 3 {
         return;
     }
-    let (plano, x, y) = (e.amarela.plano, e.amarela.x as i32, e.amarela.y as i32);
-    if plano <= 0 {
-        return;
+    // cada pedido na ordem, com a posição do momento (a morte centraliza onde a amarela morreu e o
+    // renascimento, no corpo novo: vetor amarela_leao/1711)
+    let pedidos: Vec<(i16, i16, i16)> = e
+        .eventos
+        .iter()
+        .filter_map(|ev| match *ev {
+            crate::rules::estado::Evento::CentralizarNaAmarela { plano, x, y } => Some((plano, x, y)),
+            _ => None,
+        })
+        .collect();
+    for (plano, x, y) in pedidos {
+        if plano <= 0 {
+            continue;
+        }
+        if e.vistas.plano != plano {
+            e.vistas.plano = plano;
+            e.vistas.modo_mapa = plano;
+        }
+        let (px, py) = centralizar_edicao(e.vistas.ponto, i32::from(x), i32::from(y), plano);
+        e.vistas.ponto = (px as i16, py as i16);
     }
-    if e.vistas.plano != plano {
-        e.vistas.plano = plano;
-        e.vistas.modo_mapa = plano;
-    }
-    let (px, py) = centralizar_edicao(e.vistas.ponto, x, y, plano);
-    e.vistas.ponto = (px as i16, py as i16);
 }
 
 /// `_CenterEdit` (`1010:1620`, telas/jogo.md "Centralizar"): anda `_MapPnt` até (x − w/2, y − h/2)

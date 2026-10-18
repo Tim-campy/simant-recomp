@@ -978,8 +978,11 @@ pub enum Evento {
     /// `_EndGameDialog(0)`: pedido a cada tick enquanto `_IsGameOver` ≠ 0.
     DialogoFimDeJogo,
     /// `_GotoMyAnt` (`1000:a764`): levar a vista da janela de edição até a formiga amarela
-    /// (AutoTrack, Home, Backspace, clique na própria amarela, ordem impossível...).
-    CentralizarNaAmarela,
+    /// (AutoTrack, Home, Backspace, clique na própria amarela, ordem impossível...). Leva a posição
+    /// da amarela **no momento do pedido**: num mesmo tick o original pode centralizar mais de uma vez
+    /// (na morte, no lugar onde ela morreu; depois, no corpo novo), e cada `_CenterEdit` parte de onde
+    /// o anterior deixou a vista (vetor `amarela_leao/1711`, testes-tick.md).
+    CentralizarNaAmarela { plano: i16, x: i16, y: i16 },
     /// `_EditMessage(texto, duração, importante)`: mensagem da faixa (telas/mensagens.md §2).
     MensagemFaixa(MensagemFaixa),
     /// Uma animação dentro do tick (`_AnimYellowFight`) espera tantos milissegundos de tempo real
@@ -1190,6 +1193,13 @@ pub fn cor_do_tipo(t: u8) -> Cor {
 }
 
 impl Estado {
+    /// `_GotoMyAnt`: pede à interface que leve a vista até a amarela, na posição de agora.
+    pub fn pedir_centralizar_na_amarela(&mut self) {
+        let a = &self.amarela;
+        let ev = Evento::CentralizarNaAmarela { plano: a.plano, x: a.x, y: a.y };
+        self.eventos.push(ev);
+    }
+
     /// Estado com todos os blocos zerados e geradores na semente 0 / estado 1.
     pub fn vazio() -> Estado {
         Estado {

@@ -1051,7 +1051,12 @@ fn tabela_evento(lua: &Lua, ev: &Evento) -> mlua::Result<Table> {
         }
         Evento::TemaDoNinho => t.set("tipo", "tema_do_ninho")?,
         Evento::DialogoFimDeJogo => t.set("tipo", "fim_de_jogo")?,
-        Evento::CentralizarNaAmarela => t.set("tipo", "centralizar_na_amarela")?,
+        Evento::CentralizarNaAmarela { plano, x, y } => {
+            t.set("tipo", "centralizar_na_amarela")?;
+            t.set("plano", *plano)?;
+            t.set("x", *x)?;
+            t.set("y", *y)?;
+        }
         Evento::MensagemFaixa(m) => {
             t.set("tipo", "mensagem_faixa")?;
             t.set("lista", m.lista)?;

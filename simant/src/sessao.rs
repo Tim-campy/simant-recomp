@@ -500,7 +500,7 @@ impl Sessao<'_> {
                 EventoRegras::Som(_) | EventoRegras::TemaDoNinho | EventoRegras::Espera(_) => {} // tocados por som::Audio
                 EventoRegras::Animacao(_) => {} // a Partida guarda e mostra os quadros
                 EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
-                EventoRegras::CentralizarNaAmarela | EventoRegras::MensagemFaixa(_) => {} // a faixa é da Partida
+                EventoRegras::CentralizarNaAmarela { .. } | EventoRegras::MensagemFaixa(_) => {} // a faixa é da Partida
             }
         }
         eventos

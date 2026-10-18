@@ -591,7 +591,7 @@ pub(crate) fn encerrar_ordem(e: &mut Estado, plano: i32, x: i32, y: i32) {
 /// amarela (o movimento da vista é da interface: `core::partida`).
 fn centralizar(e: &mut Estado) {
     e.tutorial.temporario = 1;
-    e.eventos.push(Evento::CentralizarNaAmarela);
+    e.pedir_centralizar_na_amarela();
 }
 
 // ---------------------------------------------------------------------------------------------
