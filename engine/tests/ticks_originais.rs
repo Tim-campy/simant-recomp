@@ -7,6 +7,9 @@
 //! `indice.json` de cada cenário, sempre com o motivo:
 //! - `"pendentes"`: {tick: motivo} — vetores em que o port ainda diverge; só se exige que rodem e que a
 //!   ida e volta do save funcione. Quem corrigir a regra tira o tick da lista.
+//! - `"pela_interface"`: {tick: onde} — ticks em que o original passa pela interface DENTRO do tick
+//!   (ex.: GAME OVER e "Select a Game"); o tick sozinho não chega ao estado de depois, e o vetor é
+//!   conferido inteiro (307/307, S e R) pelo teste da interface indicado.
 //! - `"vida_nao_reconstruivel"`: {tick: motivo} — a vida do original não é reconstruível das listas
 //!   (duas ocupantes na mesma célula); não se confere a reconstrução, só a vida depois do tick.
 //!   A chave `"*"` vale para todos os ticks do cenário.
@@ -60,7 +63,8 @@ fn casos() -> Vec<Caso> {
                 .time_temp
                 .filter(|&t| regras.memoria_tutor.tempo_limite != i64::from(t))
                 .map(|t| format!("_TimeTemp: original {t}, port {}", regras.memoria_tutor.tempo_limite));
-            out.push((format!("{prefixo}{t}"), r, motivo("pendentes", t), motivo("vida_nao_reconstruivel", t), tutor));
+            let pendente = motivo("pendentes", t).or_else(|| motivo("pela_interface", t).map(|m| format!("conferido pela interface: {m}")));
+            out.push((format!("{prefixo}{t}"), r, pendente, motivo("vida_nao_reconstruivel", t), tutor));
         }
     }
     out

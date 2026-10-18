@@ -262,6 +262,7 @@ fn principal() -> Result<(), String> {
             Origem::Save(save, ..) => save.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
             Origem::Novo(_, tipo) => format!("{tipo:?}"),
             Origem::Tutorial(..) => "Tutorial Game".into(),
+            Origem::NovoNaPartida(_, tipo) => format!("{tipo:?}"),
         };
         let mut s = Sessao::abrir(&recursos, &o.dados, origem, cores)?;
         for &a in &o.acoes {

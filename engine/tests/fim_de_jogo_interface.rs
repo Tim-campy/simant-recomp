@@ -149,3 +149,36 @@ fn fim_de_jogo_volta_a_selecao_e_comeca_jogo_completo() {
     // O menino e o cachorro postos por _InitSimYard (quintal.md: _BoyX/_BoyY = 0xB4/0x49).
     assert_eq!((novo.menino.x, novo.menino.y), (0xB4, 0x49));
 }
+
+/// O vetor regravado: o tick 21 abre as caixas e o "Select a Game" DENTRO do tick e volta com um
+/// Jogo Completo novo (GameTime 0), gerado com os geradores do momento (o novo jogo não ressemeia).
+#[test]
+fn tick_21_volta_com_o_jogo_completo_novo_do_original() {
+    use engine::core::carregar::jogo_novo_com_geradores;
+    use engine::rules::vetor_tick::{comparar_com, regras_do_vetor};
+    let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+    if !jogo.join("SHARED.NDX").is_file() {
+        eprintln!("AVISO: arquivos do jogo não encontrados em {}; teste ignorado", jogo.display());
+        return;
+    }
+    let r = Recursos::abrir(&jogo, &["SHARED".to_string()], &raiz().join("data"), None).unwrap();
+    let tab = TabelasGeracao::carregar(&r).unwrap();
+    let cfg = ConfigSimulacao::de_json(&ler("data/simulacao.json")).unwrap();
+    let quintal = RegrasOriginais::carregar_sem_banco(&r).unwrap().quintal;
+    let (v, layout) = vetor();
+    let mut regras = regras_do_vetor(&v);
+    let res = comparar_com(&v, &layout, |e| {
+        tick(e, &mut regras);
+        assert_eq!(e.partida.fim_de_jogo, 1);
+        let anterior = e.clone();
+        *e = jogo_novo_com_geradores(TipoJogo::Completo, &anterior, &tab, &cfg, &quintal, (25, 19))?;
+        Ok(())
+    })
+    .unwrap();
+    println!("{}", res.placar());
+    let falhas: Vec<String> = res.diferentes().map(|b| format!("{}: {:?}", b.simbolo, b.detalhes)).collect();
+    for x in &res.extras {
+        println!("{} original {} port {}", x.nome, x.original, x.port);
+    }
+    assert!(falhas.is_empty(), "port difere do original:\n{}", falhas.join("\n"));
+}

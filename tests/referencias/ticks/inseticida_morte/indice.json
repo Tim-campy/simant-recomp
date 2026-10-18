@@ -57,7 +57,7 @@
  "selecao": [
   "19-21"
  ],
- "pendentes": {
-  "tick_000021": "fim de jogo com a interface inteira dentro do tick (regravado em 2026-10-17 com o breakpoint do retorno armado antes de fechar cada caixa): a amarela morre pelo inseticida sem corpo e sem outra colônia preta; dentro do mesmo _DoAntSim abrem-se a caixa 10042, a 10056 (_PictStrnDialog em _YellowDeath), o GAME OVER (pontuação 27572) e a tela \"Select a Game\" (_EndGameDialog -> _NewGame); a bancada escolheu Full Game e o tick volta com um Jogo Completo novo (GameTime 0, _CurYardPnt (11, 8)). O GameTime 8 da 1ª gravação era artefato do script. O port termina o tick com _IsGameOver = 1 e o mundo intacto; o jogo novo é da interface (engine/tests/fim_de_jogo_interface.rs)"
+ "pela_interface": {
+  "tick_000021": "engine/tests/fim_de_jogo_interface.rs (tick_21_volta_com_o_jogo_completo_novo_do_original): o tick do port, o GAME OVER e o Jogo Completo novo com os geradores do momento (carregar::jogo_novo_com_geradores) chegam ao estado de depois, 307/307 com S e R"
  }
 }

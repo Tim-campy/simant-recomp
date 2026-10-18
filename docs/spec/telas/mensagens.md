@@ -116,6 +116,8 @@ Quais caixas param a simulação (desmontagem, 2026-10-18) [código]:
 
 **Port:** o diálogo é desenhado com a janela 4; a posição medida fica 1 pixel à esquerda da calculada (`ajuste` em `data/mensagens.json`) e os textos centram sem o pixel a mais à direita, como na faixa [medido]. Ao fechar, o port abre o "Select a Game" sobre a partida, como `_NewGame(0)` no original (`simant/src/modos.rs`).
 
+**Depois do GAME OVER** (`_EndGameDialog` → `_NewGame(0)`, dentro do tick no original): o "Select a Game"; a escolha gera o jogo novo **sem ressemear** S nem R — o mundo sai dos geradores do instante — e o tick volta com o jogo novo em `GameTime` 0 [bancada, vetor `inseticida_morte/21` regravado]. Port: a partida pede o diálogo uma vez; a interface mostra as caixas na ordem e, fechado o GAME OVER, abre o "Select a Game" (`Modal::abre_selecao_de_jogo`); o jogo novo vem de `carregar::jogo_novo_com_geradores` (também no Ctrl+N), conferido 307/307 com S e R contra o vetor.
+
 ### 4.1 Pontuação (`_CalcScore`, `1000:5530`)
 
 Oito parciais `p[0..7]` (0 a 100) [código]:

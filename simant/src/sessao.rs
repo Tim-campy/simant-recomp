@@ -12,6 +12,9 @@ pub(crate) enum Origem<'o> {
     /// Load de um arquivo com o nome do tutorial (`Tutorial.Ant`): `_GenerateTutorial` sobre o
     /// estado da partida aberta, com a semente de S de `_SeedSRand` (telas/arquivos.md).
     Tutorial(&'o Estado, u16),
+    /// Jogo novo escolhido durante a partida (Ctrl+N ou depois do GAME OVER): `_NewGame` sem
+    /// ressemear, com os geradores e o que `_RandYard` não escreve vindos da partida aberta.
+    NovoNaPartida(&'o Estado, TipoJogo),
 }
 
 /// Tudo o que a tela de jogo ao vivo precisa: a tela carregada (layouts e tilesets), a configuração
@@ -81,6 +84,12 @@ impl Sessao<'_> {
                 let estado = engine::core::carregar::estado_de_jogo_novo(tipo, semente, &geracao, &cfg_sim, &quintal)?;
                 (estado.para_save(&layout)?, estado)
             }
+            Origem::NovoNaPartida(anterior, tipo) => {
+                let quintal = RegrasOriginais::carregar_sem_banco(recursos)?.quintal;
+                // `_MapPnt` provisório (25 × 19); a navegação recentra com a vista real.
+                let estado = engine::core::carregar::jogo_novo_com_geradores(tipo, anterior, &geracao, &cfg_sim, &quintal, (25, 19))?;
+                (estado.para_save(&layout)?, estado)
+            }
             Origem::Tutorial(anterior, semente_s) => {
                 let mut regras = RegrasOriginais::carregar_sem_banco(recursos)?;
                 let quintal = regras.quintal.clone();
@@ -102,7 +111,7 @@ impl Sessao<'_> {
                 let tut: engine::core::carregar::ConfigTutorialArquivo = recursos.dados("tutorial_arquivo.json")?;
                 tut.titulo
             }
-            Origem::Novo(_, tipo) => {
+            Origem::Novo(_, tipo) | Origem::NovoNaPartida(_, tipo) => {
                 let nomes = avisos::linhas_do_texto(recursos, 1001);
                 let nome = nomes.get(tipo as usize).map(|l| l.iter().map(|&b| b as char).collect::<String>()).unwrap_or_default();
                 format!("SimAnt - {nome}")
@@ -111,7 +120,7 @@ impl Sessao<'_> {
         tela.atualizar(&estado);
         // Jogo novo: _NewGame faz _SetMapPlane(_MePlane) e _CenterEdit na amarela, o mesmo que a
         // posição "ao carregar"; um save segue data/navegacao.json.
-        let posicao = if matches!(origem, Origem::Novo(..) | Origem::Tutorial(..)) { PosicaoVista::AoCarregar } else { nav_cfg.posicao_inicial };
+        let posicao = if matches!(origem, Origem::Novo(..) | Origem::NovoNaPartida(..) | Origem::Tutorial(..)) { PosicaoVista::AoCarregar } else { nav_cfg.posicao_inicial };
         let nav = tela.navegacao(&jogo, posicao)?;
         // Tabelas de todas as partes com mods (data/*.json); o seno da geração já foi lido do banco.
         let regras = RegrasOriginais { geracao: Some(geracao), ..RegrasOriginais::carregar_sem_banco(recursos)? };
@@ -128,7 +137,7 @@ impl Sessao<'_> {
         }
         let arquivo = match origem {
             Origem::Save(p, ..) => Some(p.to_path_buf()),
-            Origem::Novo(..) | Origem::Tutorial(..) => None,
+            Origem::Novo(..) | Origem::NovoNaPartida(..) | Origem::Tutorial(..) => None,
         };
         let modos = modos::Modos::carregar(recursos, &interface)?;
         let janelas = JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?, &interface);

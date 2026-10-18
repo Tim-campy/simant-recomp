@@ -39,6 +39,45 @@ pub fn geradores_depois_do_load(r: GeradorR, tipo: TipoJogo, tab: &TabelasGeraca
     Ok((s, r))
 }
 
+/// Jogo novo escolhido durante a partida (`_NewGame` do "Select a Game", também o que vem depois do
+/// GAME OVER): o original **não** ressemeia S nem R; `_RandYard` gera o mundo com o R da partida
+/// que estava aberta (geracao-mundo.md §1).
+pub fn jogo_novo_com_geradores(
+    tipo: TipoJogo,
+    anterior: &Estado,
+    tab: &TabelasGeracao,
+    cfg: &ConfigSimulacao,
+    quintal: &TabelasQuintal,
+    vista: (i32, i32),
+) -> Result<Estado, String> {
+    let mut r = anterior.r;
+    let mut s = anterior.s;
+    let m = Mundo::novo_jogo(tipo, &mut r, &mut s, tab)?;
+    let mut e = Estado::de_mundo(&m, s, r, cfg)?;
+    iniciar_quintal(&mut e, quintal);
+    manter_do_anterior(&mut e, anterior);
+    // _NewGame: a lição só recomeça no Tutorial (tipo 0); `_GotoMyAnt` põe `_LessonTemp = 1`.
+    if tipo != TipoJogo::Tutorial {
+        e.tutorial.licao = anterior.tutorial.licao;
+        e.tutorial.dada = anterior.tutorial.dada;
+    }
+    e.tutorial.temporario = 1;
+    centrar_na_amarela(&mut e, vista);
+    Ok(e)
+}
+
+/// `_SetMapPlane(_MePlane)` e `_CenterEdit`: o plano da amarela e `_MapPnt` com a vista de
+/// `largura × altura` células centrada nela (a navegação da interface recentra com a vista real).
+pub fn centrar_na_amarela(e: &mut Estado, (w, h): (i32, i32)) {
+    let plano = e.amarela.plano;
+    let largura_plano = if plano < 2 { 128 } else { 64 };
+    e.vistas.plano = plano;
+    e.vistas.modo_mapa = plano;
+    let cx = (i32::from(e.amarela.x) - w / 2).clamp(0, largura_plano - w);
+    let cy = (i32::from(e.amarela.y) - h / 2).clamp(0, 64 - h);
+    e.vistas.ponto = (cx as i16, cy as i16);
+}
+
 /// Os 30 patches de `_GenerateTutorial`: (x, y, pretas/32, vermelhas/32) (tabelas `DGROUP:25f0`,
 /// `260e`, `262c`, `264a`; geracao-mundo.md §6).
 #[derive(Clone, Debug, serde::Deserialize)]
@@ -99,16 +138,7 @@ pub fn estado_do_tutorial(
     e.tutorial.dada = 0;
     e.s = GeradorS::new(semente_s);
     manter_do_anterior(&mut e, anterior);
-    // _SetMapPlane(_MePlane): o plano da amarela, com a vista centrada nela (largura × altura da
-    // vista de edição).
-    let (w, h) = vista;
-    let plano = e.amarela.plano;
-    let largura_plano = if plano < 2 { 128 } else { 64 };
-    e.vistas.plano = plano;
-    e.vistas.modo_mapa = plano;
-    let cx = (i32::from(e.amarela.x) - w / 2).clamp(0, largura_plano - w);
-    let cy = (i32::from(e.amarela.y) - h / 2).clamp(0, 64 - h);
-    e.vistas.ponto = (cx as i16, cy as i16);
+    centrar_na_amarela(&mut e, vista);
     Ok(e)
 }
 
@@ -142,6 +172,7 @@ fn manter_do_anterior(e: &mut Estado, a: &Estado) {
     e.partida.pausado = a.partida.pausado;
     let (m, am) = (&mut e.amarela, &a.amarela);
     m.difusa_x = am.difusa_x;
+    m.difusa_y = am.difusa_y;
     m.contorno_contagem = am.contorno_contagem;
     m.comeu_tipo = am.comeu_tipo;
     m.alvo_plano = am.alvo_plano;
