@@ -120,44 +120,71 @@ class Sessao:
             self.b.executar(f"teclas {c}")
         self.log(f"teclas {' '.join(combos)}")
 
-    def capturar_tick(self):
-        """Como Depurador.capturar_tick, mas um tick que abre uma caixa de mensagem modal (morte da amarela,
-        fim de jogo...) não volta sozinho: depois de 15 s sem chegar ao retorno de _DoAntSim, captura a
-        tela, aperta Enter e espera o retorno de novo (até 5 vezes). O relógio lido até a caixa é
-        guardado; o que a caixa lê depois não."""
+    def capturar_tick(self, espera=5):
+        """Como Depurador.capturar_tick, mas um tick que abre uma caixa de mensagem modal (lição do
+        tutorial, morte da amarela, fim de jogo) não volta sozinho: depois de `espera` s sem chegar ao
+        retorno de _DoAntSim, captura a tela e fecha a caixa com o breakpoint do retorno JÁ ARMADO e a VM
+        correndo (clique em (320, 310), dentro das caixas vistas; depois Enter), até 5 vezes. Armar
+        antes importa: sem isso o tick terminava sem ser visto e os ticks seguintes rodavam soltos até o
+        breakpoint, o que parecia "ticks aninhados" (tutorial/23, inseticida_morte/21 da 1ª gravação).
+        O relógio lido até a caixa é guardado; o que a caixa lê depois não."""
         dep, mj = self.dep, self.mj
         dep.ir_entrada()
         out = {"estado_antes.bin": mj.estado(), "vida_antes.bin": dep.vida()}
         ex = {"antes": dep.extras()}
         relogio = []
         try:
-            dep.ir_saida(timeout=15, relogio=relogio)
-        except RuntimeError as err:
+            dep.ir_saida(timeout=espera, relogio=relogio)
+        except RuntimeError:
             gt = ex["antes"]["GameTime"]
             for k in range(5):
-                self.log(f"tick {gt} parado ({err}); tela em re_trabalho/cen/dialogo_{gt}_{k}.png e Enter")
+                self.log(f"tick {gt} parado: tela em re_trabalho/cen/dialogo_{gt}_{k}.png; fechando a caixa")
                 self.b.executar(f"capturar re_trabalho/cen/dialogo_{gt}_{k}.png")
-                dep.retomar()
-                # caixa de morte da amarela: "Click here to continue": (320, 310) cai dentro das caixas vistas (morte, GAME OVER, Tutorial)
-                self.b.executar("clicar_em 320 310")
-                time.sleep(1)
-                self.b.executar("teclas ret")
-                time.sleep(2)
-                try:
-                    dep._rodar_ate(dep.retorno, 15)
+                if self.fechar_caixa_ate_o_retorno(k):
                     break
-                except RuntimeError as e2:
-                    err = e2
             else:
-                raise
+                raise RuntimeError(f"tick {gt}: a caixa não fechou")
             ex["dialogos"] = k + 1
         out["estado_depois.bin"] = mj.estado()
         out["vida_depois.bin"] = dep.vida()
         ex["depois"] = dep.extras()
-        ex["antes"]["MacTickCount"] = relogio[0] if relogio else None
+        ex["antes"]["MacTickCount"] = relogio[0] if relogio and relogio[0] is not None else None
         ex["MacTickCount_lidos"] = relogio
         out["extras.json"] = ex
         return out
+
+    def fechar_caixa_ate_o_retorno(self, k, limite=15):
+        """Com a VM parada dentro do tick: arma o breakpoint do retorno de _DoAntSim, deixa a VM correr,
+        fecha a caixa (clique ou, nas tentativas ímpares, Enter) e espera parar no retorno."""
+        import socket
+        dep = self.dep
+        g = self.mj.sessao_gdb()
+        g.breakpoint(dep.retorno)
+        try:
+            g.drenar()
+            g.s.sendall(b"$c#63")
+            time.sleep(0.2)
+            if k % 2 == 0:
+                qb.mouse_canto(self.q)
+                qb.mover_rel(self.q, 320, 310)
+                time.sleep(0.2)
+                self.botoes(False)
+            else:
+                self.q.cmd("send-key", keys=[{"type": "qcode", "data": "ret"}], **{"hold-time": 150})
+            g.s.settimeout(limite)
+            try:
+                while not g._e_parada(g._proximo()):
+                    pass
+            except socket.timeout:
+                g.s.settimeout(30)
+                g.interromper()
+                return False
+            finally:
+                g.s.settimeout(30)
+        finally:
+            g.breakpoint(dep.retorno, False)
+        pc, _ = dep.pc()
+        return pc == dep.retorno
 
     def gravar(self, saida, n, parar=None):
         """Grava n ticks consecutivos em saida/tick_NNNNNN; `parar(save_depois)` encerra antes."""
