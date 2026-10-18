@@ -59,6 +59,8 @@ pub(crate) struct Opcoes {
     pub(crate) trilhas: bool,
     /// Sem janela: Examine na célula X,Y do plano atual antes de exportar.
     pub(crate) examinar: Option<(i32, i32)>,
+    /// Com --examinar: a janela já foi aberta antes nesta sessão (sem o ajuste da primeira abertura).
+    pub(crate) exame_ja_aberto: bool,
     pub(crate) som: som::OpcoesSom,
 }
 
@@ -103,6 +105,7 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         janela_mapa: None,
         trilhas: false,
         examinar: None,
+        exame_ja_aberto: false,
         som: som::OpcoesSom::default(),
     };
     let mut args = std::env::args().skip(1);
@@ -139,6 +142,7 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
             "--dialogo" => o.dialogo = Some(valor()?),
             "--janela-mapa" => o.janela_mapa = Some(valor()?.parse().ok().filter(|m| (1..=8).contains(m)).ok_or(format!("{a}: modo 1 a 8"))?),
             "--trilhas" => o.trilhas = true,
+            "--exame-ja-aberto" => o.exame_ja_aberto = true,
             "--examinar" => {
                 let v = valor()?;
                 let (x, y) = v.split_once(',').ok_or("--examinar X,Y")?;

@@ -378,6 +378,7 @@ fn principal() -> Result<(), String> {
             None => {}
         }
         if let Some((x, y)) = o.examinar {
+            s.janela_exame.ja_aberta = o.exame_ja_aberto;
             let plano = i32::from(s.partida.nav.plano_mapa);
             match engine::rules::experimental::examinar(&s.partida.estado, plano, x, y) {
                 Some(ex) => s.abrir_exame(ex),
