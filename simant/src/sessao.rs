@@ -337,6 +337,8 @@ impl Sessao<'_> {
             self.partida.navegar(Acao::Superficie);
         }
         self.janelas.trazer_para_frente(Some(Controle::Mapa));
+        // _YardToMap → _DrawMap: a geração da abertura, com o modo de agora.
+        self.mapa.atualizar(&self.partida.estado, self.partida.mostrar_trilhas);
     }
 
     /// Botão configurável da faixa sob (x, y): a função dele (`_DoUserButton`).
