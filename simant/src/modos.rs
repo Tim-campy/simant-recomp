@@ -648,4 +648,48 @@ mod testes {
         assert_eq!(pixel(&com, w, 260, 200), [255, 255, 255]);
         assert_ne!(pixel(&sem, w, 260, 200), [255, 255, 255]);
     }
+
+    /// Bancada (cenário `trofalaxia`, 2026-10-18): o quadro de `_YellowDialog(9110)` com a contorno
+    /// azul-escuro de 4 pixels em (156, 159)–(361, 326) da área cliente; depois de 45 unidades de
+    /// `_TickCount`, o bitmap 9111 sobreposto em (72, 62), com o som 45; fecha sozinho depois de
+    /// 45 + 45 + 54. Capturas trofalaxia_028/030.png (fora do git, topo 38).
+    #[test]
+    fn quadro_da_trofalaxia_como_no_original() {
+        use engine::core::avisos::Modal;
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let save = raiz().join("tests/referencias/saves/BALAO_OVO.ANT");
+        let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
+        let a = &mut s.partida.avisos;
+        assert!(a.receber_quadro_amarela(9110));
+        assert_eq!(a.passar_tempo(1000), None);
+        assert_eq!(a.retirar_sons(), vec![42]);
+        let primeiro = s.quadro_rgb().unwrap();
+        let a = &mut s.partida.avisos;
+        assert_eq!(a.passar_tempo(1044), None);
+        assert!(!a.sobreposta_visivel());
+        assert_eq!(a.passar_tempo(1045), None);
+        assert!(a.sobreposta_visivel());
+        assert_eq!(a.retirar_sons(), vec![45]);
+        let segundo = s.quadro_rgb().unwrap();
+        if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+            let (l, h) = (s.tela.cfg.largura, s.tela.cfg.altura);
+            let saida = PathBuf::from(saida);
+            crate::salvar_png(&saida.join("trofalaxia_a.png"), l, h, &primeiro).unwrap();
+            crate::salvar_png(&saida.join("trofalaxia_b.png"), l, h, &segundo).unwrap();
+        }
+        let w = s.tela.cfg.largura as usize;
+        assert_eq!(pixel(&primeiro, w, 157, 200), [0, 0, 128], "contorno azul-escuro");
+        assert_ne!(primeiro, segundo, "a imagem sobreposta muda o quadro");
+        let a = &mut s.partida.avisos;
+        assert_eq!(a.passar_tempo(1000 + 45 + 45 + 53), None);
+        assert_eq!(a.passar_tempo(1000 + 45 + 45 + 54), Some(Modal::Amarela { imagem: 9110 }));
+    }
 }

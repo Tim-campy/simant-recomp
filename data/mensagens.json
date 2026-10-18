@@ -2,6 +2,9 @@
   "_comentario": "Avisos ao jogador durante a partida (engine/src/core/avisos.rs): quadro de mensagem (_PictStrnDialog/_PictureDialog), mensagem da faixa (_EditMessage/_DrawRibbonMessage), diálogo de fim de jogo (_EndGameDialog) e pontuação (_CalcScore). Ver docs/spec/telas/mensagens.md. Ids de texto são listas SHARED tipo 4 (decimal); ids de imagem são bitmaps tipo 2.",
   "ms_por_tickcount": 55,
   "_ms_por_tickcount": "_TickCount (1008:18ac) = GetTickCount() / 55: o relógio de prazos das mensagens e dos quadros.",
+  "_quadro_amarela": "_YellowDialog (1000:8262), só com Options → Events: abre a janela 26 (dialogPicWin) com o bitmap; trofalaxia (_EatMyFood(1), 9110): som 0x2a, _myDelay(0x2d), bitmap 9111 em _YellowEatPnt (72, 62) a partir do canto do primeiro, som 0x2d, _myDelay(0x2d) e _DialogWaitInit(3) = 54 unidades de _TickCount; um clique ou tecla encerra. Geometria medida na bancada (cenário trofalaxia, trof_030.png, topo 38): contorno de 4 pixels azul-escuro de (156, 159) a (361, 326) da área cliente, bitmap em (160, 163) cortado em 198 × 160. Ver docs/spec/telas/mensagens.md §10.",
+  "quadro_amarela": {"externo": [156, 159, 361, 326], "borda": 4, "cor_borda": 4, "imagem_em": [160, 163], "area": [198, 160], "espera_final_tickcount": 54,
+    "sequencias": {"9110": {"som_inicio": 42, "espera_tickcount": 45, "sobreposta": 9111, "deslocamento": [72, 62], "som_sobreposta": 45, "espera_sobreposta_tickcount": 45}}},
   "quadro": {
     "_janela": "_PictureDialog abre a janela 30 (0x1e00, picStrWin) com o retângulo calculado; o texto usa a fonte 4 (_font_SetFont(4)) e a cor do objeto 1 (picStrArea).",
     "janela": 30,

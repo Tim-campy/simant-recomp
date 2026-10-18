@@ -967,6 +967,9 @@ grupo_do_save! {
 pub enum Evento {
     /// Texto de SHARED tipo 4 (`_PictStrnDialog`), pelo id decimal (ex.: 10010).
     Mensagem(u16),
+    /// `_YellowDialog(bitmap)` (`1000:8262`): quadro com imagem da amarela (trofalaxia: 9110). A
+    /// interface só o mostra com Options → Events.
+    QuadroAmarela(u16),
     /// Música (`_myBeginSong`), pelo id do cabeçalho tipo 18 do banco SOUND.
     Musica(u16),
     /// Efeito sonoro (`_myBeginSound`), pelo id do objeto tipo 5 do banco SOUND

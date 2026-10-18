@@ -187,6 +187,13 @@ pub struct TabelasAmarela {
     pub mensagens: MensagensAmarela,
     #[serde(default)]
     pub sons: SonsAmarela,
+    /// Bitmap do `_YellowDialog` da trofalaxia (`_EatMyFood(1)`, 0x2396). Opcional (API 0.21).
+    #[serde(default = "imagem_trofalaxia_padrao")]
+    pub imagem_trofalaxia: u16,
+}
+
+fn imagem_trofalaxia_padrao() -> u16 {
+    9110
 }
 
 /// Ids dos efeitos sonoros (objetos tipo 5 do banco SOUND, `_myBeginSound`) pedidos por esta parte
@@ -1222,7 +1229,8 @@ fn comer(e: &mut Estado, t: &TabelasAmarela, tipo: i32) {
         return;
     }
     if tipo == 1 {
-        // `_YellowDialog` da trofalaxia (quadro com imagem): ainda não no port [lacuna].
+        // `_YellowDialog(9110)` da trofalaxia: quadro com imagem (a interface confere Events).
+        e.eventos.push(Evento::QuadroAmarela(t.imagem_trofalaxia));
     }
     let vida = e.amarela.saude as i32;
     let pop = e.preta.populacao as i32;

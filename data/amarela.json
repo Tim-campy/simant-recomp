@@ -40,6 +40,8 @@
     "fundar_fim": 20001,
     "virou_rainha": 11006
   },
+  "_imagem_trofalaxia": "Bitmap do quadro de _YellowDialog chamado por _EatMyFood(1) (1020:8cda): 0x2396.",
+  "imagem_trofalaxia": 9110,
   "mensagens": {
     "luta_atacou": 10030,
     "luta_atacada": 10032,

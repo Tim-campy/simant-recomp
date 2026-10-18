@@ -1041,6 +1041,10 @@ fn tabela_evento(lua: &Lua, ev: &Evento) -> mlua::Result<Table> {
             t.set("tipo", "mensagem")?;
             t.set("id", *id)?;
         }
+        Evento::QuadroAmarela(id) => {
+            t.set("tipo", "quadro_amarela")?;
+            t.set("imagem", *id)?;
+        }
         Evento::Musica(id) => {
             t.set("tipo", "musica")?;
             t.set("id", *id)?;

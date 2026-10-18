@@ -108,6 +108,34 @@ pub struct ConfigPontuacao {
     pub outros: EscalaOutros,
 }
 
+/// Uma sequência de `_YellowDialog` (por bitmap): som ao abrir, espera, imagem sobreposta com som,
+/// espera (`_myDelay`, em `_TickCount`).
+#[derive(Clone, Debug, Deserialize)]
+pub struct SequenciaAmarela {
+    pub som_inicio: Option<u16>,
+    pub espera_tickcount: u64,
+    pub sobreposta: Option<u16>,
+    pub deslocamento: [i16; 2],
+    pub som_sobreposta: Option<u16>,
+    pub espera_sobreposta_tickcount: u64,
+}
+
+/// `_YellowDialog` (`1000:8262`): a janela 26 (`dialogPicWin`) com um bitmap (mensagens.md §10).
+#[derive(Clone, Debug, Deserialize)]
+pub struct ConfigQuadroAmarela {
+    /// Contorno externo na área cliente (medido na bancada).
+    pub externo: [i16; 4],
+    pub borda: i16,
+    pub cor_borda: u8,
+    /// Canto do bitmap e tamanho da área que o mostra (o resto é cortado).
+    pub imagem_em: [i16; 2],
+    pub area: [i16; 2],
+    /// `_DialogWaitInit(3)`: espera final, em `_TickCount`.
+    pub espera_final_tickcount: u64,
+    /// Bitmap (como texto) → sequência.
+    pub sequencias: HashMap<String, SequenciaAmarela>,
+}
+
 /// Conteúdo de data/mensagens.json.
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigAvisos {
@@ -116,6 +144,9 @@ pub struct ConfigAvisos {
     pub faixa: ConfigFaixa,
     pub fim_de_jogo: ConfigFimDeJogo,
     pub pontuacao: ConfigPontuacao,
+    /// Opcional (API 0.21): sem ele, `_YellowDialog` não aparece.
+    #[serde(default)]
+    pub quadro_amarela: Option<ConfigQuadroAmarela>,
 }
 
 impl ConfigAvisos {
@@ -138,6 +169,8 @@ pub enum Modal {
     Quadro { texto: u16, imagem: Option<u16> },
     /// `_EndGameDialog`.
     FimDeJogo { tipo_jogo: i16, pretas_venceram: bool, pontos: i64 },
+    /// `_YellowDialog(bitmap)`: quadro com imagem da formiga amarela (trofalaxia: 9110).
+    Amarela { imagem: u16 },
 }
 
 impl Modal {
@@ -159,11 +192,15 @@ pub struct Avisos {
     modais: VecDeque<Modal>,
     /// Quando o modal da frente apareceu (unidades de `_TickCount`).
     aberto_em: Option<u64>,
+    /// `_YellowDialog`: a imagem sobreposta já apareceu.
+    sobreposta_visivel: bool,
+    /// Efeitos pedidos pelos quadros (`_myBeginSound` de `_YellowDialog`), para a partida tocar.
+    sons: Vec<u16>,
 }
 
 impl Avisos {
     pub fn new(cfg: ConfigAvisos) -> Avisos {
-        Avisos { cfg, texto: None, expira: None, modais: VecDeque::new(), aberto_em: None }
+        Avisos { cfg, texto: None, expira: None, modais: VecDeque::new(), aberto_em: None, sobreposta_visivel: false, sons: Vec::new() }
     }
 
     // --- faixa ---------------------------------------------------------------------------------
@@ -255,6 +292,33 @@ impl Avisos {
         });
     }
 
+    /// `_YellowDialog(imagem)` (só com Options → Events, quem chama confere). Sem configuração para
+    /// a imagem, nada. Devolve se o quadro entrou na fila.
+    pub fn receber_quadro_amarela(&mut self, imagem: u16) -> bool {
+        let tem = self.cfg.quadro_amarela.as_ref().is_some_and(|c| c.sequencias.contains_key(&imagem.to_string()));
+        if tem {
+            self.modais.push_back(Modal::Amarela { imagem });
+        }
+        tem
+    }
+
+    /// Efeitos pedidos pelos quadros desde a última chamada.
+    pub fn retirar_sons(&mut self) -> Vec<u16> {
+        std::mem::take(&mut self.sons)
+    }
+
+    /// Sequência e configuração do `_YellowDialog` da frente.
+    fn sequencia_amarela(&self) -> Option<(&ConfigQuadroAmarela, &SequenciaAmarela)> {
+        let Some(Modal::Amarela { imagem }) = self.modais.front() else { return None };
+        let c = self.cfg.quadro_amarela.as_ref()?;
+        Some((c, c.sequencias.get(&imagem.to_string())?))
+    }
+
+    /// A imagem sobreposta do `_YellowDialog` da frente está na tela.
+    pub fn sobreposta_visivel(&self) -> bool {
+        self.sobreposta_visivel
+    }
+
     /// O aviso modal da frente, se houver.
     pub fn modal(&self) -> Option<&Modal> {
         self.modais.front()
@@ -268,9 +332,26 @@ impl Avisos {
     /// `_DialogWaitInit` (o fim de jogo não tem prazo). Devolve o que foi fechado.
     pub fn passar_tempo(&mut self, agora: u64) -> Option<Modal> {
         let m = self.modais.front()?;
+        let novo = self.aberto_em.is_none();
         let desde = *self.aberto_em.get_or_insert(agora);
         if matches!(m, Modal::Quadro { .. }) && agora >= desde + self.cfg.quadro.espera_tickcount {
             return self.fechar_modal();
+        }
+        if let Some((c, s)) = self.sequencia_amarela() {
+            // _YellowDialog: som, espera, sobreposta com som, espera, e a espera final de
+            // _DialogWaitInit(3).
+            let (fim, sobrepor) = (desde + s.espera_tickcount + s.espera_sobreposta_tickcount + c.espera_final_tickcount, desde + s.espera_tickcount);
+            let (som_inicio, som_sobreposta, tem_sobreposta) = (s.som_inicio, s.som_sobreposta, s.sobreposta.is_some());
+            if novo {
+                self.sons.extend(som_inicio);
+            }
+            if tem_sobreposta && !self.sobreposta_visivel && agora >= sobrepor {
+                self.sobreposta_visivel = true;
+                self.sons.extend(som_sobreposta);
+            }
+            if agora >= fim {
+                return self.fechar_modal();
+            }
         }
         None
     }
@@ -278,6 +359,7 @@ impl Avisos {
     /// Fecha o aviso da frente (clique, tecla ou prazo) e devolve qual era.
     pub fn fechar_modal(&mut self) -> Option<Modal> {
         self.aberto_em = None;
+        self.sobreposta_visivel = false;
         self.modais.pop_front()
     }
 }
@@ -593,7 +675,37 @@ pub fn desenhar_modal(q: &mut Quadro, recursos: &Recursos, interface: &Interface
             let (r, p) = desenhar_fim_de_jogo(q, recursos, interface, &avisos.cfg.fim_de_jogo, *tipo_jogo, *pretas_venceram, *pontos)?;
             Ok((Some(r), p))
         }
+        Some(Modal::Amarela { imagem }) => {
+            let (c, s) = avisos.sequencia_amarela().ok_or("quadro da amarela sem configuração")?;
+            let sobreposta = if avisos.sobreposta_visivel { s.sobreposta.map(|id| (id, s.deslocamento)) } else { None };
+            Ok((Some(desenhar_quadro_amarela(q, recursos, c, *imagem, sobreposta)?), Vec::new()))
+        }
     }
+}
+
+/// `_YellowDialog`: contorno de `borda` pixels na cor `cor_borda` e o bitmap cortado na área; com a
+/// sobreposta, o segundo bitmap no deslocamento (`_YellowEatPnt`) a partir do canto do primeiro.
+/// Devolve o retângulo que fecha o quadro ao ser clicado.
+pub fn desenhar_quadro_amarela(
+    q: &mut Quadro,
+    recursos: &Recursos,
+    c: &ConfigQuadroAmarela,
+    imagem: u16,
+    sobreposta: Option<(u16, [i16; 2])>,
+) -> Result<Retangulo, String> {
+    let [e, t, d, b] = c.externo;
+    let externo = Retangulo { esq: e, topo: t, dir: d + 1, base: b + 1 };
+    q.preencher(externo, c.cor_borda, c.cor_borda);
+    let [ix, iy] = c.imagem_em;
+    let area = Retangulo { esq: ix, topo: iy, dir: ix + c.area[0], base: iy + c.area[1] };
+    let antes = q.recorte.replace(area);
+    let bitmap = |id: u16| recursos.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d));
+    q.bitmap(&bitmap(imagem)?, i32::from(ix), i32::from(iy));
+    if let Some((id, [dx, dy])) = sobreposta {
+        q.bitmap(&bitmap(id)?, i32::from(ix + dx), i32::from(iy + dy));
+    }
+    q.recorte = antes;
+    Ok(externo)
 }
 
 #[cfg(test)]

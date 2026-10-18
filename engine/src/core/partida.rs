@@ -397,9 +397,14 @@ impl Partida {
             self.resto_ms = 0;
             return Avanco::default();
         }
+        let sobreposta = self.avisos.sobreposta_visivel();
         if self.avisos.passar_tempo(self.agora()).is_some() {
             self.redesenhar = true;
             self.depois_de_fechar();
+        }
+        self.redesenhar |= sobreposta != self.avisos.sobreposta_visivel();
+        for id in self.avisos.retirar_sons() {
+            self.eventos.push_back(Evento::Som(id));
         }
         if self.avisos.tem_modal() {
             self.resto_ms = 0;
@@ -667,6 +672,13 @@ impl Partida {
                     let texto = TextoFaixa::Lista { lista: m.lista, indice: m.indice as usize };
                     self.avisos.editar(Some(texto), Some(u32::from(m.duracao)), m.importante, opcao, agora);
                     self.redesenhar = true;
+                }
+                Evento::QuadroAmarela(imagem) => {
+                    // _YellowDialog: só com Options → Events (_OptionStates[3]).
+                    if self.estado.partida.opcoes[3] != 0 {
+                        self.avisos.receber_quadro_amarela(imagem);
+                    }
+                    self.eventos.push_back(ev);
                 }
                 Evento::Mensagem(id) => {
                     let licoes = &self.regras.quintal.conselhos.licoes;
