@@ -24,7 +24,7 @@
     "_tecla_continuar": "_DialogAbortOrCont: GetAsyncKeyState(VK_SPACE). Nome da tecla no SDL.",
     "tecla_continuar": "Space",
     "_nao_forcadas": "Chamadas de _PictStrnDialog com o terceiro parâmetro 0: só aparecem com Options → Events ligado (_OptionStates[3]). As demais aparecem sempre (as regras já testam Events quando o original testa antes de chamar).",
-    "nao_forcadas": [10006, 10007, 10022, 10024, 10046, 10050],
+    "nao_forcadas": [10006, 10007, 10020, 10022, 10024, 10046, 10050],
     "_imagens": "Texto → bitmap do quadro. Mortes da formiga amarela (_YellowDeath, 1000:7746) e lições do tutorial (lidas de data/quintal.json, conselhos.licoes[].imagem, que tem prioridade).",
     "imagens": {
       "10034": 9155,

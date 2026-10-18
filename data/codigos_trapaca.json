@@ -1,0 +1,62 @@
+{
+  "_comentario": "Códigos de trapaça do SimAnt original (docs/spec/regras/trapacas.md). Letras digitadas na partida entram num anel de 4 (minúsculas sem Shift, maiúsculas com Shift; Enter limpa); quando as 4 últimas formam um código, o efeito é aplicado. A ordem e os textos vêm da tabela _Cheats (8:83bc, bits invertidos), lida na bancada e no SIMANTW.EXE; o efeito de cada posição vem de _CheatKeys (1018:67de). Um mod pode trocar o texto de um código ou tirá-lo da lista.",
+  "codigos": [
+    {"codigo": "oops", "efeito": "rainhas_guardadas_vermelhas"},
+    {"codigo": "rand", "efeito": "saude_amarela_cheia"},
+    {"codigo": "erad", "efeito": "saude_amarela_minima"},
+    {"codigo": "FUND", "efeito": "dinheiro"},
+    {"codigo": "joke", "efeito": "piada"},
+    {"codigo": "hole", "efeito": "buracos_pretos"},
+    {"codigo": "HOLE", "efeito": "buracos_vermelhos"},
+    {"codigo": "qeen", "efeito": "rainha_preta"},
+    {"codigo": "QEEN", "efeito": "rainha_vermelha"},
+    {"codigo": "eggs", "efeito": "ovos_pretos"},
+    {"codigo": "EGGS", "efeito": "ovos_vermelhos"},
+    {"codigo": "heal", "efeito": "saude_preta_cheia"},
+    {"codigo": "HEAL", "efeito": "saude_vermelha_cheia"},
+    {"codigo": "zhea", "efeito": "saude_vermelha_zero"},
+    {"codigo": "ZHEA", "efeito": "saude_preta_zero"},
+    {"codigo": "just", "efeito": "rainhas_guardadas_pretas"},
+    {"codigo": "will", "efeito": "invencivel"},
+    {"codigo": "mick", "efeito": "aranha_de_re"},
+    {"codigo": "jeff", "efeito": "colonias_pretas_no_quintal"},
+    {"codigo": "joel", "efeito": "colonias_no_quintal"},
+    {"codigo": "fred", "efeito": "animacao_vitoria"},
+    {"codigo": "jenn", "efeito": "nunca_com_fome"},
+    {"codigo": "susi", "efeito": "sempre_saudavel"},
+    {"codigo": "data", "efeito": "banco_de_dados"},
+    {"codigo": "serv", "efeito": "rede_servidor"},
+    {"codigo": "clie", "efeito": "rede_cliente"}
+  ],
+  "_valores": "Constantes de _CheatKeys: rainhas somadas por oops/just, saúde da amarela de rand/erad (_SetMyHealth), saúde das colônias de heal/HEAL/susi, ovos de eggs/EGGS e o tipo somado ao RRand(6), buracos de hole/HOLE (c = 0..buracos-1), população somada por jeff a cada patch e _BColoniesStarted somado por jeff a cada coluna de 16 patches.",
+  "valores": {
+    "rainhas_guardadas": 10,
+    "saude_amarela_cheia": 100,
+    "saude_amarela_minima": 1,
+    "saude_colonia": 100,
+    "ovos": 16,
+    "ovos_sorteio": 6,
+    "ovo_tipo_preto": 1,
+    "ovo_tipo_vermelho": 129,
+    "buracos": 64,
+    "rainha_dx": 2,
+    "rainha_direcao": 2,
+    "populacao_jeff": 4,
+    "colonias_jeff_por_coluna": 16
+  },
+  "_sons": "Ids dos efeitos sonoros (_myBeginSound): oops toca 10, rand/erad 1, just 0x29 = 41, jeff 2, joel 1; will/mick/jenn/susi tocam 'ligou' (2) ou 'desligou' (1).",
+  "sons": {
+    "rainhas_vermelhas": 10,
+    "rainhas_pretas": 41,
+    "saude_amarela": 1,
+    "jeff": 2,
+    "joel": 1,
+    "ligou": 2,
+    "desligou": 1
+  },
+  "_mensagens": "Quadros de _PictStrnDialog(0, id, 0) (terceiro parâmetro 0: só com Options → Events; ver nao_forcadas de mensagens.json): FUND = 10020, joke = 10022 e 10024.",
+  "mensagens": {
+    "dinheiro": 10020,
+    "piada": [10022, 10024]
+  }
+}

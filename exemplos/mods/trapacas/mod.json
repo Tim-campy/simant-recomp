@@ -1,0 +1,6 @@
+{
+  "nome": "trapacas",
+  "versao": "1.0",
+  "dependencias": [],
+  "scripts": ["trapacas.lua"]
+}

@@ -201,12 +201,13 @@ fn recursos_com_mods(mods: &std::path::Path) -> Recursos {
 fn mod_de_exemplo_chove_comida_a_cada_500_ticks() {
     let r = recursos_com_mods(&raiz().join("exemplos/mods"));
     let mut s = Scripts::carregar(&r, Limites::default()).unwrap().expect("exemplos/mods/exemplo-lua tem scripts");
-    assert_eq!(s.situacao(), vec![("exemplo-lua".to_string(), true)]);
+    // exemplos/mods tem também o mod de trapaças (só lê o estado nos ganchos de tick).
+    assert_eq!(s.situacao(), vec![("exemplo-lua".to_string(), true), ("trapacas".to_string(), true)]);
     let mut e = estado_quick();
     e.ambiente.proxima_comida = -1; // sem a alimentação periódica do jogo, para isolar o script
     let mut regras = RegrasOriginais::default();
     s.ao_iniciar(&mut e);
-    assert!(s.retirar_registro()[0].contains("chuva de comida ligada; API 0.12, jogo rapido"));
+    assert!(s.retirar_registro()[0].contains("chuva de comida ligada; API 0.17, jogo rapido"));
     let mut sem_script = e.clone();
     for _ in 0..499 {
         s.antes_do_tick(&mut e);
@@ -263,4 +264,234 @@ fn caminho_de_script_invalido_desliga_o_mod() {
     assert!(s.situacao().is_empty());
     assert!(s.retirar_registro()[0].contains("caminho de script inválido"));
     let _ = fs::remove_dir_all(&dir);
+}
+
+// ---------------------------------------------------------------------------------------------
+// API 0.17: menu, painel, ações e avanço de ticks (pela Partida, que executa os pedidos)
+// ---------------------------------------------------------------------------------------------
+
+mod api017 {
+    use super::*;
+    use engine::core::avisos::ConfigAvisos;
+    use engine::core::navegacao::{Evento as EventoTecla, Navegacao};
+    use engine::core::partida::{ConfigPartida, Partida};
+    use engine::core::tela_jogo::PosicaoVista;
+    use engine::formats::save::{JogoSalvo, LayoutSave};
+    use engine::rules::amarela::TabelasAmarela;
+    use engine::rules::estado::{ConfigSimulacao, Evento};
+    use engine::rules::quintal::{self, Relogios, TabelasQuintal};
+    use engine::scripts::TeclaMod;
+
+    fn ler(nome: &str) -> String {
+        fs::read_to_string(raiz().join("data").join(nome)).unwrap()
+    }
+
+    /// Partida do QUICK2.ANT (Jogo Rápido), sem scripts.
+    pub(super) fn partida() -> Partida {
+        let layout = LayoutSave::carregar(&raiz().join("data/save_layout.json")).unwrap();
+        let jogo = JogoSalvo::abrir(&layout, &raiz().join("tests/referencias/saves/QUICK2.ANT")).unwrap();
+        let estado = Estado::de_save(&jogo).unwrap();
+        let nav = Navegacao::do_save(&jogo, PosicaoVista::AoCarregar, 25, 19).unwrap();
+        Partida::nova(
+            estado,
+            nav,
+            RegrasOriginais::default(),
+            TabelasAmarela::padrao().clone(),
+            ConfigSimulacao::de_json(&ler("simulacao.json")).unwrap(),
+            ConfigPartida::de_json(&ler("partida.json")).unwrap(),
+            ConfigAvisos::de_json(&ler("mensagens.json")).unwrap(),
+        )
+    }
+
+    /// Partida com um script cujo `ao_menu(i)` roda `acoes[i]`.
+    fn partida_com(acoes: &[&str]) -> Partida {
+        let corpo: String = acoes.iter().enumerate().map(|(i, a)| format!("[{}] = function(e) {a} end,\n", i + 1)).collect();
+        let codigo = format!(
+            "local acoes = {{\n{corpo}}}\n\
+             function ao_iniciar(e) definir_menu({{titulo = 'T', tecla = 'F12', itens = {{'a'}}}}) end\n\
+             function ao_menu(i, texto, e) acoes[i](e) end"
+        );
+        let mut p = partida();
+        p.ligar_scripts(scripts(&codigo));
+        p
+    }
+
+    fn escolher(p: &mut Partida, i: usize) {
+        p.escolher_no_menu_de_mod("teste", i);
+    }
+
+    fn rodar(p: &mut Partida, n: u32) {
+        for _ in 0..n {
+            p.rodar_tick();
+        }
+    }
+
+    #[test]
+    fn tecla_do_menu_exige_funcao_ou_ctrl_alt() {
+        assert!(TeclaMod::de_texto("F12").is_ok());
+        let t = TeclaMod::de_texto("Ctrl+Shift+T").unwrap();
+        assert!(t.casa(&EventoTecla::Tecla { nome: "T".into(), ctrl: true, shift: true, alt: false }));
+        assert!(!t.casa(&EventoTecla::Tecla { nome: "T".into(), ctrl: true, shift: false, alt: false }));
+        assert_eq!(t.texto(), "Ctrl+Shift+T");
+        assert!(TeclaMod::de_texto("T").is_err(), "letra sozinha é do jogo (amarela, trapaças)");
+        assert!(TeclaMod::de_texto("Shift+1").is_err());
+        assert!(TeclaMod::de_texto("Hyper+F1").is_err());
+    }
+
+    #[test]
+    fn menu_e_painel_definidos_pelo_script() {
+        let mut s = scripts(
+            "function ao_iniciar(e) definir_menu({titulo = 'Teste', tecla = 'F11', itens = {'um', '-', 'dois'}}) \
+             definir_painel('linha 1\\nlinha 2') end \
+             function ao_menu(i, texto, e) registrar(i, texto, e:tempo()) definir_painel(nil) end",
+        );
+        let mut e = estado_quick();
+        s.ao_iniciar(&mut e);
+        let menus = s.menus();
+        assert_eq!(menus.len(), 1);
+        assert_eq!(menus[0].1.itens, vec!["um", "-", "dois"]);
+        assert_eq!(s.paineis(), vec![("teste".to_string(), vec!["linha 1".to_string(), "linha 2".to_string()])]);
+        s.retirar_registro();
+        s.ao_menu("teste", 3, &mut e);
+        assert_eq!(s.retirar_registro(), vec!["[teste] 3\tdois\t0".to_string()]);
+        assert!(s.paineis().is_empty());
+        // Tecla inválida: erro desliga o mod.
+        let mut s = scripts("function ao_iniciar(e) definir_menu({titulo = 'x', tecla = 'Q', itens = {'a'}}) end");
+        s.ao_iniciar(&mut e);
+        assert_eq!(s.ativo("teste"), Some(false));
+    }
+
+    #[test]
+    fn sem_usar_o_menu_o_jogo_fica_igual() {
+        let mut com = partida_com(&["e:comecar_chuva()"]);
+        let mut sem = partida();
+        rodar(&mut com, 200);
+        rodar(&mut sem, 200);
+        assert!(com.estado == sem.estado, "definir um menu não muda o tick");
+    }
+
+    #[test]
+    fn chuva_comeca_com_os_sorteios_do_original_e_a_agua_sobe() {
+        let mut p = partida_com(&["e:comecar_chuva()", "e:parar_chuva()"]);
+        let mut esperado = p.estado.clone();
+        let rel = Relogios::do_port(&esperado, TabelasQuintal::padrao());
+        quintal::comecar_chuva(&mut esperado, TabelasQuintal::padrao(), rel);
+        escolher(&mut p, 1);
+        assert_eq!(p.estado.ambiente.chovendo, 1);
+        assert!((150..300).contains(&p.estado.ambiente.chuva_contagem));
+        assert_eq!((p.estado.s, p.estado.r), (esperado.s, esperado.r), "S e R como o começo da chuva de _DoSimYard");
+        let lencol = p.estado.ambiente.lencol;
+        rodar(&mut p, 120);
+        assert!(p.estado.ambiente.lencol < lencol, "_WaterTable sobe nos ninhos ({lencol} → {})", p.estado.ambiente.lencol);
+        // Chover de novo é recusado; parar desliga no tick seguinte.
+        escolher(&mut p, 1);
+        assert!(p.retirar_registro_scripts().iter().any(|l| l.contains("já está chovendo")));
+        escolher(&mut p, 2);
+        rodar(&mut p, 1);
+        assert_eq!(p.estado.ambiente.chovendo, 0);
+    }
+
+    #[test]
+    fn avancar_ticks_roda_sem_o_relogio_e_parar_interrompe() {
+        let mut p = partida_com(&["avancar_ticks(150)", "parar_avanco()"]);
+        let t0 = p.estado.partida.tempo;
+        escolher(&mut p, 1);
+        assert_eq!(p.ticks_de_mods_pendentes(), 150);
+        while p.ticks_de_mods_pendentes() > 0 {
+            p.avancar(0);
+        }
+        assert_eq!(p.estado.partida.tempo, t0 + 150);
+        escolher(&mut p, 1);
+        escolher(&mut p, 2);
+        assert_eq!(p.ticks_de_mods_pendentes(), 0);
+    }
+
+    #[test]
+    fn bichos_amarela_e_colonias() {
+        let mut p = partida_com(&[
+            "e:trazer_gato()",
+            "e:latir()",
+            "e:trazer_aranha()",
+            "e:saude_amarela(7)",
+            "e:saude_colonia('vermelha', 3)",
+            "e:guardar_rainhas('preta', 2)",
+            "e:povoar_patch('vermelha', 3, 9, 20)",
+            "e:matar_amarela()",
+            "e:menino_inseticida()",
+            "e:menino_cortar_grama()",
+        ]);
+        p.estado.aranha.ligada = 0;
+        p.estado.bichos.gato_ligado = 0;
+        for i in 1..=7 {
+            escolher(&mut p, i);
+        }
+        let e = &p.estado;
+        assert_eq!(e.bichos.gato_ligado, 1);
+        assert_eq!(e.aranha.ligada, 1);
+        assert_eq!(e.amarela.saude, 7);
+        assert_eq!(e.vermelha.saude, 3);
+        assert_eq!(e.preta.rainhas_guardadas, 2);
+        assert_eq!(e.vermelha.populacao_quintal.0[3 * 16 + 9], 20);
+        p.retirar_eventos();
+        escolher(&mut p, 8);
+        assert!(p.retirar_eventos().contains(&Evento::Mensagem(10040)), "_YellowDeath(8): morreu de fome");
+        escolher(&mut p, 9);
+        assert_eq!(p.estado.menino.no_numero, 32);
+        escolher(&mut p, 10);
+        let m = &p.estado.menino;
+        assert_eq!((m.no_numero, m.presente, m.cortando_grama), (0x26, 3, 1));
+        assert_eq!((m.px, m.py), p.estado.ambiente.patch);
+    }
+
+    #[test]
+    fn latido_pede_o_som_do_cachorro() {
+        let mut p = partida_com(&["e:latir()"]);
+        let s0 = p.estado.s;
+        escolher(&mut p, 1);
+        assert_ne!(p.estado.s, s0, "SRand4 e o atraso do latido");
+        let latidos = &TabelasQuintal::padrao().sons.latidos;
+        assert!(p.retirar_eventos().iter().any(|ev| matches!(ev, Evento::Som(id) if latidos.contains(id))));
+    }
+
+    #[test]
+    fn reprodutores_e_revoada_armada() {
+        let mut p = partida_com(&["e:criar_reprodutores('vermelha', 25) e:armar_revoada('vermelha')", "e:armar_revoada('preta')"]);
+        escolher(&mut p, 1);
+        assert_eq!(p.estado.vermelha.revoada, 200);
+        let machos = p.estado.superficie.lista.ativas().filter(|(_, f)| f.tipo & 0xF8 == 0xA0 && f.modo == 14).count();
+        assert!(machos > 0, "machos alados em pré-voo");
+        // O jogo faz o resto: pré-voo → decolagem (15) com _FlyAway > 100, e saem voando (16).
+        let mut decolaram = false;
+        for _ in 0..200 {
+            p.rodar_tick();
+            decolaram |= p.estado.superficie.lista.ativas().any(|(_, f)| f.tipo & 0x80 != 0 && f.modo >= 15 && f.tipo & 0x78 == 0x20);
+        }
+        assert!(decolaram, "alados decolam");
+        escolher(&mut p, 2);
+        assert!(p.retirar_registro_scripts().iter().any(|l| l.contains("sem machos")));
+    }
+
+    #[test]
+    fn fim_de_jogo_licao_e_misterio() {
+        let mut p = partida_com(&["e:terminar_jogo('vitoria')", "e:avancar_licao()", "e:misterio()"]);
+        escolher(&mut p, 2);
+        assert!(p.retirar_registro_scripts().iter().any(|l| l.contains("só no tutorial")));
+        let r0 = p.estado.r;
+        escolher(&mut p, 3);
+        assert!(p.ultimo_misterio.is_some());
+        assert_ne!(p.estado.r, r0, "um RRand(15)");
+        escolher(&mut p, 1);
+        assert_eq!((p.estado.partida.fim_de_jogo, p.estado.partida.pretas_venceram), (1, 1));
+        p.rodar_tick();
+        assert!(p.retirar_eventos().contains(&Evento::DialogoFimDeJogo));
+    }
+
+    #[test]
+    fn argumentos_invalidos_sao_erro() {
+        for codigo in ["e:trocar_patch(12, 0)", "e:saude_amarela(101)", "e:povoar_patch('azul', 1, 1, 1)", "avancar_ticks(0)", "e:terminar_jogo('empate')"] {
+            let mut p = partida_com(&[codigo]);
+            escolher(&mut p, 1);
+            assert_eq!(p.scripts.as_ref().unwrap().ativo("teste"), Some(false), "{codigo}");
+        }
+    }
 }

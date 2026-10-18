@@ -42,6 +42,33 @@ impl Fonte {
         }
     }
 
+    /// Bytes de um texto do port (UTF-8) para esta fonte: as fontes do Windows (FNT) usam o
+    /// Latin-1; as do Macintosh (FONT), o Mac Roman. Letra que a fonte não tem vira a letra sem
+    /// acento (ou '?').
+    pub fn codificar(&self, texto: &str) -> Vec<u8> {
+        texto
+            .chars()
+            .map(|c| {
+                let (latin1, mac) = codigos_do_caractere(c);
+                let preferido = match self {
+                    Fonte::Mac(_) => mac,
+                    Fonte::Fnt(_) => latin1,
+                };
+                match preferido {
+                    Some(b) if self.tem_glifo(b) => b,
+                    _ => sem_acento(c),
+                }
+            })
+            .collect()
+    }
+
+    fn tem_glifo(&self, c: u8) -> bool {
+        match self {
+            Fonte::Mac(f) => c < 0x80 || f.indice(c) != f.ultimo + 1,
+            Fonte::Fnt(f) => (f.primeiro..=f.ultimo).contains(&c),
+        }
+    }
+
     /// Imagem da string como o jogo a monta antes de desenhar (opaca, sem recorte).
     pub fn imagem(&self, texto: &[u8]) -> ImagemTexto {
         match self {
@@ -286,5 +313,65 @@ mod testes {
         assert_eq!(f.largura_texto(&[0]), 3);
         // caractere ausente usa o glifo "ausente" (avanço 1 + 1)
         assert_eq!(f.largura_texto(&[1]), 2);
+    }
+}
+
+/// Código Latin-1 e Mac Roman de um caractere (só os de 0x00–0xFF do Unicode).
+fn codigos_do_caractere(c: char) -> (Option<u8>, Option<u8>) {
+    let u = c as u32;
+    if u < 0x80 {
+        return (Some(u as u8), Some(u as u8));
+    }
+    if !(0xA0..=0xFF).contains(&u) {
+        return (None, None);
+    }
+    // Latin-1 0xA0–0xFF → Mac Roman (0 = sem equivalente).
+    const MAC: [u8; 96] = [
+        0xCA, 0xC1, 0xA2, 0xA3, 0xDB, 0xB4, 0, 0xA4, 0xAC, 0xA9, 0xBB, 0xC7, 0xC2, 0, 0xA8, 0xF8, //
+        0xA1, 0xB1, 0, 0, 0xAB, 0xB5, 0xA6, 0xE1, 0xFC, 0, 0xBC, 0xC8, 0, 0, 0, 0xC0, //
+        0xCB, 0xE7, 0xE5, 0xCC, 0x80, 0x81, 0xAE, 0x82, 0xE9, 0x83, 0xE6, 0xE8, 0xED, 0xEA, 0xEB, 0xEC, //
+        0, 0x84, 0xF1, 0xEE, 0xEF, 0xCD, 0x85, 0, 0xAF, 0xF4, 0xF2, 0xF3, 0x86, 0, 0, 0xA7, //
+        0x88, 0x87, 0x89, 0x8B, 0x8A, 0x8C, 0xBE, 0x8D, 0x8F, 0x8E, 0x90, 0x91, 0x93, 0x92, 0x94, 0x95, //
+        0, 0x96, 0x98, 0x97, 0x99, 0x9B, 0x9A, 0xD6, 0xBF, 0x9D, 0x9C, 0x9E, 0x9F, 0, 0, 0xD8,
+    ];
+    let mac = MAC[(u - 0xA0) as usize];
+    (Some(u as u8), (mac != 0).then_some(mac))
+}
+
+/// A letra sem acento (para fontes sem o glifo acentuado).
+fn sem_acento(c: char) -> u8 {
+    const BASE: [(&str, u8); 12] = [
+        ("ÀÁÂÃÄÅ", b'A'),
+        ("àáâãäå", b'a'),
+        ("ÈÉÊË", b'E'),
+        ("èéêë", b'e'),
+        ("ÌÍÎÏ", b'I'),
+        ("ìíîï", b'i'),
+        ("ÒÓÔÕÖ", b'O'),
+        ("òóôõö", b'o'),
+        ("ÙÚÛÜ", b'U'),
+        ("ùúûü", b'u'),
+        ("Ç", b'C'),
+        ("ç", b'c'),
+    ];
+    if (c as u32) < 0x80 {
+        return c as u8;
+    }
+    BASE.iter().find(|(l, _)| l.contains(c)).map_or(b'?', |&(_, b)| b)
+}
+
+#[cfg(test)]
+mod testes_codificar {
+    use super::*;
+
+    #[test]
+    fn latin1_e_mac_roman() {
+        assert_eq!(codigos_do_caractere('ç'), (Some(0xE7), Some(0x8D)));
+        assert_eq!(codigos_do_caractere('ã'), (Some(0xE3), Some(0x8B)));
+        assert_eq!(codigos_do_caractere('A'), (Some(b'A'), Some(b'A')));
+        assert_eq!(codigos_do_caractere('€'), (None, None));
+        assert_eq!(sem_acento('ç'), b'c');
+        assert_eq!(sem_acento('Ú'), b'U');
+        assert_eq!(sem_acento('€'), b'?');
     }
 }

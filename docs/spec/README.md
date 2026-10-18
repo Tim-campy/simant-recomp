@@ -19,6 +19,7 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
   - [telas/abertura.md](telas/abertura.md): abertura (`_ShowIntro`), implementada no marco 1.
   - [telas/jogo.md](telas/jogo.md): tela de jogo (faixa + janela de edição com chão e vida), planos, rolagem e reconstrução de `_LifeA/B/R`.
   - [telas/mensagens.md](telas/mensagens.md): avisos ao jogador (mensagem da faixa, quadros de mensagem, fim de jogo e pontuação), botões configuráveis da faixa e salvar.
+  - [telas/menus-mods.md](telas/menus-mods.md): menu e painel dos scripts de mods (API 0.17; extensão do port, não existe no original).
   - [telas/janelas.md](telas/janelas.md): Caste e Behavior Control (triângulo), History, menus de segurar o botão (`_AntMenu`, ícones) e estado dos botões da faixa.
 - Formatos:
   - [formatos/banco-dat-ndx.md](formatos/banco-dat-ndx.md): banco de recursos e compressão LZSS.
@@ -44,6 +45,7 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
   - [regras/testes-tick.md](regras/testes-tick.md): determinismo do original na bancada QEMU, vetores "estado antes → depois" de um tick e o que capturar além do save.
   - [regras/quintal.md](regras/quintal.md): quintal (`_DoSimYard`): menino dentro e fora de casa, cortador, pé e inseticida, gato, cachorro, pássaro, chuva e água, colônias do quintal 12 × 16 (`_SimColonies`, revoada, migração) e fim do Jogo Completo; casos Q-01 e Q-02 confirmados no original.
   - [regras/som.md](regras/som.md): funções de som, opções Music/Sound Effects, preempção e catálogo de quem toca cada música e efeito.
+  - [regras/trapacas.md](regras/trapacas.md): códigos de trapaça de 4 letras do original (`_Cheats`, `_CheatKeys`), conferidos na bancada.
   - [regras/conselhos.md](regras/conselhos.md): `_Feedback`: mensagens de conselho (lista 4/1020) e tutorial (`_GiveLesson`/`_LessonDone`, lições 4/11000…11112).
 
 ## Próximos subsistemas a especificar

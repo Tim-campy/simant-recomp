@@ -1,0 +1,33 @@
+{
+  "_comentario": "Menu e painel de texto dos scripts de mods (API 0.17, docs/api-mods.md; extensão do port, não existe no original). O menu imita um menu suspenso do Windows 3.1 (fundo branco, contorno preto, item escolhido em azul-escuro com texto branco, separador cinza) com uma barra de título como a das caixas de mensagem. Cores: índices da paleta (data/paleta.json). Fontes: índices de interface.json, a primeira que existir (7 = MS Sans Serif 8 em negrito, 6 = System, 0 = reserva). Posições em pixels da área cliente; o menu fica centrado em x e a 'topo' pixels do alto da área abaixo da faixa; o painel fica no canto escolhido ('cima_direita', 'cima_esquerda', 'baixo_direita', 'baixo_esquerda') com 'margem' da borda.",
+  "menu": {
+    "fontes": [7, 6, 0],
+    "fontes_titulo": [6, 0],
+    "topo": 8,
+    "altura_titulo": 18,
+    "altura_item": 16,
+    "altura_separador": 8,
+    "margem_x": 12,
+    "largura_minima": 160,
+    "cor_fundo": 15,
+    "cor_texto": 0,
+    "cor_borda": 0,
+    "cor_realce": 4,
+    "cor_texto_realce": 15,
+    "cor_separador": 7,
+    "cor_titulo": 4,
+    "cor_texto_titulo": 15,
+    "cor_dica": 7
+  },
+  "painel": {
+    "fontes": [0, 6],
+    "canto": "cima_direita",
+    "margem": 6,
+    "folga": 4,
+    "altura_linha": 14,
+    "cor_fundo": 0,
+    "cor_texto": 10,
+    "cor_titulo": 14,
+    "cor_borda": 7
+  }
+}

@@ -74,7 +74,7 @@ Um mod é uma pasta em `mods/` com um `mod.json`. Para ter script, liste os arqu
 { "nome": "meu-mod", "versao": "1.0", "dependencias": [], "scripts": ["principal.lua"] }
 ```
 
-No `.lua`, defina como funções globais os ganchos que quiser (`ao_iniciar`, `antes_do_tick`, `depois_do_tick`, `ao_evento`) e use só a API de `docs/api-mods.md` (seção "Scripts Lua"):
+No `.lua`, defina como funções globais os ganchos que quiser (`ao_iniciar`, `antes_do_tick`, `depois_do_tick`, `ao_evento`, `ao_menu`) e use só a API de `docs/api-mods.md` (seção "Scripts Lua"):
 
 ```lua
 function depois_do_tick(estado)
@@ -89,6 +89,49 @@ end
 ```
 
 O exemplo completo está em `exemplos/mods/exemplo-lua/` (chuva de comida a cada 500 ticks); ele fica fora de `mods/` para não mudar o jogo por padrão. Todos os mods da pasta de `--mods` (padrão `mods/`) ficam ativos: para experimentar o exemplo, use `--mods exemplos/mods` ou copie a pasta dele para `mods/`. O script roda em sandbox (sem `io`, `os`, `require`, `load`), com limite de instruções, tempo e memória; se der erro, é desligado, o erro sai no console (`[script] ...`) e a faixa avisa, mas o jogo continua.
+
+### Códigos de trapaça do original
+
+O SimAnt tem trapaças embutidas: durante a partida, digite um código de 4 letras (minúsculas sem Shift, maiúsculas com Shift; Enter apaga o que foi digitado). Os mais úteis: `heal` / `HEAL` (saúde da colônia preta / vermelha em 100), `just` / `oops` (+10 rainhas guardadas pretas / vermelhas), `qeen` / `QEEN` (rainha nova no ninho), `eggs` / `EGGS` (16 ovos em volta da amarela), `rand` (amarela com saúde 100), `hole` (64 buracos pretos), `jeff` / `joel` (colônias no quintal), `will` (as vermelhas sempre perdem a luta), `jenn` (amarela nunca com fome), `susi` (colônia preta sempre saudável). Lista completa e o que cada um faz: `docs/spec/regras/trapacas.md` (tabela em `data/codigos_trapaca.json`).
+
+### Testando com o mod de trapaças
+
+Para provocar na hora os eventos raros (chuva, revoada, menino, gato, fim de jogo...), há um **mod de trapaças** em `exemplos/mods/trapacas/` (extensão do port, não existe no original). Ele fica fora de `mods/`, então não muda o jogo por padrão. Para ligar:
+
+```
+cargo run --release -p simant -- --save tests/referencias/saves/QUICK2.ANT --mods exemplos/mods
+```
+
+(`--mods exemplos/mods` liga também o exemplo da chuva de comida; para só as trapaças, copie `exemplos/mods/trapacas` para `mods/`.)
+
+Na partida, **F12** abre o menu (setas + Enter, ou clique; Esc ou clique fora fecha; a simulação para enquanto ele está aberto). Cada trapaça usada aparece na faixa como "Trapaça: ..."; se o jogo recusar (por exemplo, trocar de patch fora do Full Game), o motivo aparece na faixa e no console (`[script] ...`). O jogo salvo não registra o uso de trapaças. Itens:
+
+| Grupo | Itens |
+|---|---|
+| Chuva | Começar chuva · Parar chuva |
+| Menino e casa | Menino: cortar a grama neste patch · Menino: inseticida dentro de casa · Ir para o patch da cozinha (0, 12) · Ir para o próximo patch da casa · Ir para o patch do quintal ao lado |
+| Colônias | Guardar 3 rainhas pretas (botão PLACE) · Revoada vermelha (25 reprodutores) · Revoada preta (25 reprodutores) |
+| Bichos | Gato aparecer · Cachorro latir · Aranha aparecer · Formiga-leão perto da amarela |
+| Amarela | Luta: soldado vermelho junto da amarela · Comida em volta da amarela · Curar a amarela · Matar a amarela |
+| Tempo | Avançar 100 / 500 / 1000 ticks · Pular até o próximo evento (avança até a próxima mensagem, música ou fim de jogo) |
+| Jogo | Tutorial: avançar lição · Fim de jogo: vitória · Fim de jogo: derrota · Mystery · Painel de depuração (GameTime, sementes S/R, patch, populações, rainhas guardadas, chuva e `_WaterTable`, `_FlyAway`, menino, lição) |
+
+Roteiro para as pendências de teste:
+
+- **Troca de patch e patches da casa**: Full Game (`--novo-jogo --tipo completo`, ou um save do Full Game) com a colônia já crescida; F12 → *Ir para o patch da cozinha*, depois *Ir para o próximo patch da casa* várias vezes (percorre os 38 patches da casa) e *Ir para o patch do quintal ao lado*. Também dá para usar a Yard View (Ctrl+Y) e dar duplo clique: o mod só garante uma colônia preta no destino.
+- **Botão PLACE**: Full Game; F12 → *Guardar 3 rainhas pretas*; Ctrl+Y, botão *Place* e um clique num patch a até 3 do atual.
+- **Chuva**: F12 → *Começar chuva*; Ctrl+Y para ver as gotas no quintal; entre num ninho (Ctrl+9) e use *Avançar 500 ticks*: a água sobe (o `_WaterTable` cai no painel). O som da chuva toca de vez em quando.
+- **Menino cortando a grama**: F12 → *Menino: cortar a grama neste patch*; Ctrl+Y mostra o menino com o cortador; na superfície, o pé e o cortador passam no patch.
+- **Menino com inseticida**: *Ir para o patch da cozinha (0, 12)* (Full Game) e *Menino: inseticida dentro de casa*; a amarela na superfície corre risco.
+- **Revoada**: *Revoada vermelha* (ou preta) e *Avançar 100 ticks* algumas vezes: os machos alados saem, decolam e somem; no quintal (Ctrl+Y) aparece o enxame.
+- **Gato**: *Gato aparecer* e Ctrl+Y (o gato entra pelo canto e o som toca na vista do quintal).
+- **Cheiro no Experimental**: o menu de ferramentas do Experimental já põe cheiro; com *Painel de depuração* ligado dá para acompanhar o tempo. Os botões de cheiro da faixa mostram a camada.
+- **Tutorial**: *Tutorial* no "Select a Game" (Ctrl+N); F12 → *Tutorial: avançar lição* mostra a próxima lição (o painel mostra o número).
+- **Sons**: *Cachorro latir* (latido), *Gato aparecer* com a vista do quintal (gato), *Luta: soldado vermelho junto da amarela* e duplo clique nele (luta), *Começar chuva* (chuva).
+- **Fim de jogo**: *Fim de jogo: vitória* ou *derrota* (quadro final e "Select a Game").
+- **Mod Lua de exemplo (500 ticks)**: com `--mods exemplos/mods` ele já está ligado; *Avançar 500 ticks* e a faixa mostra "Choveu comida!".
+
+O menu e o painel usam só a API pública de scripts (`docs/api-mods.md`, API 0.17): qualquer mod pode ter o seu menu (`definir_menu`) e painel (`definir_painel`). Para exportar uma tela com o menu aberto sem janela: `--menu mod@F12 --exportar-tela-jogo tela.png` (`mod@F12#N` escolhe o item N).
 
 ## Organização
 

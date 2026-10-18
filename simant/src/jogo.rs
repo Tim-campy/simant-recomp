@@ -49,6 +49,10 @@ pub(crate) fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool, o: &Opcoes
         s.partida.navegar(a);
         return None;
     }
+    // Menu de um script de mod (API 0.17): só teclas que o jogo não usa chegam aqui.
+    if mods_ui::tecla_abre_menu(s, ev) {
+        return None;
+    }
     let EventoNav::Tecla { nome, ctrl, shift, alt } = ev;
     if *alt {
         return None;
@@ -59,6 +63,12 @@ pub(crate) fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool, o: &Opcoes
             println!("tecla {nome} (VK 0x{vk:02X}): {r:?}");
             return None;
         }
+    }
+    // _DoKeyDown: Enter e letras vão para o anel dos códigos de trapaça do original (trapacas.md).
+    if let Some(ef) = s.partida.tecla_de_trapaca(nome, *shift) {
+        let falta = if ef.sem_equivalente() { " (sem equivalente no port)" } else { "" };
+        println!("código de trapaça do original: {ef:?}{falta}");
+        return None;
     }
     s.partida.cfg.botao_da_tecla(nome)
 }
@@ -154,6 +164,14 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 if matches!(ev, Event::Quit { .. }) {
                     return Ok(());
                 }
+                continue;
+            }
+            if matches!(ev, Event::Quit { .. }) && s.menu_mod.is_some() {
+                return Ok(());
+            }
+            if let Some(mudou) = mods_ui::evento(s, &ev) {
+                // Menu de um script de mod aberto (API 0.17): recebe toda a entrada.
+                redesenhar |= mudou;
                 continue;
             }
             if s.dialogo.is_some() && !matches!(ev, Event::Window { .. }) {
@@ -405,7 +423,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         }
         // Com o "Select a Game" aberto (Ctrl+N), a simulação fica parada (_SetPause(1) em _NewGame).
         s.atualizar_janelas_desenho(minimizada);
-        if !s.modos.escolhendo && s.dialogo.is_none() && s.exame.is_none() {
+        if !s.modos.escolhendo && s.dialogo.is_none() && s.exame.is_none() && s.menu_mod.is_none() {
             s.partida.avancar(ms);
         }
         let pedidos = s.registrar_eventos();

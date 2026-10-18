@@ -386,6 +386,16 @@ fn criar_formiga_leao(e: &mut Estado, t: &TabelasInimigos, x: i32, y: i32) {
     }
 }
 
+/// `_AddAntLion(x, y)` numa célula livre com as 8 vizinhas livres, se ainda cabe uma (no máximo
+/// `leao_maximo`). Para a API de mods. Devolve se criou.
+pub fn nova_formiga_leao(e: &mut Estado, t: &TabelasInimigos, x: i32, y: i32) -> bool {
+    if e.formigas_leao.quantidade >= t.regras.leao_maximo || !livre_3x3(e, t, x, y) {
+        return false;
+    }
+    criar_formiga_leao(e, t, x, y);
+    true
+}
+
 /// Retira a formiga-leão `k` (centro vira "morta", a borda fica) e desloca as seguintes.
 fn remover_formiga_leao(e: &mut Estado, t: &TabelasInimigos, k: usize) {
     let (x, y) = (e.formigas_leao.x[k] as i32, e.formigas_leao.y[k] as i32);
@@ -735,6 +745,12 @@ fn aranha_aparecer(e: &mut Estado, t: &TabelasInimigos) {
     if e.partida.tipo_jogo == 0 || e.s.rand1(t.regras.aranha_chance_aparecer) != 0 {
         return;
     }
+    aranha_entra(e);
+}
+
+/// A aranha entra no patch (o fim de `_MoveSpider` depois do sorteio de aparecer): x = 512 + S(1024),
+/// por cima ou por baixo (S(2)), andando. Também para a API de mods.
+pub fn aranha_entra(e: &mut Estado) {
     e.aranha.x = e.s.rand1(1024) as i16 + 512;
     e.aranha.ligada = 1;
     e.aranha.estado = 1;

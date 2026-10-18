@@ -1883,7 +1883,7 @@ fn sem_efeitos(e: &mut Estado, f: impl FnOnce(&mut Estado)) {
 }
 
 /// `_MakeBlkQueen/_MakeRedQueen(x, y, d)` (ciclo-de-vida.md).
-fn fazer_rainha(e: &mut Estado, t: &TabelasAmarela, cor: Cor, x: i32, y: i32, d: i32) {
+pub(crate) fn fazer_rainha(e: &mut Estado, t: &TabelasAmarela, cor: Cor, x: i32, y: i32, d: i32) {
     let (dx, dy) = t.d8(d ^ 4);
     comum::cavar(e, t, cor, x, y);
     comum::cavar(e, t, cor, x + dx, y + dy);

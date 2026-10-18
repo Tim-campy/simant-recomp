@@ -28,7 +28,8 @@ use crate::rules::amarela::{
 use crate::rules::desenho::{self, ContadoresRedesenho, JanelasDesenho};
 use crate::rules::estado::{ConfigSimulacao, Estado, Evento};
 use crate::rules::tick::{tick, Regras, RegrasOriginais, Relogio};
-use crate::scripts::{Gancho, Scripts};
+use crate::rules::trapacas::{self, letra_da_tecla, AnelTrapaca, EfeitoTrapaca, TabelasTrapaca};
+use crate::scripts::{Gancho, PedidoMod, Scripts};
 
 /// Nome do arquivo de dados (sobrescrevível por mod).
 pub const ARQUIVO_CONFIG: &str = "partida.json";
@@ -273,6 +274,12 @@ pub struct Partida {
     pub scripts: Option<Scripts>,
     /// Linhas de registro dos scripts ainda não retiradas pela interface.
     registro_scripts: Vec<String>,
+    /// Códigos de trapaça do original (`data/codigos_trapaca.json`) e o anel de letras (fora do
+    /// save; rules/trapacas.rs).
+    pub tabelas_trapaca: TabelasTrapaca,
+    anel_trapaca: AnelTrapaca,
+    /// Ticks pedidos por `avancar_ticks` dos scripts (API 0.17) ainda por rodar.
+    ticks_de_mods: u32,
 }
 
 impl Partida {
@@ -318,6 +325,9 @@ impl Partida {
             ultimo_misterio: None,
             scripts: None,
             registro_scripts: Vec::new(),
+            tabelas_trapaca: TabelasTrapaca::padrao().clone(),
+            anel_trapaca: AnelTrapaca::default(),
+            ticks_de_mods: 0,
         };
         p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
         p.vistas_para_estado();
@@ -375,6 +385,9 @@ impl Partida {
         let ms = ms - espera;
         if self.bloqueio_ms > 0 {
             return Avanco::default();
+        }
+        if self.ticks_de_mods > 0 {
+            return self.rodar_ticks_de_mods();
         }
         let intervalo = self.intervalo_ms();
         self.resto_ms += ms;
@@ -454,10 +467,12 @@ impl Partida {
         self.estado.relogio_mac = Some(self.mac_inicial.wrapping_add(((self.ms_total / 55) * 3) as u32));
         if let Some(s) = self.scripts.as_mut().filter(|s| s.tem_gancho(Gancho::AntesDoTick)) {
             s.antes_do_tick(&mut self.estado);
+            self.aplicar_pedidos_dos_mods();
         }
         tick(&mut self.estado, &mut self.regras as &mut dyn Regras);
         if let Some(s) = self.scripts.as_mut().filter(|s| s.tem_gancho(Gancho::DepoisDoTick)) {
             s.depois_do_tick(&mut self.estado);
+            self.aplicar_pedidos_dos_mods();
         }
         self.vistas_do_estado();
         self.tratar_eventos();
@@ -498,7 +513,7 @@ impl Partida {
     // --- vistas: navegação ↔ estado ------------------------------------------------------------
 
     /// As regras leem o plano mostrado (`_MapPlane`) e os pontos lembrados; a navegação é a dona.
-    fn vistas_para_estado(&mut self) {
+    pub(crate) fn vistas_para_estado(&mut self) {
         let e = &mut self.estado;
         let n = &self.nav;
         let par = |(x, y): (i32, i32)| (x as i16, y as i16);
@@ -571,6 +586,7 @@ impl Partida {
         if self.estado.partida.fim_de_jogo == 0 {
             self.fim_anunciado = false;
         }
+        self.aplicar_pedidos_dos_mods();
         self.saidas_dos_scripts();
     }
 
@@ -580,8 +596,73 @@ impl Partida {
     pub fn ligar_scripts(&mut self, mut scripts: Scripts) {
         scripts.ao_iniciar(&mut self.estado);
         self.scripts = Some(scripts);
+        self.aplicar_pedidos_dos_mods();
         self.saidas_dos_scripts();
         self.redesenhar = true;
+    }
+
+    /// O jogador escolheu o item `indice` (a partir de 1) do menu do mod `nome` (API 0.17):
+    /// `ao_menu`, as ações pedidas e os eventos que elas geraram.
+    pub fn escolher_no_menu_de_mod(&mut self, nome: &str, indice: usize) {
+        self.vistas_para_estado();
+        let Some(s) = self.scripts.as_mut() else { return };
+        s.ao_menu(nome, indice, &mut self.estado);
+        self.aplicar_pedidos_dos_mods();
+        self.processar_eventos_do_estado();
+    }
+
+    /// Ticks ainda pedidos por `avancar_ticks` (API 0.17).
+    pub fn ticks_de_mods_pendentes(&self) -> u32 {
+        self.ticks_de_mods
+    }
+
+    /// Executa as ações pedidas pelos scripts (`core::acoes_mods`); recusas vão para o registro.
+    fn aplicar_pedidos_dos_mods(&mut self) {
+        let Some(s) = self.scripts.as_mut() else { return };
+        let pedidos = s.retirar_pedidos();
+        if pedidos.is_empty() {
+            return;
+        }
+        for (nome, pedido) in pedidos {
+            match pedido {
+                PedidoMod::AvancarTicks(n) => self.ticks_de_mods = self.ticks_de_mods.saturating_add(n),
+                PedidoMod::PararAvanco => self.ticks_de_mods = 0,
+                ref outro => {
+                    if let Err(motivo) = super::acoes_mods::aplicar(self, outro) {
+                        self.registro_scripts.push(format!("[{nome}] {outro:?} recusado: {motivo}"));
+                        // A recusa também aparece na faixa, como uma mensagem do script.
+                        let agora = self.agora();
+                        let d = self.avisos.cfg.faixa.duracao_conselho;
+                        let texto = super::avisos::TextoFaixa::Literal(format!("{nome}: {motivo}"));
+                        self.avisos.editar(Some(texto), Some(d), true, self.estado.partida.opcoes[4] != 0, agora);
+                    }
+                }
+            }
+        }
+        self.vistas_do_estado();
+        self.redesenhar = true;
+    }
+
+    /// Um lote dos ticks pedidos por `avancar_ticks`, sem esperar o relógio (com a pausa ou não);
+    /// para no fim do jogo ou num aviso modal.
+    fn rodar_ticks_de_mods(&mut self) -> Avanco {
+        let mut av = Avanco::default();
+        let lote = self.ticks_de_mods.min(self.cfg.relogio.max_mensagens_por_avanco.max(1) * 50);
+        for _ in 0..lote {
+            if self.ticks_de_mods == 0 {
+                // `parar_avanco` num gancho do tick anterior.
+                break;
+            }
+            if self.estado.partida.fim_de_jogo != 0 || self.avisos.tem_modal() {
+                self.ticks_de_mods = 0;
+                break;
+            }
+            self.rodar_tick();
+            self.ticks_de_mods = self.ticks_de_mods.saturating_sub(1);
+            av.ticks += 1;
+        }
+        self.redesenhar = true;
+        av
     }
 
     /// Linhas de `registrar` dos scripts (e avisos de script desligado) desde a última retirada.
@@ -921,6 +1002,23 @@ impl Partida {
                 (nome.clone(), b.bitmap_selecionado + f, b.bitmap_normal + f, ligado)
             })
             .collect()
+    }
+
+    /// Tecla que `_YellowCommandKey` não tratou, para o anel dos códigos de trapaça do original
+    /// (`_DoKeyDown`, trapacas.md §1): Enter limpa o anel; letras entram (minúsculas sem Shift,
+    /// maiúsculas com Shift) e, se as 4 últimas formam um código, `_CheatKeys` é aplicado. Devolve o
+    /// efeito aplicado.
+    pub fn tecla_de_trapaca(&mut self, nome: &str, shift: bool) -> Option<EfeitoTrapaca> {
+        if nome == "Return" || nome == "Keypad Enter" {
+            self.anel_trapaca.limpar();
+            return None;
+        }
+        let letra = letra_da_tecla(nome, shift)?;
+        let efeito = self.anel_trapaca.digitar(letra, &self.tabelas_trapaca)?;
+        self.vistas_para_estado();
+        trapacas::aplicar(&mut self.estado, &self.tabelas_trapaca, &self.tabelas_amarela, efeito);
+        self.processar_eventos_do_estado();
+        Some(efeito)
     }
 
     /// Tecla de comando da amarela (`_YellowCommandKey`), com o código de tecla virtual do Windows.
