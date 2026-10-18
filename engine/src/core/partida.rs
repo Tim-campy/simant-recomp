@@ -829,6 +829,20 @@ impl Partida {
         mudou
     }
 
+    /// `_SetMapPlane(0)`: o quintal passa a ser o plano mostrado (`_MapToYard` trocando o mapa pelo
+    /// quintal; Ctrl+Y/5/6/7 com `_MapPlane` ≠ 0). A edição fica na superfície sem centralizar
+    /// ([`Navegacao::ir_para_quintal`]). `_OldMapPlane` termina em 0: `_SetMapPlane` guarda o plano
+    /// antigo e já grava `_MapPlane = 0` antes de `_SetMapPlaneLocation(0, …)`, que guarda de novo
+    /// [código, `1000:a5ca` e `1000:a386`]. `_SetMapModeAnt(0)` vem de `vistas_para_estado`.
+    pub fn ir_para_quintal(&mut self) -> bool {
+        let (px, py) = self.estado.ambiente.patch;
+        let mudou = self.nav.ir_para_quintal((i32::from(px), i32::from(py)));
+        self.estado.vistas.plano_anterior = 0;
+        self.vistas_para_estado();
+        self.redesenhar |= mudou;
+        mudou
+    }
+
     /// Clique numa célula do mapa mostrado (`_processEdit`). `duplo` = duplo clique (esquerdo ou
     /// direito). Menus de "segurar o botão" ainda não existem no port (`segurando` = falso). O clique
     /// simples para a simulação por `espera_clique_simples_tickcount` (o laço de espera do original).

@@ -22,6 +22,10 @@ pub(crate) struct Opcoes {
     pub(crate) janela: Option<(u32, u32)>,
     /// Opções de vídeo resolvidas (`data/video.json` + linha de comando), preenchidas em `principal`.
     pub(crate) video: video::ConfigVideo,
+    /// Arquivo de preferências do jogador (`--preferencias ARQ`; padrão: a pasta de dados do usuário,
+    /// resolvida em `principal` só para a partida com janela; `--sem-preferencias` desliga).
+    pub(crate) preferencias: Option<PathBuf>,
+    pub(crate) sem_preferencias: bool,
     /// Quick Game gerado pelo port.
     pub(crate) novo_jogo: bool,
     /// Semente do Quick Game (padrão: relógio).
@@ -76,6 +80,8 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         escala: None,
         janela: None,
         video: video::ConfigVideo::default(),
+        preferencias: None,
+        sem_preferencias: false,
         novo_jogo: false,
         semente: None,
         ticks: None,
@@ -106,6 +112,8 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
             "--sair-apos-ms" => o.sair_apos_ms = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
             "--escala" => o.escala = Some(valor()?.parse().map_err(|_| format!("{a}: inteiro (0 = a maior que cabe)"))?),
             "--janela" => o.janela = Some(video::ler_tamanho(&valor()?)?),
+            "--preferencias" => o.preferencias = Some(valor()?.into()),
+            "--sem-preferencias" => o.sem_preferencias = true,
             "--capturar-janela" => o.capturar_janela = Some(valor()?.into()),
             "--novo-jogo" => o.novo_jogo = true,
             "--semente" => o.semente = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),

@@ -63,6 +63,7 @@ Navegação na tela de jogo:
   - `"escala_inteira"`: ao redimensionar, o jogo amplia só por múltiplos inteiros, centralizado com tarjas pretas (nítido); com `false`, ocupa o máximo mantendo a proporção.
   
   A janela é ciente de DPI e amplia por vizinho mais próximo (sem borrar com a escala de tela do Windows). Sem foco (outra janela ativa ou minimizada), a música para e os efeitos se calam, em todas as telas, como no original.
+- Preferências: como o original faz com o `WIN.INI`, a partida guarda ao sair as opções (AutoTrack, Music, Sound Effects, Events, Messages, Silly) e as funções dos botões configuráveis da faixa em `preferencias.json`, na pasta de dados do usuário (no Windows, `%APPDATA%\SimAnt recomp\SimAnt\`), e as usa no próximo jogo novo (um `.ANT` carregado traz as suas opções). `--preferencias ARQ` usa outro arquivo; `--sem-preferencias` não lê nem grava.
 - Janela, para testes sem interação: `--sair-apos-ms N` fecha sozinha e `--capturar-janela ARQ.png` grava o que a janela mostrava. `--ticks N` roda N ticks sem janela (com `--exportar-tela-jogo`, grava a tela depois) e escreve o `GameTime` antes e depois.
 
 ### Mods com script (Lua)

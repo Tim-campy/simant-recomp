@@ -96,7 +96,29 @@ pub(crate) fn tratar_modal(s: &mut Sessao, ev: &sdl2::event::Event) -> Option<Mo
     }
 }
 
-pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Result<(), String> {
+/// Partida com janela. Preferências do jogador (o `[SimAnt]` do `WIN.INI` do original,
+/// simant/src/preferencias.rs): lidas ao abrir — as opções só fora de um `.ANT` (`de_save`), que
+/// traz as suas; os botões configuráveis sempre — e gravadas ao sair com o que estiver valendo.
+pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool, de_save: bool) -> Result<(), String> {
+    let prefs = o.preferencias.as_deref().map(preferencias::Preferencias::ler);
+    if let Some(p) = &prefs {
+        if !de_save {
+            p.aplicar_opcoes(&mut s.partida.estado.partida.opcoes);
+        }
+        p.aplicar_botoes(&mut s.partida.funcoes_botoes);
+    }
+    let r = laco_partida(&mut s, titulo, o, jogo_novo);
+    if let Some(caminho) = &o.preferencias {
+        let p = preferencias::Preferencias::do_momento(&s.partida.estado.partida.opcoes, &s.partida.funcoes_botoes);
+        match p.gravar(caminho) {
+            Ok(()) => println!("preferências gravadas em {}", caminho.display()),
+            Err(e) => eprintln!("preferências: {e}"),
+        }
+    }
+    r
+}
+
+fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Result<(), String> {
     use sdl2::event::{Event, WindowEvent};
     use sdl2::keyboard::{Keycode, Scancode};
     use sdl2::mouse::MouseButton;
@@ -157,8 +179,8 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     _ => continue,
                 };
                 if let arquivos::RespostaDialogo::Carregar(p) = r {
-                    match arquivos::carregar(&s, &p, o) {
-                        Ok(nova) => s = nova,
+                    match arquivos::carregar(s, &p, o) {
+                        Ok(nova) => *s = nova,
                         Err(e) => eprintln!("erro no Load: {e}"),
                     }
                 }
@@ -169,7 +191,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                 if let Event::MouseMotion { x, y, .. } = ev {
                     cursor = (x, y);
                 }
-                if tratar_modal(&mut s, &ev).is_some_and(|m| m.abre_selecao_de_jogo()) {
+                if tratar_modal(s, &ev).is_some_and(|m| m.abre_selecao_de_jogo()) {
                     // _EndGameDialog → _NewGame(0): abre o "Select a Game" (simant/src/modos.rs).
                     println!("fim de jogo: Select a Game");
                     s.modos.escolhendo = true;
@@ -206,7 +228,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                         continue;
                     }
                     let nas_janelas = mousestate.left() && s.janelas.mover(s.recursos, &mut s.partida.estado, x, y).unwrap_or(false);
-                    if nas_janelas || (mousestate.left() && modos::mover(&mut s, x, y, ctrl_apertado(&eventos))) {
+                    if nas_janelas || (mousestate.left() && modos::mover(s, x, y, ctrl_apertado(&eventos))) {
                         redesenhar = true;
                     }
                 }
@@ -218,7 +240,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                         redesenhar = true;
                         continue;
                     }
-                    match modos::tecla(&mut s, &ev) {
+                    match modos::tecla(s, &ev) {
                         modos::Resposta::Seguir => {}
                         modos::Resposta::Tratada => {
                             redesenhar = true;
@@ -232,13 +254,13 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                             continue;
                         }
                         modos::Resposta::NovoJogo(e) => {
-                            s = novo_jogo(&s, e, o)?;
+                            *s = novo_jogo(s, e, o)?;
                             audio.musica_jogo_novo(false);
                             redesenhar = true;
                             continue;
                         }
                     }
-                    if let Some(b) = tratar_tecla(&mut s, &ev, tab, o) {
+                    if let Some(b) = tratar_tecla(s, &ev, tab, o) {
                         let agora = Instant::now();
                         let duplo = ultima_tecla_clique.is_some_and(|(ub, t)| {
                             ub == b && (agora - t).as_millis() as u64 <= s.partida.cfg.duplo_clique_teclado_ms
@@ -256,7 +278,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     let popup = s.modos.escolhendo || s.modos.menu_aberto;
                     let rota = if popup { janelas_ui::Roteamento::Fora } else { s.clicar_nas_janelas(x, y, clicks >= 2) };
                     let resposta = match rota {
-                        _ if popup => modos::clique_popup(&mut s, x, y),
+                        _ if popup => modos::clique_popup(s, x, y),
                         janelas_ui::Roteamento::Tratado => modos::Resposta::Tratada,
                         janelas_ui::Roteamento::Linha(a) => {
                             // Seta da barra: repete enquanto o botão fica apertado.
@@ -264,11 +286,11 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                             modos::Resposta::Tratada
                         }
                         janelas_ui::Roteamento::Quintal => {
-                            modos::clique_no_quintal(&mut s, x, y, clicks >= 2);
+                            modos::clique_no_quintal(s, x, y, clicks >= 2);
                             modos::Resposta::Tratada
                         }
                         janelas_ui::Roteamento::Edicao => {
-                            if modos::clique_na_edicao(&mut s, x, y, ctrl) {
+                            if modos::clique_na_edicao(s, x, y, ctrl) {
                                 modos::Resposta::Tratada
                             } else {
                                 if clicks >= 2 {
@@ -289,7 +311,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                                 s.partida.marcador(i, ctrl);
                                 modos::Resposta::Tratada
                             } else {
-                                modos::clique_na_faixa(&mut s, x, y)
+                                modos::clique_na_faixa(s, x, y)
                             }
                         }
                     };
@@ -307,7 +329,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                             continue;
                         }
                         modos::Resposta::NovoJogo(e) => {
-                            s = novo_jogo(&s, e, o)?;
+                            *s = novo_jogo(s, e, o)?;
                             audio.musica_jogo_novo(false);
                             redesenhar = true;
                             continue;
@@ -338,7 +360,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     // (só o esquerdo é comido, `MAINWNDPROC`); o direito só vale na área do mapa.
                     if s.clicar_direito_nas_janelas(x, y) {
                         // Experimental: _processExp recebe também o clique direito.
-                        if !modos::clique_na_edicao(&mut s, x, y, ctrl_apertado(&eventos)) {
+                        if !modos::clique_na_edicao(s, x, y, ctrl_apertado(&eventos)) {
                             // _processEdit: clique direito simples = simples; duplo direito = duplo.
                             s.clicar_no_mapa(x, y, clicks >= 2);
                         }
@@ -355,9 +377,9 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     s.janelas.soltar();
                     // Popup de definição do Info: só enquanto o botão fica apertado.
                     redesenhar |= s.info.soltar();
-                    modos::soltar(&mut s);
+                    modos::soltar(s);
                 }
-                Event::MouseButtonUp { mouse_btn: MouseButton::Right, .. } => modos::soltar(&mut s),
+                Event::MouseButtonUp { mouse_btn: MouseButton::Right, .. } => modos::soltar(s),
                 _ => {}
             }
         }
@@ -458,5 +480,6 @@ pub(crate) fn novo_jogo<'a>(s: &Sessao<'a>, e: engine::core::selecao::Escolha, o
     println!("novo jogo {e:?} com R = {:#010x}", s.partida.estado.r.estado());
     let mut nova = Sessao::abrir(s.recursos, &o.dados, Origem::NovoNaPartida(&s.partida.estado, tipo), s.cores.clone())?;
     nova.herdar_janelas(s);
+    nova.herdar_opcoes(s, false);
     Ok(nova)
 }

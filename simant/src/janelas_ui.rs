@@ -264,12 +264,13 @@ impl Sessao<'_> {
         self.depois_do_gerente(antes);
     }
 
-    /// `_MapToYard` (botão Yard, Ctrl+Y/5/6/7): com o mapa aberto e o quintal não, o quintal toma o
-    /// lugar dele (`_win_Swap`); senão abre o quintal. Vem para a frente com a faixa 35 [medido em
-    /// w20]. O port não muda `_MapPlane` para 0 (divergência registrada em quintal.md).
+    /// `_MapToYard` (botão Yard, Ctrl+Y/5/6/7): com o mapa aberto e o quintal não, `_SetMapPlane(0)`
+    /// (a edição passa à superfície, sem centralizar) e o quintal toma o lugar do mapa
+    /// (`_win_Swap`); senão só abre o quintal. Vem para a frente com a faixa 35 [medido em w20, p01].
     pub(crate) fn abrir_quintal(&mut self) {
         let antes = self.janelas.gerente.topo();
         if !self.janelas.aberta(Controle::Quintal) && self.janelas.aberta(Controle::Mapa) {
+            self.partida.ir_para_quintal();
             self.janelas.trocar(Controle::Mapa, Controle::Quintal);
         }
         self.janelas.abrir(Controle::Quintal);
