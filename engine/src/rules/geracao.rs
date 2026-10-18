@@ -77,7 +77,17 @@ pub enum Cor {
     Vermelha,
 }
 
-/// Tabelas da geração (conteúdo de `data/geracao.json` mais o seno do banco).
+/// Tabelas de `data/comum.json` que a geração usa (chave aqui, chave em `comum.json`).
+pub const USOS_COMUNS: &[comum::UsoComum] = &[
+    ("dx8", "dx8"),
+    ("dy8", "dy8"),
+    ("borda_buraco", "borda_buraco"),
+    ("borda_formiga_leao", "borda_formiga_leao"),
+    ("sow_tab", "sow_tab"),
+];
+
+/// Tabelas da geração (conteúdo de `data/geracao.json`, com as tabelas comuns de `data/comum.json`
+/// ([`USOS_COMUNS`]), mais o seno do banco).
 #[derive(Clone, Debug, Deserialize)]
 pub struct TabelasGeracao {
     /// `_Dx8`/`_Dy8`: deslocamento por direção 0–7 (0 = cima, 2 = direita, 4 = baixo, 6 = esquerda).
@@ -104,7 +114,7 @@ pub struct TabelasGeracao {
 impl TabelasGeracao {
     /// Lê `geracao.json` (com mods) e o seno do banco.
     pub fn carregar(r: &Recursos) -> Result<TabelasGeracao, String> {
-        let mut t: TabelasGeracao = r.dados(ARQUIVO_TABELAS)?;
+        let mut t: TabelasGeracao = comum::parte_dos_recursos(r, ARQUIVO_TABELAS, USOS_COMUNS)?;
         t.seno = seno_do_objeto(&r.objeto(CHAVE_SENO)?)?;
         t.casa = TabelasCasa::carregar(r)?;
         t.validar()?;
@@ -113,7 +123,7 @@ impl TabelasGeracao {
 
     /// Monta a partir do texto do JSON e dos bytes do objeto 9/1000.
     pub fn de_partes(json: &str, objeto_seno: &[u8]) -> Result<TabelasGeracao, String> {
-        let mut t: TabelasGeracao = serde_json::from_str(json).map_err(|e| format!("{ARQUIVO_TABELAS}: {e}"))?;
+        let mut t: TabelasGeracao = comum::parte_do_texto(ARQUIVO_TABELAS, json, USOS_COMUNS)?;
         t.seno = seno_do_objeto(objeto_seno)?;
         t.validar()?;
         Ok(t)

@@ -80,7 +80,7 @@ Um byte por célula, no mesmo índice do mapa de chão (`x × 64 + y`): 0 = vazi
 
 - Só age se (x, y) estiver dentro do mapa do plano (planos 0 e 1: 128 × 64; 2 e 3: 64 × 64).
 - Grava o valor (0xFF) em `_LifeA` (planos 0 e 1), `_LifeB` (2) ou `_LifeR` (3), por cima do que as listas deixaram.
-- Se `_MeType = 0x60` (rainha), grava também a segunda metade (0xFE) na célula vizinha, deslocada por uma tabela de direções indexada por `_MeDir ^ 4`. **A tabela não foi localizada** (o pseudocódigo mostra só o endereço relativo) [em aberto]; o port ainda não desenha essa metade e a registra como pendência.
+- Se `_MeType = 0x60` (rainha), grava também a segunda metade (0xFE) na célula vizinha, deslocada por uma tabela de direções indexada por `_MeDir ^ 4`. **A tabela não foi localizada** (o pseudocódigo mostra só o endereço relativo) [em aberto; provavelmente `_Dx8/_Dy8`, que as regras da amarela já usam para a cauda (`rules/amarela.rs`, `cauda`), hipótese]; a reconstrução do port (`core/vida.rs`) ainda não grava essa metade.
 - Nos ninhos, `_SetLife` com valor > 0 em célula de terra (`_IsItDirt`) ou de grama (0x1C a 0x1F) escava o tile (`_DigMyTile`) e toca um som [código]. Isso não muda a camada de vida e não ocorre no `QUICK2.ANT` (a formiga está num túnel); o port não reproduz a escavação ao carregar [hipótese: caso raro].
 
 No `QUICK2.ANT`, `_MeMode = 0` e a formiga amarela está em (34, 9) do ninho preto, a mesma célula da rainha preta (T = 102) e de um ovo. Resultado em `_LifeB`: (34, 9) = 0xFF, (35, 9) = 110 (metade da rainha), (36, 9) = 1 (ovo) [save + código].
@@ -108,7 +108,7 @@ A célula é o tile de chão e, por cima, o tile de vida com o índice 13 transp
 
 A faixa é a janela 34 desenhada como na abertura ([janela.md](../formatos/janela.md)), com uma diferença de estado: `_SetMapPlaneLocation` (`1000:a386`), quando há faixa, seleciona o botão do plano mostrado com `_win_MakeObjSelected`: `0x2205` (`ribToSurface`) no plano 1, `0x2203` (`ribToBNest`) no 2 e `0x2204` (`ribToRNest`) no 3; no plano 0 não seleciona nada [código; o pseudocódigo mostra esses números como ponteiros para texto, `s_Client_ERROR…_21ef + 0x14…0x16`]. O botão selecionado usa o bitmap alternativo (bit 2 das flags). Fica em `data/tela_jogo.json` (`botao_do_plano`). No `QUICK2.ANT` (plano 2), o `ribToBNest` selecionado bate pixel a pixel com a captura [medido].
 
-Barras e números da faixa (`ribBlacks`, `ribReds`, `ribYellowHealth`, `ribBlackHealth`, `ribRedHealth`, `ribBlackP`, `ribRedP`; `_DrawMapData`): reproduzidos desde 2026-10-18, conferidos com a bancada ([mensagens.md](mensagens.md) §9). Ainda não reproduzidos: `mapRibCaste` (área desenhada pelo código) e os botões configuráveis `ribUserDef1A`–`1H` conforme o `WIN.INI` (`_SetUserButton`).
+Barras e números da faixa (`ribBlacks`, `ribReds`, `ribYellowHealth`, `ribBlackHealth`, `ribRedHealth`, `ribBlackP`, `ribRedP`; `_DrawMapData`): reproduzidos desde 2026-10-18, conferidos com a bancada ([mensagens.md](mensagens.md) §9). O clique na área `mapRibCaste` (quadro das castas e limiares de saúde) está em [mensagens.md](mensagens.md) §9.1; as funções dos botões configuráveis `ribUserDef1A`–`1H` ficam entre partidas em `preferencias.json`, no lugar do `WIN.INI` (`_SetUserButton`; [../../decisoes.md](../../decisoes.md)).
 
 ### Objetos da janela 0
 
@@ -192,7 +192,7 @@ Os eventos de objeto chegam por `_DoEvent` (`1000:0bc2`), que despacha pelo byte
 | `0x2204` | `ribToRNest` | `_ClearMapScentButtons`, `_SetMapPlane(3)` |
 | `0x2205` | `ribToSurface` | `_ClearMapScentButtons`, `_SetMapPlane(1)` |
 
-A janela do mapa (`_ProcMapEvent`, `1010:c222`) tem botões equivalentes (0x106–0x108 → planos 1 a 3) [código]; ela ainda não existe no port. Não foi estudado em que fase do clique (apertar ou soltar) o evento é gerado [em aberto]; o port age ao apertar.
+A janela do mapa (`_ProcMapEvent`, `1010:c222`) tem botões equivalentes (0x106–0x108 → planos 1 a 3) [código]; a janela existe no port desde 2026-10-18 ([mapa.md](mapa.md)). Não foi estudado em que fase do clique (apertar ou soltar) o evento é gerado [em aberto]; o port age ao apertar.
 
 ### Troca de plano (`_SetMapPlane`, `1000:a5ca`; `_SetMapPlaneLocation`, `1000:a386`)
 
@@ -210,14 +210,14 @@ Consequências:
 - `_CenterEdit` parte do `_MapPnt` do plano anterior, já com os limites do plano novo.
 - Escolher o plano que já está na tela também centraliza: a vista volta ao ponto lembrado, desfazendo a rolagem feita pelas barras (que não atualiza o ponto) [código; não testado no original].
 
-`_GotoMapPoint(n, x, y)` (`1000:a52a`): se `n` é o plano atual e > 0, só `_CenterEdit(x, y)`; senão `_SetMapPlaneLocation(n, x, y)` (troca de plano centralizando em (x, y), sem ler o ponto lembrado) [código]. É usada, por exemplo, por cliques no mapa pequeno; o port ainda não tem quem a chame.
+`_GotoMapPoint(n, x, y)` (`1000:a52a`): se `n` é o plano atual e > 0, só `_CenterEdit(x, y)`; senão `_SetMapPlaneLocation(n, x, y)` (troca de plano centralizando em (x, y), sem ler o ponto lembrado) [código]. É usada, por exemplo, por cliques no mapa pequeno; no port, só os marcadores 1–7 a chamam (`Navegacao`, `core/partida.rs`).
 
 ### O que o port faz
 
 - Estado: `Navegacao { plano_mapa, vista, pontos }`, iniciado do save. Com `posicao_inicial: "ao_carregar"` (padrão em `data/navegacao.json`) a vista é a de depois do "Load Game" (seção "Posição ao carregar") e o ponto do plano de `_MePlane` recebe `(_MeLocX, _MeLocY)`, como em `_DoLoadInitializations`; com `"salva"`, ficam os valores gravados.
 - Ações: `linha_*` e `pagina_*` seguem a tabela de `_DoEditScroll` (sem mexer nos pontos lembrados); `superficie`, `ninho_preto` e `ninho_vermelho` seguem `_SetMapPlane(1/2/3)` com as duas centralizações. O resultado é limitado com `_BoundEditPosition` também quando `_CenterEdit` não anda, como faz o desenho (`FUN_1010_16d4`).
 - Entradas ligadas por padrão: os aceleradores do original (Ctrl+setas, Ctrl+8/9/0), os botões `ribToSurface`, `ribToBNest` e `ribToRNest` da faixa e as setas das barras de rolagem (clique, com repetição enquanto o botão fica apertado). **Extensões do port**, marcadas em `data/navegacao.json` e em [divergencias.md](../../divergencias.md): setas sem Ctrl rolam (no original movem o cursor) e PageUp/PageDown rolam uma página na vertical.
-- Ainda não implementado: polegar e trilho das barras (arrasto, página pelo clique no trilho, `SB_TOP/BOTTOM`), botão Yard e plano 0 (janela do mapa/quintal), `_ClearMapScentButtons` e `_GotoMapPoint` vindo do mapa pequeno. A vista seguindo a amarela está na seção seguinte.
+- Também implementados depois (2026-10-18): arrasto do polegar (com AutoTrack a vista acompanha, sem ele pula ao soltar, como no original; `divergencias.md`), página pelo clique no trilho (`SB_PAGEUP/PAGEDOWN`), botão Yard e janelas do mapa e do quintal ([mapa.md](mapa.md), [quintal.md](quintal.md)), marcadores com `_GotoMapPoint`. Ainda não: `SB_TOP/BOTTOM` e `_GotoMapPoint` vindo do mapa pequeno (o minimapa não existe no port). A vista seguindo a amarela está na seção seguinte.
 
 ## Simulação ao vivo
 
@@ -301,7 +301,9 @@ Exemplo `tela_jogo` com o `QUICK2.ANT` e a captura `qi_14_salvo.png`, tabela de 
 | mapa visível, (24, 158) a (423, 461) | **100%** (87.128 de 87.128) | nada: chão, túnel, grama e a vida (formiga amarela, metade da rainha, ovo) que aparece abaixo do diálogo |
 | janela de edição inteira, (20, 135) a (443, 479) | 99,33% | texto do título, desenhos da caixa do menu de sistema e do botão de maximizar, setas e polegares das barras de rolagem |
 | faixa, linhas 38 a 110 | 93,27% | barras de população/saúde e botões `ribUserDef*` |
-| área cliente inteira | 78,24% | o acima, mais as janelas `mapWin` e de controle de casta atrás da janela de edição, que o port ainda não desenha |
+| área cliente inteira | 78,24% | o acima, mais as janelas `mapWin` e de controle de casta atrás da janela de edição, que o port ainda não desenhava em 2026-10-16 |
+
+Esta tabela é de 2026-10-16 e ficou como histórico: depois dela vieram as barras e os botões da faixa, a janela do mapa e as janelas de controle, cada uma comparada no seu documento (mensagens.md §9, [mapa.md](mapa.md), [janelas.md](janelas.md)); resumo em [../../estado-do-projeto.md](../../estado-do-projeto.md) §2.5.
 
 Mapeamento de cores inferido (índice do port → cor da captura) igual ao da seção anterior. Imagens geradas em `re_trabalho/tela_jogo/` (fora do git): `tela_jogo.png` (port), `tela_jogo_640x480_mapeada.png`, `diferencas.png` e recortes ampliados da faixa e das formigas.
 
