@@ -3,10 +3,12 @@
 //! original redesenharia (`_UpdateWindows` depois de cada tick, ver [`redesenho_do_timer`]), para que o
 //! gerador S siga o do original. Especificação: docs/spec/regras/rng.md, "Sorteios do desenho".
 //!
-//! Fora daqui (dependem de estado da interface que não está no `Estado`): os balões da opção "Silly"
-//! (`_DrawCurBalloons`, prazos em tempo real) e o balão da aranha (`_DrawSpider`), o ícone animado com
-//! a janela minimizada (`_SRand1(7)` no `MYTIMERFUNC`), as caixas de fim de jogo e da aranha.
+//! Os balões da opção "Silly" (`_DrawCurBalloons` e o balão da aranha em `_DrawSpider`, prazos em
+//! tempo real) estão em `rules::baloes` e são chamados daqui, na ordem do redesenho da janela de
+//! edição. Fora daqui: o ícone animado com a janela minimizada (`_SRand1(7)` no `MYTIMERFUNC`, em
+//! `core::partida`), as caixas de fim de jogo e da aranha.
 
+use super::baloes::{self, TabelasBaloes};
 use super::estado::Estado;
 use super::geracao::Cor;
 
@@ -146,6 +148,37 @@ pub struct JanelasDesenho {
     pub aranha_visivel: bool,
     /// Efeito do cortador de grama (`_DrawMower`, 0x24; `quintal.json`, `sons.cortador`).
     pub som_cortador: Option<u16>,
+    /// `_TickCount` (`GetTickCount() / 55`) do redesenho: prazos dos balões "Silly".
+    pub tick_count: u32,
+}
+
+/// Tabelas que o redesenho da janela de edição usa: os balões e as direções da aranha
+/// (`_Dx8`/`_Dy8`, para o balão dela).
+#[derive(Clone, Copy, Debug)]
+pub struct TabelasDesenho<'a> {
+    pub baloes: &'a TabelasBaloes,
+    pub d8: (&'a [i8; 8], &'a [i8; 8]),
+}
+
+impl TabelasDesenho<'static> {
+    /// Cópias embutidas (`data/baloes.json` e `data/inimigos.json`), para testes e vetores.
+    pub fn padrao() -> TabelasDesenho<'static> {
+        let i = super::inimigos::TabelasInimigos::padrao();
+        TabelasDesenho { baloes: TabelasBaloes::padrao(), d8: (&i.dx8, &i.dy8) }
+    }
+}
+
+/// O redesenho da janela de edição (`FUN_1010_16d4`), só o que sorteia, na ordem do original:
+/// `_DrawCurBalloons`, as células, `_DrawSpider` (palpos e balão da aranha) com a aranha visível, e
+/// `_DrawBalloons` (escolhe o balão desenhado). Devolve os passos de S.
+pub fn desenhar_edicao(e: &mut Estado, j: &JanelasDesenho, t: &TabelasDesenho) -> u32 {
+    let mut passos = baloes::sorteios_dos_baloes(e, t.baloes, j.tick_count);
+    if j.aranha_visivel {
+        passos += desenhar_palpos(e);
+        passos += baloes::balao_da_aranha(e, t.baloes, t.d8, j.tick_count);
+    }
+    baloes::escolher_balao(e, t.baloes);
+    passos
 }
 
 /// Contadores do `MYTIMERFUNC`/`_UpdateWindows` que não vão no save (a interface os guarda).
@@ -164,8 +197,8 @@ pub struct ContadoresRedesenho {
 /// ativa, ou 1 tick em 8 inativa; nunca minimizada; velocidade 2 pula metade e 3 três quartos) e, em
 /// ordem, o quintal (sempre na frente; atrás, um redesenho sim e outro não) e a janela de edição (idem).
 /// Devolve os passos de S. [hipótese: `_WaitedEnough` do quintal com `_YardMode` > 1, que só não sorteia,
-/// não é modelado; os balões e o balão da aranha ficam de fora (módulo).]
-pub fn redesenho_do_timer(e: &mut Estado, j: &JanelasDesenho, k: &mut ContadoresRedesenho) -> u32 {
+/// não é modelado.]
+pub fn redesenho_do_timer(e: &mut Estado, j: &JanelasDesenho, k: &mut ContadoresRedesenho, t: &TabelasDesenho) -> u32 {
     k.ticks = k.ticks.wrapping_add(1);
     if j.minimizada || (!j.ativa && k.ticks & 7 != 0) {
         return 0;
@@ -196,8 +229,8 @@ pub fn redesenho_do_timer(e: &mut Estado, j: &JanelasDesenho, k: &mut Contadores
             k.alterna_edicao = !k.alterna_edicao;
             !k.alterna_edicao
         };
-        if desenha && j.aranha_visivel {
-            passos += desenhar_palpos(e);
+        if desenha {
+            passos += desenhar_edicao(e, j, t);
         }
     }
     passos
@@ -230,20 +263,20 @@ mod testes {
         let j = JanelasDesenho { ativa: true, quintal_aberto: true, quintal_na_frente: true, ..Default::default() };
         let mut e = chuva();
         let mut k = ContadoresRedesenho::default();
-        assert_eq!(redesenho_do_timer(&mut e, &j, &mut k), 28);
+        assert_eq!(redesenho_do_timer(&mut e, &j, &mut k, &TabelasDesenho::padrao()), 28);
         k.chamadas = 0;
         e.partida.velocidade = 3;
-        let n: u32 = (0..8).map(|_| redesenho_do_timer(&mut e, &j, &mut k)).sum();
+        let n: u32 = (0..8).map(|_| redesenho_do_timer(&mut e, &j, &mut k, &TabelasDesenho::padrao())).sum();
         assert_eq!(n, 2 * 28, "ultra: 1 em 4");
         e.partida.velocidade = 1;
         let atras = JanelasDesenho { quintal_na_frente: false, ..j };
-        let n: u32 = (0..4).map(|_| redesenho_do_timer(&mut e, &atras, &mut k)).sum();
+        let n: u32 = (0..4).map(|_| redesenho_do_timer(&mut e, &atras, &mut k, &TabelasDesenho::padrao())).sum();
         assert_eq!(n, 2 * 28, "atrás: um sim, outro não");
         let inativa = JanelasDesenho { ativa: false, ..j };
         k.ticks = 0;
-        let n: u32 = (0..16).map(|_| redesenho_do_timer(&mut e, &inativa, &mut k)).sum();
+        let n: u32 = (0..16).map(|_| redesenho_do_timer(&mut e, &inativa, &mut k, &TabelasDesenho::padrao())).sum();
         assert_eq!(n, 2 * 28, "inativa: 1 tick em 8");
         let min = JanelasDesenho { minimizada: true, ..j };
-        assert_eq!(redesenho_do_timer(&mut e, &min, &mut k), 0);
+        assert_eq!(redesenho_do_timer(&mut e, &min, &mut k, &TabelasDesenho::padrao()), 0);
     }
 }

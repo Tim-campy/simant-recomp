@@ -1040,30 +1040,40 @@ pub struct MensagemFaixa {
     pub importante: bool,
 }
 
-/// Contadores de balões de fala zerados no começo do tick (simulacao-visao-geral.md §5, passo 3).
+/// Balões de fala da janela de edição (opção "Silly"), fora do save. O tick só anota onde há
+/// balão (`_FightBalloons` & cia.); os sorteios e a escolha do balão são do desenho
+/// (`rules::baloes`). Especificação: docs/spec/telas/baloes.md.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Baloes {
-    /// `_FightBalloonCnt`, `_RestBalloonCnt`, `_QueenBalloonCnt`, `_EggBalloonCnt`.
-    pub luta: i16,
-    pub descanso: i16,
-    pub rainha: i16,
-    pub ovo: i16,
-    /// `_LastFightPnt`, `_LastRestPnt`, `_LastQueenPnt`, `_LastEggPnt` (−1 = nenhum).
-    pub ultimo_luta: (i16, i16),
-    pub ultimo_descanso: (i16, i16),
-    pub ultimo_rainha: (i16, i16),
-    pub ultimo_ovo: (i16, i16),
+    /// `_FightBalloonCnt`, `_RestBalloonCnt`, `_QueenBalloonCnt`, `_EggBalloonCnt` (índice:
+    /// `rules::baloes::TipoBalao`); zerados no começo do tick com "Silly".
+    pub contagem: [i16; 4],
+    /// `_LastFightPnt` & cia. (célula; −1 = nenhum) e `_Last*Plane`.
+    pub ultimo: [(i16, i16); 4],
+    pub ultimo_plano: [i16; 4],
+    /// `_CurFightPnt` & cia. (célula do balão mostrado) e `_Cur*Plane`.
+    pub atual: [(i16, i16); 4],
+    pub atual_plano: [i16; 4],
+    /// `_editWidth` e `_editHeight` (a interface informa antes do tick).
+    pub vista: (i16, i16),
+    /// Por fala (`rules::baloes::Fala`): prazo em `_TickCount`, balão ligado e índice da fala.
+    pub prazo: [u32; 6],
+    pub ligado: [bool; 6],
+    pub indice: [i16; 6],
+    /// `DGROUP:0x72f4`: `_SMode` visto pelo último balão da aranha.
+    pub modo_aranha_visto: i16,
+    /// `_CurBalloonCnt` e a lista de balões do redesenho (`_AddMsgBalloon`, até 6).
+    pub pedidos: [Option<crate::rules::baloes::Balao>; 6],
+    pub quantidade: i16,
+    /// O balão desenhado no último redesenho da janela de edição (`_DrawBalloons` desenha um só).
+    pub desenhado: Option<crate::rules::baloes::Balao>,
 }
 
 impl Baloes {
+    /// Passo 3 do tick (`_DoAntSim`): zera as contagens e os últimos pontos (os planos ficam).
     pub fn zerar(&mut self) {
-        *self = Baloes {
-            ultimo_luta: (-1, -1),
-            ultimo_descanso: (-1, -1),
-            ultimo_rainha: (-1, -1),
-            ultimo_ovo: (-1, -1),
-            ..Baloes::default()
-        };
+        self.contagem = [0; 4];
+        self.ultimo = [(-1, -1); 4];
     }
 }
 

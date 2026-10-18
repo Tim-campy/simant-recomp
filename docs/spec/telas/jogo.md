@@ -102,7 +102,7 @@ A célula é o tile de chão e, por cima, o tile de vida com o índice 13 transp
 
 ## Desenho da janela de edição
 
-`FUN_1010_16d4` (`1010:16d4`) desenha as `_editWidth × _editHeight` células no buffer `_editBuf`, linha a linha; `_win_DrawEditWindow` (`1010:14f0`) copia o buffer para a tela no canto do `editTileArea` [código]. Cada célula (col, lin) vem de `FUN_1010_6250`: célula do mapa `(_MapPnt.x + col, _MapPnt.y + lin)`; se y passar de 63, soma 64 a x e faz `y &= 63` (com os limites, só aconteceria com `_editHeight > 64`) [código]. Por cima do mapa vêm a aranha e os balões (`_DrawSpider`, `_DrawBalloons`) e os gráficos de saúde (`_DrawEditGraphs`), ainda não especificados.
+`FUN_1010_16d4` (`1010:16d4`) desenha as `_editWidth × _editHeight` células no buffer `_editBuf`, linha a linha; `_win_DrawEditWindow` (`1010:14f0`) copia o buffer para a tela no canto do `editTileArea` [código]. Cada célula (col, lin) vem de `FUN_1010_6250`: célula do mapa `(_MapPnt.x + col, _MapPnt.y + lin)`; se y passar de 63, soma 64 a x e faz `y &= 63` (com os limites, só aconteceria com `_editHeight > 64`) [código]. Por cima do mapa vêm a aranha e os balões (`_DrawSpider`, `_DrawBalloons`; balões em [baloes.md](baloes.md)). Os gráficos de saúde (`_DrawEditGraphs`) não são desenhados nos modos do Windows (`_displayType` 9 e 10; baloes.md §3).
 
 ### Faixa
 

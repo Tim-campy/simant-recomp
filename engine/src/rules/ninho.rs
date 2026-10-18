@@ -25,6 +25,7 @@ use std::sync::OnceLock;
 use serde::Deserialize;
 
 use super::amarela::{self, TabelasAmarela};
+use super::baloes::{self, TipoBalao};
 use super::comum::{
     self, e_amarela, e_comida_ninho as e_comida, e_terra, e_vermelha as vermelha, grupo, lista_do_ninho,
     plano_do_ninho, Direcoes, TabelaDeGiro, TabelaLuta, TabelaModos, ABERTURA_NINHO as ABERTURA, COMIDA_NINHO_CHEIA as COMIDA_CHEIA,
@@ -917,7 +918,10 @@ impl Formigueiro<'_> {
         self.eu_mut().tipo = t;
         self.definir_vida(x, y, t);
         if self.sk(16) != 0 {
-            // Balão de luta: só desenho, sem sorteio (lacuna no port).
+            if self.e.partida.opcoes[5] == 1 {
+                // `_FightBalloons(x, y, plano)`: só anota o balão (sem sorteio).
+                baloes::anotar(self.e, TipoBalao::Luta, x, y, plano_do_ninho(self.cor));
+            }
             return;
         }
         let w = self.eu().s;
@@ -949,7 +953,10 @@ impl Formigueiro<'_> {
         let t = self.t();
         self.definir_vida(x, y, t);
         if self.s(20) != 0 {
-            // Balão de descanso: só desenho.
+            if self.e.partida.opcoes[5] == 1 {
+                // `_RestBalloons(x, y, plano)`: só anota o balão (sem sorteio).
+                baloes::anotar(self.e, TipoBalao::Descanso, x, y, plano_do_ninho(self.cor));
+            }
             return;
         }
         let m = novo_modo_pela_cor(self.e, self.tab, grupo(t), t);
@@ -996,6 +1003,8 @@ impl Formigueiro<'_> {
     /// `_SimEggB` (`1028:3ca0`) / `_SimEggR` (`1028:62a6`).
     fn simular_ovo(&mut self) {
         let mut t = self.t();
+        // O balão do ovo só aparece se o ovo não virou formiga neste tick (morto também conta).
+        let mut eclodiu = false;
         let ciclo = self.e.partida.ciclo as u16;
         let mascara = match self.cor {
             Cor::Preta if self.e.preta.populacao < 3 => 0x1F,
@@ -1019,6 +1028,7 @@ impl Formigueiro<'_> {
                             t = (c as u8).wrapping_mul(8).wrapping_add(2);
                             let m = if c == 2 { 1 } else { novo_modo_preto(self.e, self.tab, c as u8) };
                             self.eu_mut().modo = m;
+                            eclodiu = true;
                         }
                     }
                     Cor::Vermelha => {
@@ -1028,12 +1038,16 @@ impl Formigueiro<'_> {
                         t = c.wrapping_mul(8).wrapping_add(0x82);
                         let m = novo_modo_vermelho(self.e, self.tab, c);
                         self.eu_mut().modo = m;
+                        eclodiu = true;
                     }
                 }
             }
         }
-        // Balão de ovo: só desenho, sem sorteio.
         let (x, y) = (self.x0, self.y0);
+        if self.e.partida.opcoes[5] != 0 && !eclodiu {
+            // `_EggBalloons(x, y, plano)`: só anota o balão (sem sorteio).
+            baloes::anotar(self.e, TipoBalao::Ovo, x, y, plano_do_ninho(self.cor));
+        }
         self.definir_vida(x, y, t);
         let f = self.eu_mut();
         f.tipo = t;
@@ -1065,7 +1079,10 @@ impl Formigueiro<'_> {
                 c.rainhas = c.rainhas.wrapping_sub(1);
             }
             self.definir_vida(x, y, t);
-            // Balão de rainha: só desenho.
+            if self.e.partida.opcoes[5] != 0 {
+                // `_QueenBalloons(x, y, plano)`: só anota o balão (sem sorteio).
+                baloes::anotar(self.e, TipoBalao::Rainha, x, y, plano_do_ninho(self.cor));
+            }
         } else if g == 13 {
             let t = self.t();
             self.definir_vida(x, y, t);

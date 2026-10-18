@@ -589,70 +589,14 @@ impl DesenhoQuintal {
         let fala = usize::try_from(m.mensagem_offset).ok().and_then(|i| self.falas_menino.get(i));
         let (Some(f), Some(texto)) = (fonte, fala) else { return };
         let b = &self.cfg.balao_menino;
-        // Linhas separadas pelos dois caracteres '\' 'n'.
-        let mut linhas: Vec<&[u8]> = Vec::new();
-        let mut resto: &[u8] = texto;
-        while let Some(p) = resto.windows(2).position(|w| w == b"\\n") {
-            linhas.push(&resto[..p]);
-            resto = &resto[p + 2..];
-        }
-        linhas.push(resto);
-        let largura_texto = linhas.iter().map(|l| f.largura_texto(l) as i32).max().unwrap_or(0);
-        let colunas = ((largura_texto + 23) >> 3).max(3);
-        let fh = f.altura() as i32;
-        let n = linhas.len() as i32;
-        let y_baixo = fh * n + 6;
-        let altura = fh * n + 15 - i32::from(n <= 1);
+        let forma = super::baloes::FormaBalao::medir(texto, f);
         let (dx, _) = self.cfg.sprites.menino.deslocamento(m.quadro);
         let (ox, oy) = self.cfg.origem();
         let x0 = ox + i32::from(m.x + dx) + i32::from(b.dx);
-        let y0 = oy + i32::from(m.y) + i32::from(b.dy) - altura;
+        let y0 = oy + i32::from(m.y) + i32::from(b.dy) - forma.altura;
         let antes = q.recorte.replace(self.cfg.cliente());
-        let peca = |q: &mut Quadro, nome: &str, coluna: i32, py: i32| {
-            let Some(linhas) = b.pecas.get(nome) else { return };
-            for (j, l) in linhas.iter().enumerate() {
-                for (i, c) in l.bytes().enumerate() {
-                    let cor = match c {
-                        b'#' => b.cor_tinta,
-                        b'o' => b.cor_fundo,
-                        _ => continue,
-                    };
-                    q.ponto(x0 + coluna * 8 + i as i32, y0 + py + j as i32, cor);
-                }
-            }
-        };
-        peca(q, "canto_sup_esq", 0, 0);
-        for c in 1..colunas - 1 {
-            peca(q, "borda_cima", c, 0);
-        }
-        peca(q, "canto_sup_dir", colunas - 1, 0);
-        let mut y = 8;
-        while y < y_baixo {
-            peca(q, "borda_esq", 0, y);
-            for c in 1..colunas - 1 {
-                peca(q, "centro", c, y);
-            }
-            peca(q, "borda_dir", colunas - 1, y);
-            y += 8;
-        }
-        peca(q, "canto_inf_esq", 0, y_baixo);
-        for c in 1..colunas - 1 {
-            peca(q, "borda_baixo", c, y_baixo);
-        }
-        peca(q, "canto_inf_dir", colunas - 1, y_baixo);
-        peca(q, "cunha_esq", 1, y_baixo);
-        for (i, l) in linhas.iter().enumerate() {
-            let img = f.imagem(l);
-            let tx = x0 + (colunas * 8 - img.largura as i32) / 2;
-            let ty = y0 + fh * i as i32 + 6;
-            for j in 0..img.altura {
-                for k in 0..img.largura {
-                    if img.bits[j * img.largura + k] {
-                        q.ponto(tx + k as i32, ty + j as i32, b.cor_tinta);
-                    }
-                }
-            }
-        }
+        let pecas = super::baloes::PecasBalao { pecas: &b.pecas, cor_tinta: b.cor_tinta, cor_fundo: b.cor_fundo };
+        super::baloes::desenhar(q, &forma, f, pecas, x0, y0);
         q.recorte = antes;
     }
 

@@ -632,7 +632,7 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md). Ferramenta de leitura do
 - Significado prático dos modos 17/18 na superfície (se alguma formiga sai do ninho com eles).
 - `_ForceModeA/B`, `_StartAttack`, `_GetNewRedTask` e demais funções sem chamador: confirmar se há chamadas indiretas (tabela de ponteiros) com o Ghidra.
 - Ainda não conferidos no original: morte natural (T1), luta e proporção de vitórias (T5, T6), revoada (T8), estratégia vermelha (T9), recrutamento pelo jogador (T11). As regras foram conferidas só pelos casos da seção "Observado no original".
-- `_YellowFight` e `_DoTroph` são os completos de `amarela.rs` (com `_YellowDeath(0)` e `_ResetYellowVars`); faltam só os balões (`_RestBalloons`, `_FightBalloons`, interface).
+- `_YellowFight` e `_DoTroph` são os completos de `amarela.rs` (com `_YellowDeath(0)` e `_ResetYellowVars`); os balões (`_RestBalloons`, `_FightBalloons`) anotam pelo `rules::baloes` (telas/baloes.md).
 
 ## Observado no original
 

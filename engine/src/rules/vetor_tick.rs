@@ -819,7 +819,7 @@ pub fn rodar_sequencia(dir: &Path, layout: &LayoutSave, regras: &mut dyn Regras)
         }
         if let (Some(m), Some((proximo, _))) = (desenho, extras.get(k + 1)) {
             e.vistas.modo_quintal = m;
-            passos_desenho.0 += u64::from(super::desenho::redesenho_do_timer(&mut e, &janelas, &mut contadores));
+            passos_desenho.0 += u64::from(super::desenho::redesenho_do_timer(&mut e, &janelas, &mut contadores, &super::desenho::TabelasDesenho::padrao()));
             passos_desenho.1 += u64::from(passos_entre(depois.semente_s, proximo.semente_s).unwrap_or(u32::MAX));
             if primeiro_desenho_diferente.is_none() && e.s.semente() != proximo.semente_s {
                 primeiro_desenho_diferente = Some(k + 1);

@@ -517,8 +517,11 @@ impl Partida {
         let v = &self.nav.vista;
         let aranha = desenho::aranha_visivel(&self.estado, self.nav.plano_mapa, v.x, v.y, v.largura, v.altura);
         let som_cortador = self.regras.quintal.sons.cortador;
-        let janelas = JanelasDesenho { ativa: self.ativo, aranha_visivel: aranha, som_cortador, ..self.janelas_desenho };
-        desenho::redesenho_do_timer(&mut self.estado, &janelas, &mut self.contadores_redesenho);
+        let tick_count = (self.ms_total / 55) as u32;
+        let janelas = JanelasDesenho { ativa: self.ativo, aranha_visivel: aranha, som_cortador, tick_count, ..self.janelas_desenho };
+        let r = &self.regras;
+        let tabelas = desenho::TabelasDesenho { baloes: &r.baloes, d8: (&r.inimigos.dx8, &r.inimigos.dy8) };
+        desenho::redesenho_do_timer(&mut self.estado, &janelas, &mut self.contadores_redesenho, &tabelas);
         // _UpdateWindows: em fast/ultra o mapa só é redesenhado a cada 2/4 ticks; sem foco, a cada 8.
         self.contador_mapa = self.contador_mapa.wrapping_add(1);
         self.quadros += 1;
@@ -612,6 +615,7 @@ impl Partida {
         }
         e.vistas.plano = n.plano_mapa;
         e.vistas.ponto = (n.vista.x as i16, n.vista.y as i16);
+        e.baloes.vista = (n.vista.largura as i16, n.vista.altura as i16);
         e.vistas.ponto_quintal = par(n.pontos[0]);
         e.vistas.ponto_superficie = par(n.pontos[1]);
         e.preta.vista_ninho = par(n.pontos[2]);

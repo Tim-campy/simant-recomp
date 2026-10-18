@@ -4,6 +4,7 @@ pub mod acoes_mods;
 pub mod ajuda;
 pub mod ajuda_contexto;
 pub mod avisos;
+pub mod baloes;
 pub mod barras_faixa;
 pub mod carregar;
 pub mod dialogos;

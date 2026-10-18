@@ -20,6 +20,7 @@
 //! (`feromonios::Feromonios`) feita no começo do laço e devolvida ao `Estado` no fim; nada dentro do
 //! laço lê os mapas do `Estado` diretamente.
 
+use super::baloes::{self, TipoBalao};
 use std::sync::OnceLock;
 
 use serde::Deserialize;
@@ -960,8 +961,10 @@ impl Sim<'_> {
             self.vaga(i).s = 0;
             // Cadáver com a cor do vencedor (P3).
             comum::cadaver_aqui(self.e, x, y, v & 0x80 != 0);
+        } else if self.e.partida.opcoes[5] == 1 {
+            // `_FightBalloons(x, y, 1)`: só anota o balão (sem sorteio).
+            baloes::anotar(self.e, TipoBalao::Luta, x, y, 1);
         }
-        // [lacuna] Com a opção "Silly", `_FightBalloons` (só interface, sem sorteio).
     }
 
     /// Modo 11: `_DoToAlarm` (3.11).
@@ -989,8 +992,10 @@ impl Sim<'_> {
         }
         if self.e.s.mascara(4) == 0 {
             self.vaga(i).modo = M_FORRAGEAR;
+        } else if self.e.partida.opcoes[5] == 1 {
+            // `_RestBalloons(x, y, 1)`: só anota o balão (sem sorteio).
+            baloes::anotar(self.e, TipoBalao::Descanso, x, y, 1);
         }
-        // [lacuna] Senão, com "Silly", `_RestBalloons` (só interface, sem sorteio).
     }
 
     /// Modo 15: `_DoRepoExit` (3.15).
