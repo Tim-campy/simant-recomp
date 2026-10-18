@@ -1,0 +1,27 @@
+{
+ "antes": {
+  "SementeS": 62045,
+  "SementeR": 3255958391,
+  "gameCycles": 12356,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 80,
+  "Cycle": 80,
+  "posicao": "livre"
+ },
+ "depois": {
+  "SementeS": 13115,
+  "SementeR": 394908471,
+  "gameCycles": 14958,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 0,
+  "Cycle": 0,
+  "posicao": "livre"
+ },
+ "acao": {
+  "load_tutorial": 1
+ }
+}

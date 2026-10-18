@@ -39,6 +39,128 @@ pub fn geradores_depois_do_load(r: GeradorR, tipo: TipoJogo, tab: &TabelasGeraca
     Ok((s, r))
 }
 
+/// Os 30 patches de `_GenerateTutorial`: (x, y, pretas/32, vermelhas/32) (tabelas `DGROUP:25f0`,
+/// `260e`, `262c`, `264a`; geracao-mundo.md §6).
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct ConfigTutorialArquivo {
+    /// Nome do arquivo (sem a pasta, sem diferenciar maiúsculas) que gera o tutorial (string 1800).
+    pub nome: String,
+    pub titulo: String,
+    pub patches: Vec<[u8; 4]>,
+    /// Plano da amarela depois (`_SetMapPlane(_MePlane)`) fica a cargo da interface.
+    pub velocidade: i16,
+    pub aviso_saude: i16,
+}
+
+/// `_GenerateTutorial` (`1030:6262`) como o Load de `Tutorial.Ant` a chama (o arquivo não é lido):
+/// `_CurGameType = 1` e `_RandYard` com o R da partida anterior; 32 pretas e 32 vermelhas novas;
+/// `_FullCount`; `_CurGameType = 2`; as populações dos 30 patches; depois `_InitSimVars` e
+/// `_SeedSRand` (`semente_s`, do relógio). Devolve o estado.
+#[allow(clippy::too_many_arguments)]
+pub fn estado_do_tutorial(
+    anterior: &Estado,
+    semente_s: u16,
+    tab: &TabelasGeracao,
+    cfg: &ConfigSimulacao,
+    quintal: &TabelasQuintal,
+    tut: &ConfigTutorialArquivo,
+    regras: &mut dyn crate::rules::tick::Regras,
+    vista: (i32, i32),
+) -> Result<Estado, String> {
+    use crate::rules::geracao::Cor;
+    let mut r = anterior.r;
+    let mut s = GeradorS::new(0);
+    let m = Mundo::novo_jogo(TipoJogo::Rapido, &mut r, &mut s, tab)?;
+    let mut e = Estado::de_mundo(&m, s, r, cfg)?;
+    iniciar_quintal(&mut e, quintal);
+    crate::rules::misterio::adicionar_formigas(&mut e, Cor::Preta, 32);
+    crate::rules::misterio::adicionar_formigas(&mut e, Cor::Vermelha, 32);
+    e.contar_formigas();
+    regras.dar_conselhos(&mut e);
+    e.partida.tipo_jogo = 2;
+    for &[x, y, p, v] in &tut.patches {
+        let i = usize::from(x) * 16 + usize::from(y);
+        if let Some(c) = e.preta.populacao_quintal.0.get_mut(i) {
+            *c = p.wrapping_shl(5);
+        }
+        if let Some(c) = e.vermelha.populacao_quintal.0.get_mut(i) {
+            *c = v.wrapping_shl(5);
+        }
+    }
+    // _InitSimVars.
+    e.partida.velocidade = tut.velocidade;
+    e.partida.aviso_saude_colonia = tut.aviso_saude;
+    e.partida.ferramenta_experimental = 0;
+    e.preta.enxame_contagem = 0;
+    e.vermelha.enxame_contagem = 0;
+    e.preta.rainhas_guardadas = 0;
+    e.vermelha.rainhas_guardadas = 0;
+    e.tutorial.licao = 1;
+    e.tutorial.dada = 0;
+    e.s = GeradorS::new(semente_s);
+    manter_do_anterior(&mut e, anterior);
+    // _SetMapPlane(_MePlane): o plano da amarela, com a vista centrada nela (largura × altura da
+    // vista de edição).
+    let (w, h) = vista;
+    let plano = e.amarela.plano;
+    let largura_plano = if plano < 2 { 128 } else { 64 };
+    e.vistas.plano = plano;
+    e.vistas.modo_mapa = plano;
+    let cx = (i32::from(e.amarela.x) - w / 2).clamp(0, largura_plano - w);
+    let cy = (i32::from(e.amarela.y) - h / 2).clamp(0, 64 - h);
+    e.vistas.ponto = (cx as i16, cy as i16);
+    Ok(e)
+}
+
+/// O que o Load do tutorial **não** escreve (não passa por `_NewGame`): fica como estava na partida
+/// anterior [medido na bancada, `tests/referencias/load_tutorial`]. E o que `_RandYard` põe na
+/// amarela e o port ainda não põe em `Estado::de_mundo` (alvo e última posição = a posição dela).
+fn manter_do_anterior(e: &mut Estado, a: &Estado) {
+    for (n, v) in [(&mut e.preta, &a.preta), (&mut e.vermelha, &a.vermelha)] {
+        n.modos = v.modos;
+        n.colonias_fundadas = v.colonias_fundadas;
+        n.total_colonias = v.total_colonias;
+        n.modo_estrategico = v.modo_estrategico;
+    }
+    // Vagas além do fim das listas dos ninhos: X e Y ficam os de antes (T e M zerados).
+    for (n, v) in [(&mut e.ninho_b.lista, &a.ninho_b.lista), (&mut e.ninho_r.lista, &a.ninho_r.lista)] {
+        let usadas = n.usadas();
+        for i in usadas..n.vagas.len().min(v.vagas.len()) {
+            n.vagas[i].x = v.vagas[i].x;
+            n.vagas[i].y = v.vagas[i].y;
+        }
+    }
+    e.lagarta_e_bichos.bicho_dir[0] = a.lagarta_e_bichos.bicho_dir[0];
+    let (b, ab) = (&mut e.bichos, &a.bichos);
+    b.gato_dir = ab.gato_dir;
+    b.gato_x = ab.gato_x;
+    b.gato_y = ab.gato_y;
+    b.cachorro_px = ab.cachorro_px;
+    b.cachorro_py = ab.cachorro_py;
+    e.ambiente.atualizar_colonias = a.ambiente.atualizar_colonias;
+    e.partida.modo_edicao = a.partida.modo_edicao;
+    e.partida.pausado = a.partida.pausado;
+    let (m, am) = (&mut e.amarela, &a.amarela);
+    m.difusa_x = am.difusa_x;
+    m.contorno_contagem = am.contorno_contagem;
+    m.comeu_tipo = am.comeu_tipo;
+    m.alvo_plano = am.alvo_plano;
+    m.alvo_x = m.x;
+    m.alvo_y = m.y;
+    m.ultimo_x = m.x;
+    m.ultimo_y = m.y;
+    e.controles.proxima_casta = a.controles.proxima_casta;
+    e.controles.proximo_modo = a.controles.proximo_modo;
+    e.aranha.alvo_tipo = a.aranha.alvo_tipo;
+    e.aranha.destino_x = a.aranha.destino_x;
+    e.aranha.destino_y = a.aranha.destino_y;
+}
+
+/// O nome escolhido no Load é o do tutorial?
+pub fn e_o_tutorial(caminho: &Path, tut: &ConfigTutorialArquivo) -> bool {
+    caminho.file_name().is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(&tut.nome))
+}
+
 /// `_TimeTemp` (`9:9b10`) depois do Load: `_LoadGame` grava 300 (o `_RandYard` zera e o valor
 /// gravado antes fica de fora).
 pub const TEMPO_TUTOR_DEPOIS_DO_LOAD: i64 = 300;

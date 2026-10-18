@@ -9,6 +9,9 @@ pub(crate) enum Origem<'o> {
     Save(&'o Path, GeradorR, TipoJogo),
     /// Jogo novo gerado pelo port com a semente dada.
     Novo(u32, TipoJogo),
+    /// Load de um arquivo com o nome do tutorial (`Tutorial.Ant`): `_GenerateTutorial` sobre o
+    /// estado da partida aberta, com a semente de S de `_SeedSRand` (telas/arquivos.md).
+    Tutorial(&'o Estado, u16),
 }
 
 /// Tudo o que a tela de jogo ao vivo precisa: a tela carregada (layouts e tilesets), a configuração
@@ -78,12 +81,27 @@ impl Sessao<'_> {
                 let estado = engine::core::carregar::estado_de_jogo_novo(tipo, semente, &geracao, &cfg_sim, &quintal)?;
                 (estado.para_save(&layout)?, estado)
             }
+            Origem::Tutorial(anterior, semente_s) => {
+                let mut regras = RegrasOriginais::carregar_sem_banco(recursos)?;
+                let quintal = regras.quintal.clone();
+                let tut: engine::core::carregar::ConfigTutorialArquivo = recursos.dados("tutorial_arquivo.json")?;
+                // `_MapPnt` provisório (25 × 19, a vista da bancada); a navegação recentra com a vista real.
+                let vista = (25, 19);
+                let estado = engine::core::carregar::estado_do_tutorial(
+                    anterior, semente_s, &geracao, &cfg_sim, &quintal, &tut, &mut regras, vista,
+                )?;
+                (estado.para_save(&layout)?, estado)
+            }
         };
         let mut tela = TelaDeJogo::carregar(&cfg, recursos, &interface, &jogo)?;
         // _SetEditWinTitle: no Load, o nome do arquivo (em maiúsculas, como o diálogo devolve); num
         // jogo novo, "SimAnt - " e o nome do tipo (lista 4/1001) [medido no Quick Game].
         tela.titulo = match origem {
             Origem::Save(p, ..) => p.file_name().map(|n| n.to_string_lossy().to_uppercase()).unwrap_or_default(),
+            Origem::Tutorial(..) => {
+                let tut: engine::core::carregar::ConfigTutorialArquivo = recursos.dados("tutorial_arquivo.json")?;
+                tut.titulo
+            }
             Origem::Novo(_, tipo) => {
                 let nomes = avisos::linhas_do_texto(recursos, 1001);
                 let nome = nomes.get(tipo as usize).map(|l| l.iter().map(|&b| b as char).collect::<String>()).unwrap_or_default();
@@ -93,14 +111,14 @@ impl Sessao<'_> {
         tela.atualizar(&estado);
         // Jogo novo: _NewGame faz _SetMapPlane(_MePlane) e _CenterEdit na amarela, o mesmo que a
         // posição "ao carregar"; um save segue data/navegacao.json.
-        let posicao = if matches!(origem, Origem::Novo(..)) { PosicaoVista::AoCarregar } else { nav_cfg.posicao_inicial };
+        let posicao = if matches!(origem, Origem::Novo(..) | Origem::Tutorial(..)) { PosicaoVista::AoCarregar } else { nav_cfg.posicao_inicial };
         let nav = tela.navegacao(&jogo, posicao)?;
         // Tabelas de todas as partes com mods (data/*.json); o seno da geração já foi lido do banco.
         let regras = RegrasOriginais { geracao: Some(geracao), ..RegrasOriginais::carregar_sem_banco(recursos)? };
         let cfg_avisos: ConfigAvisos = recursos.dados(avisos::ARQUIVO_CONFIG)?;
         let mut partida =
             Partida::nova(estado, nav, regras, TabelasAmarela::carregar(recursos)?, cfg_sim, cfg_partida, cfg_avisos);
-        if matches!(origem, Origem::Save(..)) {
+        if matches!(origem, Origem::Save(..) | Origem::Tutorial(..)) {
             // File → Load: _FullCount e o jogo pausado (mensagens.md §6).
             partida.ao_carregar();
         }
@@ -110,7 +128,7 @@ impl Sessao<'_> {
         }
         let arquivo = match origem {
             Origem::Save(p, ..) => Some(p.to_path_buf()),
-            Origem::Novo(..) => None,
+            Origem::Novo(..) | Origem::Tutorial(..) => None,
         };
         let modos = modos::Modos::carregar(recursos, &interface)?;
         let janelas = JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?, &interface);
