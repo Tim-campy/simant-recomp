@@ -268,3 +268,15 @@ fn clique_do_place_tambem_grava_o_patch_escolhido() {
     assert_eq!(p.estado.vistas.ponto_quintal, (5, 8));
     assert_eq!(p.nav.pontos[0], (5, 8));
 }
+
+/// O relógio do Mac da partida começa no maior prazo guardado no save (`_CatDelay` 2669 no QUICK2):
+/// o gato é testado já no primeiro tick, como num Windows ligado há mais tempo que a sessão que
+/// salvou (quintal.md, "Relógios do port").
+#[test]
+fn relogio_do_mac_comeca_nos_prazos_do_save() {
+    let mut p = partida();
+    let atraso = p.estado.bichos.gato_atraso;
+    assert_eq!(atraso, 2669);
+    p.rodar_tick();
+    assert!(p.estado.relogio_mac.unwrap() >= atraso as u32);
+}

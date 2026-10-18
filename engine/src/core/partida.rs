@@ -200,6 +200,10 @@ pub struct Partida {
     resto_ms: u64,
     /// Tempo real total passado a `avancar` (o `GetTickCount` do port, ms).
     ms_total: u64,
+    /// Relógio do Mac no início da partida: o maior dos prazos que o save guarda nesse relógio
+    /// (`_CatDelay`, `_DogBarkDelay`, `_BoyMsgCnt`), como num Windows ligado há mais tempo que o
+    /// da sessão que salvou (decisão do port; quintal.md, "Relógios do port").
+    mac_inicial: u32,
     /// O aplicativo tem o foco (`WM_ACTIVATEAPP`).
     ativo: bool,
     /// Ticks com redesenho (DGROUP `0x02F0`, "quadros").
@@ -250,6 +254,8 @@ impl Partida {
         cfg: ConfigPartida,
         cfg_avisos: ConfigAvisos,
     ) -> Partida {
+        let (b, m) = (&estado.bichos, &estado.menino);
+        let mac_inicial = [b.gato_atraso, b.cachorro_atraso_latido, m.boy_msg_cnt].into_iter().max().unwrap_or(0).max(0) as u32;
         let mut p = Partida {
             estado,
             regras,
@@ -261,6 +267,7 @@ impl Partida {
             relogio: Relogio::default(),
             resto_ms: 0,
             ms_total: 0,
+            mac_inicial,
             ativo: true,
             quadros: 0,
             contador_mapa: 0,
@@ -384,7 +391,7 @@ impl Partida {
     pub fn rodar_tick(&mut self) {
         self.vistas_para_estado();
         // `_MacTickCount` (1000:9694) = ⌊GetTickCount / 55⌋ × 3: tempo real (quintal.md, "Relógios").
-        self.estado.relogio_mac = Some(((self.ms_total / 55) * 3) as u32);
+        self.estado.relogio_mac = Some(self.mac_inicial.wrapping_add(((self.ms_total / 55) * 3) as u32));
         if let Some(s) = self.scripts.as_mut().filter(|s| s.tem_gancho(Gancho::AntesDoTick)) {
             s.antes_do_tick(&mut self.estado);
         }
