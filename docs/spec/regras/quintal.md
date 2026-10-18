@@ -471,7 +471,7 @@ Casos no original (bancada QEMU): Q-01 (chuva e água) e Q-02 (colônias), ambos
 
 ## Lacunas
 
-- `_YellowDeath` (causas 5 pisada, 6 cortador, 9 inseticida) chama `matar_amarela` de `rules/amarela.rs` (teste `pisada_mata_a_amarela`); não foi conferido contra o original.
+- `_YellowDeath` (causas 5 pisada, 6 cortador, 9 inseticida) chama `matar_amarela` de `rules/amarela.rs` (teste `pisada_mata_a_amarela`). A causa 9 (inseticida) foi conferida contra o original pelo vetor `ticks/inseticida_morte` (tick 21: morte sem corpo e fim de jogo); as causas 5 e 6 não.
 - `_DeadAntHere`, `_FindInAList` e `_KillSpider` são os de `engine/src/rules/comum.rs` (ver [../../decisoes.md](../../decisoes.md), "Módulo comum das regras"); a agonia da aranha vem de `inimigos.json` (`regras.aranha_agonia`), não mais de uma constante do quintal.
 - Textos do balão do menino (lista 4/1200) e dos sons: não conferidos.
 - `_LastColonyPop*` não está no save nem no `Estado`: o port usa o `_ColonyTotal*` da passada anterior, que é o mesmo valor exceto logo depois de `_InitSimYard` (1 no original).

@@ -1,25 +1,5 @@
 {
- "_comentario": "Tabelas do quintal e do tutorial. As de 'menino', 'cachorro', 'casa', 'colonias', dx8/dy8 foram extraídas do SIMANTW.EXE por tools/extrair_quintal.py (endereços no topo do script); 'regras', 'valores_iniciais', 'mensagens' e 'conselhos' vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/quintal.md e conselhos.md. Valores em decimal.",
- "dx8": [
-  0,
-  1,
-  1,
-  1,
-  0,
-  -1,
-  -1,
-  -1
- ],
- "dy8": [
-  -1,
-  -1,
-  0,
-  1,
-  1,
-  1,
-  0,
-  -1
- ],
+ "_comentario": "Tabelas do quintal e do tutorial. As de 'menino', 'cachorro', 'casa', 'colonias' foram extraídas do SIMANTW.EXE por tools/extrair_quintal.py (endereços no topo do script); 'regras', 'valores_iniciais', 'mensagens' e 'conselhos' vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/quintal.md e conselhos.md. Valores em decimal. As tabelas que o original tem uma vez só (dx8, dy8) ficam em data/comum.json.",
  "menino": {
   "passo_x": [
    4,

@@ -164,3 +164,49 @@ fn mod_das_regras_chega_ao_tick() {
     tick(&mut e, &mut RegrasOriginais::default());
     assert_eq!(e.controles.proxima_casta, padrao.superficie.casta_por_escolha[0]);
 }
+
+/// API de mods 0.20: as tabelas que o original tem uma vez só ficam em `data/comum.json`. Um mod que o
+/// troca muda a tabela para todas as partes; um mod antigo que ainda traz a cópia no arquivo de uma
+/// parte muda só aquela parte (com aviso no console), como antes.
+#[test]
+fn mod_de_comum_json_vale_para_todas_as_partes() {
+    use engine::rules::tick::RegrasOriginais;
+
+    let raiz = tmp("comum");
+    let (jogo, mods) = (raiz.join("jogo"), raiz.join("mods"));
+    fs::create_dir_all(&jogo).unwrap();
+    let r = Recursos::abrir(&jogo, &[], &dados_do_port(), Some(&mods)).unwrap();
+    let padrao = RegrasOriginais::carregar_sem_banco(&r).unwrap();
+    assert_eq!(padrao.ninho.classe_luta, padrao.superficie.classe_luta);
+    assert_eq!(padrao.ninho.chance_vitoria, padrao.amarela.matriz_luta);
+    assert_eq!(padrao.amarela.descarregar_grupo.map(|g| g as i8), padrao.superficie.grupo_sem_carga);
+
+    // Mod novo: comum.json com a classe de luta do grupo 0 trocada.
+    let m = criar_mod(&mods, "comum-mod", &[]);
+    sobrescrever(&m, "comum.json", |v| v["classe_luta"][0] = 3.into());
+    let r = Recursos::abrir(&jogo, &[], &dados_do_port(), Some(&mods)).unwrap();
+    let regras = RegrasOriginais::carregar_sem_banco(&r).unwrap();
+    assert_eq!(regras.superficie.classe_luta[0], 3);
+    assert_eq!(regras.ninho.classe_luta[0], 3);
+    assert_eq!(regras.amarela.classe_luta[0], 3);
+
+    // Mod antigo (API ≤ 0.19): a cópia de `turn_tab` no ninho.json vale só para o ninho.
+    fs::remove_file(m.join("data/comum.json")).unwrap();
+    sobrescrever(&m, "ninho.json", |v| {
+        v["turn_tab"] = serde_json::to_value([[1u8; 8]; 8]).unwrap();
+    });
+    let r = Recursos::abrir(&jogo, &[], &dados_do_port(), Some(&mods)).unwrap();
+    let regras = RegrasOriginais::carregar_sem_banco(&r).unwrap();
+    assert_eq!(regras.ninho.turn_tab, [[1; 8]; 8]);
+    assert_eq!(regras.inimigos.turn_tab, padrao.inimigos.turn_tab);
+    assert_eq!(regras.feromonios.turn_tab, padrao.feromonios.turn_tab);
+
+    // Uma tabela que falta em comum.json é erro ao carregar, com o nome do arquivo.
+    fs::remove_file(m.join("data/ninho.json")).unwrap();
+    sobrescrever(&m, "comum.json", |v| {
+        v.as_object_mut().unwrap().remove("borda_buraco");
+    });
+    let r = Recursos::abrir(&jogo, &[], &dados_do_port(), Some(&mods)).unwrap();
+    let erro = RegrasOriginais::carregar_sem_banco(&r).unwrap_err();
+    assert!(erro.contains("comum.json") && erro.contains("borda_buraco"), "{erro}");
+}

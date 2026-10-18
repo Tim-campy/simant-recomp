@@ -72,8 +72,9 @@ pub struct ConstantesAmarela {
 /// Quadros das animações que consomem sorteios (§10.2) e o estado de interface assumido.
 #[derive(Clone, Debug, Deserialize)]
 pub struct AnimacaoAmarela {
-    /// [hipótese] `_win_IsWinInFront(0)`: a janela de edição está à frente. O port não tem a janela; o
-    /// valor decide quantos quadros (e sorteios) as animações de morte e de loucura gastam.
+    /// [hipótese] `_win_IsWinInFront(0)`: a janela de edição está à frente. O port tem a janela, mas o
+    /// tick não consulta a ordem real das janelas: este valor fixo decide quantos quadros (e sorteios)
+    /// as animações de morte e de loucura gastam (com a edição atrás, o original gasta menos).
     pub janela_edicao_na_frente: bool,
     pub quadros_luta: i32,
     pub quadros_choque: i32,
@@ -149,7 +150,19 @@ pub struct MensagensAmarela {
     pub faixa_ninho_vermelho: MensagemFaixa,
 }
 
-/// Conteúdo de `data/amarela.json`.
+/// Tabelas de `data/comum.json` que a amarela usa (chave aqui, chave em `comum.json`).
+pub const USOS_COMUNS: &[comum::UsoComum] = &[
+    ("dx8", "dx8"),
+    ("dy8", "dy8"),
+    ("dx9", "dx9"),
+    ("dy9", "dy9"),
+    ("descarregar_grupo", "grupo_sem_carga"),
+    ("classe_luta", "classe_luta"),
+    ("matriz_luta", "matriz_luta"),
+    ("borda_buraco", "borda_buraco"),
+];
+
+/// Conteúdo de `data/amarela.json`, com as tabelas comuns de `data/comum.json` ([`USOS_COMUNS`]).
 #[derive(Clone, Debug, Deserialize)]
 pub struct TabelasAmarela {
     /// `_Dx8`/`_Dy8`.
@@ -212,13 +225,13 @@ pub struct SonsAmarela {
 impl TabelasAmarela {
     /// Lê `amarela.json` (com mods).
     pub fn carregar(r: &Recursos) -> Result<TabelasAmarela, String> {
-        let t: TabelasAmarela = r.dados(ARQUIVO_TABELAS)?;
+        let t: TabelasAmarela = comum::parte_dos_recursos(r, ARQUIVO_TABELAS, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }
 
     pub fn de_json(texto: &str) -> Result<TabelasAmarela, String> {
-        let t: TabelasAmarela = serde_json::from_str(texto).map_err(|e| format!("{ARQUIVO_TABELAS}: {e}"))?;
+        let t: TabelasAmarela = comum::parte_do_texto(ARQUIVO_TABELAS, texto, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }
@@ -1875,7 +1888,9 @@ fn reencarnar(e: &mut Estado, t: &TabelasAmarela) {
             e.partida.pretas_venceram = 0;
         } else if tipo == 2 {
             if e.preta.total_colonias > 1 {
-                // `_SpecialXfer`: o jogador escolhe outra colônia no mapa do quintal [lacuna: interface].
+                // `_SpecialXfer`: o jogador escolhe outra colônia no mapa do quintal. O tick só pede a
+                // escolha; o efeito existe (`vetor_tick::transferencia_especial` + troca de patch), mas só
+                // os vetores o chamam: a interface ainda não liga a escolha [lacuna: interface].
                 e.eventos.push(Evento::Mensagem(t.mensagens.outra_colonia));
             } else {
                 e.partida.fim_de_jogo = 1;

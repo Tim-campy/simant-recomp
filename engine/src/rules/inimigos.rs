@@ -97,7 +97,18 @@ pub struct RegrasInimigosDados {
     pub bicho_chao: u8,
 }
 
-/// Conteúdo de `data/inimigos.json`.
+/// Tabelas de `data/comum.json` que a parte dos inimigos usa (chave aqui, chave em `comum.json`).
+pub const USOS_COMUNS: &[comum::UsoComum] = &[
+    ("dx8", "dx8"),
+    ("dy8", "dy8"),
+    ("dx9", "dx9"),
+    ("dy9", "dy9"),
+    ("turn_tab", "turn_tab"),
+    ("sow_tab", "sow_tab"),
+    ("borda_formiga_leao", "borda_formiga_leao"),
+];
+
+/// Conteúdo de `data/inimigos.json`, com as tabelas comuns de `data/comum.json` ([`USOS_COMUNS`]).
 #[derive(Clone, Debug, Deserialize)]
 pub struct TabelasInimigos {
     /// `_Dx8`/`_Dy8`.
@@ -140,13 +151,13 @@ pub struct SonsInimigos {
 impl TabelasInimigos {
     /// Lê `inimigos.json` (com mods).
     pub fn carregar(r: &Recursos) -> Result<TabelasInimigos, String> {
-        let t: TabelasInimigos = r.dados(ARQUIVO_TABELAS)?;
+        let t: TabelasInimigos = comum::parte_dos_recursos(r, ARQUIVO_TABELAS, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }
 
     pub fn de_json(texto: &str) -> Result<TabelasInimigos, String> {
-        let t: TabelasInimigos = serde_json::from_str(texto).map_err(|e| format!("{ARQUIVO_TABELAS}: {e}"))?;
+        let t: TabelasInimigos = comum::parte_do_texto(ARQUIVO_TABELAS, texto, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }

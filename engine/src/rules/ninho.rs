@@ -49,7 +49,21 @@ const LIMITE_BLOQUEIO: u8 = 0x30;
 // Tabelas (dados)
 // ---------------------------------------------------------------------------------------------
 
-/// Conteúdo de `data/ninho.json` (endereços de origem em `tools/extrair_ninho.py`).
+/// Tabelas de `data/comum.json` que a parte dos ninhos usa (chave aqui, chave em `comum.json`).
+pub const USOS_COMUNS: &[comum::UsoComum] = &[
+    ("dx8", "dx8"),
+    ("dy8", "dy8"),
+    ("turn_tab", "turn_tab"),
+    ("modos_operaria", "modos_operaria"),
+    ("modos_soldado", "modos_soldado"),
+    ("modo_por_grupo", "modo_por_grupo"),
+    ("classe_luta", "classe_luta"),
+    ("chance_vitoria", "matriz_luta"),
+    ("borda_buraco", "borda_buraco"),
+];
+
+/// Conteúdo de `data/ninho.json` (endereços de origem em `tools/extrair_ninho.py`), com as tabelas
+/// comuns de `data/comum.json` ([`USOS_COMUNS`]; endereços em `tools/extrair_comum.py`).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct TabelasNinho {
     /// `_Dx8`/`_Dy8`: deslocamento por direção (0 = cima, 2 = direita, 4 = baixo, 6 = esquerda).
@@ -90,13 +104,13 @@ pub struct SonsNinho {
 impl TabelasNinho {
     /// Lê `ninho.json` (com mods).
     pub fn carregar(r: &Recursos) -> Result<TabelasNinho, String> {
-        let t: TabelasNinho = r.dados(ARQUIVO_TABELAS)?;
+        let t: TabelasNinho = comum::parte_dos_recursos(r, ARQUIVO_TABELAS, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }
 
     pub fn de_json(texto: &str) -> Result<TabelasNinho, String> {
-        let t: TabelasNinho = serde_json::from_str(texto).map_err(|e| format!("{ARQUIVO_TABELAS}: {e}"))?;
+        let t: TabelasNinho = comum::parte_do_texto(ARQUIVO_TABELAS, texto, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }

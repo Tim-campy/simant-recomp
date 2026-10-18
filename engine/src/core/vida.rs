@@ -170,7 +170,10 @@ fn definir_amarela(c: &mut CamadasVida, me: &FormigaAmarela, pendencias: &mut Ve
         return;
     }
     if me.tipo == TIPO_RAINHA {
-        // A célula da segunda metade sai de uma tabela de direções ainda não localizada (jogo.md).
+        // A segunda metade (0xFE) não é gravada aqui: jogo.md (mapa de vida) diz que a tabela de direções
+        // não foi localizada. As regras do tick já põem a cauda em `_Dx8/_Dy8[_MeDir ^ 4]`
+        // (`rules/amarela.rs`, `cauda`; formiga-amarela.md, `_DoLifeExchange`), que é provavelmente a
+        // mesma tabela [hipótese: não conferido contra uma captura da rainha amarela].
         pendencias.push("segunda metade da formiga amarela rainha (tabela de direções em aberto)".into());
     }
 }

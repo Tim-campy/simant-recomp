@@ -104,7 +104,8 @@ pub enum RespostaBotao {
     Feito,
     /// Caso 0xE: salvar o jogo (`_SaveGame(1)`), a cargo da interface.
     Salvar,
-    /// Abre uma janela que o port ainda não tem (0–4, 8) ou número desconhecido.
+    /// Funções que esta camada não trata: 0–3 (abrir Behavior, Caste, History e Info), que a
+    /// interface trata antes de chamar aqui (`simant/src/sessao.rs`), ou número desconhecido.
     NaoImplementado(u16),
 }
 
@@ -1021,8 +1022,9 @@ impl Partida {
     }
 
     /// Clique numa célula do mapa mostrado (`_processEdit`). `duplo` = duplo clique (esquerdo ou
-    /// direito). Menus de "segurar o botão" ainda não existem no port (`segurando` = falso). O clique
-    /// simples para a simulação por `espera_clique_simples_tickcount` (o laço de espera do original).
+    /// direito), sem "segurar o botão" (`segurando` = falso; os menus de segurar vêm de
+    /// [`Partida::clicar_depois_da_espera`], janelas.md §4). O clique simples para a simulação por
+    /// `espera_clique_simples_tickcount` (o laço de espera do original).
     pub fn clicar(&mut self, x: i32, y: i32, duplo: bool) -> RespostaClique {
         if !duplo {
             self.bloqueio_ms = self.cfg.espera_clique_simples_tickcount * self.avisos.cfg.ms_por_tickcount;
