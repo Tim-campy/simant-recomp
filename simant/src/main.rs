@@ -25,6 +25,7 @@ use jogo::*;
 use opcoes::*;
 use sessao::*;
 
+mod janelas_ui;
 mod modos;
 
 use std::path::{Path, PathBuf};
@@ -271,7 +272,7 @@ fn principal() -> Result<(), String> {
         if let Some(m) = o.quintal {
             let a = [AcaoQuintal::ModoQuintal, AcaoQuintal::ModoCasa, AcaoQuintal::ModoEstrategico, AcaoQuintal::ModoGrafico];
             let a = *a.get(m as usize).ok_or("--quintal: modo 0 a 3")?;
-            s.modos.janela.aplicar(a, &mut s.partida.estado);
+            modos::aplicar_acao_quintal(&mut s, a, true);
         }
         if let Some(m) = o.janela_mapa {
             s.abrir_mapa();

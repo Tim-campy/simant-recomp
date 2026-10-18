@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 use super::avisos::{desenhar_faixa, desenhar_modal, Avisos};
 use super::edicao::{desenhar_vista, tiles_para, CenaEdicao, VistaEdicao};
+use super::gerenciador::{desenhar_glifo_restaurar, desenhar_seta, inicio_do_polegar, Metricas, Rolagem, Seta};
 use super::mapa::{MapaChao, Plano};
 use super::navegacao::{Acao, Navegacao};
 use super::quadro::Quadro;
@@ -58,6 +59,46 @@ pub struct MolduraWindows {
     pub fontes_titulo: Vec<usize>,
     #[serde(default)]
     pub cor_texto_titulo: u8,
+    /// Título da janela inativa: [fundo, texto] (como as de controle, janelas.json) [medido em j01].
+    #[serde(default = "titulo_inativo_padrao")]
+    pub titulo_inativo: [u8; 2],
+    /// Cor das setas das barras e dos glifos dos botões do título.
+    #[serde(default)]
+    pub cor_seta: u8,
+}
+
+fn titulo_inativo_padrao() -> [u8; 2] {
+    [15, 0]
+}
+
+impl MolduraWindows {
+    /// Contorno externo como retângulo.
+    pub fn retangulo(&self) -> Retangulo {
+        ret(self.externo)
+    }
+
+    /// Medidas para o gerenciador de janelas.
+    pub fn metricas(&self) -> Metricas {
+        Metricas { espessura: self.espessura, altura_titulo: self.altura_titulo, barra_rolagem: self.barra_rolagem }
+    }
+}
+
+/// O que a moldura da janela de edição mostra além da geometria: título ativo, botão de maximizar
+/// ou de restaurar e a posição dos polegares (`_ResetEditScrollRange`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EstadoMoldura {
+    /// A janela de edição está aberta (fechada com Ctrl+F4 ou Close, não é desenhada).
+    pub aberta: bool,
+    pub ativa: bool,
+    pub maximizada: bool,
+    /// [horizontal, vertical].
+    pub rolagem: [Rolagem; 2],
+}
+
+impl Default for EstadoMoldura {
+    fn default() -> Self {
+        EstadoMoldura { aberta: true, ativa: true, maximizada: false, rolagem: [Rolagem::default(); 2] }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -124,8 +165,9 @@ fn linha_v(q: &mut Quadro, x: i16, y0: i16, y1: i16, cor: u8) {
     q.preencher(Retangulo { esq: x, topo: y0, dir: x + 1, base: y1 }, cor, cor);
 }
 
-/// Desenha a moldura (sem texto do título, setas e polegares das barras) e devolve as partes.
-pub fn desenhar_moldura(q: &mut Quadro, m: &MolduraWindows) -> PartesMoldura {
+/// Desenha a moldura da janela de edição (sem o texto do título) com o título ativo ou inativo, o
+/// botão de maximizar ou de restaurar, as setas e os polegares das barras, e devolve as partes.
+pub fn desenhar_moldura(q: &mut Quadro, m: &MolduraWindows, estado: &EstadoMoldura) -> PartesMoldura {
     let e = ret(m.externo);
     let (t, h, b) = (m.espessura, m.altura_titulo, m.barra_rolagem);
     let k = m.cor_linha;
@@ -143,17 +185,24 @@ pub fn desenhar_moldura(q: &mut Quadro, m: &MolduraWindows) -> PartesMoldura {
         linha_h(q, e.dir - t, e.dir, y, k);
     }
     let i = Retangulo { esq: e.esq + t, topo: e.topo + t, dir: e.dir - t, base: e.base - t };
-    // Título: caixa do menu de sistema, faixa colorida, botão de maximizar e linha embaixo.
+    // Título: caixa do menu de sistema, faixa colorida (branca na janela inativa), botão de
+    // maximizar (ou de restaurar) e linha embaixo.
     let titulo = Retangulo { base: i.topo + h, ..i };
-    q.preencher(titulo, m.cor_titulo, m.cor_titulo);
+    let fundo_titulo = if estado.ativa { m.cor_titulo } else { m.titulo_inativo[0] };
+    q.preencher(titulo, fundo_titulo, fundo_titulo);
     q.preencher(Retangulo { dir: i.esq + h, ..titulo }, m.cor_botao, m.cor_botao);
     linha_v(q, i.esq + h, titulo.topo, titulo.base, k);
-    botao(q, Retangulo { esq: i.dir - h, ..titulo }, m);
-    // Desenhos medidos (j00): seta do botão de maximizar (triângulo de 4 linhas) e o traço do menu
-    // de sistema (retângulo 7 × 3 com sombra), como nas janelas de controle.
-    let (ax, ay) = (i32::from(i.dir - h) + 8, i32::from(titulo.topo) + 6);
-    for k in 0..4 {
-        linha_h(q, (ax - k) as i16, (ax + k + 1) as i16, (ay + k) as i16, m.cor_linha);
+    let botao_max = Retangulo { esq: i.dir - h, ..titulo };
+    botao(q, botao_max, m);
+    // Desenhos medidos: seta do botão de maximizar (triângulo de 4 linhas, j00), o glifo de restaurar
+    // (w13) e o traço do menu de sistema (retângulo 7 × 3 com sombra), como nas janelas de controle.
+    if estado.maximizada {
+        desenhar_glifo_restaurar(q, botao_max, m.cor_seta);
+    } else {
+        let (ax, ay) = (i32::from(i.dir - h) + 8, i32::from(titulo.topo) + 6);
+        for k in 0..4 {
+            linha_h(q, (ax - k) as i16, (ax + k + 1) as i16, (ay + k) as i16, m.cor_seta);
+        }
     }
     let (cx, cy) = (i.esq + 6, titulo.topo + 7);
     q.preencher(Retangulo { esq: cx + 1, topo: cy + 3, dir: cx + 8, base: cy + 4 }, m.cor_relevo_escuro, m.cor_relevo_escuro);
@@ -162,23 +211,43 @@ pub fn desenhar_moldura(q: &mut Quadro, m: &MolduraWindows) -> PartesMoldura {
     q.preencher(Retangulo { esq: cx + 1, topo: cy + 1, dir: cx + 6, base: cy + 2 }, m.cor_relevo_claro, m.cor_relevo_claro);
     linha_v(q, i.dir - h - 1, titulo.topo, titulo.base, k);
     linha_h(q, i.esq, i.dir, titulo.base, k);
-    // Barras de rolagem: linha preta, botões nas pontas e trilho; canto entre as duas.
+    // Barras de rolagem: linha preta, botões com setas nas pontas, trilho e polegar; canto.
     let c = Retangulo { esq: i.esq, topo: titulo.base + 1, dir: i.dir - b, base: i.base - b };
     let lado = b - 1;
     let v = Retangulo { esq: c.dir + 1, topo: c.topo, dir: i.dir, base: c.base };
     q.preencher(v, m.cor_trilho, m.cor_trilho);
     linha_v(q, c.dir, c.topo, c.base, k);
-    botao(q, Retangulo { base: v.topo + lado, ..v }, m);
+    let cima = Retangulo { base: v.topo + lado, ..v };
+    botao(q, cima, m);
+    desenhar_seta(q, cima, Seta::Cima, m.cor_seta);
     linha_h(q, v.esq, v.dir, v.topo + lado, k);
-    botao(q, Retangulo { topo: v.base - lado, ..v }, m);
+    let baixo = Retangulo { topo: v.base - lado, ..v };
+    botao(q, baixo, m);
+    desenhar_seta(q, baixo, Seta::Baixo, m.cor_seta);
     linha_h(q, v.esq, v.dir, v.base - lado - 1, k);
+    if let Some(p) = inicio_do_polegar(v, false, lado, estado.rolagem[1]) {
+        let p = p as i16;
+        linha_h(q, v.esq, v.dir, p, k);
+        botao(q, Retangulo { topo: p + 1, base: p + 1 + lado, ..v }, m);
+        linha_h(q, v.esq, v.dir, p + lado + 1, k);
+    }
     let hz = Retangulo { esq: c.esq, topo: c.base + 1, dir: c.dir, base: i.base };
     q.preencher(hz, m.cor_trilho, m.cor_trilho);
     linha_h(q, c.esq, c.dir, c.base, k);
-    botao(q, Retangulo { dir: hz.esq + lado, ..hz }, m);
+    let esq = Retangulo { dir: hz.esq + lado, ..hz };
+    botao(q, esq, m);
+    desenhar_seta(q, esq, Seta::Esquerda, m.cor_seta);
     linha_v(q, hz.esq + lado, hz.topo, hz.base, k);
-    botao(q, Retangulo { esq: hz.dir - lado, ..hz }, m);
+    let dir = Retangulo { esq: hz.dir - lado, ..hz };
+    botao(q, dir, m);
+    desenhar_seta(q, dir, Seta::Direita, m.cor_seta);
     linha_v(q, hz.dir - lado - 1, hz.topo, hz.base, k);
+    if let Some(p) = inicio_do_polegar(hz, true, lado, estado.rolagem[0]) {
+        let p = p as i16;
+        linha_v(q, p, hz.topo, hz.base, k);
+        botao(q, Retangulo { esq: p + 1, dir: p + 1 + lado, ..hz }, m);
+        linha_v(q, p + lado + 1, hz.topo, hz.base, k);
+    }
     let canto = Retangulo { esq: c.dir, topo: c.base, dir: i.dir, base: i.base };
     q.preencher(canto, m.cor_botao, m.cor_botao);
     linha_v(q, c.dir, c.base, i.base, k);
@@ -253,6 +322,8 @@ pub struct TelaDeJogo {
     pub titulo: String,
     /// Botões da faixa com o estado "selecionado" ligado ou desligado pelo jogo (`_UpdateUserButtons`).
     pub selecao_da_faixa: Vec<(String, bool)>,
+    /// Título ativo, maximizada e polegares da moldura da janela de edição.
+    pub estado_moldura: EstadoMoldura,
     faixa: Janela,
     /// Canto do objeto 0 da faixa na área cliente.
     origem_faixa: (i16, i16),
@@ -326,6 +397,7 @@ impl TelaDeJogo {
             bitmaps_da_faixa: Vec::new(),
             titulo: String::new(),
             selecao_da_faixa: Vec::new(),
+            estado_moldura: EstadoMoldura::default(),
         })
     }
 
@@ -363,6 +435,20 @@ impl TelaDeJogo {
         }
         let (cx, cy) = nav.vista.celula(col, lin);
         Some((cx as i32, cy as i32))
+    }
+
+    /// A janela de edição foi movida, redimensionada, maximizada ou restaurada (`WM_SIZE` em
+    /// `MAINWNDPROC` + `_UpdateEdit`): a moldura vai para `externo`, o canto do mapa para o canto da
+    /// área cliente e a vista passa a ter as colunas e linhas que cobrem a área cliente
+    /// (`_win_EditChanged`: arredonda para cima). Devolve (`_editWidth`, `_editHeight`).
+    pub fn ajustar_moldura(&mut self, externo: Retangulo) -> (i32, i32) {
+        let m = &mut self.cfg.edicao.moldura;
+        m.externo = [externo.esq, externo.topo, externo.dir - externo.esq, externo.base - externo.topo];
+        let c = cliente_da_moldura(m);
+        self.cfg.edicao.area_na_tela = [c.esq, c.topo];
+        self.largura_vista = tiles_para(i32::from(c.dir - c.esq)).max(1);
+        self.altura_vista = tiles_para(i32::from(c.base - c.topo)).max(1);
+        (self.largura_vista, self.altura_vista)
     }
 
     /// Estado de navegação inicial para o save, com a vista conforme `posicao`.
@@ -417,17 +503,22 @@ impl TelaDeJogo {
         }
         let mut pendentes = desenhar_janela_carregada_na_tela(&mut q, recursos, interface, id_faixa, &faixa)?;
         pendentes.extend(atras(&mut q)?);
+        if !self.estado_moldura.aberta {
+            // Janela de edição fechada (Ctrl+F4, Close): só a faixa e as janelas.
+            return Ok((q, pendentes));
+        }
 
         let e = &cfg.edicao;
         let area = area_de_edicao(&self.edicao, e)?;
-        let partes = desenhar_moldura(&mut q, &e.moldura);
+        let partes = desenhar_moldura(&mut q, &e.moldura, &self.estado_moldura);
         let m = &e.moldura;
         if let Some(f) = m.fontes_titulo.iter().find_map(|&i| interface.fontes.get(i).and_then(|f| f.as_ref())) {
             // Centrado entre a caixa do menu de sistema e o botão de maximizar.
             let h = m.altura_titulo;
             let r = Retangulo { esq: partes.titulo.esq + h + 1, dir: partes.titulo.dir - h - 1, ..partes.titulo };
             let antes = q.recorte.replace(r);
-            q.texto(r, f, self.titulo.as_bytes(), 0, m.cor_texto_titulo, m.cor_titulo);
+            let (frente, fundo) = if self.estado_moldura.ativa { (m.cor_texto_titulo, m.cor_titulo) } else { (m.titulo_inativo[1], m.titulo_inativo[0]) };
+            q.texto(r, f, self.titulo.as_bytes(), 0, frente, fundo);
             q.recorte = antes;
         }
         let [ax, ay] = e.area_na_tela;
@@ -556,8 +647,11 @@ pub fn compor_tela_de_jogo(
     interface: &Interface,
     jogo: &JogoSalvo,
 ) -> Result<(Quadro, Vec<String>), String> {
-    let tela = TelaDeJogo::carregar(cfg, recursos, interface, jogo)?;
+    let mut tela = TelaDeJogo::carregar(cfg, recursos, interface, jogo)?;
     let nav = tela.navegacao(jogo, cfg.edicao.posicao)?;
+    // Polegares na posição da vista (`_ResetEditScrollRange`).
+    let (mx, my) = nav.maximo();
+    tela.estado_moldura.rolagem = [Rolagem { pos: nav.vista.x, max: mx }, Rolagem { pos: nav.vista.y, max: my }];
     tela.compor(recursos, interface, &nav)
 }
 
@@ -592,6 +686,6 @@ mod testes {
         )
         .unwrap();
         let mut q = Quadro::new(640, 480, 0);
-        assert_eq!(desenhar_moldura(&mut q, &m).cliente, cliente_da_moldura(&m));
+        assert_eq!(desenhar_moldura(&mut q, &m, &EstadoMoldura::default()).cliente, cliente_da_moldura(&m));
     }
 }

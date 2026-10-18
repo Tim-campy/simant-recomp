@@ -48,6 +48,51 @@
   "cor_contorno_barra": 0,
   "cor_fundo_grafico": 15,
   "mapa": {"janela": 1, "objeto_area": "mapTileArea"},
+  "_quintal": "Janela do quintal (layout 25, _MapToYard); o contorno vem de data/quintal_mapa.json ('externo').",
+  "quintal": 25,
+  "_gerenciador": "Gerenciador de janelas (engine/src/core/gerenciador.rs, docs/spec/telas/janelas.md §8). tamanho_minimo: menor contorno externo de janela com moldura grossa (WM_GETMINMAXINFO, _AdjustWndMinMax): largura 317 medida na bancada (v17), altura [hipótese: a mesma conta com o objeto 0x13 da janela de edição]. Menu de sistema: itens do menu do Windows depois de _win_Open (RemoveMenu/InsertMenu: Close com 'Ctrl+F4' e Next com 'Ctrl+F6', textos do DGROUP em 1048:bda7 e 1048:bdb6); geometria medida em w04 (item de 18 linhas, 149 de largura) [aproximado: separadores e posição do texto].",
+  "gerenciador": {
+    "tamanho_minimo": [317, 296],
+    "cor_contorno_arrasto": 7,
+    "cor_seta": 0,
+    "menu_sistema": {
+      "itens": [
+        {"texto": "&Restore", "comando": "restaurar"},
+        {"texto": "&Move", "comando": "mover"},
+        {"texto": "&Size", "comando": "tamanho"},
+        {"texto": "Mi&nimize", "comando": "minimizar"},
+        {"texto": "Ma&ximize", "comando": "maximizar"},
+        {"comando": "separador"},
+        {"texto": "&Close", "atalho": "Ctrl+F4", "comando": "fechar"},
+        {"comando": "separador"},
+        {"texto": "Nex&t", "atalho": "Ctrl+F6", "comando": "proxima"}
+      ],
+      "largura": 149,
+      "altura_item": 18,
+      "altura_separador": 4,
+      "linha_separador": 3,
+      "folga_base": 3,
+      "margem_texto": 15,
+      "coluna_atalho": 90,
+      "fontes": [6, 0],
+      "cor_fundo": 15,
+      "cor_texto": 0,
+      "cor_desabilitado": 7,
+      "cor_realce": 4,
+      "cor_texto_realce": 15,
+      "cor_borda": 0
+    }
+  },
+  "_teclas": "Aceleradores de janela da ACCELERATORTABLE (comandos 0xFDA0–0xFDA5 tratados em MAINWNDPROC): Ctrl+F4 e Ctrl+NumPad− fecham a janela de cima (WM_CLOSE); Ctrl+Espaço abre o menu de sistema dela (SC_KEYMENU); Ctrl+F6 e Ctrl+NumPad+ trazem a de baixo para cima; Ctrl+P = SC_MOVE; Ctrl+Z maximiza/restaura a janela de edição se ela é a de cima. (Ctrl+A = SC_SIZE fica com o Save As, que vem antes na tabela.) Nomes de tecla do SDL.",
+  "teclas": [
+    {"tecla": "F4", "ctrl": true, "acao": "fechar_de_cima"},
+    {"tecla": "Keypad -", "ctrl": true, "acao": "fechar_de_cima"},
+    {"tecla": "Space", "ctrl": true, "acao": "menu_sistema"},
+    {"tecla": "F6", "ctrl": true, "acao": "proxima"},
+    {"tecla": "Keypad +", "ctrl": true, "acao": "proxima"},
+    {"tecla": "P", "ctrl": true, "acao": "mover"},
+    {"tecla": "Z", "ctrl": true, "acao": "maximizar_edicao"}
+  ],
   "info": {"janela": 5, "objeto_area": "infoArea", "ajuste": [1, 0]},
   "historico": {
     "_comentario": "Janela 21 (_OpenHistoryWindow, _ProcHistoryEvent, _ToggleHistButton, _drawHistGraph em 1000:8a6a–8e78). Séries de _HistGraphs (8:8672) e parceiras de escala de _AltHistGraphs (8:869a), por símbolo do save; nomes da lista 4/1050. As cores dos 4 lugares vêm de _ConvColor(0x43, 0x46, 0x49, 0x45) (8:8e4c), cuja tabela não foi lida [hipótese].",

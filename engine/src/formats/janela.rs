@@ -65,6 +65,9 @@ impl Objeto {
 pub struct Janela {
     /// Objeto 0 é a própria janela.
     pub objetos: Vec<Objeto>,
+    /// Bytes 0x1C e 0x1D do cabeçalho: estilo da janela do Windows criada por `_win_Open`
+    /// (ver `core::gerenciador::Estilo::do_layout`).
+    pub flags: [u8; 2],
 }
 
 /// Entrada da tabela de cores: frente, fundo e segunda cor de fundo (padrão).
@@ -157,7 +160,7 @@ impl Janela {
         if o != layout.len() {
             return Err(format!("sobraram {} bytes depois do último objeto", layout.len() - o));
         }
-        Ok(Janela { objetos })
+        Ok(Janela { objetos, flags: [layout[0x1C], layout[0x1D]] })
     }
 
     pub fn retangulo(&self) -> Retangulo {

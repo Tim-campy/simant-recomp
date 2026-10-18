@@ -171,6 +171,15 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                 continue;
             }
             match ev {
+                Event::KeyDown { keycode: Some(Keycode::Escape), .. }
+                    if s.janelas.gerente.menu.is_some() || s.janelas.gerente.arrasto.is_some() =>
+                {
+                    // Esc fecha o menu de sistema ou cancela o Move/Size pelo teclado.
+                    if !s.tecla_de_janela(&EventoNav::Tecla { nome: "Escape".into(), ctrl: false, shift: false, alt: false }) {
+                        s.janelas.gerente.arrasto = None;
+                    }
+                    redesenhar = true;
+                }
                 Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return Ok(()),
                 Event::Window { win_event: WindowEvent::FocusGained, .. } => {
                     s.partida.definir_foco(true);
@@ -192,6 +201,11 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                         redesenhar |= m.mover(x, y);
                         continue;
                     }
+                    // Arrasto da moldura (mover, redimensionar, polegar) e realce do menu de sistema.
+                    if s.janelas.gerente.arrasto.is_some() || s.janelas.gerente.menu.is_some() {
+                        redesenhar |= s.mover_nas_janelas(x, y);
+                        continue;
+                    }
                     let nas_janelas = mousestate.left() && s.janelas.mover(s.recursos, &mut s.partida.estado, x, y).unwrap_or(false);
                     if nas_janelas || (mousestate.left() && modos::mover(&mut s, x, y, ctrl_apertado(&eventos))) {
                         redesenhar = true;
@@ -200,6 +214,11 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                 Event::KeyDown { keycode: Some(k), keymod, .. } => {
                     let tab = eventos.keyboard_state().is_scancode_pressed(Scancode::Tab);
                     let ev = evento_de_tecla(k, keymod);
+                    // Menu de sistema aberto e aceleradores de janela (Ctrl+F4, Ctrl+F6…).
+                    if s.tecla_de_janela(&ev) {
+                        redesenhar = true;
+                        continue;
+                    }
                     match modos::tecla(&mut s, &ev) {
                         modos::Resposta::Seguir => {}
                         modos::Resposta::Tratada => {
@@ -231,19 +250,51 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                 }
                 Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => {
                     cursor = (x, y);
-                    if s.clicar_nas_janelas(x, y) {
-                        redesenhar = true;
-                        continue;
-                    }
-                    if s.botao_de_cheiro_em(x, y) {
-                        redesenhar = true;
-                        continue;
-                    }
-                    if let Some(i) = s.marcador_em(x, y) {
-                        s.partida.marcador(i, ctrl_apertado(&eventos));
-                        continue;
-                    }
-                    match modos::clique(&mut s, x, y, clicks >= 2, ctrl_apertado(&eventos)) {
+                    let ctrl = ctrl_apertado(&eventos);
+                    // 1. "Popups" dos modos por cima de tudo (Select a Game, menu de ferramentas).
+                    // 2. Janelas (gerenciador, janelas.md §8): só a da frente sob o cursor recebe.
+                    // 3. Fora das janelas: faixa.
+                    let popup = s.modos.escolhendo || s.modos.menu_aberto;
+                    let rota = if popup { janelas_ui::Roteamento::Fora } else { s.clicar_nas_janelas(x, y, clicks >= 2) };
+                    let resposta = match rota {
+                        _ if popup => modos::clique_popup(&mut s, x, y),
+                        janelas_ui::Roteamento::Tratado => modos::Resposta::Tratada,
+                        janelas_ui::Roteamento::Linha(a) => {
+                            // Seta da barra: repete enquanto o botão fica apertado.
+                            repeticao.pressionar(a);
+                            modos::Resposta::Tratada
+                        }
+                        janelas_ui::Roteamento::Quintal => {
+                            modos::clique_no_quintal(&mut s, x, y, clicks >= 2);
+                            modos::Resposta::Tratada
+                        }
+                        janelas_ui::Roteamento::Edicao => {
+                            if modos::clique_na_edicao(&mut s, x, y, ctrl) {
+                                modos::Resposta::Tratada
+                            } else {
+                                if clicks >= 2 {
+                                    s.clique_pendente = None;
+                                    s.clicar_no_mapa(x, y, true);
+                                } else if let Some(c) = s.tela.celula_em(x, y, &s.partida.nav) {
+                                    // _processEdit: espera ~6 unidades de _TickCount e só então decide.
+                                    s.partida.iniciar_espera_do_clique();
+                                    s.clique_pendente = Some((Instant::now(), x, y, c));
+                                }
+                                modos::Resposta::Tratada
+                            }
+                        }
+                        janelas_ui::Roteamento::Fora => {
+                            if !s.modos.janela.na_frente && s.botao_de_cheiro_em(x, y) {
+                                modos::Resposta::Tratada
+                            } else if let Some(i) = s.marcador_em(x, y).filter(|_| !s.modos.janela.na_frente) {
+                                s.partida.marcador(i, ctrl);
+                                modos::Resposta::Tratada
+                            } else {
+                                modos::clique_na_faixa(&mut s, x, y)
+                            }
+                        }
+                    };
+                    match resposta {
                         modos::Resposta::Seguir => {}
                         modos::Resposta::Tratada => {
                             redesenhar = true;
@@ -263,7 +314,8 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                             continue;
                         }
                     }
-                    if ctrl_apertado(&eventos) && s.abrir_menu_de_icones(x, y) {
+                    // Faixa 34 (fora das janelas).
+                    if ctrl && s.abrir_menu_de_icones(x, y) {
                         redesenhar = true;
                         continue;
                     }
@@ -273,23 +325,24 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                             RespostaBotao::Salvar => s.salvar_com_dialogo(false, o.salvar.as_deref()),
                             RespostaBotao::NaoImplementado(n) => println!("botão {n}: janela ainda não implementada"),
                         }
+                        redesenhar = true;
                     } else if let Some(a) = s.acao_do_clique(x, y) {
                         s.partida.navegar(a);
                         repeticao.pressionar(a);
-                    } else if clicks >= 2 {
-                        s.clique_pendente = None;
-                        s.clicar_no_mapa(x, y, true);
-                    } else if let Some(c) = s.tela.celula_em(x, y, &s.partida.nav) {
-                        // _processEdit: espera ~6 unidades de _TickCount e só então decide.
-                        s.partida.iniciar_espera_do_clique();
-                        s.clique_pendente = Some((Instant::now(), x, y, c));
                     }
                 }
                 Event::MouseButtonDown { mouse_btn: MouseButton::Right, clicks, x, y, .. } => {
-                    // Experimental: _processExp recebe também o clique direito.
-                    if let modos::Resposta::Seguir = modos::clique(&mut s, x, y, clicks >= 2, ctrl_apertado(&eventos)) {
-                        // _processEdit: clique direito simples = simples; duplo direito = duplo.
-                        s.clicar_no_mapa(x, y, clicks >= 2);
+                    if s.modos.escolhendo || s.modos.menu_aberto {
+                        continue;
+                    }
+                    // WM_MOUSEACTIVATE com WM_RBUTTONDOWN: a janela vem para a frente e recebe o clique
+                    // (só o esquerdo é comido, `MAINWNDPROC`); o direito só vale na área do mapa.
+                    if s.clicar_direito_nas_janelas(x, y) {
+                        // Experimental: _processExp recebe também o clique direito.
+                        if !modos::clique_na_edicao(&mut s, x, y, ctrl_apertado(&eventos)) {
+                            // _processEdit: clique direito simples = simples; duplo direito = duplo.
+                            s.clicar_no_mapa(x, y, clicks >= 2);
+                        }
                     }
                     redesenhar = true;
                 }
@@ -298,6 +351,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                         s.soltar_menu(x, y, shift_apertado(&eventos));
                         redesenhar = true;
                     }
+                    redesenhar |= s.soltar_nas_janelas(x, y);
                     repeticao.soltar();
                     s.janelas.soltar();
                     modos::soltar(&mut s);
@@ -386,5 +440,7 @@ pub(crate) fn novo_jogo<'a>(s: &Sessao<'a>, e: engine::core::selecao::Escolha, o
     // _NewGame não ressemeia: o mundo sai do R da partida aberta (geracao-mundo.md §1; conferido no
     // vetor inseticida_morte/21, engine/tests/fim_de_jogo_interface.rs).
     println!("novo jogo {e:?} com R = {:#010x}", s.partida.estado.r.estado());
-    Sessao::abrir(s.recursos, &o.dados, Origem::NovoNaPartida(&s.partida.estado, tipo), s.cores.clone())
+    let mut nova = Sessao::abrir(s.recursos, &o.dados, Origem::NovoNaPartida(&s.partida.estado, tipo), s.cores.clone())?;
+    nova.herdar_janelas(s);
+    Ok(nova)
 }

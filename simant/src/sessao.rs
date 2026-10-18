@@ -140,13 +140,25 @@ impl Sessao<'_> {
             Origem::Novo(..) | Origem::NovoNaPartida(..) | Origem::Tutorial(..) => None,
         };
         let modos = modos::Modos::carregar(recursos, &interface)?;
-        let janelas = JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?, &interface);
+        // Gerenciador de janelas: a de edição e a área cliente embaixo da faixa (janelas.md §8).
+        let area = Retangulo { esq: 0, topo: interface.moldura.faixa.altura, dir: tela.cfg.largura as i16, base: tela.cfg.altura as i16 };
+        let moldura = &tela.cfg.edicao.moldura;
+        let mut janelas =
+            JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?, &interface, recursos, (moldura.retangulo(), moldura.metricas()), area)?;
+        let [qx, qy, qw, qh] = modos.quintal.cfg.externo;
+        janelas.registrar_quintal(Retangulo { esq: qx, topo: qy, dir: qx + qw, base: qy + qh });
+        // _SetDefaultWindows no começo do jogo e, num Load, de novo (o Load roda depois de um jogo).
+        let plano = partida.nav.plano_mapa;
+        let mut abertas = vec![janelas.janelas_padrao(plano)];
+        if matches!(origem, Origem::Save(..) | Origem::Tutorial(..)) {
+            abertas.push(janelas.janelas_padrao(plano));
+        }
         let menus_cfg: ConfigMenus = recursos.dados(menus::ARQUIVO_CONFIG)?;
         let dialogos_cfg = recursos.dados(engine::core::dialogos::ARQUIVO_CONFIG)?;
         let mapa = engine::core::janela_mapa::JanelaMapa::carregar(recursos)?;
         let janela_exame = engine::core::exame::JanelaExame::carregar(recursos)?;
         let info = engine::core::info::JanelaInfo::new(recursos.dados(engine::core::info::ARQUIVO_CONFIG)?);
-        Ok(Sessao {
+        let mut s = Sessao {
             recursos,
             interface,
             tela,
@@ -167,7 +179,12 @@ impl Sessao<'_> {
             janela_exame,
             exame: None,
             info,
-        })
+        };
+        for a in abertas.into_iter().flatten() {
+            s.depois_de_abrir(a);
+        }
+        s.sincronizar_janelas();
+        Ok(s)
     }
 
     /// File → Save (`_SaveGame(1)`): grava no arquivo da partida; sem arquivo, ou em "Save As"
@@ -199,50 +216,47 @@ impl Sessao<'_> {
         for (nome, &n) in &self.mapa.cfg.botoes_cheiro {
             self.tela.selecao_da_faixa.push((nome.clone(), n == modo));
         }
-        if self.janelas.pilha.contains(&Some(Controle::Info)) {
+        self.sincronizar_janelas();
+        if self.janelas.aberta(Controle::Info) {
             self.info.carregar(self.recursos);
         }
-        if self.janelas.pilha.contains(&Some(Controle::Mapa)) {
+        if self.janelas.aberta(Controle::Mapa) {
             self.mapa.atualizar(&self.partida.estado, self.partida.mostrar_trilhas);
         }
-        // Janelas de controle: as que estão antes da de edição na pilha ficam atrás dela.
-        let edicao = self.janelas.pilha.iter().position(|j| j.is_none()).unwrap_or(self.janelas.pilha.len());
-        let (atras, frente) = self.janelas.pilha.split_at(edicao);
-        let (recursos, interface, estado, janelas) = (self.recursos, &self.interface, &self.partida.estado, &self.janelas);
-        let (mapa, nav, trilhas, info) = (&self.mapa, &self.partida.nav, self.partida.mostrar_trilhas, &self.info);
-        let desenhar = |q: &mut Quadro, lista: &[Option<Controle>]| -> Result<Vec<String>, String> {
-            let mut p = Vec::new();
-            for c in lista.iter().flatten() {
-                if *c == Controle::Info {
-                    let g = janelas.geometria(recursos, *c)?;
-                    let ativa = janelas.ativa() == Some(*c);
-                    let titulo = info.carta.as_ref().map(|k| k.titulo.clone()).unwrap_or_default();
-                    janelas::desenhar_moldura_com_titulo(q, interface, &janelas.cfg, &g, &titulo, ativa);
-                    if let Some(area) = janelas.area_do_info(recursos) {
-                        info.desenhar(q, recursos, interface, area);
-                    }
-                    continue;
-                }
-                if *c == Controle::Mapa {
-                    let g = janelas.geometria(recursos, *c)?;
-                    let ativa = janelas.ativa() == Some(*c);
-                    janelas::desenhar_moldura_com_titulo(q, interface, &janelas.cfg, &g, &mapa.titulo(estado), ativa);
-                    if let Some(area) = janelas.area_do_mapa(recursos) {
-                        mapa.desenhar(q, area, estado, nav, trilhas);
-                    }
-                    continue;
-                }
-                p.extend(janelas.desenhar(q, recursos, interface, estado, *c)?);
-            }
-            Ok(p)
+        // Janelas na ordem do gerenciador (janelas.md §8): as de baixo da de edição são desenhadas
+        // entre a faixa e ela, as outras depois. As janelas filhas ficam dentro da área cliente da
+        // janela-mãe: a faixa (outra janela) é refeita por cima delas.
+        let ordem = self.janelas.gerente.ordem();
+        let edicao = self.janelas.gerente.aberta(janelas::ID_EDICAO);
+        let i = ordem.iter().position(|&id| id == janelas::ID_EDICAO).unwrap_or(ordem.len());
+        let (atras, frente) = (&ordem[..i], if edicao { &ordem[(i + 1).min(ordem.len())..] } else { &ordem[..0] });
+        let largura = self.tela.cfg.largura as usize;
+        let linhas_faixa = (self.interface.moldura.faixa.altura.max(0) as usize).min(self.tela.cfg.altura as usize);
+        let mut faixa_salva = Vec::new();
+        let (mut q, mut pendentes) = {
+            let s: &Sessao = self;
+            s.tela.compor_com(s.recursos, &s.interface, &s.partida.nav, &mut |q| {
+                faixa_salva = q.pixels[..largura * linhas_faixa].to_vec();
+                s.desenhar_janelas(q, atras)
+            })?
         };
-        let (mut q, mut pendentes) =
-            self.tela.compor_com(self.recursos, &self.interface, &self.partida.nav, &mut |q| desenhar(q, atras))?;
-        pendentes.extend(desenhar(&mut q, frente)?);
+        pendentes.extend(self.desenhar_janelas(&mut q, frente)?);
+        if faixa_salva.len() == largura * linhas_faixa {
+            q.pixels[..largura * linhas_faixa].copy_from_slice(&faixa_salva);
+        }
         let agora = self.partida.agora();
-        let (clique, p) = self.tela.desenhar_avisos(&mut q, self.recursos, &self.interface, &mut self.partida.avisos, agora)?;
-        self.clique_modal = clique;
-        pendentes.extend(p);
+        if self.modos.janela.na_frente {
+            // Faixa do quintal (35) no lugar da 34: sem a mensagem da faixa.
+            pendentes.extend(modos::desenhar_faixa(self, &mut q));
+            let (clique, p) = engine::core::avisos::desenhar_modal(&mut q, self.recursos, &self.interface, &self.partida.avisos)?;
+            self.clique_modal = clique;
+            pendentes.extend(p);
+        } else {
+            pendentes.extend(modos::desenhar_faixa(self, &mut q));
+            let (clique, p) = self.tela.desenhar_avisos(&mut q, self.recursos, &self.interface, &mut self.partida.avisos, agora)?;
+            self.clique_modal = clique;
+            pendentes.extend(p);
+        }
         pendentes.extend(modos::desenhar(self, &mut q)?);
         if let Some((m, _)) = &self.menu {
             pendentes.extend(m.desenhar(&mut q, self.recursos, &self.interface)?);
@@ -250,6 +264,8 @@ impl Sessao<'_> {
         if let Some((ex, canto)) = &self.exame {
             self.janela_exame.desenhar(&mut q, self.recursos, &self.interface, ex, *canto);
         }
+        // Contorno do arrasto (mover, redimensionar, polegar) e menu de sistema.
+        self.desenhar_gerente(&mut q);
         self.desenhar_dialogo(&mut q);
         if !pendentes.is_empty() {
             eprintln!("tela de jogo: não desenhado ainda: {}", pendentes.join(", "));
@@ -281,16 +297,9 @@ impl Sessao<'_> {
         self.tela.objetos_da_faixa_em(x, y).iter().find_map(|n| nomes.iter().position(|m| m == n))
     }
 
-    /// Clique esquerdo nas janelas de controle (Caste/Behavior); `true` se foi tratado.
-    pub(crate) fn clicar_nas_janelas(&mut self, x: i32, y: i32) -> bool {
-        let edicao = self.tela.retangulo_da_edicao();
-        let r = match self.janelas.clicar(self.recursos, &mut self.partida.estado, edicao, x, y) {
-            Ok(t) => t,
-            Err(e) => {
-                eprintln!("janelas: {e}");
-                false
-            }
-        };
+    /// Depois de um clique na área de uma janela de controle: o mapa centraliza a vista e o Info
+    /// troca de cartão.
+    pub(crate) fn depois_do_clique_em_controle(&mut self) {
         self.centralizar_pelo_mapa();
         if let Some((x, y)) = self.janelas.clique_info.take() {
             if let Some(a) = self.janelas.area_do_info(self.recursos) {
@@ -299,12 +308,11 @@ impl Sessao<'_> {
                 }
             }
         }
-        r
     }
 
     /// `_OpenInfoWindow`: com a janela fechada, volta ao cartão inicial; sempre a traz para a frente.
     pub(crate) fn abrir_info(&mut self) {
-        if !self.janelas.pilha.contains(&Some(Controle::Info)) {
+        if !self.janelas.aberta(Controle::Info) {
             self.info.reiniciar();
         }
         self.janelas.trazer_para_frente(Some(Controle::Info));
@@ -333,7 +341,7 @@ impl Sessao<'_> {
     /// Window -> Map (`_OpenMapYard`): com o quintal fechado, abre o mapa (ou o traz para a
     /// frente) na superfície, como `_YardToMap`.
     pub(crate) fn abrir_mapa(&mut self) {
-        if !self.janelas.pilha.contains(&Some(Controle::Mapa)) && self.partida.nav.plano_mapa != 1 {
+        if !self.janelas.aberta(Controle::Mapa) && self.partida.nav.plano_mapa != 1 {
             self.partida.navegar(Acao::Superficie);
         }
         self.janelas.trazer_para_frente(Some(Controle::Mapa));
@@ -480,19 +488,19 @@ impl Sessao<'_> {
     }
 
     /// Diz à partida quais janelas estão abertas e na frente (sorteios do desenho depois de cada
-    /// tick, `rules::desenho`): a de edição está na frente se nenhuma janela de controle está acima
-    /// dela e o quintal não está na frente [hipótese: a ordem entre o quintal e as de controle não é
-    /// modelada].
+    /// tick, `rules::desenho`): "na frente" é `_win_IsWinInFront`, a janela de cima do gerenciador.
     pub(crate) fn atualizar_janelas_desenho(&mut self, minimizada: bool) {
-        let quintal_aberto = self.modos.janela.aberta;
-        let quintal_na_frente = quintal_aberto && self.modos.janela.na_frente;
-        let edicao_no_topo = self.janelas.pilha.last().is_none_or(|j| j.is_none());
+        let g = &self.janelas.gerente;
+        let quintal = self.janelas.cfg.quintal;
+        let topo = g.topo();
         let j = &mut self.partida.janelas_desenho;
         j.minimizada = minimizada;
-        j.quintal_aberto = quintal_aberto;
-        j.quintal_na_frente = quintal_na_frente;
-        j.edicao_aberta = true;
-        j.edicao_na_frente = edicao_no_topo && !quintal_na_frente;
+        j.quintal_aberto = g.aberta(quintal);
+        j.quintal_na_frente = topo == Some(quintal);
+        j.edicao_aberta = g.aberta(janelas::ID_EDICAO);
+        j.edicao_na_frente = topo == Some(janelas::ID_EDICAO);
+        // O tutorial pergunta `_win_IsWinInFront(janela)`: o número da janela de cima (prop INDEX).
+        self.partida.regras.interface_tutor.janelas = topo.map(|t| vec![t << 8]).unwrap_or_default();
     }
 
     /// Velocidade e pausa, para o título da janela.
