@@ -282,6 +282,7 @@ impl Sessao<'_> {
         }
         // Contorno do arrasto (mover, redimensionar, polegar) e menu de sistema.
         self.desenhar_gerente(&mut q);
+        ajuda_ui::desenhar(self, &mut q);
         mods_ui::desenhar(self, &mut q);
         self.desenhar_dialogo(&mut q);
         if !pendentes.is_empty() {

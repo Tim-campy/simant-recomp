@@ -7,7 +7,9 @@
 
 use std::collections::HashMap;
 
+use engine::core::ajuda::{RespostaAjuda, VisorAjuda};
 use engine::core::ajuda_contexto::{ConfigAjudaContexto, TeclaAjuda};
+use engine::core::quadro::Quadro;
 use engine::core::janelas::ID_EDICAO;
 use engine::core::navegacao::Evento as EventoNav;
 use engine::formats::ne;
@@ -22,6 +24,12 @@ pub struct AjudaUi {
     pub cursores: HashMap<String, ne::Cursor>,
     /// Último contexto pedido (para os testes e o terminal).
     pub ultimo_contexto: Option<u32>,
+    /// Visor de ajuda (core/ajuda.rs), carregado na primeira vez; `aberto` = na tela.
+    pub visor: Option<VisorAjuda>,
+    pub aberto: bool,
+    /// O visor recebe as teclas (foi aberto ou clicado por último), como a janela do WinHelp com o
+    /// foco.
+    pub foco: bool,
 }
 
 impl AjudaUi {
@@ -34,14 +42,94 @@ impl AjudaUi {
                 HashMap::new()
             }
         };
-        Ok(AjudaUi { cfg, modo: false, cursores, ultimo_contexto: None })
+        Ok(AjudaUi { cfg, modo: false, cursores, ultimo_contexto: None, visor: None, aberto: false, foco: false })
     }
 }
 
-/// Abre a ajuda no tópico do contexto `ctx` (`WinHelp(HELP_CONTEXT)`).
+/// Abre a ajuda no tópico do contexto `ctx` (`WinHelp(HELP_CONTEXT)`). Um contexto que o arquivo
+/// não tem (0x1900 do `yardHelpBut`) abre o índice [hipótese: o WinHelp avisa e mostra o índice].
 pub fn abrir_contexto(s: &mut Sessao, ctx: u32) {
     s.ajuda.ultimo_contexto = Some(ctx);
-    println!("ajuda: contexto 0x{ctx:X}");
+    if s.ajuda.visor.is_none() {
+        match VisorAjuda::carregar(s.recursos, &s.cores) {
+            Ok(v) => s.ajuda.visor = Some(v),
+            Err(e) => {
+                eprintln!("ajuda: {e}");
+                return;
+            }
+        }
+    }
+    let Some(v) = s.ajuda.visor.as_mut() else { return };
+    if !v.abrir_contexto(ctx) {
+        println!("ajuda: contexto 0x{ctx:X} não existe no arquivo; índice");
+        v.abrir_indice();
+    }
+    println!("ajuda: contexto 0x{ctx:X}: {}", v.topico_atual().titulo);
+    s.ajuda.aberto = true;
+    s.ajuda.foco = true;
+}
+
+/// Clique esquerdo com o visor aberto: dentro dele, vai para o visor (e ele fica com o foco);
+/// fora, o foco volta ao jogo e o clique segue. Devolve se tratou.
+pub fn clique_no_visor(s: &mut Sessao, x: i32, y: i32, duplo: bool) -> bool {
+    if !s.ajuda.aberto {
+        return false;
+    }
+    let Some(v) = s.ajuda.visor.as_mut() else { return false };
+    match v.clicar(&s.interface, x, y, duplo) {
+        RespostaAjuda::Fora => {
+            s.ajuda.foco = false;
+            false
+        }
+        RespostaAjuda::Nada => {
+            s.ajuda.foco = true;
+            true
+        }
+        RespostaAjuda::Fechar => {
+            fechar(s);
+            true
+        }
+    }
+}
+
+/// Tecla com o visor aberto e com o foco (nome da tecla do SDL). Devolve se tratou.
+pub fn tecla_no_visor(s: &mut Sessao, nome: &str) -> bool {
+    if !(s.ajuda.aberto && s.ajuda.foco) {
+        return false;
+    }
+    let Some(v) = s.ajuda.visor.as_mut() else { return false };
+    match v.tecla(&s.interface, nome) {
+        RespostaAjuda::Fechar => fechar(s),
+        RespostaAjuda::Nada | RespostaAjuda::Fora => {}
+    }
+    true
+}
+
+/// Roda do mouse sobre o visor.
+pub fn rolar_visor(s: &mut Sessao, x: i32, y: i32, linhas: i32) -> bool {
+    let Some(v) = s.ajuda.visor.as_mut().filter(|_| s.ajuda.aberto) else { return false };
+    if !v.contem(x, y) {
+        return false;
+    }
+    v.rolar(&s.interface, -linhas * 3 * 13);
+    true
+}
+
+/// O ponto está sobre a janela de ajuda aberta (outra aplicação no original: o jogo não recebe).
+pub fn sobre_visor(s: &Sessao, x: i32, y: i32) -> bool {
+    s.ajuda.aberto && s.ajuda.visor.as_ref().is_some_and(|v| v.contem(x, y))
+}
+
+pub fn fechar(s: &mut Sessao) {
+    s.ajuda.aberto = false;
+    s.ajuda.foco = false;
+}
+
+/// Desenha o visor por cima do jogo, se aberto.
+pub fn desenhar(s: &Sessao, q: &mut Quadro) {
+    if let Some(v) = s.ajuda.visor.as_ref().filter(|_| s.ajuda.aberto) {
+        v.desenhar(q, &s.interface);
+    }
 }
 
 /// Botão "?" da faixa sob o ponto (`ribHelp` 0x2208 na 34, `ribHelp2` 0x2308 na 35): abre a ajuda
@@ -141,6 +229,9 @@ pub fn clique(s: &mut Sessao, x: i32, y: i32) -> bool {
 /// ela é a da frente; senão a seta (`None`).
 pub fn cursor_em(s: &Sessao, x: i32, y: i32) -> Option<String> {
     let c = &s.ajuda.cfg.cursores;
+    if s.ajuda.aberto && s.ajuda.visor.as_ref().is_some_and(|v| v.contem(x, y)) {
+        return None;
+    }
     if s.ajuda.modo {
         return Some(c.ajuda.clone());
     }
@@ -256,5 +347,15 @@ mod testes {
         assert!(!super::tecla(&mut s, &tecla("Escape", false)), "Esc sem o modo segue adiante");
         assert!(super::tecla(&mut s, &tecla("F1", true)));
         assert!(s.ajuda.modo);
+        // O visor abriu no último contexto pedido e fecha com Esc (tem o foco).
+        assert!(s.ajuda.aberto);
+        abrir_contexto(&mut s, 0x2200);
+        assert_eq!(s.ajuda.visor.as_ref().unwrap().topico_atual().titulo, "Patch Ribbon Bar");
+        let rgb = s.quadro_rgb().unwrap();
+        if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+            crate::salvar_png(&PathBuf::from(saida).join("ajuda_ribhelp.png"), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
+        }
+        assert!(tecla_no_visor(&mut s, "Escape"));
+        assert!(!s.ajuda.aberto);
     }
 }

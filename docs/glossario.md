@@ -80,3 +80,7 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `_MakeBalloon` | balão de fala (peças 8×8 do DGROUP) do menino | `1008:59e4`; telas/quintal.md §2.3 |
 | `_Cheats` (`8:83bc`) / `_CheatKeys` (`1018:67de`) | tabela dos 26 códigos de trapaça de 4 letras (bits invertidos) e a rotina que aplica cada um | `SIMANTW.SYM`; bancada ([regras/trapacas.md](spec/regras/trapacas.md)) |
 | `_GlobalKey` (`9:7866`) | "última tecla" lida por `_DoSimYard` (0xA8 liga a chuva) e `_SimCat` (0x8D); nada a grava no Windows | SYM; pseudocódigo (regras/trapacas.md §2.2) |
+| `_bHelp` (`10:0010`) | modo de ajuda: o clique direito, Shift+F1 e Delete o invertem; o próximo clique num objeto abre o WinHelp no contexto dele | `MAINWNDPROC`, `_HelpKeyDown`, `_DoEvent`; bancada ([telas/ajuda-contexto.md](spec/telas/ajuda-contexto.md)) |
+| `_DoWinHelp` (`1000:5aac`) / `_helpFile` (`9:76ac`) | `WinHelp(HELP_CONTEXT, id & 0xFF00)` com o `SIMANT.HLP` (botões "?") | pseudocódigo; telas/ajuda-contexto.md §4 |
+| `_DrawCastePopUp` (`1000:5d9e`) | quadro das castas (janela 23 `antPopWin`) aberto enquanto o botão fica apertado na área das barras da faixa | pseudocódigo + bancada ([telas/mensagens.md](spec/telas/mensagens.md) §9.1) |
+| `_MeWarnHealth` (`9:9bec`) / `_BlkWarnHealth` (`9:769c`) | limiares de aviso de saúde da amarela e da colônia preta (30 no início); o clique na barra de saúde os muda (`_DoHealthSetY`, `_DoWarnSetB`) | pseudocódigo + bancada (mensagens.md §9.1) |

@@ -214,8 +214,14 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 continue;
             }
             match ev {
-                // _HelpKeyDown: F1 (índice), Shift+F1 e Delete (modo de ajuda), Esc (sai do modo).
-                Event::KeyDown { keycode: Some(k), keymod, .. } if ajuda_ui::tecla(s, &evento_de_tecla(k, keymod)) => redesenhar = true,
+                // A janela de ajuda com o foco recebe as teclas; depois, _HelpKeyDown: F1 (índice),
+                // Shift+F1 e Delete (modo de ajuda), Esc (sai do modo).
+                Event::KeyDown { keycode: Some(k), keymod, .. }
+                    if ajuda_ui::tecla_no_visor(s, &k.name()) || ajuda_ui::tecla(s, &evento_de_tecla(k, keymod)) =>
+                {
+                    redesenhar = true
+                }
+                Event::MouseWheel { y: dy, .. } if ajuda_ui::rolar_visor(s, cursor.0, cursor.1, dy) => redesenhar = true,
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. }
                     if s.janelas.gerente.menu.is_some() || s.janelas.gerente.arrasto.is_some() =>
                 {
@@ -285,8 +291,10 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                         s.clicar_no_mapa(cursor.0, cursor.1, duplo);
                     }
                 }
-                Event::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. }
-                    if ajuda_ui::clique(s, x, y) || (!s.modos.escolhendo && !s.modos.menu_aberto && ajuda_ui::botao_de_janela(s, x, y)) =>
+                Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. }
+                    if ajuda_ui::clique_no_visor(s, x, y, clicks >= 2)
+                        || ajuda_ui::clique(s, x, y)
+                        || (!s.modos.escolhendo && !s.modos.menu_aberto && ajuda_ui::botao_de_janela(s, x, y)) =>
                 {
                     // Modo de ajuda: o clique num objeto abre a ajuda dele (_DoEvent com _bHelp).
                     cursor = (x, y);
@@ -376,7 +384,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     }
                 }
                 Event::MouseButtonDown { mouse_btn: MouseButton::Right, clicks, x, y, .. } => {
-                    if s.modos.escolhendo || s.modos.menu_aberto {
+                    if s.modos.escolhendo || s.modos.menu_aberto || ajuda_ui::sobre_visor(s, x, y) {
                         continue;
                     }
                     // WM_RBUTTONDOWN em MAINWNDPROC (todas as janelas do jogo e a faixa): liga ou
