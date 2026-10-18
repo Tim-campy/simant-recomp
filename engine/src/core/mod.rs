@@ -5,6 +5,7 @@ pub mod barras_faixa;
 pub mod carregar;
 pub mod dialogos;
 pub mod edicao;
+pub mod gerenciador;
 pub mod exame;
 pub mod historico;
 pub mod info;

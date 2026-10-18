@@ -157,6 +157,27 @@ impl Navegacao {
         pode
     }
 
+    /// `SB_THUMBPOSITION`/`SB_THUMBTRACK` (`_DoEditScroll` casos 4 e 5): a vista vai para a posição
+    /// do polegar, dentro da faixa da barra. Devolve se mudou.
+    pub fn ir_para_posicao(&mut self, horizontal: bool, pos: i32) -> bool {
+        let (mx, my) = self.maximo();
+        let (p, max) = if horizontal { (&mut self.vista.x, mx) } else { (&mut self.vista.y, my) };
+        let novo = pos.clamp(0, max.max(0));
+        let mudou = *p != novo;
+        *p = novo;
+        mudou
+    }
+
+    /// Nova largura e altura da vista (janela de edição redimensionada, maximizada ou restaurada):
+    /// a vista continua com o mesmo canto, limitada ao mapa (`_BoundEditPosition`).
+    pub fn redimensionar_vista(&mut self, largura: i32, altura: i32) -> bool {
+        let antes = self.vista;
+        self.vista.largura = largura;
+        self.vista.altura = altura;
+        self.vista.limitar();
+        self.vista != antes
+    }
+
     /// `SB_PAGEUP`/`SB_PAGEDOWN`: anda o tamanho da vista e para no limite.
     fn pagina(&mut self, horizontal: bool, sentido: i32) -> bool {
         let (mx, my) = self.maximo();
@@ -302,6 +323,24 @@ mod testes {
         assert!(n.aplicar(Acao::PaginaAbaixo));
         assert_eq!(n.vista.y, 45);
         assert!(!n.aplicar(Acao::PaginaAbaixo));
+    }
+
+    #[test]
+    fn polegar_e_tamanho_da_vista() {
+        // Ninho, vista de 26 × 19: faixa 0..38 em x e 0..45 em y.
+        let mut n = nav(2, 0, 0);
+        assert!(n.ir_para_posicao(true, 22));
+        assert_eq!(n.vista.x, 22);
+        assert!(!n.ir_para_posicao(true, 22));
+        assert!(n.ir_para_posicao(false, 99));
+        assert_eq!(n.vista.y, 45);
+        assert!(n.ir_para_posicao(true, -5));
+        assert_eq!(n.vista.x, 0);
+        // Janela maximizada (39 × 21): o canto fica, limitado ao mapa.
+        let mut n = nav(2, 30, 45);
+        assert!(n.redimensionar_vista(39, 21));
+        assert_eq!((n.vista.x, n.vista.y, n.vista.largura, n.vista.altura), (25, 43, 39, 21));
+        assert_eq!(n.maximo(), (25, 43));
     }
 
     #[test]

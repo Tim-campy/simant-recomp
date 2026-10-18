@@ -490,7 +490,7 @@
  "_origem_sprites": "_Draw_SimYard 1010:b462, _DrawSimKid 1010:af14, _DrawDog 1010:b110, _DrawSimCat 1010:b200, _DrawSimBird 1010:b196, _DrawMower, _DrawRain 1010:ba9e",
  "botao_abrir": "ribToYard",
  "botoes_faixa": {
-  "ribPatch": "fechar",
+  "ribPatch": "para_mapa",
   "ribHouse": "alternar_casa",
   "ribStrat": "modo_estrategico",
   "ribGraphic": "modo_grafico",

@@ -185,7 +185,7 @@ Resumo do que o código faz (detalhes nas specs de regras) [código]:
 
 ## 7. O que o port faz
 
-- Tela de jogo com a janela do quintal (`JanelaQuintal`): aberta pelo botão `Yard`, Ctrl+M, Ctrl+Y/5/6/7; fechada pelo botão `Patch` da faixa 35. Opção `--quintal N` abre no modo N (para exportar a tela). Desenhada por cima da janela de edição quando está na frente; atrás dela, só a parte fora da janela de edição aparece. Clique na janela de edição a traz para a frente; clique no quintal traz o quintal.
+- Tela de jogo com a janela do quintal (`JanelaQuintal`): aberta pelo botão `Yard`, Ctrl+M, Ctrl+Y/5/6/7 (`_MapToYard`: toma o lugar da janela do mapa); o botão `Patch` da faixa 35 faz `_YardToMap` (o quintal vira o mapa da superfície no mesmo lugar, faixa 34; antes de 2026-10-18 o port só fechava a janela). Opção `--quintal N` abre no modo N (para exportar a tela). Ordem, foco, faixa 34/35 e cliques: gerenciador de janelas ([janelas.md](janelas.md) §8) — o clique numa janela de trás só a traz para a frente.
 - Faixa 35 no lugar da 34 enquanto o quintal está aberto; botões House/Strat/Graphic/Patch/Place/Auto/Manual.
 - Clique simples num patch: `_YMapPnt`; duplo: `trocar_patch`.
 - Teclas e botões em `data/quintal_mapa.json` (sobrescrevível por mod).

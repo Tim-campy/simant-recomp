@@ -1,0 +1,121 @@
+# Gerenciador de janelas do original (docs/spec/telas/janelas.md §8): arrastar pelo título, menu de
+# sistema, limites, Ctrl+F4, duplo clique na caixa do menu de sistema, maximizar/restaurar a janela
+# de edição, barras de rolagem, redimensionar, Yard → Patch e clique numa janela de trás.
+# Pré-requisitos: re_trabalho/janelas_wm/ov.qcow2 = cópia do overlay com o snapshot "quick";
+# re_trabalho/janelas_wm/a.img = disquete com PORT50.ANT (o mesmo de qemu_janelas.txt).
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_gerenciador_janelas.txt --overlay re_trabalho/janelas_wm/ov.qcow2
+snapshot_carregar quick
+esperar 2
+disquete re_trabalho/janelas_wm/a.img
+esperar 1
+teclas ctrl+l
+esperar 3
+teclas n
+esperar 3
+digitar A
+teclas shift+semicolon
+digitar PORT50
+esperar 1
+teclas ret
+esperar 5
+capturar re_trabalho/janelas_wm/w00_carregado.png
+# 1. Caste Control na frente e arrastada pelo título (-200, -100).
+clicar_em 78 97
+esperar 2
+capturar re_trabalho/janelas_wm/w01_caste.png
+ir_para 457 281
+apertar
+mover -200 -100
+esperar 1
+capturar re_trabalho/janelas_wm/w02_arrastando.png
+soltar
+esperar 2
+capturar re_trabalho/janelas_wm/w03_arrastada.png
+# 2. Clique simples na caixa do menu de sistema (agora em 152, 181); Esc fecha o menu.
+clicar_em 152 181
+esperar 1
+capturar re_trabalho/janelas_wm/w04_menu_sistema.png
+teclas esc
+esperar 1
+# 3. Arrastar além do canto da área cliente.
+ir_para 257 181
+apertar
+mover -400 -300
+esperar 1
+capturar re_trabalho/janelas_wm/w05_limite_arrastando.png
+soltar
+esperar 2
+capturar re_trabalho/janelas_wm/w06_limite.png
+# 4. Ctrl+F4 (0xFDA0) fecha a janela de cima.
+teclas ctrl+f4
+esperar 2
+capturar re_trabalho/janelas_wm/w07_ctrl_f4.png
+# 5. Behavior Control: duplo clique na caixa do menu de sistema.
+clicar_em 51 97
+esperar 2
+capturar re_trabalho/janelas_wm/w08_behavior.png
+ir_para 97 281
+clicar
+clicar
+esperar 2
+capturar re_trabalho/janelas_wm/w09_duplo_clique.png
+# 6. History: Ctrl+Espaço (0xFDA1) abre o menu de sistema da janela de cima; C = Close.
+teclas ctrl+h
+esperar 2
+teclas ctrl+spc
+esperar 1
+capturar re_trabalho/janelas_wm/w10_menu_history.png
+teclas c
+esperar 2
+capturar re_trabalho/janelas_wm/w11_history_fechada.png
+# 7. Janela de edição: botão de maximizar; Ctrl+Z (0xFDA5) restaura.
+clicar_em 432 148
+esperar 3
+capturar re_trabalho/janelas_wm/w12_maximizada.png
+teclas ctrl+z
+esperar 3
+capturar re_trabalho/janelas_wm/w13_restaurada.png
+# 8. Rolagem: trilho à direita do polegar horizontal (página), arrasto do polegar vertical, seta.
+clicar_em 330 470
+esperar 2
+capturar re_trabalho/janelas_wm/w14_pagina_direita.png
+ir_para 432 181
+apertar
+mover 0 120
+esperar 1
+capturar re_trabalho/janelas_wm/w15_polegar_arrastando.png
+soltar
+esperar 2
+capturar re_trabalho/janelas_wm/w16_polegar_solto.png
+clicar_em 432 453
+esperar 2
+capturar re_trabalho/janelas_wm/w17_seta_baixo.png
+# 9. Redimensionar a janela de edição pela borda direita (-100).
+ir_para 442 300
+apertar
+mover -100 0
+esperar 1
+capturar re_trabalho/janelas_wm/w18_redim_arrastando.png
+soltar
+esperar 3
+capturar re_trabalho/janelas_wm/w19_redimensionada.png
+# 10. Yard e o botão Patch da faixa 35.
+clicar_em 30 60
+esperar 3
+capturar re_trabalho/janelas_wm/w20_quintal.png
+clicar_em 25 58
+esperar 3
+capturar re_trabalho/janelas_wm/w21_patch.png
+# 11. Quintal de novo; a janela de edição na frente; clique num patch visível do quintal (atrás).
+clicar_em 30 60
+esperar 3
+clicar_em 200 148
+esperar 2
+capturar re_trabalho/janelas_wm/w22_edicao_na_frente.png
+clicar_em 520 300
+esperar 2
+capturar re_trabalho/janelas_wm/w23_clique_no_quintal_atras.png
+clicar_em 520 300
+esperar 2
+capturar re_trabalho/janelas_wm/w24_segundo_clique.png
+fim
