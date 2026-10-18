@@ -111,7 +111,7 @@ Alternativas descartadas: procurar o conteúdo do `_MapA` na RAM física (atrave
 | Injeção e load | `qemu_carregar_save.txt`: disquete trocado depois do `loadvm`, `A:TESTE` carregado pelo File > Load; o estado lido logo depois do load é igual ao `QUICK2.ANT` salvo três blocos (`_GamePaused` e os `_CastePop*` recontados) |
 | Casos de teste | `caso_ant.py rodar` com C-01 e C-02 (`tests/referencias/casos/`): todas as conferências passaram, parando nos ticks 128 e 96 exatos (ver `tests/referencias/README.md`) |
 
-Ritmo (relógio do host, sem determinismo): `GameTime` andou 62 ticks em ~10,4 s, cerca de 6 ticks/s, abaixo dos ~18 ticks/s de um timer de 55 ms [hipótese: TCG lento; medir com `pausar`/`estado` em intervalos fixos].
+Ritmo (relógio do host, sem determinismo): `GameTime` andou 62 ticks em ~10,4 s, cerca de 6 ticks/s. **Explicado (2026-10-18):** não é lentidão do TCG; é o laço de `MYTIMERFUNC` com o temporizador de 55 ms do Windows 3.1, que roda 1 tick a cada 3 mensagens em normal. Medição por velocidade (roteiros `qemu_ritmo.txt` e `qemu_ritmo_rapido.txt`): [spec/regras/simulacao-visao-geral.md](spec/regras/simulacao-visao-geral.md) §3.1.
 
 ## Casos de teste: injetar um save e rodar
 

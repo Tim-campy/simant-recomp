@@ -245,19 +245,17 @@ impl Sessao<'_> {
             q.pixels[..largura * linhas_faixa].copy_from_slice(&faixa_salva);
         }
         let agora = self.partida.agora();
-        if self.modos.janela.na_frente {
-            // Faixa do quintal (35) no lugar da 34: sem a mensagem da faixa.
-            pendentes.extend(modos::desenhar_faixa(self, &mut q));
-            let (clique, p) = engine::core::avisos::desenhar_modal(&mut q, self.recursos, &self.interface, &self.partida.avisos)?;
-            self.clique_modal = clique;
-            pendentes.extend(p);
-        } else {
-            pendentes.extend(modos::desenhar_faixa(self, &mut q));
-            let (clique, p) = self.tela.desenhar_avisos(&mut q, self.recursos, &self.interface, &mut self.partida.avisos, agora)?;
-            self.clique_modal = clique;
-            pendentes.extend(p);
+        // Faixa do momento (35 no lugar da 34 com o quintal ativado por último; a mensagem só na 34).
+        pendentes.extend(modos::desenhar_faixa(self, &mut q));
+        if !self.modos.janela.na_frente {
+            self.tela.desenhar_mensagem_da_faixa(&mut q, self.recursos, &self.interface, &mut self.partida.avisos, agora)?;
         }
         pendentes.extend(modos::desenhar(self, &mut q)?);
+        // O aviso modal fica por cima de todas as janelas (e do resto dos modos): o quadro de recusa
+        // da troca de patch (10000/10002/10004) sai de um duplo clique no quintal.
+        let (clique, p) = avisos::desenhar_modal(&mut q, self.recursos, &self.interface, &self.partida.avisos)?;
+        self.clique_modal = clique;
+        pendentes.extend(p);
         if let Some((m, _)) = &self.menu {
             pendentes.extend(m.desenhar(&mut q, self.recursos, &self.interface)?);
         }

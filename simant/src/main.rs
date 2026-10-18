@@ -103,6 +103,12 @@ struct Janela {
 }
 
 fn abrir_janela(titulo: &str, largura: u32, altura: u32, escala: Option<u32>) -> Result<Janela, String> {
+    // Nitidez: sem ciência de DPI, o Windows com escala de tela (125%, 150%) amplia a janela inteira
+    // com filtro bilinear e o jogo fica borrado. Com "permonitorv2" a janela e os limites da tela vêm
+    // em pixels físicos, e a ampliação é só a do renderizador: inteira, por vizinho mais próximo
+    // ("0") e com tarjas quando a janela não é múltipla da resolução lógica.
+    sdl2::hint::set("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2");
+    sdl2::hint::set("SDL_RENDER_SCALE_QUALITY", "0");
     let sdl = sdl2::init()?;
     let video = sdl.video()?;
     let escala = escala.unwrap_or_else(|| {
@@ -121,6 +127,8 @@ fn abrir_janela(titulo: &str, largura: u32, altura: u32, escala: Option<u32>) ->
     let mut canvas = janela.into_canvas().present_vsync().build().map_err(|e| e.to_string())?;
     canvas.set_logical_size(largura, altura).map_err(|e| e.to_string())?;
     canvas.set_integer_scale(true)?;
+    let (w, h) = canvas.output_size()?;
+    println!("janela: {largura}x{altura} em escala {escala} ({w}x{h} pixels)");
     Ok(Janela { sdl, canvas })
 }
 

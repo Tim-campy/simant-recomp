@@ -1118,6 +1118,11 @@ pub struct Estado {
     pub relogio_mac: Option<u32>,
     /// `_gGameNeedsSaving`.
     pub precisa_salvar: bool,
+    /// `_ELayerMode` (fora do save): camada de feromônio sobreposta à superfície na janela de edição
+    /// (`_DoCalcTile`): −1 nenhuma, 0 alarme, 1 ninho preto, 2 trilha preta, 3 ninho vermelho,
+    /// 4 trilha vermelha. Ligada pelo alarme da amarela (`_SetAlarmDropState`) e pelos botões de
+    /// cheiro da faixa (jogo.md, "Camada de cheiro na janela de edição").
+    pub camada_edicao: i16,
     /// Pedidos à interface acumulados desde a última vez que foram retirados.
     pub eventos: Vec<Evento>,
 }
@@ -1176,6 +1181,7 @@ impl Estado {
             ciclos_jogo: 0,
             relogio_mac: None,
             precisa_salvar: false,
+            camada_edicao: -1,
             eventos: Vec::new(),
         }
     }
