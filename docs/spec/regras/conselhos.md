@@ -126,12 +126,12 @@ As comparações com `_TimeTemp` são de 32 bits com sinal. As lições 3 e 4 us
 ## Implementação no port
 
 - `engine/src/rules/conselhos.rs`: `conselho(&Estado, &TabelasConselhos) -> Conselho` (a mensagem da faixa como **estado derivado**: a interface a consulta depois de cada tick; não vira evento, porque o original a refaz em todo tick), `executar_tutor(e, tabelas, tabelas_amarela, memoria, interface, relogio)` e `impl RegrasConselhos for RegrasOriginais`.
-- Os quadros das lições saem como `Evento::Mensagem(texto)` (o id da imagem não cabe no evento atual [lacuna]).
+- Os quadros das lições saem como `Evento::Mensagem(texto)`; a interface acha a imagem pela lição que usa aquele texto (`imagem_do_texto` em `engine/src/core/avisos.rs`, com `data/quintal.json` → `conselhos.licoes[].imagem`; os outros textos usam `mensagens.json` → `quadro.imagens`).
 - `_TimeTemp` não está no save nem no `Estado`: fica em `MemoriaTutor`. Relógio: o mesmo do quintal (`_GameTime × mac_por_tick`, [quintal.md](quintal.md), "Implementação no port"). Janelas na frente: trait `InterfaceTutor`; `RegrasOriginais` guarda `memoria_tutor` (`MemoriaTutor`, vale de um tick para o outro, como a global do original) e `interface_tutor` (`JanelasNaFrente`: a interface grava ali as janelas que estão na frente; vazio = nenhuma). A lição que muda a vida da amarela usa o `_SetMyHealth` de `amarela.rs`, com `data/amarela.json`.
 - Dados (`data/quintal.json`, bloco `conselhos`): lista 4/1020, limiar 10 da vida crítica, os 16 ciclos de espera e a tabela de lições acima (texto, imagem, ação, condição), editável por mods.
 
 ## Lacunas
 
-- A interface ainda não grava `RegrasOriginais::interface_tutor` (a tela de jogo não tem as janelas do tutorial): até lá as condições de janela nunca valem (lições 0xA, 0xC, 0x20, 0x27, 0x2A, 0x2F e 0x31 só avançam pela repetição). `_TimeTemp` não vai para o save (como no original): carregar um jogo zera a memória.
+- A interface grava `RegrasOriginais::interface_tutor` a cada quadro com a janela de cima, no formato de `_win_IsWinInFront` (número da janela << 8; `simant/src/sessao.rs`, desde que existem as janelas de controle, do mapa e do quintal). As condições de janela das lições 0xA, 0xC, 0x20, 0x27, 0x2A, 0x2F e 0x31 não foram conferidas no original. `_TimeTemp` não vai para o save (como no original): carregar um jogo zera a memória.
 - `_SetDefaultWindPrompt` e o texto padrão da faixa por ferramenta: interface, não especificados aqui.
-- Nenhum caso do tutorial foi rodado no original.
+- Casos do original: os vetores `tests/referencias/ticks/tutorial/` (snapshot `tut`, lições 1–3: lição 1 concluída e lição 2 pedida no tick 15, lição 3 dada no 23 e esperando o marco de escavação nos 46–47, com `_TimeTemp` em `extras.json`) e o Load de `Tutorial.Ant` (`tests/referencias/load_tutorial/`) batem com o port. As demais lições e os casos C-U1..C-U10 acima só foram conferidos pelo código.
