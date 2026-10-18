@@ -1,5 +1,6 @@
 //! Estados e temporização, sem janela nem áudio.
 
+pub mod acoes_mods;
 pub mod avisos;
 pub mod barras_faixa;
 pub mod carregar;
@@ -13,6 +14,7 @@ pub mod janela_mapa;
 pub mod janelas;
 pub mod mapa;
 pub mod menus;
+pub mod menus_mods;
 pub mod navegacao;
 pub mod partida;
 pub mod quadro;

@@ -421,10 +421,7 @@ fn chuva(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
         let comeca = e.tecla_global == r.chuva_tecla
             || (e.r.rrand(r.chuva_chance_1) == 0 && e.r.rrand(r.chuva_chance_2) == 0);
         if comeca {
-            e.ambiente.chovendo = 1;
-            e.ambiente.chuva_contagem = e.s.rand1(r.chuva_duracao_sorteio) as i16 + r.chuva_duracao_min;
-            iniciar_agua(e);
-            balao_menino(e, t, rel, 0);
+            comecar_chuva(e, t, rel);
         }
     } else {
         let a = &mut e.ambiente;
@@ -435,6 +432,16 @@ fn chuva(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
             a.chovendo = 0;
         }
     }
+}
+
+/// O começo da chuva dentro de `_DoSimYard` (depois do sorteio): `_RainOn = 1`, duração
+/// `SRand1(150) + 150`, `_InitWater` (100 gotas, R) e o balão 0 do menino. Também para a API de mods.
+pub fn comecar_chuva(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
+    let r = &t.regras;
+    e.ambiente.chovendo = 1;
+    e.ambiente.chuva_contagem = e.s.rand1(r.chuva_duracao_sorteio) as i16 + r.chuva_duracao_min;
+    iniciar_agua(e);
+    balao_menino(e, t, rel, 0);
 }
 
 /// Balão de fala nº `k` do menino (corpo de `_SendBoyMsg`).
@@ -951,6 +958,26 @@ fn cachorro(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
     }
 }
 
+/// O gato entra no quintal (o fim de `_SimCat` depois do sorteio): `_CatOn = 1` em (0xFC, 0x19),
+/// direção 2. Sem sorteios. Também para a API de mods.
+pub fn gato_aparece(e: &mut Estado) {
+    let b = &mut e.bichos;
+    b.gato_ligado = 1;
+    b.gato_x = 0xFC;
+    b.gato_y = 0x19;
+    b.gato_dir = 2;
+    b.gato_quadro = 0;
+    b.gato_ciclo = 0;
+}
+
+/// `_MakeBark(k)` com o sorteio do cachorro (`SRand4` escolhe o latido) e o atraso seguinte, sem os
+/// testes de vista e de prazo de `_SimDog`. Para a API de mods.
+pub fn latido(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
+    let k = e.s.mascara(4) as usize;
+    e.pedir_som(t.sons.latidos.get(k).copied());
+    latir(e, t, rel);
+}
+
 /// Som de latido e novo atraso (`_MakeBark` embutido): `relógio + 60 + S(30)`.
 fn latir(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
     let r = &t.regras;
@@ -968,13 +995,7 @@ fn gato(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
         if e.s.mascara(r.gato_chance) != 0 && e.tecla_global != r.gato_tecla {
             return;
         }
-        let b = &mut e.bichos;
-        b.gato_ligado = 1;
-        b.gato_x = 0xFC;
-        b.gato_y = 0x19;
-        b.gato_dir = 2;
-        b.gato_quadro = 0;
-        b.gato_ciclo = 0;
+        gato_aparece(e);
         return;
     }
     e.bichos.gato_ciclo = (e.bichos.gato_ciclo + 1) & 0xFFF;

@@ -30,6 +30,7 @@ use opcoes::*;
 use sessao::*;
 
 mod janelas_ui;
+mod mods_ui;
 mod modos;
 
 use std::path::{Path, PathBuf};

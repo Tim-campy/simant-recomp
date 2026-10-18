@@ -50,6 +50,9 @@ pub(crate) struct Sessao<'a> {
     pub(crate) exame: Option<(engine::rules::experimental::Exame, (i32, i32))>,
     /// Janela Info (core/info.rs): cartão atual e histórico.
     pub(crate) info: engine::core::info::JanelaInfo,
+    /// Menus e painéis dos scripts de mods (API 0.17, simant/src/mods_ui.rs) e o menu aberto agora.
+    pub(crate) menus_mods_cfg: engine::core::menus_mods::ConfigMenusMods,
+    pub(crate) menu_mod: Option<engine::core::menus_mods::MenuModAberto>,
 }
 
 /// Para quem vai a escolha do menu aberto.
@@ -180,11 +183,14 @@ impl Sessao<'_> {
             janela_exame,
             exame: None,
             info,
+            menus_mods_cfg: recursos.dados(engine::core::menus_mods::ARQUIVO_CONFIG)?,
+            menu_mod: None,
         };
         for a in abertas.into_iter().flatten() {
             s.depois_de_abrir(a);
         }
         s.sincronizar_janelas();
+        mods_ui::avisar_teclas_ocupadas(&s);
         Ok(s)
     }
 
@@ -265,6 +271,7 @@ impl Sessao<'_> {
         }
         // Contorno do arrasto (mover, redimensionar, polegar) e menu de sistema.
         self.desenhar_gerente(&mut q);
+        mods_ui::desenhar(self, &mut q);
         self.desenhar_dialogo(&mut q);
         if !pendentes.is_empty() {
             eprintln!("tela de jogo: não desenhado ainda: {}", pendentes.join(", "));
