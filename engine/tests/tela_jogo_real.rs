@@ -217,6 +217,33 @@ fn janela_de_castas_muda_os_niveis() {
     assert_eq!(e.controles.casta_automatica, 1);
 }
 
+/// Arrasto no triângulo das castas conferido na bancada (2026-10-18, `cenarios_tick.py gravar
+/// triangulo`, snapshot rico, jogo pausado): botão apertado em (435, 421) da tela, passando por
+/// (436, 370) e (460, 400), solto em (420, 395) (área cliente = tela − 38 linhas). O original leu
+/// `_casteLevels` = (18321, 39138, 8076), `_CasteAuto` = 0 e `_IdealCaste` = (59, 12, 14, 14).
+#[test]
+fn arrasto_no_triangulo_igual_a_bancada() {
+    use engine::core::janelas::{Controle, JanelasControle};
+    use engine::rules::estado::Estado;
+    let Some(r) = recursos() else { return };
+    let mut e = Estado::de_save(&quick2()).unwrap();
+    let cfg: ConfigTelaJogo = r.dados("tela_jogo.json").unwrap();
+    let interface = Interface::carregar(&r, cfg.tabela_posicoes).unwrap();
+    let area = engine::formats::janela::Retangulo { esq: 0, topo: 73, dir: 640, base: 442 };
+    let m = &cfg.edicao.moldura;
+    let mut j = JanelasControle::new(r.dados("janelas.json").unwrap(), &interface, &r, (m.retangulo(), m.metricas()), area).unwrap();
+    j.janelas_padrao(2);
+    j.trazer_para_frente(Some(Controle::Castas));
+    j.clicar(&r, &mut e, 435, 421 - 38, false).unwrap();
+    for (x, y) in [(436, 370), (460, 400), (420, 395)] {
+        j.mover(&r, &mut e, x, y - 38).unwrap();
+    }
+    j.soltar();
+    assert_eq!(e.controles.castas, [18321, 39138, 8076]);
+    assert_eq!(e.controles.casta_automatica, 0);
+    assert_eq!(e.controles.castas_ideais, [59, 12, 14, 14]);
+}
+
 /// Navegação conferida na bancada (2026-10-18, `cenarios_tick.py gravar navegacao`, snapshot rico,
 /// jogo pausado): o estado lido depois de cada tecla. Uma Ctrl+seta mandada pela bancada fica
 /// apertada ~150 ms e o laço de `MAINWNDPROC` repete o passo enquanto ela está apertada, por isso o
