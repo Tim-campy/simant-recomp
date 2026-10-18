@@ -1,6 +1,6 @@
 # API de mods
 
-Versão da API: **0.17**. Mods sobrescrevem dados (objetos do banco, `data/*.json`, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua"); desde a 0.17, os scripts podem ter menu, painel e ações sobre o jogo (para testes, como o mod de trapaças de `exemplos/mods/trapacas/`).
+Versão da API: **0.18**. Mods sobrescrevem dados (objetos do banco, `data/*.json`, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua"); desde a 0.17, os scripts podem ter menu, painel e ações sobre o jogo (para testes, como o mod de trapaças de `exemplos/mods/trapacas/`).
 
 ## Estrutura
 
@@ -85,7 +85,7 @@ O script define funções **globais** com estes nomes (no corpo do arquivo ou de
 | `antes_do_tick(estado)` | Antes de cada tick da simulação (`_DoAntSim`). |
 | `depois_do_tick(estado)` | Depois de cada tick. |
 | `ao_menu(indice, texto, estado)` | (API 0.17) O jogador escolheu o item `indice` (a partir de 1, contando os separadores) do menu do mod (`definir_menu`). |
-| `ao_evento(evento, estado)` | Para cada pedido das regras à interface, antes de a interface tratá-lo. `evento.tipo` é `"som"`, `"musica"`, `"mensagem"` (com `id`), `"mensagem_faixa"` (com `lista`, `indice`), `"tema_do_ninho"`, `"fim_de_jogo"`, `"centralizar_na_amarela"` ou, desde a 0.16, `"espera"` (com `ms`: uma animação do tick espera esse tempo entre dois quadros; a interface atrasa os efeitos seguintes). |
+| `ao_evento(evento, estado)` | Para cada pedido das regras à interface, antes de a interface tratá-lo. `evento.tipo` é `"som"`, `"musica"`, `"mensagem"` (com `id`), `"mensagem_faixa"` (com `lista`, `indice`), `"tema_do_ninho"`, `"fim_de_jogo"`, `"centralizar_na_amarela"` ou, desde a 0.16, `"espera"` (com `ms`: uma animação do tick espera esse tempo entre dois quadros; a interface atrasa os efeitos seguintes); desde a 0.18, `"animacao"` (com `codigo` — 0 luta, 1–9 morte, 10 choque, −1 loucura —, `plano`, `quadros` e `espera_ms`: uma animação da amarela; a simulação fica parada `espera_ms × (quadros − 1)` ms enquanto a janela de edição mostra os quadros). |
 
 Os ganchos rodam **fora** do tick (antes e depois dele): a ordem interna do tick do original não muda. Sem nenhum mod com script, o laço do jogo é exatamente o mesmo de antes (os vetores de tick do original continuam iguais).
 
@@ -164,7 +164,7 @@ Ações (API 0.17). Diferente das escritas acima, uma ação é um **pedido**: o
 | `definir_painel(texto)` | (0.17) Painel de texto no canto da tela de jogo (até 16 linhas de 60 caracteres, separadas por `\n`), com o nome do mod; `nil` esconde. |
 | `avancar_ticks(n)` | (0.17) Pede `n` (1..10000) ticks seguidos, sem esperar o relógio e mesmo com o jogo pausado (com todos os ganchos de tick). Param no fim do jogo, num quadro modal ou com `parar_avanco()`. |
 | `parar_avanco()` | (0.17) Cancela os ticks pedidos que ainda faltam. |
-| `API_VERSAO`, `MOD_NOME` | `"0.17"` (era `"0.12"` até a 0.16) e o nome do mod. |
+| `API_VERSAO`, `MOD_NOME` | `"0.18"` (era `"0.12"` até a 0.16 e `"0.17"` na 0.17) e o nome do mod. |
 
 ### Sandbox e limites
 
@@ -195,9 +195,4 @@ Saved correctly"`. `exame.json` ganhou `deslocamento_linhas` e `cor_fundo` (opci
 | 0.15 | `janelas.json` ganhou `quintal` (número da janela), `gerenciador` (tamanho mínimo, cores do contorno de arrasto, menu de sistema) e `teclas` (aceleradores de janela: `fechar_de_cima`, `menu_sistema`, `proxima`, `mover`, `maximizar_edicao`); `tela_jogo.json`, `edicao.moldura`, ganhou `titulo_inativo` e `cor_seta` (opcionais); `quintal_mapa.json` aceita a ação `para_mapa` (o botão Patch passou de `fechar` para ela). | Um `janelas.json` de mod anterior precisa das três chaves novas (o arquivo é trocado inteiro). Um `quintal_mapa.json` com `"ribPatch": "fechar"` continua válido (só fecha o quintal, sem virar o mapa). |
 | 0.16 | Novo arquivo sobrescrevível e opcional `data/video.json` (escala e janela). `amarela.json`, `animacao`: chave opcional `espera_quadro_ms` (padrão 165: tempo entre dois quadros de `_AnimYellowFight`, usado para espalhar os sons da luta e do choque). Novo pedido das regras `Evento::Espera(ms)`; nos scripts, `ao_evento` recebe `evento.tipo == "espera"` com `evento.ms`. | Compatível com 0.15: só acrescenta. Um `amarela.json` de mod sem a chave nova usa 165 ms; um script que trate só os tipos antigos ignora o novo. |
 | 0.17 | Scripts: gancho `ao_menu`; funções `definir_menu`, `definir_painel`, `avancar_ticks`, `parar_avanco`; leituras `sementes`, `chuva`, `revoada`, `menino`, `patch`, `quintal`, `licao` e os campos `rainhas_guardadas`/`rainhas_vivas` de `colonia`; `colocar_formiga` com `casta` opcional; ações (pedidos executados depois do gancho) de chuva, menino, revoada, rainhas, patch, bichos, amarela, colônia, lição, fim de jogo e Mystery. `API_VERSAO` passa a `"0.17"`. Novos arquivos sobrescrevíveis `data/codigos_trapaca.json` (códigos de trapaça do original) e `data/menus_mods.json`. Textos literais da faixa (inclusive `mostrar_mensagem`) passam a sair na codificação da fonte (Mac Roman nas fontes do Mac): acentos aparecem certos. | Compatível com 0.16: só acrescenta. Um script que compare `API_VERSAO == "0.12"` precisa aceitar `"0.17"`. Sem mod com script, nada muda no jogo; um mod que só defina menu e painel não muda o tick. |
-
-## Planejado
-
-- Sobrescrita parcial (por chave) dentro dos arquivos JSON, em vez de trocar o arquivo inteiro.
-- Bitmaps de mod em PNG com conversão automática para a paleta.
-- Scripts: ganchos dentro do tick (por parte das regras), estado de script no save, mais escritas (cheiro, ninhos, castas).
+| 0.18 | Novo pedido das regras `Evento::Animacao` (quadros de `_AnimYellowFight`/`_AnimYellowInsane`); nos scripts, `ao_evento` recebe `evento.tipo == "animacao"` com `codigo`, `plano`, `quadros`, `espera_ms`. A partida para a simulação durante a animação (como o original); os ticks pedidos por `avancar_ticks` não param. `amarela.json`, `animacao`: chaves opcionais `espera_loucura_ms` (padrão 55) e `morte_para_com_musica` (padrão verdadeiro: com música ligada, as mortes 1–9 saem no primeiro quadro, como no caminho MCI do original; antes o port fazia todos os quadros e sorteios). `quintal.json`, `sons`: chave opcional `gato_fugindo` (14); `quintal_mapa.json`, `sprites`: `enxame` (bitmaps 7006/7007) e `som_cortador` (36). `API_VERSAO` passa a `"0.18"`. | Compatível com 0.17: só acrescenta. Um script que trate só os tipos antigos ignora o novo. Com música ligada, a sequência de S depois de uma morte da amarela por aranha ou formiga-leão muda (passa a ser a do original). |

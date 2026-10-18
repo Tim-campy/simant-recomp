@@ -17,6 +17,7 @@ Cenários (função cenario_<nome>; cada uma prepara e devolve a lista de passos
     amarela_sup   a amarela sai do ninho e vai comer (duplo clique numa comida), volta a um buraco e luta com
               uma vermelha (duplo clique), com cliques calculados a partir de _MapPnt
     luta      duplo clique numa vermelha (ordem 3) logo depois de uma compactação da lista A
+    luta_quadros  como luta_vizinha, com a tela capturada em cada quadro de _AnimYellowFight
 Protocolo e formato: docs/spec/regras/testes-tick.md. Snapshot "rico": tests/referencias/roteiros/qemu_snapshot_rico.txt.
 """
 import argparse
@@ -446,6 +447,77 @@ def cenario_luta_vizinha(c: Sessao, saida, n):
     """A amarela (soldado, vida 100) é posta na superfície numa célula livre vizinha de uma operária
     vermelha, e o duplo clique nela dá a ordem 3: a luta vem em poucos ticks (vitória provável:
     classe 1 contra 0)."""
+    preparar_luta_vizinha(c)
+    return c.gravar(saida, n, parar=lambda d: d.ler("MeCmd") == 3 and d.ler("MeMoveMe") == 0)
+
+
+def cenario_luta_quadros(c: Sessao, saida, n):
+    """Como `luta_vizinha`, mas captura a tela em cada quadro de _AnimYellowFight (a nuvem de luta) e
+    grava a entrada do tick da luta, para comparar com o port (formiga-amarela.md §10.2)."""
+    preparar_luta_vizinha(c)
+    return quadros_da_animacao(c, saida, n)
+
+
+# _AnimYellowFight (1028:7e56): o primeiro _DoEditUpdateDraw retorna em 1028:7e86, o de cada quadro em
+# 1028:8019, e o laço dos quadros volta a 1028:7f1c (leitura do relógio no começo do quadro).
+ANIM_PRIMEIRO_DESENHO, ANIM_QUADRO, ANIM_LACO = 0x7e86, 0x8019, 0x7f1c
+
+
+def quadros_da_animacao(c: Sessao, saida, n, timeout=60):
+    """Roda até n ticks; em cada um grava a entrada (estado, vida, extras) e, se _AnimYellowFight
+    desenhar, captura a tela parada logo depois de cada _DoEditUpdateDraw (quadro_00 = o desenho antes
+    do laço; quadro_01.. = um por quadro). Para no fim do tick que animou. Alterna dois breakpoints no
+    laço para nunca continuar de um ativo."""
+    dep, mj = c.dep, c.mj
+    saida = Path(saida).resolve()
+    for _ in range(n):
+        dep.ir_entrada()
+        ex = dep.extras()
+        gt = ex["GameTime"]
+        pasta = saida / f"tick_{gt:06d}"
+        qb.gravar(pasta / "estado_antes.bin", mj.estado())
+        qb.gravar(pasta / "vida_antes.bin", dep.vida())
+        g = mj.sessao_gdb()
+        primeiro, quadro, laco = (mj.linear_codigo(6, o) for o in (ANIM_PRIMEIRO_DESENHO, ANIM_QUADRO, ANIM_LACO))
+        armados = {dep.retorno, primeiro, quadro}
+        for a in armados:
+            g.breakpoint(a)
+        quadros = []
+        try:
+            while True:
+                g.continuar_ate_parar(timeout)
+                pc, _ = dep.pc()
+                if pc == dep.retorno:
+                    break
+                if pc not in armados:
+                    raise RuntimeError(f"parada inesperada: pc linear {pc:#x}")
+                g.breakpoint(pc, False)
+                armados.discard(pc)
+                if pc == laco:
+                    g.breakpoint(quadro)
+                    armados.add(quadro)
+                    continue
+                if pc == quadro:
+                    g.breakpoint(laco)
+                    armados.add(laco)
+                nome = f"quadro_{len(quadros):02d}"
+                rel = (pasta / f"{nome}.png").relative_to(qb.RAIZ.resolve()).as_posix()
+                c.b.executar(f"capturar {rel}")
+                quadros.append({"quadro": nome, **{v: c.ler(v, sinal=True) for v in ("MeType", "MeDir", "MeLocX", "MeLocY")}})
+        finally:
+            for a in armados:
+                g.breakpoint(a, False)
+        qb.gravar(pasta / "estado_depois.bin", mj.estado())
+        qb.gravar(pasta / "vida_depois.bin", dep.vida())
+        reg = {"antes": ex, "depois": dep.extras(), "quadros": quadros}
+        (pasta / "extras.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+        c.log(f"tick {gt}: {len(quadros)} desenhos da animação")
+        if quadros:
+            return [pasta.name]
+    return []
+
+
+def preparar_luta_vizinha(c: Sessao):
     c.teclas("ctrl+8")
     time.sleep(1)
     c.entrada()
@@ -475,7 +547,6 @@ def cenario_luta_vizinha(c: Sessao, saida, n):
         c.escrever(nome, v)
     c.log(f"amarela de ({plano}, {ox}, {oy}) para a superfície em ({mx}, {my}), vizinha da vermelha em {alvo}")
     c.clicar_celula(*alvo, duplo=True, pausado=True)
-    return c.gravar(saida, n, parar=lambda d: d.ler("MeCmd") == 3 and d.ler("MeMoveMe") == 0)
 
 
 # ------------------------------------------------------------------------------------------------

@@ -57,6 +57,9 @@ ANIMACAO = {
     "quadros_morte_frente_musica": (64, "_AnimYellowFight, códigos 1–9, janela à frente, música ligada"),
     "quadros_loucura_frente": (32, "_AnimYellowInsane 1028:8078, janela à frente"),
     "quadros_loucura_atras": (8, "_AnimYellowInsane, janela atrás"),
+    "espera_quadro_ms": (165, "_AnimYellowFight: espera _MacTickCount() > início + 6 (3 degraus de 55 ms)"),
+    "espera_loucura_ms": (55, "_AnimYellowInsane: espera _MacTickCount() > início + 3 (1 degrau)"),
+    "morte_para_com_musica": (True, "_AnimYellowFight: códigos 1–9 com música saem quando _mySongIsDone (sempre verdadeiro no MCI)"),
 }
 
 MUSICAS = {

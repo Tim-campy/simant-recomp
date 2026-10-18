@@ -40,7 +40,7 @@ use crate::rules::geracao::Cor;
 use crate::rules::inimigos::TabelasInimigos;
 
 /// Versão da API de mods que os scripts veem em `API_VERSAO`.
-pub const VERSAO_API: &str = "0.17";
+pub const VERSAO_API: &str = "0.18";
 
 /// Tamanho máximo do texto de `mostrar_mensagem` (caracteres).
 pub const MAX_TEXTO_MENSAGEM: usize = 120;
@@ -1060,6 +1060,13 @@ fn tabela_evento(lua: &Lua, ev: &Evento) -> mlua::Result<Table> {
         Evento::Espera(ms) => {
             t.set("tipo", "espera")?;
             t.set("ms", *ms)?;
+        }
+        Evento::Animacao(a) => {
+            t.set("tipo", "animacao")?;
+            t.set("codigo", a.codigo)?;
+            t.set("plano", a.plano)?;
+            t.set("quadros", a.quadros.len())?;
+            t.set("espera_ms", a.espera_ms)?;
         }
     }
     Ok(t)

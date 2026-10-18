@@ -987,6 +987,46 @@ pub enum Evento {
     /// pedidos depois saem mais tarde; a interface usa a espera para espalhar no tempo os efeitos
     /// da mesma fila (regras/som.md, "Linha do tempo dos efeitos").
     Espera(u16),
+    /// Os quadros de uma animação da amarela dentro do tick (`_AnimYellowFight`): o original redesenha
+    /// a janela de edição a cada quadro e fica parado `espera_ms` entre dois quadros (o programa
+    /// inteiro, inclusive a simulação). A interface mostra os quadros e não roda ticks nesse tempo.
+    /// Não muda o estado (regras/formiga-amarela.md §10.2).
+    Animacao(Box<AnimacaoDaAmarela>),
+}
+
+/// Animação da amarela (`_AnimYellowFight`, `1028:7e56`): o plano animado e, para cada quadro, a
+/// janela de edição como `_DoEditUpdateDraw` a desenharia naquele instante.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AnimacaoDaAmarela {
+    /// Código de `_AnimYellowFight`: 0 luta, 1–9 mortes, 10 choque elétrico.
+    pub codigo: i16,
+    /// `_MePlane` animado (1 superfície, 2 ninho preto, 3 ninho vermelho).
+    pub plano: i16,
+    /// Tempo real entre o começo de dois quadros (ms); depois do último não há espera.
+    pub espera_ms: u16,
+    pub quadros: Vec<QuadroAnimacao>,
+}
+
+/// Um quadro: mapa de chão e de vida do plano animado, e os campos `_Me*` que o desenho da marca
+/// 0xFF lê (a luta desenha a amarela com `_MeType` = 0x70, a nuvem de luta, numa direção sorteada).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QuadroAnimacao {
+    pub mapa: Vec<u8>,
+    pub vida: Vec<u8>,
+    pub x: i16,
+    pub y: i16,
+    pub tipo: i16,
+    pub dir: i16,
+    pub ovo: i16,
+    pub base: i16,
+}
+
+impl AnimacaoDaAmarela {
+    /// Tempo em que o programa fica parado (ms): uma espera antes de cada quadro, menos o primeiro
+    /// (que espera só o próximo degrau do relógio, até 55 ms, não contado).
+    pub fn duracao_ms(&self) -> u64 {
+        u64::from(self.espera_ms) * self.quadros.len().saturating_sub(1) as u64
+    }
 }
 
 /// Pedido de mensagem na faixa: string `indice` da lista SHARED 4/`lista`, com a duração do
