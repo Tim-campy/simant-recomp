@@ -1230,6 +1230,197 @@ def cenario_sprites_quintal(c: Sessao, saida, n):
     return []
 
 
+def cenario_navegacao(c: Sessao, saida, n):
+    """Navegação da janela de edição (telas/jogo.md "Navegação"), com o jogo pausado: Ctrl+setas na
+    superfície, troca de plano (Ctrl+9, Ctrl+0, Ctrl+8), Ctrl+seta num ninho e Ctrl+8 com a superfície
+    já na tela. Cada vista: captura NAV_nome.png e o estado em NAV_nome.ANT (o port desenha o mesmo
+    estado com `cargo run -p engine --example tela_jogo -- JOGO NAV_nome.ANT SAIDA NAV_nome.png`)."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+8")
+    time.sleep(2)
+    return capturar_vistas(c, saida, "nav", [
+        ("0_inicial", [], 1), ("1_ctrl_dir", ["ctrl+right"], 2), ("2_ctrl_dir2", ["ctrl+right", "ctrl+right"], 2),
+        ("3_ctrl_baixo", ["ctrl+down"], 2), ("4_ctrl_esq", ["ctrl+left"], 2), ("5_ctrl_cima", ["ctrl+up"], 2),
+        ("6_ninho_preto", ["ctrl+9"], 3), ("7_ninho_preto_dir", ["ctrl+right"], 2), ("8_ninho_vermelho", ["ctrl+0"], 3),
+        ("9_superficie", ["ctrl+8"], 3), ("a_superficie_baixo", ["ctrl+down", "ctrl+down"], 2),
+        ("b_superficie_de_novo", ["ctrl+8"], 3)])
+
+
+def segurar_em(c: Sessao, saida, nome, x, y, espera=2.0):
+    """Aperta o botão em (x, y) da tela, espera, captura NOME.png com o botão apertado e solta longe
+    (a ponta da seta vai para o canto antes de soltar, para não escolher item de menu)."""
+    c.dep.retomar()
+    qb.mouse_canto(c.q)
+    qb.mover_rel(c.q, x, y)
+    time.sleep(0.3)
+    c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": True, "button": "left"}}])
+    time.sleep(espera)
+    tela(c, saida, nome)
+    qb.mover_rel(c.q, -x + 2, -y + 2)
+    time.sleep(0.3)
+    c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": False, "button": "left"}}])
+    time.sleep(1)
+
+
+def cenario_examine_sessao(c: Sessao, saida, n):
+    """Examine várias vezes na mesma sessão (snapshot rico, ninho preto, jogo pausado): as mesmas três
+    formigas de `capturas`, na ordem ORDEM (variável de ambiente, padrão "1,0,2,1,0"), para ver se o
+    deslocamento de 3 pixels de examine_0 é da primeira abertura da sessão. Grava capt.ANT e
+    capturas.json no formato de `capturas` (comparar_capturas.py)."""
+    import os
+    ordem = [int(v) for v in os.environ.get("ORDEM", "1,0,2,1,0").split(",")]
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    (pasta / "capt.ANT").write_bytes(c.mj.estado())
+    s = c.save()
+    mx, my, plano = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2), s.ler("MapPlane")
+    lista = {1: "A", 2: "B", 3: "R"}[plano]
+    me = (s.ler("MeLocX"), s.ler("MeLocY")) if s.ler("MePlane") == plano else None
+    vistos, escolhidas = set(), []
+    for _, f in formigas(s, lista):
+        x, y, g = f["X"], f["Y"], (f["T"] & 0x78) >> 3
+        if not (mx <= x < mx + COLS and my <= y < my + LINS) or (x, y) == me or g in vistos:
+            continue
+        vistos.add(g)
+        escolhidas.append((x, y, f["T"], f["M"]))
+        if len(escolhidas) == 3:
+            break
+    reg = {"vista": [plano, mx, my], "examine": [], "ordem": ordem}
+    for k, i in enumerate(ordem):
+        x, y, t, m = escolhidas[i]
+        reg["examine"].append([x, y, t, m])
+        segurar_em(c, saida, f"examine_{k}", MAPA_X0 + (x - mx) * TILE + 8, MAPA_Y0 + (y - my) * TILE + 8, 1.5)
+    (pasta / "capturas.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"examine: {reg}")
+    return []
+
+
+def cenario_menu_amarela(c: Sessao, saida, n):
+    """_AntMenu: segura o botão na célula da amarela (vista do plano dela, jogo pausado) e captura o menu
+    (rainha alada sem colônia no snapshot full; formiga no rico). Com ARANHA=1 (snapshot rico), antes
+    vira a aranha: superfície, X (troca de corpo) e clique na célula da aranha; depois segura o botão
+    na célula da aranha. Grava menu.ANT (estado com o menu aberto) e menu.json (célula e pixel)."""
+    import os
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    c.teclas("shift+0")
+    time.sleep(1)
+    reg = {}
+    if os.environ.get("ARANHA"):
+        c.teclas("ctrl+8")
+        time.sleep(2)
+        c.mj.sessao_gdb()
+        sx, sy = c.ler("SpidX", sinal=True) >> 4, c.ler("SpidY", sinal=True) >> 4
+        reg["aranha"] = [sx, sy, c.ler("SpidOn"), c.ler("SMode")]
+        c.teclas("x")
+        time.sleep(1.5)
+        tela(c, saida, "troca_modo")
+        c.clicar_celula(sx, sy)
+        time.sleep(2)
+        c.mj.sessao_gdb()
+        reg["depois_da_troca"] = {v: c.ler(v, sinal=True) for v in ("MeMode", "MeLocX", "MeLocY", "MePlane", "CurGameTool", "GamePaused")}
+        tela(c, saida, "troca_feita")
+    else:
+        c.mj.sessao_gdb()
+        plano = c.ler("MePlane")
+        c.teclas({1: "ctrl+8", 2: "ctrl+9", 3: "ctrl+0"}[plano])
+        time.sleep(2)
+    c.mj.sessao_gdb()
+    s = c.save()
+    x, y = s.ler("MeLocX"), s.ler("MeLocY")
+    mx, my = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2)
+    if not (mx <= x < mx + COLS and my <= y < my + LINS):
+        px0 = max(0, min((128 if s.ler("MapPlane") < 2 else 64) - COLS, x - COLS // 2))
+        py0 = max(0, min(64 - LINS, y - LINS // 2))
+        c.escrever_elemento("MapPnt", 0, px0, 2)
+        c.escrever_elemento("MapPnt", 1, py0, 2)
+        c.teclas("ctrl+up", "ctrl+down")   # redesenha a vista com o _MapPnt novo
+        time.sleep(2)
+        c.mj.sessao_gdb()
+        s = c.save()
+        mx, my = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2)
+    px, py = MAPA_X0 + (x - mx) * TILE + 8, MAPA_Y0 + (y - my) * TILE + 8
+    (pasta / "menu.ANT").write_bytes(c.mj.estado())
+    reg.update({"celula": [x, y], "vista": [s.ler("MapPlane"), mx, my], "pixel": [px, py],
+                "MeType": s.ler("MeType"), "MeNestStarted": c.ler("MeNestStarted")})
+    segurar_em(c, saida, "menu", px, py, 2.5)
+    tela(c, saida, "menu_solto")
+    (pasta / "menu.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"menu: {reg}")
+    return []
+
+
+def cenario_historico(c: Sessao, saida, n):
+    """History com dados (snapshot rico, jogo pausado): Ctrl+H, captura; depois um clique em cada ponto
+    de CLIQUES ("x,y;x,y", botões dos gráficos) com captura hist_K.png. Grava hist.ANT e hist.json."""
+    import os
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+h")
+    time.sleep(3)
+    c.mj.sessao_gdb()
+    (pasta / "hist.ANT").write_bytes(c.mj.estado())
+    tela(c, saida, "hist_0")
+    cliques = [tuple(int(v) for v in p.split(",")) for p in os.environ.get("CLIQUES", "").split(";") if p]
+    for k, (x, y) in enumerate(cliques):
+        clicar_tela(c, x, y)
+        time.sleep(2.5)
+        tela(c, saida, f"hist_{k + 1}")
+    (pasta / "hist.json").write_text(json.dumps({"cliques": cliques}) + "\n", encoding="utf-8")
+    return []
+
+
+def cenario_triangulo(c: Sessao, saida, n):
+    """Arrasto no triângulo das castas (CASTE=1, Ctrl+C) ou do comportamento (Ctrl+B), jogo pausado:
+    aperta em ARRASTO[0], passa pelos pontos seguintes com o botão apertado (captura em cada um) e solta
+    no último. Lê _casteLevels/_modeLevels, _CasteAuto/_ModeAuto e _IdealCaste antes e depois e grava o
+    estado de depois em tri.ANT. ARRASTO = "x,y;x,y;..." em pixels da tela."""
+    import os
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    casta = os.environ.get("CASTE", "1") == "1"
+    nomes = ("casteLevels", "CasteAuto", "IdealCaste") if casta else ("modeLevels", "ModeAuto")
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+c" if casta else "ctrl+b")
+    time.sleep(3)
+    c.mj.sessao_gdb()
+    s = c.save()
+    reg = {"antes": {v: list(s.bytes_bloco(v)) for v in nomes}}
+    tela(c, saida, "tri_0")
+    pts = [tuple(int(v) for v in p.split(",")) for p in os.environ["ARRASTO"].split(";") if p]
+    c.dep.retomar()
+    qb.mouse_canto(c.q)
+    qb.mover_rel(c.q, *pts[0])
+    time.sleep(0.3)
+    c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": True, "button": "left"}}])
+    time.sleep(1)
+    tela(c, saida, "tri_1")
+    atual = pts[0]
+    for k, p in enumerate(pts[1:]):
+        qb.mover_rel(c.q, p[0] - atual[0], p[1] - atual[1])
+        atual = p
+        time.sleep(1)
+        tela(c, saida, f"tri_{k + 2}")
+    c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": False, "button": "left"}}])
+    time.sleep(1.5)
+    tela(c, saida, "tri_solto")
+    c.mj.sessao_gdb()
+    (pasta / "tri.ANT").write_bytes(c.mj.estado())
+    s = c.save()
+    reg["depois"] = {v: list(s.bytes_bloco(v)) for v in nomes}
+    reg["arrasto"] = pts
+    (pasta / "tri.json").write_text(json.dumps(reg) + "\n", encoding="utf-8")
+    c.log(f"triângulo: {reg}")
+    return []
+
+
 def cenario_salvo(c: Sessao, saida, n):
     """'Saved correctly': jogo pausado, Ctrl+S abre "Save Ant Hill As" (o Quick Game não tem nome),
     digita QUICK1 e Enter, confirma a substituição (Y); a caixa "%s Saved correctly" aparece; captura e fecha."""

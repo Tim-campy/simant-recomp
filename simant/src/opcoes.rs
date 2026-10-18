@@ -45,6 +45,8 @@ pub(crate) struct Opcoes {
     pub(crate) fechar_avisos: usize,
     /// Sem janela: funções de botões da faixa (`_DoUserButton`) apertados antes de exportar.
     pub(crate) botoes: Vec<u16>,
+    /// Sem janela: abre a History e alterna os botões de gráfico B (0–9, `histBPop`…) antes de exportar.
+    pub(crate) historico: Vec<usize>,
     /// Sem janela: abre um menu antes de exportar ("amarela@X,Y" ou "icones@OBJETO").
     pub(crate) menu: Option<String>,
     /// Sem janela: Ctrl+clique no marcador N (1–7) antes de exportar.
@@ -94,6 +96,7 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         salvar: None,
         fechar_avisos: 0,
         botoes: Vec::new(),
+        historico: Vec::new(),
         menu: None,
         marcar: None,
         dialogo: None,
@@ -142,6 +145,9 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
                 o.examinar = Some((x.parse().map_err(|_| "--examinar: x")?, y.parse().map_err(|_| "--examinar: y")?));
             }
             "--marcar" => o.marcar = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
+            "--historico" => {
+                o.historico = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| format!("{a}: número inválido"))).collect::<Result<_, _>>()?
+            }
             "--botoes" => {
                 o.botoes = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| format!("{a}: número inválido"))).collect::<Result<_, _>>()?
             }

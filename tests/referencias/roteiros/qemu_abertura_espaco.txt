@@ -1,0 +1,13 @@
+# Espaço fecha o título e depois o registro (capturas antes e depois de cada Espaço). Um Espaço apertado
+# antes de o logotipo terminar de ser desenhado (ampulheta, ~36 s) é perdido: GetAsyncKeyState só vê a
+# tecla apertada no instante da consulta, e a espera de _DialogWaitInit ainda não começou.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_abertura_espaco.txt --overlay re_trabalho/abertura/ov2.qcow2
+esperar 42
+capturar re_trabalho/abertura/e0_titulo.png
+teclas spc
+esperar 2
+capturar re_trabalho/abertura/e1_registro.png
+teclas spc
+esperar 3
+capturar re_trabalho/abertura/e2_selecao.png
+fim
