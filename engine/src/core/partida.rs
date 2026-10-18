@@ -194,6 +194,16 @@ impl ConfigPartida {
     }
 }
 
+/// `_ELayerMode` que o botão de cheiro da faixa (`_MapMode` n) liga: 4 ninho preto → 1, 5 trilha preta
+/// → 2, 6 ninho vermelho → 3, 7 trilha vermelha → 4, 8 alarme → 0 (`_ProcMapRibbonEvent`, `1010:c4f0`).
+pub fn camada_do_modo_de_cheiro(n: i16) -> i16 {
+    match n {
+        4..=7 => n - 3,
+        8 => 0,
+        _ => -1,
+    }
+}
+
 /// Resultado de [`Partida::avancar`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Avanco {
@@ -743,7 +753,8 @@ impl Partida {
 
     /// Botão de cheiro da faixa (`ribBNestScent`… → `_SetMapModeAnt(n)`, n de 4 a 8): os feromônios
     /// só existem na superfície (antes, `_SetMapPlane(1)`); o mesmo botão de novo volta ao mapa
-    /// simples. [o original também grava `_ELayerMode` para a janela de edição; o port não.]
+    /// simples. A janela de edição mostra a mesma camada (`_ELayerMode`, `_ProcMapRibbonEvent`
+    /// `0x220b`–`0x220f`), ou nenhuma quando o botão desliga.
     pub fn botao_de_cheiro(&mut self, n: i16) {
         if self.nav.plano_mapa != 1 {
             self.navegar(Acao::Superficie);
@@ -751,6 +762,7 @@ impl Partida {
         self.vistas_para_estado();
         let e = &mut self.estado;
         e.vistas.modo_mapa = super::janela_mapa::modo_do_botao_de_cheiro(e.vistas.modo_mapa, n);
+        e.camada_edicao = if e.vistas.modo_mapa == n { camada_do_modo_de_cheiro(n) } else { -1 };
         self.redesenhar = true;
     }
 
@@ -1080,6 +1092,31 @@ mod testes {
         assert_eq!((p.estado.partida.pausado, p.estado.partida.ferramenta), (0, -1));
         // O atraso continuou contando na pausa: o primeiro tick sai já na mensagem seguinte.
         assert_eq!(ticks_em(&mut p, 1), 1);
+    }
+
+    #[test]
+    fn alarme_e_botoes_de_cheiro_mostram_a_camada_na_edicao() {
+        // Tecla 0 na superfície (_SetAlarmDropState(1)): _ELayerMode = 0; de novo, −1.
+        let mut p = partida(1);
+        p.estado.amarela.plano = 1;
+        p.estado.amarela.modo = 0;
+        let sem = Modificadores::default();
+        p.tecla_amarela(48, sem);
+        assert_eq!((p.estado.amarela.soltando_alarme, p.estado.camada_edicao), (1, 0));
+        p.tecla_amarela(48, sem);
+        assert_eq!((p.estado.amarela.soltando_alarme, p.estado.camada_edicao), (0, -1));
+        // No ninho não liga (som de erro) e a camada não muda.
+        p.estado.amarela.plano = 2;
+        p.tecla_amarela(48, sem);
+        assert_eq!((p.estado.amarela.soltando_alarme, p.estado.camada_edicao), (0, -1));
+        // Botões de cheiro: o mesmo botão de novo desliga.
+        p.botao_de_cheiro(4);
+        assert_eq!(p.estado.camada_edicao, 1);
+        p.botao_de_cheiro(8);
+        assert_eq!(p.estado.camada_edicao, 0);
+        p.botao_de_cheiro(8);
+        assert_eq!(p.estado.camada_edicao, -1);
+        assert_eq!((5..=7).map(camada_do_modo_de_cheiro).collect::<Vec<_>>(), [2, 3, 4]);
     }
 
     #[test]

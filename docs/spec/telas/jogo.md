@@ -232,6 +232,19 @@ Como o original roda a partida enquanto a tela de jogo está aberta, e o que o p
 - O atraso continua contando durante a pausa: ao despausar, o primeiro tick sai na mensagem seguinte [código: o +1 vem antes do teste].
 - Redesenho (`_UpdateWindows`, `1000:2224`): todo tick em slow/normal, 1 a cada 2 em fast e 1 a cada 4 em ultra (`redesenho_mapa_a_cada`); sem foco, só quando o contador de quadros é múltiplo de 8 (`redesenho_sem_foco_a_cada`) [código]. [hipótese] O port incrementa o contador antes do teste (no original a ordem não foi conferida). Rolagem, troca de plano, cliques e teclas pedem redesenho na hora.
 
+### Camada de cheiro na janela de edição (`_ELayerMode`)
+
+[código] `_DoCalcTile` (`1018:4a6b`), nos planos 0 e 1: com `_ELayerMode` = 0 (alarme), 1 (ninho preto), 2 (trilha preta), 3 (ninho vermelho) ou 4 (trilha vermelha), lê o mapa de feromônio da célula 2×2 (`(x >> 1) × 32 + (y >> 1)`) e, se o valor passa de 0x10, desenha o tile `(valor >> 4) − 0x10` (0xF1–0xFF) no lugar do chão; a vida vai por cima. Quem muda `_ELayerMode` (fora do save; −1 = nenhuma):
+
+| Origem | Valor |
+|---|---|
+| tecla 0 da amarela / `_SetAlarmDropState(1)` (só na superfície e como formiga) | 0 |
+| desligar o alarme (tecla 0 de novo, entrar num ninho, morte, `_InitYellow`, tutorial) | −1 |
+| botões de cheiro da faixa (`_ProcMapRibbonEvent` `0x220b`–`0x220f`): `_SetMapModeAnt(4..8)` e, se o modo ficou ligado, 1, 2, 0, 3, 4 (ninho preto, trilha preta, alarme, ninho vermelho, trilha vermelha); se o mesmo botão desligou, −1 | 0–4 / −1 |
+| menu do botão `editScent` da janela de edição (`_EditScentMenu`, `1010:675e`: Off, Alarm, BNest, BTrail, RNest, RTrail) | −1–4 |
+
+No port: `Estado::camada_edicao`, ligado por `rules/amarela.rs` (tecla 0 e desligamentos) e `Partida::botao_de_cheiro`; `TelaDeJogo::atualizar` copia a camada e `compor` a sobrepõe à superfície (`MapaChao::com_feromonio`). Teste `camada_de_cheiro_na_janela_de_edicao` (`engine/tests/tela_jogo_real.rs`): no `QUICK2.ANT`, com a camada 1, mudam exatamente os 4 tiles do buraco preto. **Não reproduzidos:** o menu `_EditScentMenu` e o estado selecionado do botão `editScent` (os ícones da janela de edição ficam escondidos com a faixa). Não conferido na bancada.
+
 ### Fila de eventos
 
 As regras não chamam janela nem som: deixam pedidos em `Estado::eventos`. Depois de cada tick e de cada entrada do jogador, a `Partida` esvazia essa fila:

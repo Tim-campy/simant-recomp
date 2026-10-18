@@ -251,6 +251,8 @@ const TIPO_OPERARIA: i32 = 0x10;
 const TIPO_SOLDADO: i32 = 0x30;
 const ABERTURA_NINHO: u8 = 0x18;
 const PASSAGEM_ENTRE_NINHOS: i32 = 0x14;
+/// `_ELayerMode` do feromônio de alarme (`Estado::camada_edicao`).
+pub const CAMADA_ALARME: i16 = 0;
 const BURACO_QUINTAL: u8 = 0x50;
 const CENTRO_FORMIGA_LEAO: i32 = 0x38;
 
@@ -1202,7 +1204,9 @@ fn comer(e: &mut Estado, t: &TabelasAmarela, tipo: i32) {
 fn entrar_no_ninho(e: &mut Estado, t: &TabelasAmarela) {
     e.eventos.push(Evento::TemaDoNinho);
     if e.amarela.soltando_alarme != 0 {
+        // `_SetAlarmDropState(0, 1)`: desliga o alarme e a camada de cheiro da janela de edição.
         e.amarela.soltando_alarme = 0;
+        e.camada_edicao = -1;
     }
     desmarcar(e, t);
     let a = &mut e.amarela;
@@ -1751,6 +1755,7 @@ pub fn matar_amarela(e: &mut Estado, t: &TabelasAmarela, causa: CausaMorte) {
     liberar(e, true);
     if e.amarela.soltando_alarme != 0 {
         e.amarela.soltando_alarme = 0;
+        e.camada_edicao = -1;
     }
     reencarnar(e, t);
 }
@@ -2368,8 +2373,11 @@ pub fn comando(e: &mut Estado, t: &TabelasAmarela, ctl: &mut ControleJogador, c:
                     return false;
                 }
                 e.amarela.soltando_alarme = 1;
+                // A janela de edição passa a mostrar o feromônio de alarme (`_ELayerMode` = 0).
+                e.camada_edicao = CAMADA_ALARME;
             } else {
                 e.amarela.soltando_alarme = 0;
+                e.camada_edicao = -1;
             }
             e.pedir_som(t.sons.ok);
         }

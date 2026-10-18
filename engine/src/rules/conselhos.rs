@@ -287,7 +287,9 @@ pub fn licao_concluida(
         Concluida::AndouSoltandoAlarme => posicao_mudou && a.soltando_alarme != 0 && a.dis == 0,
         Concluida::TempMarcadoDesligaAlarme => {
             if a.soltando_alarme != 0 {
-                e.amarela.soltando_alarme = 0; // `_SetAlarmDropState(0, 1)`
+                // `_SetAlarmDropState(0, 1)`
+                e.amarela.soltando_alarme = 0;
+                e.camada_edicao = -1;
             }
             e.tutorial.temporario != 0
         }

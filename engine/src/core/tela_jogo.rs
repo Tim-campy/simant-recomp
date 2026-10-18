@@ -277,6 +277,8 @@ pub struct TelaDeJogo {
     pendencias: Vec<String>,
     /// Saúde, população e limiares mostrados nas barras da faixa.
     pub valores_faixa: super::barras_faixa::ValoresFaixa,
+    /// Camada de feromônio sobreposta à superfície (`_ELayerMode` ≠ −1), copiada do estado.
+    camada_edicao: Option<Vec<u8>>,
 }
 
 fn indice_do_plano(p: Plano) -> usize {
@@ -340,6 +342,7 @@ impl TelaDeJogo {
                     populacao_vermelha: v("RpopT"),
                 }
             },
+            camada_edicao: None,
             bitmaps_da_faixa: Vec::new(),
             titulo: String::new(),
             selecao_da_faixa: Vec::new(),
@@ -358,6 +361,17 @@ impl TelaDeJogo {
             r: e.ninho_r.vida.dados.clone(),
         };
         self.valores_faixa = super::barras_faixa::ValoresFaixa::do_estado(e);
+        // _DoCalcTile: com _ELayerMode 0..4, a superfície mostra o feromônio no lugar do chão.
+        let f = &e.feromonios;
+        self.camada_edicao = match e.camada_edicao {
+            0 => Some(&f.alarme),
+            1 => Some(&f.ninho_b),
+            2 => Some(&f.trilha_b),
+            3 => Some(&f.ninho_r),
+            4 => Some(&f.trilha_r),
+            _ => None,
+        }
+        .map(|g| g.dados.clone());
         let a = &e.amarela;
         self.amarela =
             FormigaAmarela { modo: a.modo, plano: a.plano, x: a.x, y: a.y, tipo: a.tipo, dir: a.dir, ovo: a.ovo, base: a.base };
@@ -459,7 +473,10 @@ impl TelaDeJogo {
         let vista = &nav.vista;
         let tiles_vida = if vista.plano == Plano::Superficie { &self.tiles_vida_superficie } else { &self.tiles_vida_ninho };
         let cena = CenaEdicao {
-            chao: MapaChao::new(vista.plano, &self.mapas[indice_do_plano(vista.plano)])?,
+            chao: match (&self.camada_edicao, vista.plano) {
+                (Some(c), Plano::Superficie) => MapaChao::new(vista.plano, &self.mapas[0])?.com_feromonio(c)?,
+                _ => MapaChao::new(vista.plano, &self.mapas[indice_do_plano(vista.plano)])?,
+            },
             vida: &self.vida,
             amarela: self.amarela,
             tiles_chao: &self.tiles_chao[usize::from(self.terreno == 1)],
