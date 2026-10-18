@@ -7,7 +7,7 @@
 1. Abre a janela interna `0x300` (768) do sistema de janelas próprio (`_win_Open`) e captura o mouse.
 2. Toca a música de id 10001 (`_myBeginSong(0x2711, 0x7e)`; o segundo parâmetro tem significado [em aberto]). No banco `SOUND`, o id 10001 existe como cabeçalho (tipo 18) e como MIDI (tipos 20 e 50).
 3. Monta um número de 8 dígitos a partir de uma tabela do DGROUP [hipótese: número de série exibido na tela; não é usado neste marco].
-4. Espera até **40 × 18 = 720 ticks** (`_DialogWaitInit(0x28)`). O tick de `_TickCount` (`1008:18ac`) é `GetTickCount() / 55`, ou seja, cerca de 18,2 por segundo, o que dá cerca de **39,6 s**.
+4. Espera até **40 × 18 = 720 ticks** (`_DialogWaitInit(0x28)`). O tick de `_TickCount` (`1008:18ac`) é `GetTickCount() / 55`, ou seja, cerca de 18,2 por segundo, o que dá cerca de **39,6 s**. **Verificado (2026-10-18, `tools/medir_abertura.py`):** a pilha de esperas (`DGROUP:150a`, início em `cad4`, duração em `caf4`) mostra o título armado em `_TickCount` 1013 com 720 e o registro em 1733 = 1013 + 720 com 270; na VM, 719 e 270 ticks do BIOS. O logotipo é desenhado antes de a espera começar. Espaço fecha o título e o registro em ~0,25 s; apertado antes de a espera começar, se perde. O tempo no relógio do host não serve (o QEMU sem `icount` perde ticks do Windows com a máquina carregada).
 5. Fecha antes do tempo se `_win_Events()` devolver um evento (clique ou tecla tratada pela janela) ou se a **barra de espaço** estiver pressionada (`GetAsyncKeyState(VK_SPACE)` em `_DialogAbortOrCont`, `1000:9c98`).
 6. Fecha a janela `0x300` e descarta os eventos pendentes.
 

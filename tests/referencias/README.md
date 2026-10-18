@@ -6,8 +6,8 @@ Capturas e logs feitos no SimAnt original (DOSBox-X, `referencia/dosbox-x.conf`)
 
 | Caso | Entrada | Esperado (pela especificação) | Observado no original | Situação |
 |---|---|---|---|---|
-| Duração da abertura | iniciar o jogo e não tocar em nada | a janela de abertura fecha depois de ~39,6 s (720 ticks de 55 ms) | — | pendente |
-| Abertura fecha com espaço | apertar Espaço durante a abertura | fecha imediatamente | — | pendente |
+| Duração da abertura | iniciar o jogo e não tocar em nada | a janela de abertura fecha depois de ~39,6 s (720 ticks de 55 ms) | bancada QEMU, `tools/medir_abertura.py` (2026-10-18): a espera do título começa em `_TickCount` 1013 com duração 720 e a do registro em 1733 = 1013 + 720 (duração 270); 719 ticks do BIOS (39,5 s da VM) com o título e 270 (14,8 s) com o registro. No relógio do host o título durou 49–73 s com a máquina carregada: o QEMU sem `icount` perde ticks do Windows, então só a contagem da VM vale. O logotipo é desenhado antes da espera começar (~2 s a mais na tela) | confirmado |
+| Abertura fecha com espaço | apertar Espaço durante a abertura | fecha imediatamente | `medir_abertura.py --espaco` (2026-10-18): Espaço 2 s depois de a espera armar fecha o título em 0,23 s e o registro em 0,26 s (4 e 3 ticks do BIOS). Um Espaço apertado antes de a espera começar (logotipo ainda sendo desenhado, ampulheta) se perde: `GetAsyncKeyState` só vê a tecla apertada no instante da consulta (`qemu_abertura_espaco.txt`) | confirmado |
 | Composição da abertura (1ª observação) | captura da tela de abertura | logotipo = bitmaps 2/2000 + 2/2001 empilhados | logotipo aparece **dentro da janela principal** do SimAnt (menu File/Window/View/Options/Speed e barra de ferramentas visíveis acima), com moldura azul; não há tela Maxis antes (o jogo foi lançado direto por `win SIMANTW.EXE`). Captura: `capturas/abertura_titulo_dosbox.png` (2026-10-16, ~30 s após iniciar) | divergência registrada |
 | Ordem das telas | iniciar o jogo e esperar 80 s | Maxis Presents → título → Select a Game [hipótese] | título → registro (Customer ID) → Select a Game; nenhuma tela Maxis. Capturas `titulo_800x600.png`, `apos_titulo.png`, `novo_jogo.png` | confirmado, hipótese corrigida |
 | Fontes Mac pixel a pixel | renderizar "Click here to continue" (font2) e "Customer ID:" (font3) e procurar na captura do registro | blocos idênticos | encontrados exatos em (362,397) e (361,356) de `apos_titulo.png` | confirmado (`fontes_mac_batem_com_o_original`) |
@@ -17,6 +17,19 @@ Capturas e logs feitos no SimAnt original (DOSBox-X, `referencia/dosbox-x.conf`)
 | Determinismo tick a tick | bancada QEMU, `tools/gerar_vetores_tick.py` (breakpoints em `_DoAntSim`) do snapshot `quick`, duas vezes | estados iguais | 307 blocos iguais exceto `_BirdDelay` (depende de `_gameCycles`, contador ligado ao relógio do host), também com 20 s de corrida livre e com sementes forçadas, até `GameTime` 300 | confirmado (`ticks/`, `docs/spec/regras/testes-tick.md`) |
 | Paleta | captura de qualquer tela colorida | cores = paleta padrão do Windows (`data/paleta.json`) | igual, com 7 = cinza escuro e 8 = cinza claro (a especificação tinha trocado) | confirmado, divergência corrigida |
 | Título pixel a pixel | `capturar_original.ps1 -Saida capturas\titulo_800x600.png`; `comparar_captura.py` contra `--exportar-telas` | port igual ao original | 99,98% iguais; diferença só sob o cursor do mouse | confirmado (`engine/tests/telas_reais.rs`) |
+
+## Telas e janelas conferidas na bancada QEMU (2026-10-18)
+
+Cenários de `tools/cenarios_tick.py` (cópia própria do overlay; capturas e estados em `re_trabalho/`, fora do git) e roteiros em `roteiros/`. Comparação com `tools/comparar_captura.py --mapear`, `tools/comparar_capturas.py` ou `cargo run -p engine --example tela_jogo` (port com o estado lido do original).
+
+| O quê | Como | Resultado |
+|---|---|---|
+| Navegação: Ctrl+setas, troca de plano (Ctrl+8/9/0), Ctrl+8 com a superfície na tela | `gravar navegacao` (rico, pausado): 12 vistas com o estado de cada uma | área do mapa **100%** nas 12 (superfície, ninho preto e vermelho); `_MapPnt` e pontos lembrados iguais aos do port (teste `navegacao_igual_a_bancada`, save `saves/NAV_RICO.ANT`) |
+| Examine na mesma sessão, ordem 1, 0, 2, 1, 0 | `gravar examine_sessao` | a primeira janela da sessão fica **3 pixels à direita** (82,7% → 97,6% com o ajuste); as outras 97,6–99,4% |
+| 51 cartões do Info alcançáveis por clique | `roteiros/qemu_info_todos.txt` (gerado por `tools/gerar_roteiro_info.py`) e `qemu_info_especies.txt` | **99,64–99,96%** na área do cartão (resta a última linha e o cursor); 127 e 129 não se alcançam por clique |
+| Menus da rainha alada e da aranha (`_AntMenu`) | `gravar menu_amarela` (snapshot full; rico com `ARANHA=1`: X e clique na aranha) | rainha **99,02%** depois do deslocamento medido (3, 0); aranha: menu igual em (1, 8), mas o port não desenha a aranha |
+| History com dados (4 gráficos e um quinto que empurra o mais velho) | `gravar historico` com `CLIQUES` | **99,0–99,6%** na janela com as cores e o deslocamento medidos (antes 97,4–99,0%) |
+| Arrasto no triângulo das castas | `gravar triangulo` com `ARRASTO` | níveis, `_CasteAuto` e `_IdealCaste` iguais (teste `arrasto_no_triangulo_igual_a_bancada`, depois de o clique passar a usar o triângulo do botão); janela **99,80%** |
 
 ## Casos de teste de regras (bancada QEMU)
 

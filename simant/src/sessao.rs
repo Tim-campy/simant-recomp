@@ -405,7 +405,7 @@ impl Sessao<'_> {
         } else {
             &self.menus_cfg.formiga
         };
-        let [dx, dy] = self.menus_cfg.deslocamento_formiga;
+        let [dx, dy] = cfg.deslocamento.unwrap_or(self.menus_cfg.deslocamento_formiga);
         let limite = Retangulo { esq: 0, topo: 0, dir: self.tela.cfg.largura as i16, base: self.tela.cfg.altura as i16 };
         match MenuAberto::abrir(self.recursos, &self.interface, cfg, x + i32::from(dx), y + i32::from(dy), limite) {
             Ok(m) => self.menu = Some((m, AlvoMenu::Amarela)),
@@ -458,7 +458,7 @@ impl Sessao<'_> {
         let celula = ((ex.x - v.x).rem_euclid(128), ex.y - v.y);
         let [ax, ay] = self.tela.cfg.edicao.area_na_tela;
         let tela = (self.tela.cfg.largura as i32, self.tela.cfg.altura as i32);
-        let canto = self.janela_exame.canto(celula, (i32::from(ax), i32::from(ay)), tela);
+        let canto = self.janela_exame.canto_ao_abrir(celula, (i32::from(ax), i32::from(ay)), tela);
         let textos = self.janela_exame.textos(&ex);
         let t: Vec<String> = textos.iter().map(|l| l.iter().map(|&b| b as char).collect()).collect();
         println!("Examine ({}, {}): {}", ex.x, ex.y, t.join(" / "));

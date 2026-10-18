@@ -8,12 +8,14 @@
   "rainha": {
     "janela": 8,
     "itens": ["yllwStartDig", "yllwStartBrood", "yllwStartHelp"],
-    "codigos": [8, 9, 0]
+    "codigos": [8, 9, 0],
+    "deslocamento": [3, 0]
   },
   "aranha": {
     "janela": 32,
     "itens": ["spiderMenuChase", "spiderMenuHunt", "spiderMenuXchange", "spiderMenuHelp"],
-    "codigos": [10, 11, 6, 0]
+    "codigos": [10, 11, 6, 0],
+    "deslocamento": [1, 8]
   },
   "_icones": "Ctrl+clique num botão ribUserDef (_DoUserButton com GetAsyncKeyState(VK_CONTROL)): janela 36 (iconMenu), itens iconM1–16 = funções 0–15; soltar sobre um item troca a função do botão (_SetUserButton: bitmaps 0x3889 + f e 0x3857 + f).",
   "icones": {
@@ -21,7 +23,7 @@
     "itens": ["iconM1", "iconM2", "iconM3", "iconM4", "iconM5", "iconM6", "iconM7", "iconM8", "iconM9", "iconM10", "iconM11", "iconM12", "iconM13", "iconM14", "iconM15", "iconM16"],
     "codigos": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
   },
-  "_deslocamentos": "Medidos na bancada (capturas j09 e j07 de tests/referencias/roteiros/qemu_janelas.txt): o contorno externo do menu da formiga fica 19 pixels à direita e 8 abaixo do clique; o do menu de ícones, 1 pixel à esquerda do botão e na linha 73 da área cliente (logo abaixo da faixa).",
+  "_deslocamentos": "Medidos na bancada (capturas j09 e j07 de tests/referencias/roteiros/qemu_janelas.txt): o contorno externo do menu da formiga fica 19 pixels à direita e 8 abaixo do clique; o da rainha alada sem colônia, 3 à direita e 0 abaixo, e o da aranha, 1 à direita e 8 abaixo (2026-10-18, cenarios_tick.py menu_amarela, uma captura de cada; causa da diferença não localizada); o do menu de ícones, 1 pixel à esquerda do botão e na linha 73 da área cliente (logo abaixo da faixa).",
   "deslocamento_formiga": [19, 8],
   "deslocamento_icones": [-1, 73],
   "codigo_com_shift": [2, 3]

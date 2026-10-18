@@ -4,7 +4,7 @@
 //! Uso:
 //!   simant [--jogo DIR] [--dados DIR] [--mods DIR] [--exportar-telas DIR]
 //!   simant (--save ARQ.ANT | --novo-jogo [--semente N]) [--acoes a,b,...]
-//!          [--ticks N] [--avancar-ms MS] [--botoes F,F,...] [--fechar-avisos N] [--exportar-tela-jogo ARQ.png]
+//!          [--ticks N] [--avancar-ms MS] [--botoes F,F,...] [--historico B,B,...] [--fechar-avisos N] [--exportar-tela-jogo ARQ.png]
 //!          [--salvar ARQ.ANT]
 //!   opções da janela: [--escala N] [--janela LxA] [--sair-apos-ms N [--capturar-janela ARQ.png]]
 //!   (padrões em data/video.json: escala 1 = 640×480 como o original; simant/src/video.rs)
@@ -330,6 +330,12 @@ fn principal() -> Result<(), String> {
         for &b in &o.botoes {
             println!("botão {b}: {:?}", s.botao_usuario(b));
         }
+        if !o.historico.is_empty() {
+            s.botao_usuario(2);
+            for &b in &o.historico {
+                s.janelas.historico.alternar(b);
+            }
+        }
         if let Some(n) = o.marcar {
             s.partida.marcador(n.saturating_sub(1), true);
         }
@@ -372,6 +378,7 @@ fn principal() -> Result<(), String> {
             None => {}
         }
         if let Some((x, y)) = o.examinar {
+            s.janela_exame.ja_aberta = o.exame_ja_aberto;
             let plano = i32::from(s.partida.nav.plano_mapa);
             match engine::rules::experimental::examinar(&s.partida.estado, plano, x, y) {
                 Some(ex) => s.abrir_exame(ex),

@@ -45,6 +45,8 @@ pub(crate) struct Opcoes {
     pub(crate) fechar_avisos: usize,
     /// Sem janela: funções de botões da faixa (`_DoUserButton`) apertados antes de exportar.
     pub(crate) botoes: Vec<u16>,
+    /// Sem janela: abre a History e alterna os botões de gráfico B (0–9, `histBPop`…) antes de exportar.
+    pub(crate) historico: Vec<usize>,
     /// Sem janela: abre um menu antes de exportar ("amarela@X,Y" ou "icones@OBJETO").
     pub(crate) menu: Option<String>,
     /// Sem janela: Ctrl+clique no marcador N (1–7) antes de exportar.
@@ -57,6 +59,8 @@ pub(crate) struct Opcoes {
     pub(crate) trilhas: bool,
     /// Sem janela: Examine na célula X,Y do plano atual antes de exportar.
     pub(crate) examinar: Option<(i32, i32)>,
+    /// Com --examinar: a janela já foi aberta antes nesta sessão (sem o ajuste da primeira abertura).
+    pub(crate) exame_ja_aberto: bool,
     pub(crate) som: som::OpcoesSom,
 }
 
@@ -94,12 +98,14 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         salvar: None,
         fechar_avisos: 0,
         botoes: Vec::new(),
+        historico: Vec::new(),
         menu: None,
         marcar: None,
         dialogo: None,
         janela_mapa: None,
         trilhas: false,
         examinar: None,
+        exame_ja_aberto: false,
         som: som::OpcoesSom::default(),
     };
     let mut args = std::env::args().skip(1);
@@ -136,12 +142,16 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
             "--dialogo" => o.dialogo = Some(valor()?),
             "--janela-mapa" => o.janela_mapa = Some(valor()?.parse().ok().filter(|m| (1..=8).contains(m)).ok_or(format!("{a}: modo 1 a 8"))?),
             "--trilhas" => o.trilhas = true,
+            "--exame-ja-aberto" => o.exame_ja_aberto = true,
             "--examinar" => {
                 let v = valor()?;
                 let (x, y) = v.split_once(',').ok_or("--examinar X,Y")?;
                 o.examinar = Some((x.parse().map_err(|_| "--examinar: x")?, y.parse().map_err(|_| "--examinar: y")?));
             }
             "--marcar" => o.marcar = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
+            "--historico" => {
+                o.historico = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| format!("{a}: número inválido"))).collect::<Result<_, _>>()?
+            }
             "--botoes" => {
                 o.botoes = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| format!("{a}: número inválido"))).collect::<Result<_, _>>()?
             }
