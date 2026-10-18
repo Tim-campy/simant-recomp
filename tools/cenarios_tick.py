@@ -1045,6 +1045,109 @@ def cenario_tela_mate(c: Sessao, saida, n):
     return []
 
 
+# Variáveis dos balões "Silly" (docs/spec/telas/baloes.md), com o tamanho em bytes.
+VARS_BALOES = [
+    ("FightBalloonCnt", 2), ("RestBalloonCnt", 2), ("QueenBalloonCnt", 2), ("EggBalloonCnt", 2),
+    ("CurFightPnt", 4), ("CurFightPlane", 2), ("CurRestPnt", 4), ("CurRestPlane", 2),
+    ("CurQueenPnt", 4), ("CurQueenPlane", 2), ("CurEggPnt", 4), ("CurEggPlane", 2),
+    ("LastFightPnt", 4), ("LastRestPnt", 4), ("LastQueenPnt", 4), ("LastEggPnt", 4),
+    ("BFightBalloonTicks", 4), ("RFightBalloonTicks", 4), ("EggBalloonTicks", 4), ("QueenBalloonTicks", 4),
+    ("RestBalloonTicks", 4), ("SpidBalloonTicks", 4),
+    ("WantBFightBalloon", 2), ("WantRFightBalloon", 2), ("WantEggBalloon", 2), ("WantQueenBalloon", 2),
+    ("WantRestBalloon", 2), ("WantSpiderBalloon", 2),
+    ("BFightBalloonIndex", 2), ("RFightBalloonIndex", 2), ("EggBalloonIndex", 2), ("QueenBalloonIndex", 2),
+    ("RestBalloonIndex", 2), ("8:87da", 2), ("LastSMode", 2), ("CurBalloonCnt", 2),
+    ("MapPnt", 4), ("MapPlane", 2), ("editWidth", 2), ("editHeight", 2), ("ELayerMode", 2),
+]
+
+
+LIVRE_BALOES = 1.5  # segundos de VM livre entre dois intervalos gravados
+
+
+def ler_baloes(c: Sessao):
+    out = {}
+    for nome, n in VARS_BALOES:
+        out[nome] = int.from_bytes(c.mj.ler_variavel(nome, n), "little", signed=(n == 2))
+    return out
+
+
+def cenario_baloes(c: Sessao, saida, n):
+    """Balões "Silly" na janela de edição: liga _OptionStates[5] na entrada de um tick, põe a vista do
+    ninho preto centrada na rainha (_MapPnt) e grava n intervalos: em cada um, as variáveis dos balões e
+    as sementes no fim do tick (`depois`) e na entrada do tick seguinte (`antes_seguinte`), com o
+    redesenho da janela de edição no meio. Quando há fala ligada, captura a tela (o buffer do redesenho)
+    e o estado (.ANT). Saída: baloes.json + baloes_<k>.png/.ANT. Ver docs/spec/telas/baloes.md."""
+    c.teclas("ctrl+9")
+    time.sleep(1.5)
+    c.entrada()
+    c.escrever_elemento("OptionStates", 5, 1, 2)
+    s = c.save()
+    rainhas = [(f["X"], f["Y"]) for _, f in formigas(s, "B") if (f["T"] & 0x78) >> 3 == 12 and not f["T"] & 0x80]
+    if rainhas:
+        qx, qy = rainhas[0]
+        c.escrever_elemento("MapPnt", 0, max(0, min(64 - COLS, qx - COLS // 2)), 2)
+        c.escrever_elemento("MapPnt", 1, max(0, min(64 - LINS, qy - LINS // 2)), 2)
+        c.log(f"rainha preta em ({qx}, {qy})")
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    reg = []
+    for k in range(n):
+        if k and LIVRE_BALOES:
+            # os prazos são de tempo real (~3 a 10 s): deixa a VM correr entre um intervalo e outro
+            c.livre(LIVRE_BALOES)
+            c.dep.ir_entrada()
+        c.dep.ir_saida()
+        depois = {**ler_baloes(c), **c.dep.extras()}
+        c.dep.ir_entrada()
+        seguinte = {**ler_baloes(c), **c.dep.extras()}
+        item = {"k": k, "depois": depois, "antes_seguinte": seguinte}
+        falas = [v for v in ("WantBFightBalloon", "WantRFightBalloon", "WantEggBalloon", "WantQueenBalloon",
+                             "WantRestBalloon", "WantSpiderBalloon") if seguinte[v]]
+        if falas:
+            tela(c, saida, f"baloes_{k}")
+            (pasta / f"baloes_{k}.ANT").write_bytes(c.mj.estado())
+            item["captura"] = f"baloes_{k}"
+        reg.append(item)
+        (pasta / "baloes.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"baloes: {len(reg)} intervalos, {sum('captura' in r for r in reg)} capturas")
+    return []
+
+
+def cenario_trofalaxia(c: Sessao, saida, n):
+    """Quadro da trofalaxia (_YellowDialog com o bitmap 9110, chamado por _EatMyFood(1)): a amarela com
+    fome (_MeHealth = 10) recebe duplo clique numa operária preta da superfície perto do buraco preto
+    (ordem 4); sai do ninho e vai até ela. Depois do clique, captura a tela a cada 0,5 s (até n) com
+    _MeHealth e _MeCmd lidos a cada vez, e para 14 capturas depois de _MeHealth subir."""
+    c.teclas("ctrl+8")
+    time.sleep(1.5)
+    c.entrada()
+    s = c.save()
+    me = (s.ler("MeLocX"), s.ler("MeLocY"))
+    c.log(f"amarela no plano {s.ler('MePlane')} em {me}")
+    c.escrever("MeHealth", 10)
+    buracos = [(x, y) for x in range(64) for y in range(64) if s.celula("MapA", x, y) == 0x50]
+    bx, by = buracos[0] if buracos else me
+    operarias = [(f["X"], f["Y"]) for _, f in formigas(s, "A") if not f["T"] & 0x80 and (f["T"] & 0x78) >> 3 == 2]
+    alvo = perto(operarias, bx, by)
+    c.clicar_celula(*alvo, duplo=True)
+    reg = []
+    fim = None
+    for k in range(n):
+        time.sleep(0.5)
+        tela(c, saida, f"trof_{k:03d}")
+        saude = int.from_bytes(c.mj.ler_variavel("MeHealth"), "little", signed=True)
+        cmd = int.from_bytes(c.mj.ler_variavel("MeCmd"), "little", signed=True)
+        reg.append({"k": k, "t": time.time(), "MeHealth": saude, "MeCmd": cmd})
+        if fim is None and saude >= 90:
+            fim = k + 14
+        if fim is not None and k >= fim:
+            break
+    reg.append({"alvo": alvo, "buraco": [bx, by]})
+    (Path(saida).resolve() / "trofalaxia.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"trofalaxia: {reg[-2]}")
+    return []
+
+
 def cenario_capturas(c: Sessao, saida, n):
     """Capturas do original para comparar com o port (jogo pausado, snapshot rico): o estado vira
     `capt.ANT` (o port o abre com --save); Examine sobre três formigas diferentes da vista do ninho;
