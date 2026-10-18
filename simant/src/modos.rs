@@ -328,6 +328,36 @@ mod testes {
     }
 
     #[test]
+    fn opcoes_e_botoes_passam_ao_jogo_novo_mas_o_save_traz_as_suas() {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
+        let mut velha = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores.clone()).unwrap();
+        let do_arquivo = velha.partida.estado.partida.opcoes;
+        // O jogador liga AutoTrack e Silly e troca a função do último botão configurável.
+        velha.partida.estado.partida.opcoes[0] = 1;
+        velha.partida.estado.partida.opcoes[5] = 1;
+        velha.partida.funcoes_botoes[7] = 11;
+        // Jogo novo (_NewGame não toca em _OptionStates): ficam as opções e os botões do momento.
+        let mut nova = Sessao::abrir(&recursos, &dados, Origem::NovoNaPartida(&velha.partida.estado, TipoJogo::Rapido), cores.clone()).unwrap();
+        nova.herdar_opcoes(&velha, false);
+        assert_eq!(nova.partida.estado.partida.opcoes, velha.partida.estado.partida.opcoes);
+        assert_eq!(nova.partida.funcoes_botoes[7], 11);
+        // Load de um .ANT: as opções vêm do arquivo; os botões (fora do save) ficam.
+        let mut lida = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
+        lida.herdar_opcoes(&velha, true);
+        assert_eq!(lida.partida.estado.partida.opcoes, do_arquivo);
+        assert_eq!(lida.partida.funcoes_botoes[7], 11);
+    }
+
+    #[test]
     fn ciclo_do_botao_yard_patch() {
         let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
         if !jogo.join("SHARED.NDX").is_file() {

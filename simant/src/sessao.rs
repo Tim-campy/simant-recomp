@@ -485,6 +485,16 @@ impl Sessao<'_> {
         eventos
     }
 
+    /// Globais do original que um jogo novo ou um Load não refazem: `_OptionStates` (`_NewGame` não
+    /// o toca; o `_GenerateTutorial` do Load de `Tutorial.Ant` também não) e as funções dos botões
+    /// configuráveis (fora do save). `do_save`: Load de um `.ANT`, que traz as opções dele.
+    pub(crate) fn herdar_opcoes(&mut self, antiga: &Sessao, do_save: bool) {
+        if !do_save {
+            self.partida.estado.partida.opcoes = antiga.partida.estado.partida.opcoes;
+        }
+        self.partida.funcoes_botoes = antiga.partida.funcoes_botoes.clone();
+    }
+
     /// Diz à partida quais janelas estão abertas e na frente (sorteios do desenho depois de cada
     /// tick, `rules::desenho`): "na frente" é `_win_IsWinInFront`, a janela de cima do gerenciador.
     pub(crate) fn atualizar_janelas_desenho(&mut self, minimizada: bool) {
