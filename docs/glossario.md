@@ -84,3 +84,10 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `_DoWinHelp` (`1000:5aac`) / `_helpFile` (`9:76ac`) | `WinHelp(HELP_CONTEXT, id & 0xFF00)` com o `SIMANT.HLP` (botões "?") | pseudocódigo; telas/ajuda-contexto.md §4 |
 | `_DrawCastePopUp` (`1000:5d9e`) | quadro das castas (janela 23 `antPopWin`) aberto enquanto o botão fica apertado na área das barras da faixa | pseudocódigo + bancada ([telas/mensagens.md](spec/telas/mensagens.md) §9.1) |
 | `_MeWarnHealth` (`9:9bec`) / `_BlkWarnHealth` (`9:769c`) | limiares de aviso de saúde da amarela e da colônia preta (30 no início); o clique na barra de saúde os muda (`_DoHealthSetY`, `_DoWarnSetB`) | pseudocódigo + bancada (mensagens.md §9.1) |
+| `_InitMenu` (`1008:4e36`) | monta a barra de menus da janela principal a partir do objeto 6/0 do banco; comandos `0xFD01 + 16 × menu + item` | pseudocódigo; [spec/telas/menus.md](spec/telas/menus.md), [spec/formatos/menu.md](spec/formatos/menu.md) |
+| `_DoMenuEntry` (`1000:1876`) / `_ProcMenu` (`1000:4fc2`) / `_ProcMenuHelp` (`1000:4fa6`) | `WM_COMMAND` 0xFDxx: com o modo de ajuda, a ajuda do item; senão, o que o item faz (Load/Save/Quit adiados por `_fileWaitFlag`) | pseudocódigo; telas/menus.md §2 |
+| `_SetMenuEntries` (`1000:4c24`) / `_SetMenuItemState` / `_SetMenuOptionText` | marcas do Speed e do Options e o texto Pause/Unpause | pseudocódigo; telas/menus.md §2 |
+| `_MenuQuit` (`1000:d628`) | pergunta "SimAnt Quit" (Yes = Save As e sai, No = sai, Cancel) | pseudocódigo, bancada m19/o03; telas/menus.md §4 |
+| `_AboutDialog` (`1000:cf3a`) | File → About: janela 31, figura e créditos (4/1700) rolando, jogo pausado | pseudocódigo, bancada; telas/menus.md §5 |
+| `_ScoreDialog` (`1000:5caa`) / `_win_DrawScoreWindow` (`1000:5aca`) | Window → Status (Ctrl+T): janela 24 com as notas de `_CalcScore` e a pontuação; o jogo continua andando | pseudocódigo, bancada n02; telas/menus.md §6 |
+| `_win_Events` (`1030:d040`) | despacha as mensagens pendentes e diz se houve clique ou Espaço/Insert (fecha os diálogos do jogo) | pseudocódigo |
