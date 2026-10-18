@@ -94,7 +94,7 @@ def extrair(exe):
         "sprites": {
             "menino": {"base": 8000, "ultimo_quadro": 999, "deslocamentos": desl([(0, 12, 0x18D4, 0x18E0), (20, 24, 0x18D8, 0x18DC), (100, 112, 0x1890, 0x189C)])},
             "cachorro": {"base": 8500, "ultimo_quadro": 199, "deslocamentos": desl([(0, 12, 0x1918, 0x1924), (100, 104, 0x18CC, 0x18D0)])},
-            "gato": {"base": 1300, "ultimo_quadro": 39, "_comentario_ajuste": "Somado ao deslocamento: os quadros andando (0-5, sem tabela no _Draw_SimYard) aparecem 1 pixel abaixo de (_CatX, _CatY) na bancada (6 capturas de re_trabalho/sprites, cenarios_tick.py sprites_quintal); causa em aberto.", "ajuste_medido": {str(q): [0, 1] for q in range(6)}, "deslocamentos": desl([(10, 20, 0x192E, 0x1932), (20, 30, 0x192C, 0x1936)])},
+            "gato": {"base": 1300, "ultimo_quadro": 39, "_comentario_ajuste": "Somado ao deslocamento: os quadros andando (0-5, sem tabela no _Draw_SimYard) e sentado (10-12) aparecem 1 pixel abaixo do que dá a conta do código na bancada; os da fuga (20-29), não (capturas de re_trabalho/sprites, cenarios_tick.py sprites_quintal); causa em aberto.", "ajuste_medido": {str(q): [0, 1] for q in [0, 1, 2, 3, 4, 5, 10, 11, 12]}, "deslocamentos": desl([(10, 20, 0x192E, 0x1932), (20, 30, 0x192C, 0x1936)])},
             "passaro": {"base": 1250, "ultimo_quadro": 1, "deslocamentos": {"0": [-10, -3], "1": [-9, -1]}},
             "cortador": {"base": 8800, "parado": [98, 181], "direita": [19, 15], "esquerda": [-15, 15]},
             "placa": {"id": 1260, "x": 170, "y": 186},
