@@ -40,7 +40,7 @@ use crate::rules::geracao::Cor;
 use crate::rules::inimigos::TabelasInimigos;
 
 /// Versão da API de mods que os scripts veem em `API_VERSAO`.
-pub const VERSAO_API: &str = "0.19";
+pub const VERSAO_API: &str = "0.20";
 
 /// Tamanho máximo do texto de `mostrar_mensagem` (caracteres).
 pub const MAX_TEXTO_MENSAGEM: usize = 120;

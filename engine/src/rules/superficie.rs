@@ -86,7 +86,17 @@ pub struct RegrasSuperficieDados {
     pub mensagem_ataque_vermelho: super::estado::MensagemFaixa,
 }
 
-/// Conteúdo de `data/superficie.json`.
+/// Tabelas de `data/comum.json` que a parte da superfície usa (chave aqui, chave em `comum.json`).
+pub const USOS_COMUNS: &[comum::UsoComum] = &[
+    ("grupo_sem_carga", "grupo_sem_carga"),
+    ("modos_operaria", "modos_operaria"),
+    ("modos_soldado", "modos_soldado"),
+    ("modo_por_grupo", "modo_por_grupo"),
+    ("classe_luta", "classe_luta"),
+    ("matriz_luta", "matriz_luta"),
+];
+
+/// Conteúdo de `data/superficie.json`, com as tabelas comuns de `data/comum.json` ([`USOS_COMUNS`]).
 #[derive(Clone, Debug, Deserialize)]
 pub struct TabelasSuperficie {
     /// `_IsCarryCaste` (`8:0074`): 1 se o grupo carrega algo.
@@ -123,7 +133,12 @@ pub struct SonsSuperficie {
 
 impl TabelasSuperficie {
     pub fn de_json(texto: &str) -> Result<TabelasSuperficie, String> {
-        let t: TabelasSuperficie = serde_json::from_str(texto).map_err(|e| format!("{ARQUIVO_TABELAS}: {e}"))?;
+        comum::parte_do_texto::<TabelasSuperficie>(ARQUIVO_TABELAS, texto, USOS_COMUNS)?.validar()
+    }
+
+    fn validar(self) -> Result<TabelasSuperficie, String> {
+        let t = self;
+        // As tabelas comuns já vêm de comum.json; uma cópia antiga no superficie.json também passa aqui.
         if t.classe_luta.iter().any(|&c| c > 3) {
             return Err(format!("{ARQUIVO_TABELAS}: classe_luta fora de 0–3"));
         }
@@ -133,13 +148,12 @@ impl TabelasSuperficie {
         Ok(t)
     }
 
-    /// Lê `superficie.json` de `data/` (com mods).
+    /// Lê `superficie.json` e `comum.json` de `data/` (com mods).
     ///
     /// Antes da unificação lia com `Recursos::arquivo`, que procura na pasta do jogo e em
     /// `arquivos/` dos mods, e nunca achava o arquivo de `data/` [corrigido].
     pub fn carregar(r: &crate::recursos::Recursos) -> Result<TabelasSuperficie, String> {
-        let v: serde_json::Value = r.dados(ARQUIVO_TABELAS)?;
-        TabelasSuperficie::de_json(&v.to_string())
+        comum::parte_dos_recursos::<TabelasSuperficie>(r, ARQUIVO_TABELAS, USOS_COMUNS)?.validar()
     }
 
     /// Cópia embutida de `data/superficie.json` (sem mods), para `RegrasOriginais::default` e testes.

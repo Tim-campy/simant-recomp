@@ -1,0 +1,77 @@
+{
+  "_comentario": "Tabelas que o original tem uma vez só e várias partes das regras usam (desde a API de mods 0.20; antes cada data/<parte>.json tinha a sua cópia). Extraídas do SIMANTW.EXE por tools/extrair_comum.py. Um mod que traga este arquivo muda a tabela para todas as partes listadas em '_usado_por'. Ver docs/api-mods.md. Valores em decimal.",
+  "_enderecos": {
+    "dx8": "8:0000 (seletor 1038, SIMANT_DATA_GROUP): _Dx8",
+    "dy8": "8:0008 (seletor 1038, SIMANT_DATA_GROUP): _Dy8",
+    "dx9": "8:0010 (seletor 1038, SIMANT_DATA_GROUP): _Dx9 (0 = parado, k = direção k - 1)",
+    "dy9": "8:001a (seletor 1038, SIMANT_DATA_GROUP): _Dy9",
+    "turn_tab": "8:0024 (seletor 1038, SIMANT_DATA_GROUP): _TurnTab[atual][alvo]",
+    "grupo_sem_carga": "8:0094 (seletor 1038, SIMANT_DATA_GROUP): _UnCarryCaste",
+    "modos_operaria": "8:89e6 (seletor 1038, SIMANT_DATA_GROUP): _ModeTabWB[modo estratégico][Sk(8)]",
+    "modos_soldado": "8:8a16 (seletor 1038, SIMANT_DATA_GROUP): _ModeTabSB[modo estratégico][Sk(8)]",
+    "modo_por_grupo": "8:8a46 (seletor 1038, SIMANT_DATA_GROUP): _CasteModeTabB[grupo]",
+    "sow_tab": "8:8a90 (seletor 1038, SIMANT_DATA_GROUP): _SowTab",
+    "classe_luta": "10:22c6 (seletor 1048, DGROUP): sem nome; classe de luta por grupo (_GetWinner)",
+    "matriz_luta": "10:22d6 (seletor 1048, DGROUP): sem nome; chance em 10 de a ocupante vencer (_GetWinner)",
+    "borda_buraco": "10:230c (seletor 1048, DGROUP): sem nome; borda do buraco por direção (_MakeNewHole*)",
+    "borda_formiga_leao": "10:25e8 (seletor 1048, DGROUP): sem nome; borda da armadilha, + 0x30 (_InitAntLions)"
+  },
+  "_usado_por": {
+    "dx8": ["amarela", "feromonios", "geracao", "inimigos", "ninho", "quintal"],
+    "dy8": ["amarela", "feromonios", "geracao", "inimigos", "ninho", "quintal"],
+    "dx9": ["amarela", "inimigos"],
+    "dy9": ["amarela", "inimigos"],
+    "turn_tab": ["feromonios", "inimigos", "ninho"],
+    "grupo_sem_carga": ["amarela", "superficie"],
+    "modos_operaria": ["ninho", "superficie"],
+    "modos_soldado": ["ninho", "superficie"],
+    "modo_por_grupo": ["ninho", "superficie"],
+    "sow_tab": ["geracao", "inimigos"],
+    "classe_luta": ["amarela", "ninho", "superficie"],
+    "matriz_luta": ["amarela", "ninho", "superficie"],
+    "borda_buraco": ["amarela", "geracao", "ninho"],
+    "borda_formiga_leao": ["geracao", "inimigos"]
+  },
+  "dx8": [0, 1, 1, 1, 0, -1, -1, -1],
+  "dy8": [-1, -1, 0, 1, 1, 1, 0, -1],
+  "dx9": [0, 0, 1, 1, 1, 0, -1, -1, -1],
+  "dy9": [0, -1, -1, 0, 1, 1, 1, 0, -1],
+  "turn_tab": [
+    [0, 1, 1, 1, 7, 7, 7, 7],
+    [0, 1, 2, 2, 2, 2, 0, 0],
+    [1, 1, 2, 3, 3, 3, 3, 1],
+    [2, 2, 2, 3, 4, 4, 4, 4],
+    [3, 3, 3, 3, 4, 5, 5, 5],
+    [6, 6, 4, 4, 4, 5, 6, 6],
+    [7, 7, 7, 5, 5, 5, 6, 7],
+    [0, 0, 0, 0, 6, 6, 6, 7]
+  ],
+  "grupo_sem_carga": [0, 2, 2, 2, 4, 2, 6, 6, 8, 6, 10, 11, 12, 13, 14, 15],
+  "modos_operaria": [
+    [1, 2, 7, 7, 7, 7, 7, 7],
+    [4, 1, 1, 1, 4, 2, 2, 2],
+    [13, 13, 13, 4, 4, 4, 2, 2],
+    [13, 13, 4, 4, 4, 4, 4, 2],
+    [1, 1, 1, 2, 2, 2, 2, 2],
+    [1, 2, 2, 2, 2, 2, 2, 2]
+  ],
+  "modos_soldado": [
+    [7, 7, 7, 7, 7, 7, 7, 7],
+    [1, 2, 2, 2, 2, 2, 2, 2],
+    [2, 2, 2, 4, 4, 2, 2, 2],
+    [2, 4, 4, 4, 4, 4, 4, 2],
+    [2, 2, 2, 2, 2, 2, 2, 2],
+    [2, 2, 2, 2, 2, 2, 2, 2]
+  ],
+  "modo_por_grupo": [8, 1, 0, 3, 14, 5, 0, 3, 14, 5, 0, 0, 9, 9, 10, 0],
+  "sow_tab": [114, 115, 113, 112, 114, 115, 113, 112],
+  "classe_luta": [0, 0, 0, 0, 2, 0, 1, 1, 2, 1, 0, 0, 3, 3, 0, 0],
+  "matriz_luta": [
+    [5, 2, 7, 3],
+    [8, 5, 9, 4],
+    [3, 1, 5, 2],
+    [7, 6, 8, 5]
+  ],
+  "borda_buraco": [25, 26, 28, 31, 30, 29, 27, 24],
+  "borda_formiga_leao": [1, 2, 4, 7, 6, 5, 3, 0]
+}

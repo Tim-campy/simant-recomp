@@ -1,25 +1,9 @@
 {
-  "_comentario": "Tabelas e constantes dos inimigos (formiga-leão, aranha, lagarta, bicho-de-conta). As tabelas foram extraídas do SIMANTW.EXE por tools/extrair_inimigos.py (endereços no topo do script); turn_tab[atual][alvo] = nova direção. As constantes de 'regras' vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/inimigos.md. Valores em decimal.",
-  "dx8": [0, 1, 1, 1, 0, -1, -1, -1],
-  "dy8": [-1, -1, 0, 1, 1, 1, 0, -1],
-  "dx9": [0, 0, 1, 1, 1, 0, -1, -1, -1],
-  "dy9": [0, -1, -1, 0, 1, 1, 1, 0, -1],
-  "turn_tab": [
-    [0, 1, 1, 1, 7, 7, 7, 7],
-    [0, 1, 2, 2, 2, 2, 0, 0],
-    [1, 1, 2, 3, 3, 3, 3, 1],
-    [2, 2, 2, 3, 4, 4, 4, 4],
-    [3, 3, 3, 3, 4, 5, 5, 5],
-    [6, 6, 4, 4, 4, 5, 6, 6],
-    [7, 7, 7, 5, 5, 5, 6, 7],
-    [0, 0, 0, 0, 6, 6, 6, 7]
-  ],
+  "_comentario": "Tabelas e constantes dos inimigos (formiga-leão, aranha, lagarta, bicho-de-conta). As tabelas foram extraídas do SIMANTW.EXE por tools/extrair_inimigos.py (endereços no topo do script); turn_tab[atual][alvo] = nova direção. As constantes de 'regras' vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/inimigos.md. Valores em decimal. As tabelas que o original tem uma vez só (dx8, dy8, dx9, dy9, turn_tab, sow_tab, borda_formiga_leao) ficam em data/comum.json.",
   "passo_aranha_x": [0, 3, 4, 3, 0, -3, -4, -3],
   "passo_aranha_y": [-4, -3, 0, 3, 4, 3, 0, -3],
   "boca_aranha_x": [0, 1, 1, 1, 0, -1, -1, -1],
   "boca_aranha_y": [-1, -1, 0, 1, 1, 1, 0, -1],
-  "sow_tab": [114, 115, 113, 112, 114, 115, 113, 112],
-  "borda_formiga_leao": [1, 2, 4, 7, 6, 5, 3, 0],
   "regras": {
     "leao_chance_nova": 1024,
     "leao_chance_cuspir": 512,

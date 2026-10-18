@@ -11,14 +11,17 @@ São dados inicializados do executável, sem relocação.
 
 | Chave no JSON | Endereço  | Símbolo / uso                                                         |
 |---------------|-----------|-----------------------------------------------------------------------|
-| dx8           | 1038:0000 | `_Dx8`, 8 bytes com sinal (deslocamento x por direção 0–7)             |
-| dy8           | 1038:0008 | `_Dy8`, 8 bytes com sinal                                             |
-| turn_tab      | 1038:0024 | `_TurnTab`, 8 × 8 bytes: linha = direção atual, coluna = direção alvo; |
+| dx8           | 1038:0000 | `_Dx8`, 8 bytes com sinal (deslocamento x por direção 0–7) (só conferida; vai para comum.json) |
+| dy8           | 1038:0008 | `_Dy8`, 8 bytes com sinal (só conferida; vai para comum.json) |
+| turn_tab      | 1038:0024 | `_TurnTab`, 8 × 8 bytes: linha = direção atual, coluna = direção alvo; (só conferida; vai para comum.json) |
 |               |           | valor = nova direção (gira no máximo 45° rumo ao alvo)                 |
 
 As constantes da seção "regras" não são tabelas do executável: são valores imediatos lidos no
 pseudocódigo das funções citadas ao lado de cada uma (docs/spec/regras/feromonios.md). O script só
 as escreve no JSON, para que fiquem fora do código do port e possam ser trocadas por mods.
+
+As tabelas marcadas "vai para comum.json" são lidas só para as conferências: desde a API de mods 0.20 elas ficam em
+data/comum.json (tools/extrair_comum.py), e este script não as grava.
 """
 import argparse
 import json
@@ -26,6 +29,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("tools", 1)[0] + "tools")
 from ne_info import parse_ne  # noqa: E402
+from extrair_comum import sem_comuns, nota_comuns  # noqa: E402
 
 SEG8 = 8
 
@@ -88,12 +92,13 @@ def main():
         return
     saida = {
         "_comentario": (
-            "Tabelas e constantes das regras de feromônio. dx8/dy8/turn_tab foram extraídas do "
-            "SIMANTW.EXE por tools/extrair_feromonios.py (endereços no topo do script); turn_tab[atual][alvo] "
-            "= nova direção. As constantes de 'regras' vêm do pseudocódigo (origem em '_origem'). "
+            "Constantes das regras de feromônio, gravadas por tools/extrair_feromonios.py (que também confere "
+            "_Dx8/_Dy8/_TurnTab no SIMANTW.EXE; turn_tab[atual][alvo] = nova direção). As constantes de "
+            "'regras' vêm do pseudocódigo (origem em '_origem'). "
             "Ver docs/spec/regras/feromonios.md. Valores em decimal."
+            + nota_comuns("feromonios")
         ),
-        **t,
+        **sem_comuns("feromonios", t),
         "regras": {k: v for k, (v, _) in REGRAS.items()},
         "_origem": {k: o for k, (_, o) in REGRAS.items()},
     }

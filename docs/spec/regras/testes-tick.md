@@ -310,10 +310,10 @@ Bancada (novidades de `tools/cenarios_tick.py` e `qemu_bancada.py`): um tick que
 
 ## Limitações
 
-- **Configuração única.** Snapshot `quick`: Quick Game, velocidade normal, as janelas que o jogo abre sozinho, sem balões, sem chuva, sem a formiga amarela em movimento. Outras janelas, velocidades e eventos (aranha na tela, revoada, chuva) podem fazer o desenho consumir S ou mudar o caminho do tick.
-- **Velocidades "fast"/"ultra"** não medidas (ver `_BirdDelay`).
+- **Configurações cobertas.** Os primeiros vetores eram só do snapshot `quick` (Quick Game, velocidade normal, sem balões, chuva nem amarela em movimento). Hoje (2026-10-18) há 107 vetores em 21 grupos, de vários snapshots (`quick`, `rico`, `full`, `tut`, Experimental), com chuva, revoada, predadores, menino e cortador, inseticida, amarela andando e lutando, as quatro velocidades e o tutorial (lições 1–3), além das sequências longas `ticks_longos/rico_200` e `full_600` (esta com a Yard View na frente). Continuam sem vetor: balões ligados, a janela de edição atrás nas animações da amarela, e os ramos listados em [../../estado-do-projeto.md](../../estado-do-projeto.md) §3; nesses casos o desenho pode consumir S ou mudar o caminho do tick.
+- **Velocidades "fast"/"ultra"**: há vetores (`velocidade_rapida`, `velocidade_ultra`; `_gameCycles` anda 1 por tick), mas o ritmo em ticks por segundo depende da CPU no original e só foi medido na bancada QEMU (ver `_BirdDelay` e simulacao-visao-geral.md §3.1).
 - **Leituras:** o mapeamento cobre os segmentos de dados 8, 9 e 10 fora do save. Não cobre a memória do Windows (API chamada de dentro do tick) nem os mapas de vida (já capturados). Uma variável lida só em situações que não aconteceram nos 140 ticks não aparece.
 - **`_Tindex` e `_TemDensity`**: classificados por inferência, não por teste.
 - **Determinismo depende do snapshot**: o `loadvm` com a VM rodando chegou sempre ao mesmo primeiro tick nas execuções feitas, mas isso não é garantido pelo QEMU sem `icount` (o tempo até o primeiro `WM_TIMER` vem do relógio do host). Se uma execução parar num `GameTime` diferente de 79, compare por `GameTime`, não pela ordem.
 - **Seletores** valem para `-m 16` e para a sessão salva no snapshot; o script sempre procura de novo.
-- Tamanho: cada tick ocupa ~130 KB (2 × 48.386 + 2 × 16.384 + JSON). Versionados: 24 ticks (3,2 MB); sequências longas ficam em `re_trabalho/`.
+- Tamanho: cada tick ocupa ~130 KB (2 × 48.386 + 2 × 16.384 + JSON). Versionados (2026-10-18): 107 ticks em `ticks/` (15 MB) e as duas sequências de `ticks_longos/` (1,1 MB, só os campos que mudam); outras sequências longas ficam em `re_trabalho/`.

@@ -146,12 +146,12 @@ Os objetos `ribUserDef1A`–`1H` (ids `0x2210`–`0x2217`) chamam `_DoUserButton
 
 | Função | Efeito |
 |---|---|
-| 0, 1, 2, 3 | abre a janela Behavior, Caste, History ou Info (port: Behavior, Caste e History em janelas.md; Info ainda não) |
-| 4 | liga/desliga as trilhas do mapa (port: só o estado do botão; a janela do mapa não existe) |
+| 0, 1, 2, 3 | abre a janela Behavior, Caste, History ou Info (port: Behavior, Caste e History em janelas.md; Info em [info.md](info.md)) |
+| 4 | liga/desliga as trilhas do mapa (port: `Partida::mostrar_trilhas`, usado pela janela do mapa, [mapa.md](mapa.md)) |
 | 5 | `_SetPause(!_GamePaused)` (§2.3) |
 | 6 | `_GameSpeed` += 1 (3 volta a 0) e a mensagem "Game speed now …" (§2.3) |
 | 7, 9, 10, 11, 12, 13 | alternam `_OptionStates[1]` (Music), `[2]` (Sound Effects), `[5]` (Silly), `[0]` (AutoTrack), `[3]` (Events), `[4]` (Messages) |
-| 8 | `_MysteryButton` (port: ainda não) |
+| 8 | `_MysteryButton` (port: `rules/misterio.rs`; ações `misterio_*` em `tests/referencias/acoes/`) |
 | 14 | `_SaveGame(1)` (§6) |
 | 15 | abre a janela de edição e `_GotoMyAnt` |
 

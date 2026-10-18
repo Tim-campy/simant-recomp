@@ -4,11 +4,10 @@
 //! O tick faz aqui mesmo o que a spec descreve por inteiro (contadores, periodicidade, alimentação
 //! periódica, compactação das listas, `_CountAnts`, `_HistUpdate`, `_ClrModePop`/`_TallyModePop`,
 //! decremento de `_FlyAway*`, fim de jogo) e chama as sub-rotinas de cada assunto pelas traits
-//! abaixo, uma por documento de regras. Cada método tem implementação padrão vazia: um subsistema
-//! ainda não implementado simplesmente não faz nada (e não consome sorteios).
-//!
-//! Para implementar um assunto: em `rules/<assunto>.rs`, escreva `impl Regras<Assunto> for
-//! RegrasOriginais { ... }` e apague a linha vazia correspondente no fim deste arquivo.
+//! abaixo, uma por documento de regras. Cada método tem implementação padrão vazia, que não faz nada
+//! (e não consome sorteios). As seis partes já estão implementadas para [`RegrasOriginais`]
+//! (`impl Regras<Assunto> for RegrasOriginais` em `rules/<assunto>.rs`); as implementações vazias
+//! servem aos testes, que montam regras com só algumas partes.
 
 use super::amarela::TabelasAmarela;
 use super::conselhos::{JanelasNaFrente, MemoriaTutor};
