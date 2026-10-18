@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use super::quadro::Quadro;
 use super::telas::{carregar_janela, desenhar_objetos, Interface};
-use crate::formats::janela::{Janela, Retangulo, TIPO_CONTORNO};
+use crate::formats::janela::{Janela, Retangulo};
 use crate::recursos::Recursos;
 use crate::rules::experimental::Exame;
 
@@ -38,6 +38,16 @@ pub struct ConfigExame {
     pub largura_borda: Option<i16>,
     #[serde(default)]
     pub ajuste_conteudo: [i16; 2],
+    /// Deslocamento (x, y) de cada linha em relação ao topo do objeto [medido em examine_0..2].
+    #[serde(default)]
+    pub deslocamento_linhas: [[i32; 2]; 3],
+    /// Cor da área do objeto 0 (a linha branca em volta do bitmap).
+    #[serde(default = "branco")]
+    pub cor_fundo: u8,
+}
+
+fn branco() -> u8 {
+    15
 }
 
 /// Janela 29 carregada, com as listas de texto.
@@ -87,36 +97,37 @@ impl JanelaExame {
         [primeira, pega(2, ex.modo), pega(3, ex.grupo)]
     }
 
-    /// Desenha a janela com o canto em `(x, y)` da área cliente.
+    /// Desenha a janela com o canto em `(x, y)` da área cliente: contorno preto e moldura azul
+    /// (`largura_borda` pixels, contorno incluído), a área do objeto 0 em branco (a linha branca
+    /// em volta do bitmap) e os objetos [medido na bancada: examine_0..2].
     pub fn desenhar(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, ex: &Exame, (x, y): (i32, i32)) {
         let m = &interface.moldura;
         let ob0 = &self.janela.objetos[0];
-        let t = if ob0.tipo == TIPO_CONTORNO { ob0.byte_28 as i16 } else { 0 };
         let (w, h) = self.tamanho();
         let (w, h) = (w as i16, h as i16);
-        let (lw, lh) = if t > 0 { (w - 2 * t - 1, h - 2 * t - 1) } else { (w, h) };
         let b = self.cfg.largura_borda.unwrap_or(m.borda.largura);
+        // O canto já vem com `ajuste_canto` (de `canto`).
         let (ex0, ey0) = (x as i16, y as i16);
-        let externo = Retangulo { esq: ex0, topo: ey0, dir: ex0 + lw + 2 * b, base: ey0 + lh + 2 * b };
-        let interno = Retangulo { esq: ex0 + b, topo: ey0 + b, dir: ex0 + b + lw, base: ey0 + b + lh };
+        let externo = Retangulo { esq: ex0, topo: ey0, dir: ex0 + w + 2 * b, base: ey0 + h + 2 * b };
+        let interno = Retangulo { esq: ex0 + b, topo: ey0 + b, dir: ex0 + b + w, base: ey0 + b + h };
         q.preencher(externo, self.cfg.cor_borda, self.cfg.cor_borda);
         q.contorno(Retangulo { dir: externo.dir - 1, base: externo.base - 1, ..externo }, m.borda.cor_externa);
-        let origem = (
-            interno.esq - t + m.borda.ajuste_x_contorno * i16::from(t > 0) + self.cfg.ajuste_conteudo[0],
-            interno.topo - t + self.cfg.ajuste_conteudo[1],
-        );
+        q.preencher(interno, self.cfg.cor_fundo, self.cfg.cor_fundo);
+        let origem = (interno.esq + self.cfg.ajuste_conteudo[0], interno.topo + self.cfg.ajuste_conteudo[1]);
         let (o0x, o0y) = (ob0.retangulo.esq, ob0.retangulo.topo);
         desenhar_objetos(q, recursos, interface, &self.janela, origem, Some(interno));
         let Some(f) = interface.fontes.get(self.cfg.fonte).and_then(|f| f.as_ref()) else { return };
         let antes = q.recorte.replace(interno);
-        for ((nome, texto), cor) in self.cfg.objetos.iter().zip(self.textos(ex)).zip(self.cfg.cores_texto) {
+        for (((nome, texto), cor), [dx, dy]) in
+            self.cfg.objetos.iter().zip(self.textos(ex)).zip(self.cfg.cores_texto).zip(self.cfg.deslocamento_linhas)
+        {
             let Some(o) = self.janela.objetos.iter().find(|o| &o.nome == nome) else { continue };
             let r = o.retangulo;
             // Centrado na largura do objeto, a partir do topo dele [hipótese: sem captura].
             let img = f.imagem(&texto);
             let largura = i32::from(r.dir - r.esq);
-            let tx = i32::from(origem.0 + r.esq - o0x) + (largura - img.largura as i32) / 2;
-            let ty = i32::from(origem.1 + r.topo - o0y);
+            let tx = i32::from(origem.0 + r.esq - o0x) + (largura - img.largura as i32) / 2 + dx;
+            let ty = i32::from(origem.1 + r.topo - o0y) + dy;
             for j in 0..img.altura {
                 for i in 0..img.largura {
                     if img.bits[j * img.largura + i] {
