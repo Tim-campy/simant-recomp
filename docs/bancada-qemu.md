@@ -174,6 +174,13 @@ Teste: `qemu_titulo_logo.txt` captura a tela a cada ~1,4 s, de 24 s a 49 s, com 
 
 **Causa:** não é memória, nem a tabela de posições 9/0, nem defeito do driver VGA. É um estado transitório: o bitmap (DIB, guardado de baixo para cima) é desenhado devagar no TCG com o driver VGA de 16 cores (que converte e pontilha as cores), e a captura antiga caiu no meio do desenho. Para capturar o título, espere pelo menos ~35 s após o boot (o `qemu_entrada.txt`, com 35 s, já pega o logotipo completo). As cores diferem das do DOSBox-X (16 cores pontilhadas contra 256 cores), então a comparação pixel a pixel do título continua sendo feita só no DOSBox-X.
 
+## Argumentos extras do QEMU: `-icount` e placa de som (2026-10-18)
+
+`roteiro ... --qemu-args "ARGS"` (ou a variável `SIMANT_QEMU_ARGS`, que vale também para `cenarios_tick.py` e `gerar_vetores_tick.py`, que criam a `Bancada` sem argumentos) acrescenta argumentos à linha do QEMU.
+
+- **`-icount shift=N,sleep=on`** liga o relógio da VM ao número de instruções (2^N ns por instrução). Um snapshot gravado sem `-icount` carrega, mas a simulação fica parada (`GameTime` e `_gameCycles` não andam em 60 s); é preciso boot completo (`tools/ritmo_icount.py`). O TCG com `icount` emula só ~3–8 milhões de instruções por segundo do host, então a VM fica atrás do relógio do host: o tempo da VM tem de ser medido dentro dela. O contador de tiques do BIOS (`0040:006C`, lido no endereço linear `0x46C` com `Memoria.ler_linear`) serve: em normal dá **6,07 ticks/s** em tempo da VM com shift 5, 6 e 7 (o modelo dá 6,06), contra 1,5–3,7 ticks/s no relógio do host. Resultado das medições: [spec/regras/simulacao-visao-geral.md](spec/regras/simulacao-visao-geral.md) §3.3.
+- **Som:** `-audiodev wav,... -device sb16,audiodev=...,irq=7 -parallel none [-device adlib,...]`; a gravação funciona, mas não serve de referência (OPL2 contra driver de OPL3, silêncios descartados, efeitos que não batem): [spec/regras/som.md](spec/regras/som.md), "Áudio do original na bancada QEMU". Também exige boot completo.
+
 ## Cuidados
 
 - O DOS grava com atraso. Antes de encerrar, espere uns 15 s depois de salvar; o `fim` já usa `quit`. O primeiro save (`QUICK1.ANT`) saiu com 0 bytes porque o QEMU foi morto logo depois de salvar.
