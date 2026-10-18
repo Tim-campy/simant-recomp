@@ -12,21 +12,24 @@ inicializados do executável, sem relocação.
 
 | Chave no JSON       | Endereço  | Símbolo / uso                                                           |
 |---------------------|-----------|-------------------------------------------------------------------------|
-| dx8                 | 1038:0000 | `_Dx8`, 8 bytes com sinal                                               |
-| dy8                 | 1038:0008 | `_Dy8`, 8 bytes com sinal                                               |
-| turn_tab            | 1038:0024 | `_TurnTab`, 8 × 8 (`_RandTurn`: `_TurnTab[dir][Sk(8)]`)                  |
-| modos_operaria      | 1038:89e6 | `_ModeTabWB`, 6 × 8: modo da operária por modo estratégico e `Sk(8)`     |
-| modos_soldado       | 1038:8a16 | `_ModeTabSB`, 6 × 8: idem para o soldado                                |
-| modo_por_grupo      | 1038:8a46 | `_CasteModeTabB`, 16: modo dos demais grupos (`_GetNewMode*`)           |
+| dx8                 | 1038:0000 | `_Dx8`, 8 bytes com sinal (só conferida; vai para comum.json) |
+| dy8                 | 1038:0008 | `_Dy8`, 8 bytes com sinal (só conferida; vai para comum.json) |
+| turn_tab            | 1038:0024 | `_TurnTab`, 8 × 8 (`_RandTurn`: `_TurnTab[dir][Sk(8)]`) (só conferida; vai para comum.json) |
+| modos_operaria      | 1038:89e6 | `_ModeTabWB`, 6 × 8: modo da operária por modo estratégico e `Sk(8)` (só conferida; vai para comum.json) |
+| modos_soldado       | 1038:8a16 | `_ModeTabSB`, 6 × 8: idem para o soldado (só conferida; vai para comum.json) |
+| modo_por_grupo      | 1038:8a46 | `_CasteModeTabB`, 16: modo dos demais grupos (`_GetNewMode*`) (só conferida; vai para comum.json) |
 | castas_vermelhas    | 1038:897e | `_CasteTabC`, 7 × 8: casta do ovo vermelho por `_StrategicModeR mod 7`  |
 |                     |           | e `Sk(8)`; a linha 6 já é o começo de `_CasteTabB` (8:89ae)             |
 | vitoria_vermelha    | 1048:22e6 | sem nome; modo da vencedora vermelha no fim da luta (`_DoNestFightR`)   |
-| classe_luta         | 1048:22c6 | sem nome; classe de luta por grupo (`_GetWinner`)                        |
-| chance_vitoria      | 1048:22d6 | sem nome; 4 × 4, chance em 10 de a ocupante vencer (`_GetWinner`)       |
-| borda_buraco        | 1048:230c | sem nome; borda do buraco na superfície por direção (`_MakeNewHoleB/R`) |
+| classe_luta         | 1048:22c6 | sem nome; classe de luta por grupo (`_GetWinner`) (só conferida; vai para comum.json) |
+| chance_vitoria      | 1048:22d6 | sem nome; 4 × 4, chance em 10 de a ocupante vencer (`_GetWinner`) (só conferida; vai para comum.json) |
+| borda_buraco        | 1048:230c | sem nome; borda do buraco na superfície por direção (`_MakeNewHoleB/R`) (só conferida; vai para comum.json) |
 
 As linhas de `_ModeTabWB/SB` são indexadas por `_StrategicModeB/R` (0..5); o `_GetNewMode*` do original
 não confere o índice. O segmento das tabelas sem nome foi deduzido do conteúdo (formigas.md §6).
+
+As tabelas marcadas "vai para comum.json" são lidas só para as conferências: desde a API de mods 0.20 elas ficam em
+data/comum.json (tools/extrair_comum.py), e este script não as grava.
 """
 import argparse
 import json
@@ -34,6 +37,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("tools", 1)[0] + "tools")
 from ne_info import parse_ne  # noqa: E402
+from extrair_comum import sem_comuns, nota_comuns  # noqa: E402
 from sons_regras import SONS  # noqa: E402
 
 SEG8 = 8
@@ -108,8 +112,9 @@ def main():
             "tools/extrair_ninho.py (endereços no topo do script). Ver docs/spec/regras/ninho.md, "
             "ciclo-de-vida.md e formigas.md. Valores em decimal. Linhas de modos_*: modo estratégico "
             "0..5; colunas: Sk(8). chance_vitoria[ocupante][atacante] = chance em 10 de a ocupante vencer."
+            + nota_comuns("ninho")
         ),
-        **t,
+        **sem_comuns("ninho", t),
         "sons": SONS["ninho"],
     }
     # Uma lista por linha, para o arquivo ficar legível e fácil de editar num mod.

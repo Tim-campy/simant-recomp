@@ -199,7 +199,13 @@ pub struct BotaoRevoada {
     pub faixa_so_jogo_completo: MensagemFaixa,
 }
 
-/// Conteúdo de `data/quintal.json`.
+/// Tabelas de `data/comum.json` que a parte do quintal usa (chave aqui, chave em `comum.json`).
+pub const USOS_COMUNS: &[comum::UsoComum] = &[
+    ("dx8", "dx8"),
+    ("dy8", "dy8"),
+];
+
+/// Conteúdo de `data/quintal.json`, com as tabelas comuns de `data/comum.json` ([`USOS_COMUNS`]).
 #[derive(Clone, Debug, Deserialize)]
 pub struct TabelasQuintal {
     /// `_Dx8`/`_Dy8` (passo do gato × 4).
@@ -224,13 +230,13 @@ pub struct TabelasQuintal {
 impl TabelasQuintal {
     /// Lê `quintal.json` (com mods).
     pub fn carregar(r: &Recursos) -> Result<TabelasQuintal, String> {
-        let t: TabelasQuintal = r.dados(ARQUIVO_TABELAS)?;
+        let t: TabelasQuintal = comum::parte_dos_recursos(r, ARQUIVO_TABELAS, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }
 
     pub fn de_json(texto: &str) -> Result<TabelasQuintal, String> {
-        let t: TabelasQuintal = serde_json::from_str(texto).map_err(|e| format!("{ARQUIVO_TABELAS}: {e}"))?;
+        let t: TabelasQuintal = comum::parte_do_texto(ARQUIVO_TABELAS, texto, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }

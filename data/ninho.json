@@ -1,34 +1,5 @@
 {
-  "_comentario": "Tabelas das regras do ninho e do ciclo de vida, extraídas do SIMANTW.EXE por tools/extrair_ninho.py (endereços no topo do script). Ver docs/spec/regras/ninho.md, ciclo-de-vida.md e formigas.md. Valores em decimal. Linhas de modos_*: modo estratégico 0..5; colunas: Sk(8). chance_vitoria[ocupante][atacante] = chance em 10 de a ocupante vencer.",
-  "dx8": [0, 1, 1, 1, 0, -1, -1, -1],
-  "dy8": [-1, -1, 0, 1, 1, 1, 0, -1],
-  "turn_tab": [
-    [0, 1, 1, 1, 7, 7, 7, 7],
-    [0, 1, 2, 2, 2, 2, 0, 0],
-    [1, 1, 2, 3, 3, 3, 3, 1],
-    [2, 2, 2, 3, 4, 4, 4, 4],
-    [3, 3, 3, 3, 4, 5, 5, 5],
-    [6, 6, 4, 4, 4, 5, 6, 6],
-    [7, 7, 7, 5, 5, 5, 6, 7],
-    [0, 0, 0, 0, 6, 6, 6, 7]
-  ],
-  "modos_operaria": [
-    [1, 2, 7, 7, 7, 7, 7, 7],
-    [4, 1, 1, 1, 4, 2, 2, 2],
-    [13, 13, 13, 4, 4, 4, 2, 2],
-    [13, 13, 4, 4, 4, 4, 4, 2],
-    [1, 1, 1, 2, 2, 2, 2, 2],
-    [1, 2, 2, 2, 2, 2, 2, 2]
-  ],
-  "modos_soldado": [
-    [7, 7, 7, 7, 7, 7, 7, 7],
-    [1, 2, 2, 2, 2, 2, 2, 2],
-    [2, 2, 2, 4, 4, 2, 2, 2],
-    [2, 4, 4, 4, 4, 4, 4, 2],
-    [2, 2, 2, 2, 2, 2, 2, 2],
-    [2, 2, 2, 2, 2, 2, 2, 2]
-  ],
-  "modo_por_grupo": [8, 1, 0, 3, 14, 5, 0, 3, 14, 5, 0, 0, 9, 9, 10, 0],
+  "_comentario": "Tabelas das regras do ninho e do ciclo de vida, extraídas do SIMANTW.EXE por tools/extrair_ninho.py (endereços no topo do script). Ver docs/spec/regras/ninho.md, ciclo-de-vida.md e formigas.md. Valores em decimal. Linhas de modos_*: modo estratégico 0..5; colunas: Sk(8). chance_vitoria[ocupante][atacante] = chance em 10 de a ocupante vencer. As tabelas que o original tem uma vez só (dx8, dy8, turn_tab, modos_operaria, modos_soldado, modo_por_grupo, classe_luta, chance_vitoria (comum.json: matriz_luta), borda_buraco) ficam em data/comum.json.",
   "castas_vermelhas": [
     [2, 2, 2, 2, 2, 6, 6, 6],
     [4, 4, 8, 8, 2, 2, 2, 6],
@@ -39,14 +10,6 @@
     [2, 0, 6, 0, 4, 0, 8, 0]
   ],
   "vitoria_vermelha": [1, 1, 1, 3, 0, 5, 2, 3, 0, 5, 0, 0, 9, 9, 10, 0],
-  "classe_luta": [0, 0, 0, 0, 2, 0, 1, 1, 2, 1, 0, 0, 3, 3, 0, 0],
-  "chance_vitoria": [
-    [5, 2, 7, 3],
-    [8, 5, 9, 4],
-    [3, 1, 5, 2],
-    [7, 6, 8, 5]
-  ],
-  "borda_buraco": [25, 26, 28, 31, 30, 29, 27, 24],
   "sons": {
     "_origem": "docs/spec/regras/som.md: _DoDigInB (1028:4bd0) / _DoDigInR (1028:6f0c)",
     "cavar_preta": 17, "cavar_vermelha": 18

@@ -11,16 +11,19 @@ Origem de cada tabela (endereço `seletor:offset`; seletor 1038 = segmento 8 do 
 
 | Chave no JSON          | Endereço    | Símbolo / uso                                              |
 |------------------------|-------------|------------------------------------------------------------|
-| dx8                    | 1038:0000   | `_Dx8`, 8 bytes com sinal (deslocamento x por direção 0–7)  |
-| dy8                    | 1038:0008   | `_Dy8`, 8 bytes com sinal                                  |
-| borda_buraco           | 1048:230c   | sem nome; borda do buraco por direção (`_MakeNewHoleB/R`)  |
-| borda_formiga_leao     | 1048:25e8   | sem nome; somado a 0x30 por direção (`_InitAntLions`)      |
-| sow_tab                | 1038:8a90   | `_SowTab`, tile do bicho-de-conta por direção (`_InitPillar`) |
+| dx8                    | 1038:0000   | `_Dx8`, 8 bytes com sinal (deslocamento x por direção 0–7) (só conferida; vai para comum.json) |
+| dy8                    | 1038:0008   | `_Dy8`, 8 bytes com sinal (só conferida; vai para comum.json) |
+| borda_buraco           | 1048:230c   | sem nome; borda do buraco por direção (`_MakeNewHoleB/R`) (só conferida; vai para comum.json) |
+| borda_formiga_leao     | 1048:25e8   | sem nome; somado a 0x30 por direção (`_InitAntLions`) (só conferida; vai para comum.json) |
+| sow_tab                | 1038:8a90   | `_SowTab`, tile do bicho-de-conta por direção (`_InitPillar`) (só conferida; vai para comum.json) |
 | pedras5                | 1038:870a   | 6 formas 5 × 5 (25 bytes cada, `_AddRock5`)                |
 | pedras3                | 1038:87a0   | 6 formas 3 × 3 (9 bytes cada, `_AddRock3`)                 |
 
 A tabela de seno (`_FracSineTab`) não é extraída aqui: vem do objeto tipo 9 nº 1000 do banco
 SHARED e é lida em tempo de execução (engine/src/rules/geracao.rs).
+
+As tabelas marcadas "vai para comum.json" são lidas só para as conferências: desde a API de mods 0.20 elas ficam em
+data/comum.json (tools/extrair_comum.py), e este script não as grava.
 """
 import argparse
 import json
@@ -28,6 +31,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("tools", 1)[0] + "tools")
 from ne_info import parse_ne  # noqa: E402
+from extrair_comum import sem_comuns, nota_comuns  # noqa: E402
 
 SEG8 = 8
 DGROUP = 10
@@ -82,8 +86,9 @@ def main():
             "Tabelas da geração do mundo extraídas do SIMANTW.EXE por tools/extrair_geracao.py "
             "(endereços no topo do script). Formas de pedra: célula (x+i, y+j) recebe forma[j*N+i] "
             "quando não é 0. Ver docs/spec/regras/geracao-mundo.md. Valores em decimal."
+            + nota_comuns("geracao")
         ),
-        **t,
+        **sem_comuns("geracao", t),
     }
     # Uma lista por linha, para o arquivo ficar legível e fácil de editar num mod.
     linhas = ["{"]

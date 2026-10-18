@@ -125,10 +125,12 @@ Os ids 0, 3–6, 8, 11, 12, 16, 20, 25, 26, 31, 33, 34, 39, 40, 43, 46, 48, 50�
 | partida (`core/partida.rs`) | `_GotoMyAnt` no Experimental: 1 | `ir_para_amarela` |
 | simant | `_TryAntTheme`: 10004, 10005, 10003 em ciclo, se passaram 396 s (7200 × 55 ms) desde o último; o relógio anda mesmo com a música desligada | `som::Audio`, `data/som.json` → `tema_ninho` |
 
-### O que não está ligado
+### Interface: o que está ligado e o que falta
 
-- **Interface (menus, botões e diálogos), fora de `rules/`:** `_EditToolsMenu`/`_MapToolsMenu`/`_RibbonToolsMenu` (2 e 11003), `_DoTool`, `_DoBookMark`, `_CheatKeys`, `_MysteryButton`, `_LionDialog`, `_YellowDialog`, `_SpiderDialog`, `_EndGameDialog` (10008/10010 e o tema seguinte), `_DrawSimPayoff` (20003, 20004), `_ProcYardEvent` (exceto o botão MATE, ligado em 2026-10-18), `_XferPatch`/`_SpecialXfer`/`_PlaceQueenInYard` (1, 11002, 11003), `_StartAttack` (11018 pelo menu). Ficam para o `simant` quando essas telas existirem.
-- **Modo Experimental** (`_ExpDig`, `_ExpAddAnt`, `_ExpAddFood`, `_ExpIncSmell`, `_ExpKillAnts`): o modo ainda não está no port.
+Conferido contra o código em 2026-10-18 (antes esta seção dizia que o Experimental não existia no port).
+
+- **Ligados fora do tick** (os pedidos chegam a `simant/src/som/` como os das regras): ferramentas do Experimental, `_DoTool` e o "Start Game" do menu de ferramentas (`rules/experimental.rs`, `data/experimental.json` → `sons`, `musicas.comecar_jogo` = 11003; o botão de ferramentas no Quick Game pede 2, `para_experimental`); `_GotoMyAnt` no Experimental (`core/partida.rs`, som 1); marcador vazio de `_DoBookMark` (`partida.json` → `marcadores.som_vazio`); `_CheatKeys` (`data/codigos_trapaca.json` → `sons`); `_MysteryButton` (`rules/misterio.rs`); `_EndGameDialog` (10008/10010, `mensagens.json` → `fim_de_jogo`); `_XferPatch`/`_SpecialXfer`/`_PlaceQueenInYard` (1, 11002, 11003; `rules/troca_patch.rs` e `core/quintal_mapa.rs`); botão MATE de `_ProcYardEvent` (`quintal.json` → `botao_revoada`).
+- **Não ligados**, porque a tela ou o caminho não existe no port: os diálogos `_LionDialog`, `_YellowDialog` e `_SpiderDialog`; `_DrawSimPayoff` (20003, 20004); `_StartAttack` pelo menu (11018) e os demais itens da barra de menus do Windows; os outros botões da faixa 35 (`_ProcYardEvent`).
 - `_myBeginSoundSection` (0x26 da formiga-leão) é vazia no Windows: nada a pedir (o `S8()` continua).
 
 **Executável.** `simant/src/som/` recebe os eventos e toca com SDL2:
