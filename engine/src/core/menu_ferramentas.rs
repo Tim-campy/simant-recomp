@@ -29,8 +29,8 @@ pub struct ConfigMenuFerramentas {
     pub submenus: [u16; 8],
     /// Primeiro objeto de item dos submenus (2).
     pub primeiro_item_submenu: usize,
-    /// Canto do menu relativo ao canto inferior esquerdo do botão [hipótese: `_win_DoProxMenu`
-    /// abre o menu junto ao botão; posição não medida].
+    /// Canto do menu relativo ao canto inferior esquerdo do botão. Só vale sem `moldura`: com ela, a
+    /// posição é a medida na bancada (centrado no botão, i05), e este valor fica sem uso.
     pub deslocamento: [i16; 2],
     /// Cor do contorno do item atual (`__win_SetProxItem`); sem uso desde que o realce passou a
     /// inverter o item, como no original.

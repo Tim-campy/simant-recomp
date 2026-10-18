@@ -12,17 +12,20 @@ inicializados do executável, sem relocação.
 
 | Chave no JSON       | Endereço  | Símbolo / uso                                                         |
 |---------------------|-----------|-----------------------------------------------------------------------|
-| dx8, dy8            | 1038:0000 | `_Dx8`/`_Dy8` (8:0000/0008): deslocamento por direção 0–7               |
-| dx9, dy9            | 1038:0010 | `_Dx9`/`_Dy9` (8:0010/001a): índice 0 = parado, 1–8 = direções 0–7    |
-| turn_tab            | 1038:0024 | `_TurnTab`, 8 × 8: linha = direção atual, coluna = alvo; valor = nova  |
+| dx8, dy8            | 1038:0000 | `_Dx8`/`_Dy8` (8:0000/0008): deslocamento por direção 0–7 (só conferida; vai para comum.json) |
+| dx9, dy9            | 1038:0010 | `_Dx9`/`_Dy9` (8:0010/001a): índice 0 = parado, 1–8 = direções 0–7 (só conferida; vai para comum.json) |
+| turn_tab            | 1038:0024 | `_TurnTab`, 8 × 8: linha = direção atual, coluna = alvo; valor = nova (só conferida; vai para comum.json) |
 | passo_aranha_x/y    | 1038:87dc | `_SpX`/`_SpY` (8:87dc/87e4): passo da aranha em 1/16 de célula         |
 | boca_aranha_x/y     | 1038:87ec | `_SeatX`/`_SeatY` (8:87ec/87f4): célula da boca relativa à aranha      |
-| sow_tab             | 1038:8a90 | `_SowTab`: tile do bicho-de-conta por direção                         |
-| borda_formiga_leao  | 1048:25e8 | sem nome; somado a 0x30 por direção (`_AddRandAntLion`, `_DoAntLions`) |
+| sow_tab             | 1038:8a90 | `_SowTab`: tile do bicho-de-conta por direção (só conferida; vai para comum.json) |
+| borda_formiga_leao  | 1048:25e8 | sem nome; somado a 0x30 por direção (`_AddRandAntLion`, `_DoAntLions`) (só conferida; vai para comum.json) |
 
 As constantes da seção "regras" não são tabelas do executável: são valores imediatos lidos no
 pseudocódigo das funções citadas em "_origem" (docs/spec/regras/inimigos.md). O script só as
 escreve no JSON, para que fiquem fora do código do port e possam ser trocadas por mods.
+
+As tabelas marcadas "vai para comum.json" são lidas só para as conferências: desde a API de mods 0.20 elas ficam em
+data/comum.json (tools/extrair_comum.py), e este script não as grava.
 """
 import argparse
 import json
@@ -30,6 +33,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("tools", 1)[0] + "tools")
 from ne_info import parse_ne  # noqa: E402
+from extrair_comum import sem_comuns, nota_comuns  # noqa: E402
 from sons_regras import SONS  # noqa: E402
 
 SEG8 = 8
@@ -143,8 +147,9 @@ def main():
             "foram extraídas do SIMANTW.EXE por tools/extrair_inimigos.py (endereços no topo do script); "
             "turn_tab[atual][alvo] = nova direção. As constantes de 'regras' vêm do pseudocódigo (origem em "
             "'_origem'). Ver docs/spec/regras/inimigos.md. Valores em decimal."
+            + nota_comuns("inimigos")
         ),
-        **t,
+        **sem_comuns("inimigos", t),
         "regras": {k: v for k, (v, _) in REGRAS.items()},
         "_origem": {k: o for k, (_, o) in REGRAS.items()},
         "sons": SONS["inimigos"],

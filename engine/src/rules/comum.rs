@@ -8,9 +8,11 @@
 //!
 //! Organização:
 //! - **Tipo T** (`grupo`, cor, direção) e **valores de tile** (terra, comida, sólido, amarela…).
+//! - **Tabelas comuns** (`data/comum.json`, API de mods 0.20): `_Dx8`, `_TurnTab`, as tabelas de luta, de
+//!   modos, da borda do buraco... que o original tem uma vez só. Cada parte lê as que usa por
+//!   [`completar_com_comuns`] ao carregar o seu `data/<parte>.json`.
 //! - **Direções**: as traits [`Direcoes`] (`_Dx8/_Dy8`) e [`TabelaDeGiro`] (`_TurnTab`), implementadas
-//!   pelas tabelas de cada parte. Cada `data/<parte>.json` continua com a sua cópia (o mod de uma parte
-//!   não muda as outras); só o código é único.
+//!   pelas tabelas de cada parte (preenchidas a partir de `comum.json`).
 //! - **Planos** (`_MePlane`: 0/1 superfície, 2 ninho preto, 3 vermelho): `_GetMap`, `_GetLife`,
 //!   `_IsClearTile`, `_IsNotObstacle`, `_IsThisPebble`, `_GetBestDir`.
 //! - **Listas**: `_FindInAList`, `_FindAntIndex`/`_FindInBList`/`_FindInRList`.
@@ -157,11 +159,77 @@ pub fn em_casa(e: &Estado) -> bool {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Tabelas comuns (data/comum.json)
+// ---------------------------------------------------------------------------------------------
+
+/// Arquivo das tabelas que o original tem uma vez só e várias partes usam (gerado por
+/// `tools/extrair_comum.py`, com o endereço de cada uma em `_enderecos`).
+pub const ARQUIVO_COMUNS: &str = "comum.json";
+
+/// Uma tabela comum usada por uma parte: (chave no `data/<parte>.json` — e no struct da parte —,
+/// chave em `comum.json`). As duas só diferem onde a parte já tinha nome próprio (`descarregar_grupo`
+/// da amarela, `chance_vitoria` do ninho).
+pub type UsoComum = (&'static str, &'static str);
+
+/// `comum.json` embutido na compilação (sem mods), para os `padrao()` e os `de_json` das partes.
+pub fn comuns_embutidas() -> &'static serde_json::Value {
+    static C: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
+    C.get_or_init(|| serde_json::from_str(include_str!("../../../data/comum.json")).expect("data/comum.json inválido"))
+}
+
+/// Põe no JSON de uma parte as tabelas comuns que ela usa, tiradas de `comuns`.
+///
+/// Compatibilidade (API de mods 0.20): até a 0.19 cada `data/<parte>.json` trazia a sua cópia. Se o
+/// arquivo da parte (de um mod antigo) ainda trouxer a chave, ela **vale só para aquela parte**, como
+/// antes, e o console avisa; a tabela de `comum.json` continua valendo para as outras partes.
+pub fn completar_com_comuns(
+    arquivo: &str,
+    parte: &mut serde_json::Value,
+    comuns: &serde_json::Value,
+    usos: &[UsoComum],
+) -> Result<(), String> {
+    let obj = parte.as_object_mut().ok_or_else(|| format!("{arquivo}: esperado um objeto JSON"))?;
+    for &(chave, chave_comum) in usos {
+        if obj.contains_key(chave) {
+            eprintln!(
+                "aviso: {arquivo} traz \"{chave}\", que desde a API de mods 0.20 fica em {ARQUIVO_COMUNS} \
+                 (\"{chave_comum}\"); a cópia vale só para esta parte"
+            );
+            continue;
+        }
+        let v = comuns
+            .get(chave_comum)
+            .ok_or_else(|| format!("{ARQUIVO_COMUNS}: falta a tabela \"{chave_comum}\" (usada por {arquivo})"))?;
+        obj.insert(chave.to_string(), v.clone());
+    }
+    Ok(())
+}
+
+/// Lê o JSON de uma parte a partir do texto, com as tabelas comuns embutidas.
+pub fn parte_do_texto<T: serde::de::DeserializeOwned>(arquivo: &str, texto: &str, usos: &[UsoComum]) -> Result<T, String> {
+    let mut v: serde_json::Value = serde_json::from_str(texto).map_err(|e| format!("{arquivo}: {e}"))?;
+    completar_com_comuns(arquivo, &mut v, comuns_embutidas(), usos)?;
+    serde_json::from_value(v).map_err(|e| format!("{arquivo}: {e}"))
+}
+
+/// Lê `data/<arquivo>` e `data/comum.json` pelos [`Recursos`](crate::recursos::Recursos) (com mods).
+pub fn parte_dos_recursos<T: serde::de::DeserializeOwned>(
+    r: &crate::recursos::Recursos,
+    arquivo: &str,
+    usos: &[UsoComum],
+) -> Result<T, String> {
+    let mut v: serde_json::Value = r.dados(arquivo)?;
+    let comuns: serde_json::Value = r.dados(ARQUIVO_COMUNS)?;
+    completar_com_comuns(arquivo, &mut v, &comuns, usos)?;
+    serde_json::from_value(v).map_err(|e| format!("{arquivo}: {e}"))
+}
+
+// ---------------------------------------------------------------------------------------------
 // Direções e geometria
 // ---------------------------------------------------------------------------------------------
 
 /// `_Dx8/_Dy8`: deslocamento por direção 0–7 (0 = cima, 2 = direita, 4 = baixo, 6 = esquerda). Cada
-/// tabela de dados que traz a sua cópia implementa esta trait.
+/// tabela de parte que usa `dx8`/`dy8` (preenchidos a partir de `data/comum.json`) implementa esta trait.
 pub trait Direcoes {
     fn deslocamentos(&self) -> (&[i8; 8], &[i8; 8]);
 

@@ -2,6 +2,8 @@
 
 Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as specs de `docs/spec/`, `docs/divergencias.md`, `docs/api-mods.md`, `docs/spec/regras/testes-tick.md`, `tests/referencias/README.md`, `README.md`, comentários de `engine/src` e `simant/src`, e a tabela de símbolos `re_trabalho/symbols.tsv` (2.171 nomes do `SIMANTW.SYM`).
 
+**Atualização de 2026-10-18 (tabelas comuns e documentação):** depois da revisão, as tabelas repetidas foram juntadas em `data/comum.json` (API de mods 0.20), `jogo.json` ficou sobrescrevível, a documentação desatualizada listada em §5 foi corrigida e os comentários do código conferidos. Mudaram as linhas 7, 10 e 12 da tabela de §1 e as seções 2.2, 2.5, 2.6, 2.7, 2.10, 2.11, 2.12, 4 e 5; o resto continua sendo a revisão sobre `1ff4b82`.
+
 **Medições desta revisão:**
 
 - `cargo test --workspace` com `SIMANT_DIR` apontando para `SimAnt-T/MAXIS/ANTWIN`: **518 testes passaram, 0 falharam, 0 ignorados** em 35 binários de teste (unitários de `engine` e `simant` e os testes de integração de `engine/tests/`).
@@ -31,14 +33,14 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 | 4 | Jogo ao vivo (laço, relógio, ritmo) | 90% | 65% | slow/normal medidos (3,0/6,0 ticks/s); fast/ultra e relógio do Mac só na bancada QEMU e com decisões do port |
 | 5 | Telas e janelas | 85% | 70% | quase todas as janelas existem e foram comparadas (93–100%); faltam balões, gráficos de saúde da edição, partes da ajuda |
 | 6 | Diálogos e menus | 60% | 50% | **sem barra de menus do Windows** (File/Window/View/Options/Speed); "Load Game" do "Select a Game" não existe |
-| 7 | Som e música | 75% | 35% | efeitos e músicas das regras tocam; sons de menus/diálogos/Experimental não; timbre diferente; nada comparado de ouvido |
+| 7 | Som e música | 75% | 35% | efeitos e músicas das regras e do Experimental tocam; sons de menus e diálogos não; timbre diferente; nada comparado de ouvido |
 | 8 | Modos (Quick, Completo, Experimental, Tutorial) | 90% | 75% | os quatro existem e têm vetores; tutorial é o menos conferido |
 | 9 | Salvar/carregar | 95% | 90% | `.ANT` aceito pelo original; Load com `_RandYard` conferido; `Tutorial.Ant` gerado |
-| 10 | Mods (dados + Lua) | 85% | n/a | API 0.19, 36 JSON sobrescrevíveis (exceto `jogo.json`), Lua em sandbox, testes em `mods.rs`, `mods_lua.rs` e `mod_trapacas.rs` |
+| 10 | Mods (dados + Lua) | 90% | n/a | API 0.20, 37 JSON sobrescrevíveis (todos, inclusive `jogo.json`), tabelas comuns uma vez só em `comum.json`, Lua em sandbox, seção "Planejado"; testes em `mods.rs`, `mods_lua.rs` e `mod_trapacas.rs` |
 | 11 | Ferramentas e testes | 90% | n/a | 30 ferramentas em `tools/`, bancada QEMU com gdbstub, 518 testes |
-| 12 | Documentação | 85% | n/a | 42 specs (~8,8 mil linhas); vários trechos desatualizados (§5) |
+| 12 | Documentação | 90% | n/a | 42 specs (~8,8 mil linhas); trechos desatualizados de §5 corrigidos em 2026-10-18 |
 
-**Geral (conta em §6): cerca de 87% implementado e 70% verificado contra o original** (este último só nas áreas 1–9).
+**Geral (conta em §6): cerca de 88% implementado e 70% verificado contra o original** (este último só nas áreas 1–9).
 
 ## 2. Por área
 
@@ -53,7 +55,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 
 - **Completo e verificado:** ordem do tick (`_DoAntSim`), geradores S e R, superfície (lista A, feromônios, luta, comida, entrada no ninho, líder vermelha), ninhos preto e vermelho (escavação, comida, saída, invasoras, água), ciclo de vida (ovos, rainha, castas), inimigos (formiga-leão, aranha, lagarta, bicho-de-conta), formiga amarela (andar, contorno, comer, ninho, luta com derrota e vitória), quintal (menino, cortador, inseticida, gato, cachorro, pássaro, chuva, enxames, `_SimColonies`), conselhos e tutorial no tick, trapaças (`heal`, `just`, `qeen` etc. conferidas). Evidência: 107 vetores, 2 sequências longas, 20 casos da bancada.
 - **Implementado, não verificado:** ver a lista consolidada em §3 (morte natural, proporção de vitórias, revoada natural, estratégia vermelha, recrutamento, cerco, laser, faro, aranha do jogador, morte da amarela por inimigos, casos estatísticos dos ovos e do ninho, defeitos do original marcados [hipótese]).
-- **Parcial:** `_SpecialXfer` termina fora do tick (o original troca de patch dentro do passo 17; S e R batem assim mesmo, `divergencias.md`); `_DropFoodA` (comida que cai na casa some porque `_DROPdir` não está no `Estado`, `geracao-mundo.md` l. 294); `_ExitHole` com a lista A cheia (vaga 1000 no original; `ninho.md`); `_KillAntLion(-1)` no inseticida (o original grava fora da tabela; o port ignora).
+- **Parcial:** `_SpecialXfer` termina fora do tick (o original troca de patch dentro do passo 17; S e R batem assim mesmo, `divergencias.md`), e **só nos vetores**: na partida ao vivo a interface não reage à mensagem 10058 (a morte da amarela no Jogo Completo com outra colônia preta só mostra a mensagem; achado de 2026-10-18, comentário em `rules/amarela.rs`); `_DropFoodA` (comida que cai na casa some porque `_DROPdir` não está no `Estado`, `geracao-mundo.md` l. 294); `_ExitHole` com a lista A cheia (vaga 1000 no original; `ninho.md`); `_KillAntLion(-1)` no inseticida (o original grava fora da tabela; o port ignora).
 - **Falta:** modos 17/18 e grupos 10/11/15 sem significado conhecido (`formigas.md`); `_RevSpider` sem chamador visto (`inimigos.md`); chamadas indiretas de `_ForceModeA/B`, `_StartAttack`, `_GetNewRedTask` não procuradas (`superficie.md`).
 
 ### 2.3 Geração de mundo
@@ -79,7 +81,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 | Gerenciador de janelas | 85% | 70% | ordem, foco, arrasto, maximizar, menu de sistema; contorno XOR e menu de sistema aproximados; altura mínima [hipótese] |
 | Caste / Behavior / History | 95% | 80% | 98,72–98,92% (só o título); arrasto no triângulo e gráficos com dados não conferidos |
 | Menus de segurar (amarela, ícones) | 100% | 80% | `_AntMenu` 100%, ícones 99,93%; menus da rainha e da aranha não conferidos |
-| Mapa (`mapWin`) | 85% | 75% | 93,78–99,89% por modo; falta ligar `_ELayerMode` da edição, Shift+clique dá ordem, `_win_Swap`, redesenho alternado atrás; cores de `_ConvColor` [hipótese] |
+| Mapa (`mapWin`) | 90% | 75% | 93,78–99,89% por modo; `_ELayerMode` da edição e `_win_Swap` ligados; faltam Shift+clique dar ordem e o redesenho alternado atrás (o port gera a cada tick); cores de `_ConvColor` [hipótese] |
 | Quintal (Yard View, faixa 35) | 90% | 85% | 99,27–99,59% nos três modos, faixa 93,09%; botões configuráveis da faixa 35 não existem |
 | Info (cartões) | 90% | 70% | 11 de 53 cartões contra capturas (96,36–99,75%); os outros 42 só por conferência automática |
 | Examine (`_MagnifyMenu`) | 85% | 30% | sem captura do original com a janela aberta; alinhamento e cor dos textos [hipótese] |
@@ -94,7 +96,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 - **Completo e verificado:** quadros de mensagem (`_PictStrnDialog`), fim de jogo, "Saved correctly", pergunta do Load, Save As/Load (imitação), menus de segurar, menu de ícones, menu de ferramentas do Experimental, aceleradores do original (Speed, AutoTrack, Save, Save As, janelas, planos, quintal).
 - **Falta (alto impacto):**
   - **A barra de menus do Windows** (File, Window, View, Options, Speed): o port não tem (`data/partida.json`: "o port não tem barra de menus"); tudo depende de aceleradores e dos botões configuráveis da faixa. Sem ela, quem joga não descobre Options (Music, Sound Effects, Events, Messages, Silly), Quit, About, a janela de placar (Ctrl+T, `0xFD17`) nem Ctrl+J/K.
-  - "Load Game" no "Select a Game", na abertura e durante a partida (`simant/src/modos.rs`: imprime "Load Game ainda não implementado no port"). **Atenção:** `divergencias.md` (linha de 2026-10-17, "Select a Game: Load Game e Cancel") diz que durante a partida ele abre o File → Load; o código não faz isso.
+  - "Load Game" no "Select a Game", na abertura e durante a partida (`simant/src/modos.rs`: imprime "Load Game ainda não implementado no port"; o Ctrl+L da partida existe). A linha de `divergencias.md` que dizia o contrário foi corrigida em 2026-10-18.
   - `_YellowDialog` da trofalaxia (`rules/amarela.rs` l. 1212, "[lacuna]"); `_AboutDialog`, `_ScoreDialog` sem equivalente.
 - **Implementado, não verificado:** diálogos de arquivo modais (a simulação não anda) [hipótese, `telas/arquivos.md`]; primeiro clique numa janela de trás comido também no título [hipótese].
 
@@ -103,7 +105,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 - **Completo:** 57 efeitos decodificados (8 bits, 4096 Hz); músicas `.MID` com a tabela MCI; opções Music/Sound Effects; silêncio sem foco em todas as telas; linha do tempo dos sons da luta (165 ms).
 - **Verificado:** só o formato e o catálogo (quem pede cada som, pelo código). **Nada foi comparado de ouvido com o original** (a bancada QEMU não tem placa de som; `divergencias.md`).
 - **Parcial / decisão do port:** timbre por `rustysynth` + SoundFont ou sintetizador simples, não o OPL/MIDI Mapper; volume relativo efeito/música não medido; efeito novo sempre corta o anterior.
-- **Falta:** sons de menus, diálogos e das ferramentas do Experimental (`regras/som.md`, "O que não está ligado"; o texto dessa seção ainda diz que o Experimental não existe, o que está desatualizado).
+- **Falta:** sons de menus e diálogos (`_LionDialog`, `_YellowDialog`, `_SpiderDialog`, `_DrawSimPayoff`, itens da barra de menus; `regras/som.md`, "Interface: o que está ligado e o que falta"). Os das ferramentas do Experimental, dos marcadores, das trapaças, do Mystery, do fim de jogo e da troca de patch tocam.
 
 ### 2.8 Modos
 
@@ -121,20 +123,20 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 
 ### 2.10 Mods (dados + Lua)
 
-- **Completo:** API 0.19; objetos do banco por (tipo, id), arquivos soltos, 36 `data/*.json` (todos sobrescrevíveis, exceto `jogo.json`, `api-mods.md` l. 35); as tabelas das regras chegam ao tick (inclusive `amarela.json`); scripts Lua com ganchos, menu, painel, ações e avanço de ticks, em sandbox; mod de trapaças e de chuva de comida em `exemplos/`. Testes: `mods.rs` (4) e `mods_lua.rs` (22), mais `mod_trapacas`.
-- **"Planejado":** `docs/api-mods.md` **não tem** seção "Planejado"; não há roteiro escrito para a API. Itens implícitos: tornar `jogo.json` sobrescrevível; dar à faixa 35 botões configuráveis; resolver a duplicação de tabelas (§5).
-- **Risco:** mudanças de formato quebram mods (ex.: 0.7 e 0.13 exigiram chaves novas); a tabela de histórico tem a linha 0.19 antes da 0.18.
+- **Completo:** API 0.20; objetos do banco por (tipo, id), arquivos soltos, 37 `data/*.json` (todos sobrescrevíveis; `jogo.json` desde a 0.20, lido com os mods antes de abrir os bancos); as tabelas das regras chegam ao tick (inclusive `amarela.json`), e as 14 que o original tem uma vez só ficam só em `comum.json` (um mod antigo com a cópia numa parte continua valendo para aquela parte, com aviso); scripts Lua com ganchos, menu, painel, ações e avanço de ticks, em sandbox; mod de trapaças e de chuva de comida em `exemplos/`. Testes: `mods.rs` (5, inclusive `comum.json` e a cópia antiga) e `mods_lua.rs` (22), mais `mod_trapacas`.
+- **"Planejado":** seção nova em `docs/api-mods.md` (2026-10-18): sobrescrita parcial por chave, botões configuráveis da faixa 35, itens da barra de menus vindos de dados, leitura das tabelas pelos scripts e o fim do aceite das cópias antigas das tabelas comuns.
+- **Risco:** mudanças de formato quebram mods (ex.: 0.7 e 0.13 exigiram chaves novas), porque cada arquivo é trocado inteiro (a sobrescrita por chave está em "Planejado"). O histórico está em ordem desde 2026-10-18.
 
 ### 2.11 Ferramentas e testes
 
-- 30 ferramentas em `tools/` (inspetores de formato, extratores de tabelas, `cenarios_tick.py`, `caso_ant.py`, `comparar_captura(s).py`, bancada QEMU com gdbstub), 51 roteiros em `tests/referencias/roteiros/`.
+- 32 ferramentas em `tools/` (inspetores de formato, extratores de tabelas — `extrair_comum.py` e `conferir_extracoes.py`, que confere que os extratores reproduzem os `data/*.json`, desde 2026-10-18 —, `cenarios_tick.py`, `caso_ant.py`, `comparar_captura(s).py`, bancada QEMU com gdbstub), 51 roteiros em `tests/referencias/roteiros/`.
 - 518 testes; o de vetores exige igualdade total; os de arquivos reais avisam e passam sem `SIMANT_DIR`.
 - **Fraqueza:** capturas e `re_trabalho/` ficam fora do git (direitos autorais), então as porcentagens de tela só são reprodutíveis na máquina do usuário; o determinismo da bancada depende do snapshot (QEMU sem `icount`).
 
 ### 2.12 Documentação
 
-- 42 specs, `decisoes.md`, `glossario.md`, `divergencias.md` (68 linhas), `bancada-qemu.md`, `api-mods.md`. A convenção de evidência (verificado / visto no código / [hipótese]) é seguida; há 154 marcas `[hipótese` (com ou sem complemento) nas specs.
-- **Desatualizado** (ver §5): `README.md`, `spec/README.md`, `regras/som.md`, `regras/conselhos.md`, `regras/formiga-amarela.md`, `regras/quintal.md`, `telas/mensagens.md`, `telas/jogo.md`, `testes-tick.md` ("Limitações"), `executavel.md`, linhas duplicadas em `divergencias.md`.
+- 42 specs, `decisoes.md`, `glossario.md`, `divergencias.md` (67 linhas desde 2026-10-18, em três seções: em aberto, extensões do port, resolvidas), `bancada-qemu.md`, `api-mods.md`. A convenção de evidência (verificado / visto no código / [hipótese]) é seguida; há 154 marcas `[hipótese` (com ou sem complemento) nas specs.
+- **Desatualizado:** os documentos listados em §5 item 9 foram corrigidos em 2026-10-18 (README reescrito como guia enxuto; specs conferidas contra o código).
 
 ### 2.13 Funções do original sem equivalente (estimativa pela tabela de símbolos)
 
@@ -214,10 +216,10 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 | Item | Esforço | Referência |
 |---|---|---|
 | Barra de menus do Windows (File, Window, View, Options, Speed), com Quit, About e as opções que hoje só existem nos botões configuráveis | G | `telas/experimental.md` l. 23 (tabela de aceleradores); `data/partida.json` |
-| "Load Game" no "Select a Game" (abertura e partida); corrigir a linha de `divergencias.md` que diz que já existe | P | `simant/src/modos.rs`; `telas/abertura.md` |
+| "Load Game" no "Select a Game" (abertura e partida) | P | `simant/src/modos.rs`; `telas/abertura.md` |
 | Balões de fala da edição ("Silly", luta, descanso, ovos, rainha, aranha) | M | `_DrawBalloons`, `_EggBalloons`, `_QueenBalloons`, `_RestBalloons`, `_FightBalloons`; `rules/desenho.rs` |
 | Gráficos de saúde na janela de edição (`_DrawEditGraphs`) | P–M | `telas/jogo.md` l. 105 |
-| Sons de menus, diálogos e ferramentas do Experimental | P | `regras/som.md`, "O que não está ligado" |
+| Sons de menus e diálogos (os do Experimental já tocam) | P | `regras/som.md`, "Interface: o que está ligado e o que falta" |
 | Janela de placar (Ctrl+T, `0xFD17`) e `_ScoreDialog`, se forem do jogo e não de depuração [em aberto] | M | aceleradores em `telas/experimental.md` |
 
 ### Médio impacto
@@ -226,10 +228,10 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 |---|---|---|
 | Diálogo da trofalaxia (`_YellowDialog`) | P | `rules/amarela.rs` l. 1212 |
 | Ajuda: Search, History, menus e popups pequenos | M | `telas/ajuda.md`, `divergencias.md` |
-| Mapa: `_ELayerMode` na edição, Shift+clique dá ordem, troca com o quintal e redesenho atrás | P–M | `telas/mapa.md`, `divergencias.md` |
+| Mapa: Shift+clique dá ordem e redesenho alternado atrás | P | `telas/mapa.md`, `divergencias.md` |
 | Textos do quadro de exame e avisos do Experimental (listas 4/1010, 4/1100–1103) | P | `telas/experimental.md` §10 |
 | PLACE parando a simulação e Shift para outra rainha | P | `divergencias.md` (`_PlaceQueenInYard`) |
-| `_SpecialXfer` dentro do tick (ordem do original) | M | `divergencias.md` |
+| `_SpecialXfer` na partida ao vivo (hoje só nos vetores) e dentro do tick (ordem do original) | M | `divergencias.md`, `rules/amarela.rs` |
 | Animação `_DrawSimPayoff` (trapaça `fred` e fim de jogo) | M | `regras/trapacas.md` |
 | Botões configuráveis da faixa 35 | P | `regras/som.md` l. 32 |
 | Queda de comida na casa (`_DROPdir` no `Estado`, `_DropFoodA`) | P | `regras/geracao-mundo.md` l. 294 |
@@ -260,7 +262,7 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 
 ## 5. Riscos e dívidas técnicas
 
-1. **Tabelas duplicadas nos JSON.** Uma varredura dos `data/*.json` encontrou 30 tabelas numéricas repetidas, 28 delas em arquivos diferentes: `dx8`/`dy8` em 4 arquivos (`amarela`, `feromonios`, `geracao`, `inimigos`), `turn_tab` (8 linhas) em 3 (`feromonios`, `inimigos`, `ninho`), `classe_luta` em 3 (`amarela`, `ninho`, `superficie`), `borda_buraco` em 3, `modo_por_grupo` e `modos_operaria` em 2, `sow_tab`, `dx9`/`dy9`, `borda_formiga_leao` em 2. Um mod que muda uma cópia e esquece as outras deixa o jogo incoerente. Corrigir mexe na API de mods (precisa nota de compatibilidade).
+1. ~~**Tabelas duplicadas nos JSON.**~~ **Resolvido em 2026-10-18 (API de mods 0.20).** A revisão achou 30 tabelas numéricas repetidas, 28 em arquivos diferentes; as que são a mesma tabela do original (14: `dx8`/`dy8`, `dx9`/`dy9`, `turn_tab`, `grupo_sem_carga`, `modos_operaria`/`modos_soldado`/`modo_por_grupo`, `sow_tab`, `classe_luta`, `matriz_luta`, `borda_buraco`, `borda_formiga_leao`) ficam agora só em `data/comum.json`, com o endereço de cada uma. As outras coincidências são tabelas diferentes do original com os mesmos valores (`boca_aranha_x/y` = `_SeatX/_SeatY`, roteiros de `quintal.json` e `casa.json`, bordas de `dialogos.json`) e ficaram. Um mod antigo com a cópia numa parte vale só para aquela parte, com aviso (decisoes.md).
 2. **Ajustes de pixel medidos sem causa conhecida** ([causa em aberto] em `divergencias.md`): texto da faixa e janela do fim de jogo 1 pixel à esquerda (`mensagens.json`, `ajuste`); gato 1 pixel abaixo nos quadros 0–12 (`quintal_mapa.json`, `ajuste_medido`); título, triângulo e barras das janelas de controle; Info 1 pixel à direita e popup deslocado (`info.json`). Funcionam em 640×480 e podem errar em outras resoluções ou se a causa for outra.
 3. **Hipóteses no relógio.** O relógio do Mac ao vivo começa no maior prazo do save (o port não sabe há quanto tempo o Windows está ligado); `mac_por_tick` = 9 só vale na bancada; sem relógio, `_GameTime × 6` [hipótese] em `quintal.json`. O gato, o cachorro e o balão do menino dependem disso, e com o gato e o cachorro **o consumo de sorteios** também: uma partida ao vivo não reproduz exatamente uma do original.
 4. **Ritmo de fast/ultra dependente da CPU no original.** O port fixa 5 e 7 voltas por período (decisão registrada). `_BirdDelay` depende de `_gameCycles` e é a única entrada não determinística do tick.
@@ -268,21 +270,11 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 6. **Load ressemeia S**, então capturas do original e do port do mesmo estado têm direções diferentes nas animações (`formiga-amarela.md`).
 7. **Bancada QEMU TCG** é lenta e sem placa de som: o ritmo, o relógio e o som medidos ali podem não valer numa máquina real. O determinismo depende do snapshot (QEMU sem `icount`).
 8. **Evidência fora do git.** Capturas, `re_trabalho/` e pseudocódigo não são versionados (direitos autorais); as porcentagens de tela não podem ser refeitas por terceiros sem o jogo e a bancada.
-9. **Documentação desatualizada** (pode enganar quem continuar o trabalho):
-   - `README.md`: diz "Ainda não há menus nem as janelas de mapa, castas e história" e que os botões que abririam janelas "ainda não fazem nada"; hoje as janelas existem.
-   - `regras/som.md`: "o modo [Experimental] ainda não está no port".
-   - `regras/conselhos.md`: "A interface ainda não grava `interface_tutor`" (já grava, `simant/src/sessao.rs` l. 532) e "Nenhum caso do tutorial foi rodado no original" (há vetores `tutorial/`).
-   - `regras/formiga-amarela.md`: "`RegrasOriginais` sem campo para `TabelasAmarela`" (o campo existe, `rules/tick.rs` l. 116).
-   - `regras/quintal.md`: causa 9 (inseticida) "não conferida" (coberta por `inseticida_morte/21`).
-   - `telas/mensagens.md` §5: "Info ainda não", "a janela do mapa não existe", "`_MysteryButton` (port: ainda não)" — os três existem.
-   - `telas/jogo.md`: tabela de verificação de 2026-10-16 (78,24% da área cliente, "mapWin não desenhada") e "a janela do mapa ainda não existe no port".
-   - `testes-tick.md`, "Limitações": "Versionados: 24 ticks", "fast/ultra não medidas" (hoje 107 vetores e vetores de fast/ultra).
-   - `executavel.md`: o intervalo de 55 ms ainda como "[hipótese, a medir]" (medido).
-   - `spec/README.md`: "Próximos subsistemas" lista tiles e mapas, já feitos; "Regras:" aparece duas vezes.
-   - `divergencias.md`: linhas repetidas (botão Patch/Yard e arrasto do polegar aparecem duas vezes) e a linha do "Load Game" que não confere com o código.
-   - `api-mods.md`: histórico com 0.19 antes de 0.18; não há seção "Planejado".
-10. **70 comentários com `[hipótese]`, "ainda não" ou "[lacuna]" no código** (`engine/src`, `simant/src`); nenhum `todo!` ou `unimplemented!`. Alguns comentários também estão desatualizados (ex.: `core/partida.rs` l. 1022, "Menus de segurar o botão ainda não existem").
-11. **`jogo.json` não é sobrescrevível por mod**, ao contrário do princípio 4 do `CLAUDE.md`.
+9. ~~**Documentação desatualizada**~~ **Corrigida em 2026-10-18:** `README.md` (reescrito como guia atual), `spec/README.md`, `regras/som.md`, `regras/conselhos.md`, `regras/formiga-amarela.md`, `regras/quintal.md`, `telas/mensagens.md`, `telas/jogo.md` (a tabela de 2026-10-16 ficou como histórico), `testes-tick.md`, `executavel.md`, `divergencias.md` (duplicadas removidas, cada linha conferida, seção "Resolvidas") e `api-mods.md` (histórico em ordem, seção "Planejado").
+10. **Comentários com `[hipótese]`, "ainda não" ou "[lacuna]" no código** (`engine/src`, `simant/src`): a busca de 2026-10-18 achou 56 linhas (a contagem de 70 da revisão incluía outras grafias); 8 estavam desatualizados e foram corrigidos (entre eles `core/partida.rs`, "Menus de segurar o botão ainda não existem", e `rules/tick.rs`, "subsistema ainda não implementado"); os 48 restantes são hipóteses ainda sem evidência ou lacunas reais (balões, `_YellowDialog`, `_CommandKey`, `_DropFoodA` na casa, Load Game do "Select a Game"). Nenhum `todo!` ou `unimplemented!`.
+11. ~~**`jogo.json` não é sobrescrevível por mod**~~ **Resolvido em 2026-10-18 (API 0.20):** é lido com os mods antes de abrir os bancos.
+12. **Ordem das janelas fixa nas animações da amarela.** `animacao.janela_edicao_na_frente` de `amarela.json` é sempre verdadeiro: com a janela de edição atrás, o original faz menos quadros (e sorteios) nas mortes e na loucura, e o port não acompanha a ordem real das janelas. Uma partida ao vivo nessa situação pode se afastar do original na sequência de S (achado de 2026-10-18, comentário em `rules/amarela.rs`).
+13. **Cauda da amarela rainha na reconstrução do mapa de vida** (`core/vida.rs`): não é gravada, embora as regras já usem `_Dx8/_Dy8[_MeDir ^ 4]` para ela; provavelmente basta a mesma tabela, a conferir numa captura (`telas/jogo.md`).
 
 ## 6. Porcentagem geral estimada
 
@@ -299,12 +291,12 @@ Pesos por área, pensados no que importa para quem joga um port completo (as reg
 | Som e música | 6 | 75 | 450 | 35 | 210 |
 | Modos | 8 | 90 | 720 | 75 | 600 |
 | Salvar/carregar | 4 | 95 | 380 | 90 | 360 |
-| Mods | 5 | 85 | 425 | n/a | — |
+| Mods | 5 | 90 | 450 | n/a | — |
 | Ferramentas e testes | 3 | 90 | 270 | n/a | — |
-| Documentação | 3 | 85 | 255 | n/a | — |
-| **Total** | **100** | | **8.735** | | **6.220** (peso 89) |
+| Documentação | 3 | 90 | 270 | n/a | — |
+| **Total** | **100** | | **8.775** | | **6.220** (peso 89) |
 
-- **Implementado:** 8.735 / 100 = **≈ 87%**.
+- **Implementado:** 8.775 / 100 = **≈ 88%** (era 8.735 na revisão; subiram mods e documentação em 2026-10-18).
 - **Verificado contra o original** (só as áreas 1–9, peso 89): 6.220 / 89 = **≈ 70%**.
 
 Leitura: a simulação está praticamente completa e muito bem amarrada ao original (vetores de tick inteiros). O que separa o port de um jogo "completo" para quem joga é a camada de interface do Windows: barra de menus, Load pelo "Select a Game", balões, gráficos de saúde e sons de interface. O que separa de "verificado" são os ramos raros das regras, o áudio e as janelas sem captura.

@@ -11,17 +11,20 @@ segmentos do NE (tools/ne_info.py). São dados inicializados do executável, sem
 
 | Chave no JSON      | Endereço  | Símbolo / uso                                                              |
 |--------------------|-----------|----------------------------------------------------------------------------|
-| dx8, dy8           | 8:0000/08 | `_Dx8`/`_Dy8`: deslocamento por direção 0–7 (0 = cima)                       |
-| dx9, dy9           | 8:0010/1a | `_Dx9`/`_Dy9`: 9 entradas, índice 0 = parado, k = direção k − 1 (`_GetDir`) |
+| dx8, dy8           | 8:0000/08 | `_Dx8`/`_Dy8`: deslocamento por direção 0–7 (0 = cima) (só conferida; vai para comum.json) |
+| dx9, dy9           | 8:0010/1a | `_Dx9`/`_Dy9`: 9 entradas, índice 0 = parado, k = direção k − 1 (`_GetDir`) (só conferida; vai para comum.json) |
 | desvios_busca      | 8:006c    | `_absSearchDirs`: 0, +1, −1, +2, … desvios tentados ao sair do ninho e largar |
-| descarregar_grupo  | 8:0094    | `_UnCarryCaste`: 16 bytes, grupo sem a carga                                 |
-| classe_luta        | 10:22c6   | classe de luta por grupo (`_GetWinner`)                                      |
-| matriz_luta        | 10:22d6   | 4 × 4, chance em 10 de "a" vencer (`_GetWinner`)                             |
-| borda_buraco       | 10:230c   | tile da borda do buraco por direção (`_MakeNewHole*`, `_CreateNewHole`)      |
+| descarregar_grupo  | 8:0094    | `_UnCarryCaste`: 16 bytes, grupo sem a carga (só conferida; vai para comum.json) |
+| classe_luta        | 10:22c6   | classe de luta por grupo (`_GetWinner`) (só conferida; vai para comum.json) |
+| matriz_luta        | 10:22d6   | 4 × 4, chance em 10 de "a" vencer (`_GetWinner`) (só conferida; vai para comum.json) |
+| borda_buraco       | 10:230c   | tile da borda do buraco por direção (`_MakeNewHole*`, `_CreateNewHole`) (só conferida; vai para comum.json) |
 
 As seções "regras", "animacao", "musicas" e "mensagens" não são tabelas do executável: são valores
 imediatos vistos no pseudocódigo das funções citadas em "_origem". O script só as escreve no JSON, para
 que fiquem fora do código do port e possam ser trocadas por mods.
+
+As tabelas marcadas "vai para comum.json" são lidas só para as conferências: desde a API de mods 0.20 elas ficam em
+data/comum.json (tools/extrair_comum.py), e este script não as grava.
 """
 import argparse
 import json
@@ -29,6 +32,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("tools", 1)[0] + "tools")
 from ne_info import parse_ne  # noqa: E402
+from extrair_comum import sem_comuns, nota_comuns  # noqa: E402
 from sons_regras import SONS  # noqa: E402
 
 SEG8 = 8
@@ -57,9 +61,9 @@ ANIMACAO = {
     "quadros_morte_frente_musica": (64, "_AnimYellowFight, códigos 1–9, janela à frente, música ligada"),
     "quadros_loucura_frente": (32, "_AnimYellowInsane 1028:8078, janela à frente"),
     "quadros_loucura_atras": (8, "_AnimYellowInsane, janela atrás"),
-    "espera_quadro_ms": (165, "_AnimYellowFight: espera _MacTickCount() > início + 6 (3 degraus de 55 ms)"),
-    "espera_loucura_ms": (55, "_AnimYellowInsane: espera _MacTickCount() > início + 3 (1 degrau)"),
-    "morte_para_com_musica": (True, "_AnimYellowFight: códigos 1–9 com música saem quando _mySongIsDone (sempre verdadeiro no MCI)"),
+    "espera_quadro_ms": (165, "_AnimYellowFight: cada quadro espera _MacTickCount() > início + 6; o relógio anda 3 a cada 55 ms (quintal.md, Relógios), logo 3 degraus = 165 ms entre quadros (o primeiro espera só o próximo degrau). A interface para a simulação e mostra os quadros nesse tempo (regras/som.md, formiga-amarela.md §10.2)"),
+    "espera_loucura_ms": (55, "_AnimYellowInsane 1028:8078: espera _MacTickCount() > início + 3 (1 degrau = 55 ms)"),
+    "morte_para_com_musica": (True, "_AnimYellowFight: códigos 1–9 com música ligada saem quando _mySongIsDone, sempre verdadeiro no caminho MCI (regras/som.md)"),
 }
 
 MUSICAS = {
@@ -90,6 +94,17 @@ MENSAGENS = {
     "sem_corpo": (10056, "_YellowDeath: derrota no Jogo Completo"),
     "outra_colonia": (10058, "_YellowDeath: escolher outra colônia (_SpecialXfer)"),
     "transferida": (10059, "_YellowDeath: transferida para um adulto"),
+}
+
+# Mensagens da faixa (`_EditMessage`), entram em "mensagens" sem origem própria (a origem é "_faixa").
+FAIXA = {
+    "_faixa": (
+        "_EditMessage com a lista SHARED 4/1010 (_WindPromptStrs): _EatMyFood (1020:8cda) tipo 1 → [11] \"You feel much better now!\", tipo 2 → [12] \"Thank you for your contribution\" (duração 0x78), tipo 3 → [13] \"Cannibalism has restored your health\" (0xb4); _DoAntMoveY (1028:75f4), passagem para o ninho vermelho → [4] \"You have entered the red nest\" (0x168). Nenhuma é importante."
+    ),
+    "faixa_comida_recebida": {"lista": 1010, "indice": 11, "duracao": 120, "importante": False},
+    "faixa_doacao": {"lista": 1010, "indice": 12, "duracao": 120, "importante": False},
+    "faixa_canibalismo": {"lista": 1010, "indice": 13, "duracao": 180, "importante": False},
+    "faixa_ninho_vermelho": {"lista": 1010, "indice": 4, "duracao": 360, "importante": False},
 }
 
 
@@ -157,12 +172,13 @@ def main():
             "tools/extrair_amarela.py (endereços no topo do script); as seções regras/animacao/musicas/"
             "mensagens vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/formiga-amarela.md. "
             "Valores em decimal."
+            + nota_comuns("amarela")
         ),
-        **t,
+        **sem_comuns("amarela", t),
         "regras": secao(REGRAS),
         "animacao": secao(ANIMACAO),
         "musicas": secao(MUSICAS),
-        "mensagens": secao(MENSAGENS),
+        "mensagens": {**secao(MENSAGENS), **FAIXA},
         "_origem": origens(REGRAS, ANIMACAO, MUSICAS, MENSAGENS),
         "sons": SONS["amarela"],
     }
