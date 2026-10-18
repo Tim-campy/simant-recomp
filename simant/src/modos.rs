@@ -298,6 +298,9 @@ pub fn clique_na_faixa(s: &mut Sessao, x: i32, y: i32) -> Resposta {
     if barras_da_faixa(s, x, y) {
         return Resposta::Tratada;
     }
+    if super::ajuda_ui::botao_da_faixa(s, x, y) {
+        return Resposta::Tratada;
+    }
     if s.modos.janela.na_frente {
         // Faixa 35 no lugar da 34.
         if y < i32::from(s.interface.moldura.faixa.altura) {

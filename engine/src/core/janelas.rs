@@ -452,6 +452,16 @@ impl JanelasControle {
         Ok(())
     }
 
+    /// Id do objeto (janela × 256 + índice) da janela de controle `id` sob o ponto (x, y): o último
+    /// objeto do layout que contém o ponto (os de cima vêm depois); sem nenhum, o objeto 0. Serve à
+    /// ajuda por contexto (`_DoEvent` com `_bHelp`).
+    pub fn objeto_em(&self, recursos: &Recursos, id: u16, x: i32, y: i32) -> Option<u16> {
+        let janela = carregar_janela(recursos, id).ok()?;
+        let g = self.geometria_atual(id)?;
+        let i = janela.objetos.iter().enumerate().skip(1).rev().find(|(_, o)| contem(mover(o.retangulo, g.dx, g.dy), x, y)).map_or(0, |(i, _)| i);
+        Some((id << 8) | i as u16)
+    }
+
     /// Ponto (x, y) dentro de alguma janela que esteja por cima da de edição.
     pub fn cobre(&self, x: i32, y: i32) -> bool {
         self.gerente.janela_em(x, y).is_some_and(|id| id != ID_EDICAO)

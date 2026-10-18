@@ -45,8 +45,8 @@
     "X": 88, "F9": 120, "J": 74, "Keypad *": 106,
     "Backspace": 8, "Home": 36
   },
-  "_teclas_clique": "_DoKeyDown (formiga-amarela.md §11.1): Espaço e Insert valem como clique esquerdo na posição do cursor, Delete como clique direito; se a tecla se repete logo em seguida, vale como duplo clique.",
-  "teclas_clique": {"Space": "esquerdo", "Insert": "esquerdo", "Delete": "direito"},
+  "_teclas_clique": "_DoKeyDown (formiga-amarela.md §11.1): Espaço e Insert valem como clique esquerdo na posição do cursor; se a tecla se repete logo em seguida, vale como duplo clique. Delete não imita o mouse: o ramo dele em _DoKeyDown só é alcançado com Espaço/Insert; Delete vai a _HelpKeyDown e liga/desliga o modo de ajuda (data/ajuda_contexto.json, telas/ajuda-contexto.md).",
+  "teclas_clique": {"Space": "esquerdo", "Insert": "esquerdo"},
   "_duplo_clique_teclado_ms": "Escolha do port: no original, é duplo clique se a mensagem seguinte da fila já é outra Espaço/Insert/Delete; o port usa este intervalo entre as duas teclas.",
   "duplo_clique_teclado_ms": 250,
   "_espera_clique_simples_tickcount": "_processEdit (1000:6a38): no clique simples com a janela de edição na frente, espera até _TickCount = início + 6 (≈ 330 ms) num laço, sem tratar mensagens (a simulação para); depois, se o botão continua apertado, abre _AntMenu (na amarela) ou _MagnifyMenu (Examine) [os menus ainda não existem no port].",

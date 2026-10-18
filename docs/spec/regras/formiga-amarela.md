@@ -417,12 +417,12 @@ Como `_MeType` não tem cor, com `_Invincible = 1` a amarela sempre vence (a reg
 | Origem | Bits |
 |---|---|
 | botão esquerdo apertado (`WM_LBUTTONDOWN`) | 0x200 |
-| botão direito apertado (`WM_RBUTTONDOWN`) | 0x800 |
+| botão direito apertado (`WM_RBUTTONDOWN`) | 0x800 no código de `_DoMouse`, mas o `MAINWNDPROC` desvia o 0x204 para o modo de ajuda antes (telas/ajuda-contexto.md §1) |
 | **duplo clique** esquerdo (`WM_LBUTTONDBLCLK`) | 0x2000 |
 | duplo clique direito (`WM_RBUTTONDBLCLK`) | 0x4000 |
 | Shift / Ctrl seguros | bit 0 / bit 1 |
 | teclas **Espaço** ou **Insert** | como clique esquerdo na posição do cursor (0x200); se a mensagem seguinte já é outra Espaço/Insert, como duplo clique (0x2000) |
-| tecla **Delete** | como clique direito (0x800), ou duplo (0x4000) |
+| tecla **Delete** | no código de `_DoKeyDown`, como clique direito (0x800) ou duplo (0x4000); mas o ramo só é alcançado com Espaço/Insert: Delete vai a `_HelpKeyDown` e liga/desliga o modo de ajuda (telas/ajuda-contexto.md §2) |
 | setas | movem o cursor 8 pixels (`SetCursorPos`) |
 
 Antes de chegar ao jogo, `_HelpKeyDown` e `_YellowCommandKey` (11.4) têm prioridade sobre as demais teclas. Letras A–Z alimentam um anel de 4 caracteres; se `_Cheats` (`8:83bc`) estiver habilitado e as 4 últimas letras formarem um código da tabela (guardada com os bits invertidos; lida do `SIMANTW.EXE`: `oops rand erad FUND joke hole HOLE qeen QEEN eggs EGGS heal HEAL zhea ZHEA just will mick jeff joel fred jenn susi data serv clie`), chama `_CheatKeys`. Enter limpa o anel. Códigos e efeitos: [trapacas.md](trapacas.md).

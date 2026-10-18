@@ -38,7 +38,7 @@ Com o retângulo do objeto `casteTriangle`/`modeTriangle` (com o pixel a mais de
 | Manual (0x1305) | = 0, mostra os conjuntos |
 | Set 1–3 (0x1306–0x1308) | guarda os níveis no conjunto atual, carrega o escolhido, vai para Manual |
 | áreas dos números (0x130f–0x1311) | alterna porcentagem / número de formigas |
-| ? (0x1303) | WinHelp (não reproduzido) |
+| ? (0x1303) | `_DoWinHelp`: ajuda no contexto 0x1300 "Caste Control Window" (ajuda-contexto.md §4) |
 
 [código]. Medido (j01, com `_CasteAuto` = 1): Auto e os Set aparecem levantados e Manual afundado; o port desenha os Set sem escolha com Auto ligado [medido; a lógica dos grupos "invisíveis" não foi fechada].
 
@@ -146,7 +146,7 @@ Valores do `WINGANT`: edição `0e/05` (título, menu, maximizar, moldura grossa
 - Ordem: a de cima é a "ativa" (`_MyGetTopWindow`, `_win_IsWinInFront`); título azul nela e branco nas outras (j01). `_win_Open` de janela já aberta só faz `BringWindowToTop`; de janela fechada (escondida), mostra-a **onde estava** (a posição não volta à da tabela) [código].
 - **Clique numa janela que não é a de cima:** `WM_MOUSEACTIVATE` com `WM_LBUTTONDOWN` faz `BringWindowToTop` e devolve `MA_ACTIVATEANDEAT`: a janela vem para a frente e **o clique é comido** [código]. Bancada: em w12 o clique no botão de maximizar da edição inativa só a trouxe para a frente; em v12 o clique num patch do quintal atrás da edição trouxe o quintal (e a faixa 35) sem escolher o patch. O port come o primeiro clique em qualquer parte da janela de trás [hipótese para o título e as barras].
 - Só a janela da frente sob o cursor recebe o clique (o Windows manda a mensagem a uma janela só): no port, o gerenciador procura de cima para baixo e o conteúdo das outras não vê o clique.
-- O clique direito não é comido (`WM_MOUSEACTIVATE` só come `0x201`): a janela vem para a frente e recebe [código]; no port, só a área do mapa da janela de edição usa o direito.
+- O clique direito não é comido (`WM_MOUSEACTIVATE` só come `0x201`): a janela vem para a frente [código]; o `WM_RBUTTONDOWN` liga/desliga o modo de ajuda em qualquer janela ([ajuda-contexto.md](ajuda-contexto.md) §1).
 - **Faixa:** `WM_NCACTIVATE` da janela de edição troca a faixa 35 pela 34; o do quintal troca a 34 pela 35 [código]. A faixa segue a última ativada **entre esses dois**; ativar a Caste não muda a faixa. Bancada v11/v12.
 - Aceleradores (`ACCELERATORTABLE`, comandos tratados em `MAINWNDPROC`): Ctrl+F4 e Ctrl+NumPad− = `WM_CLOSE` na de cima (w07); Ctrl+Espaço = menu de sistema da de cima; Ctrl+F6 e Ctrl+NumPad+ = a de baixo para cima (x03, x04); Ctrl+P = Move; Ctrl+Z = maximiza/restaura a de edição se ela é a de cima (w13); Ctrl+A (Size) perde para o Save As [dados + código].
 

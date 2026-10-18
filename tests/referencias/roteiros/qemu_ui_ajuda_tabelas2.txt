@@ -1,0 +1,7 @@
+# Contexto de ajuda de cada função dos botões configuráveis (DS:0x8AE6, 4 bytes por função), procurado nos segmentos 8 e 9.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_ajuda_tabelas2.txt --overlay re_trabalho/qemu/ov_ui_quick.qcow2
+snapshot_carregar quick
+esperar 3
+ler_variavel 9:8ae6 re_trabalho/agente_ui/ctx9.bin 96
+ler_variavel 8:8ae6 re_trabalho/agente_ui/ctx8.bin 96
+fim

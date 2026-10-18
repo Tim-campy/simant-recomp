@@ -17,6 +17,7 @@
 //! sai (--salvar grava o .ANT do estado no fim). Na janela, Ctrl+S salva no arquivo da partida e
 //! Ctrl+A ("Save As") num nome novo (o de --salvar, ou SALVO01.ANT, SALVO02.ANT… na pasta atual).
 
+mod ajuda_ui;
 mod arquivos;
 mod jogo;
 mod opcoes;
@@ -469,7 +470,7 @@ mod testes {
         assert_eq!(cfg.tecla_virtual(&Keycode::F9.name()), Some(0x78));
         assert_eq!(cfg.botao_da_tecla(&Keycode::Space.name()), Some(BotaoTeclado::Esquerdo));
         assert_eq!(cfg.botao_da_tecla(&Keycode::Insert.name()), Some(BotaoTeclado::Esquerdo));
-        assert_eq!(cfg.botao_da_tecla(&Keycode::Delete.name()), Some(BotaoTeclado::Direito));
+        assert_eq!(cfg.botao_da_tecla(&Keycode::Delete.name()), None, "Delete é a tecla do modo de ajuda");
     }
 
     #[test]

@@ -1,0 +1,25 @@
+# Tabelas da ajuda por contexto (_DoEvent com _bHelp): funções dos botões configuráveis (DS:0x12, faixa
+# 34; DS:0x22, faixa 35) e o contexto de cada função (DS:0x8AE6, 4 bytes por função). Mais um clique
+# de ajuda num botão configurável (ribUserDef1A) e num marcador (ribBM1).
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_ajuda_tabelas.txt --overlay re_trabalho/qemu/ov_ui_quick.qcow2
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+ler_variavel 10:0012 re_trabalho/agente_ui/funcoes_botoes.bin 32
+ler_variavel 10:8ae6 re_trabalho/agente_ui/contextos_funcoes.bin 96
+clicar_direito_em 300 96
+esperar 1
+clicar_em 24 96
+esperar 6
+capturar re_trabalho/agente_ui/a10_ajuda_userdef1a.png
+teclas alt+f4
+esperar 3
+clicar_direito_em 300 96
+esperar 1
+clicar_em 335 95
+esperar 6
+capturar re_trabalho/agente_ui/a11_ajuda_bm1.png
+teclas alt+f4
+esperar 3
+fim

@@ -1,0 +1,19 @@
+{
+  "_comentario": "Ajuda por contexto (docs/spec/telas/ajuda-contexto.md). Modo de ajuda (_bHelp): clique direito em qualquer janela ou na faixa (WM_RBUTTONDOWN em MAINWNDPROC), Shift+F1 ou Delete alternam; Esc desliga. No modo, o próximo clique num objeto abre o WinHelp com o contexto do objeto (_DoEvent 1000:0bc2) e desliga o modo. Números em decimal: ids de objeto = janela * 256 + objeto. janelas: 0 edição -> 4 (0x4), 1 mapa e 25 quintal -> 258 (0x102), 5 Info -> 1280 (0x500), 18 Behavior -> 4608 (0x1200), 19 Caste -> 4864 (0x1300), 21 History -> 5376 (0x1500), 34 faixa do mapa -> 8704 (0x2200), 35 faixa do quintal -> 8960 (0x2300). objetos_proprios: 0x1503-0x150D (History), 0x2202-0x2209, 0x220B-0x220D, 0x2302-0x2305, 0x2308. deslocados: 0x220E-0x220F -> id - 3 (ninho e trilha vermelhos = os pretos). marcadores: 0x2218-0x221E e 0x2313-0x2319 -> 0xFD48. botoes_usuario: 0x2210-0x2217 e 0x230B-0x2312 -> contexto_funcao[função do botão] (tabela DS:8AE6 do segmento 8, lida na bancada em 2026-10-18: funções 0-15). contexto_indice: 0x100 (F1 = WinHelp HELP_INDEX, o tópico 'SimAnt'). cursores (MAINWNDPROC, WM_SETCURSOR): HELPCURSOR no modo de ajuda; no Experimental, sobre a área cliente da janela de edição quando ela é a da frente (ou do mapa com Shift), o cursor da ferramenta 0-6 (_magCursor ... _sprayCursor), recursos GROUP_CURSOR do executável. botoes_ajuda: o botão '?' das faixas (ribHelp 0x2208: _LessonTemp = 1 e _DoWinHelp(0x2208), contexto 0x2208 & 0xFF00 = 0x2200 'Patch Ribbon Bar'; ribHelp2 0x2308: _DoWinHelp(0x2308) -> 0x2300 'Yard Ribbon Bar'). botoes_janela: [objeto, contexto] dos botões '?' das janelas (_DoWinHelp com o id do objeto & 0xFF00): Caste 0x1303 -> 0x1300, Behavior 0x1203 -> 0x1200, History 0x150D -> 0x1500, quintal 0x1911 (yardHelpBut) -> 0x1900 (o SIMANT.HLP não tem esse contexto). editHelpBut (0x0006) e mapHelpBut (0x0116) existem no código mas não são visíveis no layout de 640x480.",
+  "faixa_mapa": 34,
+  "faixa_quintal": 35,
+  "cursores": {"executavel": "SIMANTW.EXE", "ajuda": "HELPCURSOR", "ferramentas": ["MAGCURSOR", "ROCKCURSOR", "DIGCURSOR", "ANTCURSOR", "FOODCURSOR", "DROPCURSOR", "SPRAYCURSOR"]},
+  "botoes_ajuda": [{"objeto": "ribHelp", "contexto": 8704, "licao": true}, {"objeto": "ribHelp2", "contexto": 8960, "licao": false}],
+  "botoes_janela": [[4867, 4864], [4611, 4608], [5389, 5376], [6417, 6400]],
+  "janelas": {"0": 4, "1": 258, "5": 1280, "18": 4608, "19": 4864, "21": 5376, "25": 258, "34": 8704, "35": 8960},
+  "objetos_proprios": [[5379, 5389], [8706, 8713], [8715, 8717], [8962, 8965], [8968, 8968]],
+  "deslocados": [[[8718, 8719], -3]],
+  "marcadores": [[8728, 8734], [8979, 8985]],
+  "contexto_marcadores": 64840,
+  "botoes_usuario": [[8720, 8727], [8971, 8978]],
+  "contexto_funcao": [575, 574, 573, 572, 567, 570, 569, 64818, 568, 64819, 64822, 64817, 64821, 64820, 571, 64839],
+  "contexto_indice": 256,
+  "tecla_indice": {"tecla": "F1"},
+  "teclas_alternar": [{"tecla": "F1", "shift": true}, {"tecla": "Delete"}],
+  "teclas_sair": [{"tecla": "Escape"}]
+}

@@ -825,6 +825,14 @@ impl DesenhoQuintal {
         pendentes
     }
 
+    /// Índice do objeto visível da faixa sob o ponto (o último do layout que o contém; 0 se nenhum).
+    /// Para a ajuda por contexto: id do objeto = janela × 256 + índice.
+    pub fn indice_da_faixa_em(&self, x: i32, y: i32) -> usize {
+        let base = self.faixa.retangulo();
+        let (dx, dy) = (i32::from(self.origem_faixa.0 - base.esq), i32::from(self.origem_faixa.1 - base.topo));
+        self.faixa.objetos.iter().enumerate().skip(1).rev().find(|(_, o)| o.visivel() && contem(o.retangulo, x - dx, y - dy)).map_or(0, |(i, _)| i)
+    }
+
     /// Nomes dos objetos visíveis da faixa 35 sob o ponto (x, y).
     pub fn objetos_da_faixa_em(&self, x: i32, y: i32) -> Vec<&str> {
         let base = self.faixa.retangulo();
