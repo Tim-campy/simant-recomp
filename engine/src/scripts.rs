@@ -685,6 +685,10 @@ fn tabela_evento(lua: &Lua, ev: &Evento) -> mlua::Result<Table> {
             t.set("lista", m.lista)?;
             t.set("indice", m.indice)?;
         }
+        Evento::Espera(ms) => {
+            t.set("tipo", "espera")?;
+            t.set("ms", *ms)?;
+        }
     }
     Ok(t)
 }

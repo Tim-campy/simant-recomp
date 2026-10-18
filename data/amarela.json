@@ -35,7 +35,8 @@
     "quadros_morte_frente": 32,
     "quadros_morte_frente_musica": 64,
     "quadros_loucura_frente": 32,
-    "quadros_loucura_atras": 8
+    "quadros_loucura_atras": 8,
+    "espera_quadro_ms": 165
   },
   "musicas": {
     "recrutar_5": 11013,
@@ -90,6 +91,7 @@
     "quadros_morte_frente_musica": "_AnimYellowFight, códigos 1–9, janela à frente, música ligada",
     "quadros_loucura_frente": "_AnimYellowInsane 1028:8078, janela à frente",
     "quadros_loucura_atras": "_AnimYellowInsane, janela atrás",
+    "espera_quadro_ms": "_AnimYellowFight: cada quadro espera _MacTickCount() > início + 6; o relógio anda 3 a cada 55 ms (quintal.md, Relógios), logo 3 degraus = 165 ms entre quadros (o primeiro espera só o próximo degrau). Só espalha os sons no tempo (regras/som.md)",
     "recrutar_5": "_YellowCommand 1000:87ba, comando 1",
     "recrutar_10": "comando 2",
     "recrutar_todas": "comando 3",

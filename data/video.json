@@ -1,0 +1,7 @@
+{
+  "_comentario": "Vídeo do port (não é do original). escala: inteira, pixels da tela por pixel do jogo (1 = 640x480 como no original; 0 = a maior que cabe no monitor). janela: [largura, altura] inicial em pixels da tela, ou null = 640x480 x escala. redimensionavel: a janela do sistema pode mudar de tamanho. escala_inteira: ao redimensionar, só múltiplos inteiros com tarjas (nítido); false = ocupa o máximo mantendo a proporção. A linha de comando (--escala N, --janela LxA) vence este arquivo. Ver README e docs/decisoes.md.",
+  "escala": 1,
+  "janela": null,
+  "redimensionavel": true,
+  "escala_inteira": true
+}

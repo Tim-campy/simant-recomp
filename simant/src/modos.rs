@@ -302,3 +302,56 @@ pub fn clique_no_quintal(s: &mut Sessao, x: i32, y: i32, duplo: bool) {
         Err(e) => eprintln!("quintal: {e}"),
     }
 }
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+    use crate::*;
+
+    fn raiz() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
+    }
+
+    /// Clique esquerdo como no laço da janela (jogo.rs): janelas primeiro, depois a faixa.
+    fn clicar(s: &mut Sessao, x: i32, y: i32) {
+        match s.clicar_nas_janelas(x, y, false) {
+            janelas_ui::Roteamento::Fora => {
+                clique_na_faixa(s, x, y);
+            }
+            _ => println!("roteado para uma janela"),
+        }
+    }
+
+    #[test]
+    fn ciclo_do_botao_yard_patch() {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
+        let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
+        let (r, _) = s.tela.objeto_da_faixa(&s.modos.quintal.cfg.botao_abrir).unwrap();
+        let (x, y) = (i32::from(r.esq + r.dir) / 2, i32::from(r.topo + r.base) / 2);
+        let quintal = s.janelas.cfg.quintal;
+        let mapa = s.janelas.cfg.id(Controle::Mapa);
+        // Bancada (qemu_patch_rolagem.txt, p01–p06): o mesmo lugar da faixa é o Yard da 34 e o Patch
+        // da 35; seis cliques alternam quintal (faixa 35) e mapa da superfície (faixa 34), sempre
+        // com o modo do quintal mantido. Nunca fecha as duas.
+        for i in 0..6 {
+            clicar(&mut s, x, y);
+            let estado = (s.janelas.gerente.topo(), s.janelas.aberta(Controle::Quintal), s.janelas.aberta(Controle::Mapa), s.modos.janela.na_frente);
+            if i % 2 == 0 {
+                assert_eq!(estado, (Some(quintal), true, false, true), "clique {i}: quintal na frente, faixa 35");
+            } else {
+                assert_eq!(estado, (Some(mapa), false, true, false), "clique {i}: mapa na frente, faixa 34");
+                assert_eq!(s.partida.nav.plano_mapa, 1, "clique {i}: _YardToMap vai à superfície");
+            }
+            assert_eq!(s.partida.estado.vistas.modo_quintal, 0);
+        }
+    }
+}

@@ -102,6 +102,11 @@ impl Recursos {
         let texto = std::fs::read_to_string(&caminho).map_err(|e| format!("{}: {e}", caminho.display()))?;
         serde_json::from_str(&texto).map_err(|e| format!("{}: {e}", caminho.display()))
     }
+
+    /// Há um `data/<nome>` (no port ou num mod)? Para arquivos de dados opcionais.
+    pub fn existe_dado(&self, nome: &str) -> bool {
+        self.dir_dados.join(nome).is_file() || self.mods.iter().any(|m| m.dir.join("data").join(nome).is_file())
+    }
 }
 
 /// Caminho `base/<nome>` com cada parte de `nome` (separada por `/`) achada sem diferenciar
