@@ -63,7 +63,7 @@ mods/
 
 ## Scripts Lua (API 0.12)
 
-Um script é código Lua 5.4 que roda numa sandbox e só fala com o jogo pelas funções abaixo. Implementação: `engine/src/scripts.rs`; exemplo completo em `mods/exemplo-lua/`.
+Um script é código Lua 5.4 que roda numa sandbox e só fala com o jogo pelas funções abaixo. Implementação: `engine/src/scripts.rs`; exemplo completo em `exemplos/mods/exemplo-lua/` (fora de `mods/`, para não ficar ativo por padrão).
 
 ### Carga e ciclo de vida
 

@@ -80,7 +80,7 @@ function depois_do_tick(estado)
 end
 ```
 
-O exemplo completo está em `mods/exemplo-lua/` (chuva de comida a cada 500 ticks). Todos os mods de `--mods` (padrão `mods/`) ficam ativos: use `--mods OUTRA_PASTA` para jogar sem ele. O script roda em sandbox (sem `io`, `os`, `require`, `load`), com limite de instruções, tempo e memória; se der erro, é desligado, o erro sai no console (`[script] ...`) e a faixa avisa, mas o jogo continua.
+O exemplo completo está em `exemplos/mods/exemplo-lua/` (chuva de comida a cada 500 ticks); ele fica fora de `mods/` para não mudar o jogo por padrão. Todos os mods da pasta de `--mods` (padrão `mods/`) ficam ativos: para experimentar o exemplo, use `--mods exemplos/mods` ou copie a pasta dele para `mods/`. O script roda em sandbox (sem `io`, `os`, `require`, `load`), com limite de instruções, tempo e memória; se der erro, é desligado, o erro sai no console (`[script] ...`) e a faixa avisa, mas o jogo continua.
 
 ## Organização
 

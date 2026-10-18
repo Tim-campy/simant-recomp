@@ -375,8 +375,13 @@ mod testes {
     use super::*;
     use sdl2::keyboard::{Keycode, Mod};
 
+    /// `SDL_GetKeyName` devolve um buffer estático: testes que chamam `Keycode::name` em paralelo
+    /// podem ler o nome um do outro. Esta trava os serializa.
+    static NOMES_SDL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn teclas_do_sdl_viram_acoes_de_data_navegacao() {
+        let _trava = NOMES_SDL.lock().unwrap_or_else(|e| e.into_inner());
         let caminho = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/navegacao.json");
         let cfg: ConfigNavegacao = serde_json::from_str(&std::fs::read_to_string(caminho).unwrap()).unwrap();
         let acao = |k, m| cfg.acao_da_tecla(&evento_de_tecla(k, m));
@@ -395,6 +400,7 @@ mod testes {
 
     #[test]
     fn teclas_do_sdl_viram_aceleradores_e_comandos_de_data_partida() {
+        let _trava = NOMES_SDL.lock().unwrap_or_else(|e| e.into_inner());
         use engine::core::partida::AcaoPartida;
         let caminho = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/partida.json");
         let cfg = ConfigPartida::de_json(&std::fs::read_to_string(caminho).unwrap()).unwrap();
