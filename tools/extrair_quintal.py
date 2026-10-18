@@ -12,7 +12,7 @@ NE (tools/ne_info.py).
 
 | Chave no JSON                  | Endereço            | Uso                                                      |
 |--------------------------------|---------------------|----------------------------------------------------------|
-| dx8, dy8                       | 1038:0000 / 0008    | `_Dx8`/`_Dy8`; passo do gato (×4) em `_SimCat`            |
+| dx8, dy8                       | 1038:0000 / 0008    | `_Dx8`/`_Dy8`; passo do gato (×4) em `_SimCat` (só conferida; vai para comum.json) |
 | menino.passo_x / passo_y       | 1038:8a76 / 8a7a    | `_BxTab`/`_ByTab`: passo do menino por direção 0–3       |
 | menino.quadro_por_passo        | 1048:25bc (4 bytes) | quadro somado pela fase `_YardCycle & 3`                  |
 | menino.quadro_por_dir          | 1048:25c0 (4 bytes) | quadro base por direção                                  |
@@ -31,6 +31,9 @@ NE (tools/ne_info.py).
 As constantes de "regras", "valores_iniciais", "mensagens" e "conselhos" não são tabelas do executável:
 são valores imediatos lidos no pseudocódigo (Code7.c) das funções citadas em "_origem". O script só as
 escreve no JSON, para que fiquem fora do código do port e possam ser trocadas por mods.
+
+As tabelas marcadas "vai para comum.json" são lidas só para as conferências: desde a API de mods 0.20 elas ficam em
+data/comum.json (tools/extrair_comum.py), e este script não as grava.
 """
 import argparse
 import json
@@ -39,6 +42,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("tools", 1)[0] + "tools")
 from ne_info import parse_ne  # noqa: E402
+from extrair_comum import sem_comuns, nota_comuns  # noqa: E402
 from sons_regras import SONS  # noqa: E402
 
 SEG8 = 8
@@ -226,10 +230,10 @@ def extrair(data):
             "chance": d(0x257E + no, 1)[0], "proximo": d(0x2588 + no, 1)[0],
         })
     t = {
-        "_comentario": "Tabelas do quintal e do tutorial. As de 'menino', 'cachorro', 'casa', 'colonias', dx8/dy8 "
+        "_comentario": "Tabelas do quintal e do tutorial. As de 'menino', 'cachorro', 'casa', 'colonias' "
                        "foram extraídas do SIMANTW.EXE por tools/extrair_quintal.py (endereços no topo do script); "
                        "'regras', 'valores_iniciais', 'mensagens' e 'conselhos' vêm do pseudocódigo (origem em "
-                       "'_origem'). Ver docs/spec/regras/quintal.md e conselhos.md. Valores em decimal.",
+                       "'_origem'). Ver docs/spec/regras/quintal.md e conselhos.md. Valores em decimal." + nota_comuns("quintal"),
         "dx8": com_sinal(ler(data, segs, SEG8, 0x0000, 8)),
         "dy8": com_sinal(ler(data, segs, SEG8, 0x0008, 8)),
         "menino": {
@@ -283,7 +287,7 @@ def main():
     ap.add_argument("--json")
     a = ap.parse_args()
     data = open(a.exe, "rb").read()
-    t = extrair(data)
+    t = sem_comuns("quintal", extrair(data))
     texto_json = json.dumps(t, ensure_ascii=False, indent=1)
     if a.json:
         with open(a.json, "w", encoding="utf-8", newline="\n") as f:

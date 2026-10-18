@@ -13,18 +13,21 @@ inicializados do executável, sem relocação.
 | Chave no JSON          | Endereço | Símbolo / uso                                                              |
 |------------------------|----------|----------------------------------------------------------------------------|
 | carrega_carga          | 8:0074   | `_IsCarryCaste`, 16 palavras: 1 = o grupo carrega algo (ovo, comida, terra)|
-| grupo_sem_carga        | 8:0094   | `_UnCarryCaste`, 16 bytes: grupo depois de largar a carga (`_DoAttackAnt`) |
+| grupo_sem_carga        | 8:0094   | `_UnCarryCaste`, 16 bytes: grupo depois de largar a carga (`_DoAttackAnt`) (só conferida; vai para comum.json) |
 | casta_por_escolha      | 8:89ae   | `_CasteTabB`, 4 palavras: grupo do próximo ovo (`_SetCasteProd`)           |
 | modo_por_tarefa        | 8:89b6   | `_ModeTabB`, 3 palavras: modo para forragear/cavar/cuidar (`_SetModeProd`) |
-| modos_operaria         | 8:89e6   | `_ModeTabWB`, 6 × 8 bytes: linha = modo estratégico, coluna = `SRand8`     |
-| modos_soldado          | 8:8a16   | `_ModeTabSB`, 6 × 8 bytes                                                  |
-| modo_por_grupo         | 8:8a46   | `_CasteModeTabB`, 16 bytes: modo dos grupos que não sorteiam               |
-| classe_luta            | 10:22c6  | 16 bytes: classe de luta por grupo (0 operária/ovo, 1 soldado, 2 reprodutor, 3 rainha) |
-| matriz_luta            | 10:22d6  | 4 × 4 bytes: chance (em 10) de a formiga da célula ("a") vencer, `_GetWinner` |
+| modos_operaria         | 8:89e6   | `_ModeTabWB`, 6 × 8 bytes: linha = modo estratégico, coluna = `SRand8` (só conferida; vai para comum.json) |
+| modos_soldado          | 8:8a16   | `_ModeTabSB`, 6 × 8 bytes (só conferida; vai para comum.json) |
+| modo_por_grupo         | 8:8a46   | `_CasteModeTabB`, 16 bytes: modo dos grupos que não sorteiam (só conferida; vai para comum.json) |
+| classe_luta            | 10:22c6  | 16 bytes: classe de luta por grupo (0 operária/ovo, 1 soldado, 2 reprodutor, 3 rainha) (só conferida; vai para comum.json) |
+| matriz_luta            | 10:22d6  | 4 × 4 bytes: chance (em 10) de a formiga da célula ("a") vencer, `_GetWinner` (só conferida; vai para comum.json) |
 
 As constantes da seção "regras" não são tabelas do executável: são valores imediatos lidos no pseudocódigo
 das funções citadas em "_origem" (docs/spec/regras/superficie.md). O script só as escreve no JSON, para que
 fiquem fora do código do port e possam ser trocadas por mods.
+
+As tabelas marcadas "vai para comum.json" são lidas só para as conferências: desde a API de mods 0.20 elas ficam em
+data/comum.json (tools/extrair_comum.py), e este script não as grava.
 """
 import argparse
 import json
@@ -32,6 +35,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("tools", 1)[0] + "tools")
 from ne_info import parse_ne  # noqa: E402
+from extrair_comum import sem_comuns, nota_comuns  # noqa: E402
 from sons_regras import SONS  # noqa: E402
 
 SEG8 = 8
@@ -58,6 +62,10 @@ REGRAS = {
     "malvadeza_base": (30, "_GstrR: _JustToBeMean = SRand1(malvadeza_sorteio) + malvadeza_base"),
     "malvadeza_sorteio": (100, "_GstrR: ver malvadeza_base"),
     "musica_ataque_vermelho": (0x2B0A, "_GstrR: música tocada no ataque vermelho (_myBeginSong)"),
+    "mensagem_ataque_vermelho": (
+        {"lista": 1020, "indice": 5, "duracao": 120, "importante": False},
+        "_GstrR (1030:03c2) e _StartAttack (1030:050e): _EditMessage(_AdviceStrs[5] = SHARED 4/1020[5] \"The red ants are attacking!\", 0x78, 0)",
+    ),
 }
 
 
@@ -127,8 +135,9 @@ def main():
             "Tabelas e constantes das regras da superfície. As tabelas foram extraídas do SIMANTW.EXE por "
             "tools/extrair_superficie.py (endereços no topo do script); as constantes de 'regras' vêm do "
             "pseudocódigo (origem em '_origem'). Ver docs/spec/regras/superficie.md. Valores em decimal."
+            + nota_comuns("superficie")
         ),
-        **t,
+        **sem_comuns("superficie", t),
         "regras": {k: v for k, (v, _) in REGRAS.items()},
         "_origem": {k: o for k, (_, o) in REGRAS.items()},
         "sons": SONS["superficie"],

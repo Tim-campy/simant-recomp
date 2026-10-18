@@ -149,7 +149,19 @@ pub struct MensagensAmarela {
     pub faixa_ninho_vermelho: MensagemFaixa,
 }
 
-/// Conteúdo de `data/amarela.json`.
+/// Tabelas de `data/comum.json` que a amarela usa (chave aqui, chave em `comum.json`).
+pub const USOS_COMUNS: &[comum::UsoComum] = &[
+    ("dx8", "dx8"),
+    ("dy8", "dy8"),
+    ("dx9", "dx9"),
+    ("dy9", "dy9"),
+    ("descarregar_grupo", "grupo_sem_carga"),
+    ("classe_luta", "classe_luta"),
+    ("matriz_luta", "matriz_luta"),
+    ("borda_buraco", "borda_buraco"),
+];
+
+/// Conteúdo de `data/amarela.json`, com as tabelas comuns de `data/comum.json` ([`USOS_COMUNS`]).
 #[derive(Clone, Debug, Deserialize)]
 pub struct TabelasAmarela {
     /// `_Dx8`/`_Dy8`.
@@ -212,13 +224,13 @@ pub struct SonsAmarela {
 impl TabelasAmarela {
     /// Lê `amarela.json` (com mods).
     pub fn carregar(r: &Recursos) -> Result<TabelasAmarela, String> {
-        let t: TabelasAmarela = r.dados(ARQUIVO_TABELAS)?;
+        let t: TabelasAmarela = comum::parte_dos_recursos(r, ARQUIVO_TABELAS, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }
 
     pub fn de_json(texto: &str) -> Result<TabelasAmarela, String> {
-        let t: TabelasAmarela = serde_json::from_str(texto).map_err(|e| format!("{ARQUIVO_TABELAS}: {e}"))?;
+        let t: TabelasAmarela = comum::parte_do_texto(ARQUIVO_TABELAS, texto, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }

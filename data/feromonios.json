@@ -1,17 +1,5 @@
 {
-  "_comentario": "Tabelas e constantes das regras de feromônio. dx8/dy8/turn_tab foram extraídas do SIMANTW.EXE por tools/extrair_feromonios.py (endereços no topo do script); turn_tab[atual][alvo] = nova direção. As constantes de 'regras' vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/feromonios.md. Valores em decimal.",
-  "dx8": [0, 1, 1, 1, 0, -1, -1, -1],
-  "dy8": [-1, -1, 0, 1, 1, 1, 0, -1],
-  "turn_tab": [
-    [0, 1, 1, 1, 7, 7, 7, 7],
-    [0, 1, 2, 2, 2, 2, 0, 0],
-    [1, 1, 2, 3, 3, 3, 3, 1],
-    [2, 2, 2, 3, 4, 4, 4, 4],
-    [3, 3, 3, 3, 4, 5, 5, 5],
-    [6, 6, 4, 4, 4, 5, 6, 6],
-    [7, 7, 7, 5, 5, 5, 6, 7],
-    [0, 0, 0, 0, 6, 6, 6, 7]
-  ],
+  "_comentario": "Constantes das regras de feromônio, gravadas por tools/extrair_feromonios.py (que também confere _Dx8/_Dy8/_TurnTab no SIMANTW.EXE; turn_tab[atual][alvo] = nova direção). As constantes de 'regras' vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/feromonios.md. Valores em decimal. As tabelas que o original tem uma vez só (dx8, dy8, turn_tab) ficam em data/comum.json.",
   "regras": {
     "limiar_trilha": 8,
     "limiar_alarme": 9,

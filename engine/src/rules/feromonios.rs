@@ -51,7 +51,14 @@ pub struct RegrasFeromonio {
     pub tile_buraco_fechado: u8,
 }
 
-/// Conteúdo de `data/feromonios.json`.
+/// Tabelas de `data/comum.json` que a parte dos feromônios usa (chave aqui, chave em `comum.json`).
+pub const USOS_COMUNS: &[comum::UsoComum] = &[
+    ("dx8", "dx8"),
+    ("dy8", "dy8"),
+    ("turn_tab", "turn_tab"),
+];
+
+/// Conteúdo de `data/feromonios.json`, com as tabelas comuns de `data/comum.json` ([`USOS_COMUNS`]).
 #[derive(Clone, Debug, Deserialize)]
 pub struct TabelasFeromonio {
     /// `_Dx8`/`_Dy8`: deslocamento por direção 0–7 (0 = cima, 2 = direita, 4 = baixo, 6 = esquerda).
@@ -65,14 +72,13 @@ pub struct TabelasFeromonio {
 impl TabelasFeromonio {
     /// Lê `feromonios.json` (com mods).
     pub fn carregar(r: &Recursos) -> Result<TabelasFeromonio, String> {
-        let t: TabelasFeromonio = r.dados(ARQUIVO_TABELAS)?;
+        let t: TabelasFeromonio = comum::parte_dos_recursos(r, ARQUIVO_TABELAS, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }
 
     pub fn de_json(texto: &str) -> Result<TabelasFeromonio, String> {
-        let t: TabelasFeromonio =
-            serde_json::from_str(texto).map_err(|e| format!("{ARQUIVO_TABELAS}: {e}"))?;
+        let t: TabelasFeromonio = comum::parte_do_texto(ARQUIVO_TABELAS, texto, USOS_COMUNS)?;
         t.validar()?;
         Ok(t)
     }

@@ -214,10 +214,9 @@ fn executar(
 
 fn principal() -> Result<(), String> {
     let o = ler_opcoes()?;
-    let config: ConfigJogo = serde_json::from_str(
-        &std::fs::read_to_string(o.dados.join("jogo.json")).map_err(|e| format!("data/jogo.json: {e}"))?,
-    )
-    .map_err(|e| format!("data/jogo.json: {e}"))?;
+    // data/jogo.json diz quais bancos abrir; um mod pode trocá-lo (API 0.20), então ele é lido com os
+    // mods antes de abrir os bancos.
+    let config: ConfigJogo = Recursos::abrir(&o.jogo, &[], &o.dados, Some(&o.mods))?.dados("jogo.json")?;
     let recursos = Recursos::abrir(&o.jogo, &config.bancos, &o.dados, Some(&o.mods))?;
     for m in recursos.mods() {
         println!("mod carregado: {} {}", m.manifesto.nome, m.manifesto.versao);
