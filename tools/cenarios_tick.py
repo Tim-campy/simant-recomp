@@ -1009,6 +1009,39 @@ def cenario_salvo(c: Sessao, saida, n):
     return []
 
 
+def cenario_load_tutorial(c: Sessao, saida, n):
+    """File → Load de um arquivo chamado Tutorial.Ant (arquivos.md §1, passo 4): o Quick Game pausado
+    é salvo como TUTORIAL.ANT (Ctrl+S, o arquivo precisa existir para o diálogo de abrir) e depois
+    carregado (Ctrl+L). Grava o estado antes do load (o do arquivo), o de depois e as capturas."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+s")
+    time.sleep(2)
+    c.b.executar("digitar tutorial")
+    c.teclas("ret")
+    time.sleep(3)
+    tela(c, saida, "1_salvo")
+    c.teclas("ret")
+    time.sleep(1)
+    antes = fotografar(c, saida, "antes")
+    c.dep.retomar()
+    c.teclas("ctrl+l")
+    time.sleep(2)
+    tela(c, saida, "2_load")
+    c.b.executar("digitar tutorial")
+    c.teclas("ret")
+    time.sleep(4)
+    tela(c, saida, "3_depois")
+    c.teclas("ret")
+    time.sleep(3)
+    tela(c, saida, "4_depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"load_tutorial": 1})
+    s = Save(c.mj.estado())
+    c.log("depois: " + str({k: s.ler(k) for k in ("CurGameType", "GameTime", "TutLesson", "TutGiven", "MePlane", "MeLocX", "MeLocY", "CurYardPnt")}))
+    return []
+
+
 def cenario_explorar(c: Sessao, saida, n):
     """Exploração da tela: CLIQUES = "x,y;x,y;..." (variável de ambiente); captura depois de cada um."""
     import os
