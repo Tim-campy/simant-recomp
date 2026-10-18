@@ -322,7 +322,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                             modos::Resposta::Tratada
                         }
                         janelas_ui::Roteamento::Quintal => {
-                            modos::clique_no_quintal(s, x, y, clicks >= 2);
+                            modos::clique_no_quintal(s, x, y, clicks >= 2, shift_apertado(&eventos));
                             modos::Resposta::Tratada
                         }
                         janelas_ui::Roteamento::Edicao => {
@@ -451,6 +451,16 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         s.atualizar_janelas_desenho(minimizada);
         if !s.modos.escolhendo && !s.modos.menu_aberto && s.dialogo.is_none() && s.exame.is_none() && !modos::segurando(s) && s.menu_mod.is_none() {
             s.partida.avancar(ms);
+        }
+        // _SpecialXfer: fechado o quadro 10058, o quintal vem para a frente na Strategic View e
+        // espera o clique numa colônia preta.
+        if engine::core::quintal_mapa::iniciar_escolha_de_colonia(&mut s.modos.janela, &mut s.partida) {
+            s.abrir_quintal();
+            redesenhar = true;
+        }
+        // PLACE: o laço acaba se o quintal deixa de ser a janela da frente (_win_IsWinInFront).
+        if s.modos.janela.colocando_rainha && !s.janelas.aberta(Controle::Quintal) {
+            engine::core::quintal_mapa::cancelar_colocacao(&mut s.modos.janela, &mut s.partida);
         }
         let pedidos = s.registrar_eventos();
         audio.tratar(&pedidos, &s.partida.estado.partida.opcoes);

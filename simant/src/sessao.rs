@@ -500,6 +500,7 @@ impl Sessao<'_> {
                 EventoRegras::Som(_) | EventoRegras::TemaDoNinho | EventoRegras::Espera(_) => {} // tocados por som::Audio
                 EventoRegras::Animacao(_) => {} // a Partida guarda e mostra os quadros
                 EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
+                EventoRegras::EscolherColonia => println!("[tick {t}] escolher outra colônia (_SpecialXfer)"),
                 EventoRegras::QuadroAmarela(id) => println!("[tick {t}] quadro da amarela {id} (_YellowDialog)"),
                 EventoRegras::CentralizarNaAmarela | EventoRegras::MensagemFaixa(_) => {} // a faixa é da Partida
             }

@@ -361,8 +361,10 @@ pub struct JanelaQuintal {
     /// A faixa 35 está no lugar da 34: o quintal foi a última ativada entre ele e a janela de edição
     /// (`WM_NCACTIVATE`, janelas.md §8). A ordem das janelas é do gerenciador.
     pub na_frente: bool,
-    /// Esperando o clique do PLACE.
+    /// Esperando o clique do PLACE (`_PlaceQueenInYard`; a simulação fica parada).
     pub colocando_rainha: bool,
+    /// Esperando o clique numa colônia preta (`_SpecialXfer`).
+    pub escolhendo_colonia: bool,
 }
 
 /// O que um clique na janela do quintal causou (para o terminal/registro).
@@ -373,26 +375,27 @@ pub enum RespostaQuintal {
     Escolheu(i16, i16),
     Troca(ResultadoTroca),
     Rainha(ResultadoRainha),
+    Colonia(troca_patch::ResultadoColonia),
 }
 
 impl JanelaQuintal {
     /// Aplica uma ação: modos, abrir/fechar, PLACE e Automatic/Manual.
     pub fn aplicar(&mut self, a: AcaoQuintal, e: &mut Estado) {
-        let modo = &mut e.vistas.modo_quintal;
+        let modo = e.vistas.modo_quintal;
         let novo = match a {
             AcaoQuintal::Abrir => None,
             AcaoQuintal::Fechar | AcaoQuintal::ParaMapa => {
                 *self = JanelaQuintal::default();
                 return;
             }
-            AcaoQuintal::AlternarCasa => Some(if *modo < 2 { *modo ^ 1 } else { 0 }),
+            AcaoQuintal::AlternarCasa => Some(if modo < 2 { modo ^ 1 } else { 0 }),
             AcaoQuintal::ModoQuintal => Some(0),
             AcaoQuintal::ModoCasa => Some(1),
             AcaoQuintal::ModoEstrategico => Some(2),
             AcaoQuintal::ModoGrafico => Some(3),
             AcaoQuintal::ColocarRainha => {
                 // _PlaceQueenInYard: sem rainhas guardadas, só a mensagem (som de erro).
-                self.colocando_rainha = e.preta.rainhas_guardadas >= 1;
+                self.colocando_rainha = troca_patch::iniciar_colocacao(e);
                 None
             }
             AcaoQuintal::RainhasAutomatico => {
@@ -407,7 +410,7 @@ impl JanelaQuintal {
             AcaoQuintal::Revoada => return,
         };
         if let Some(m) = novo {
-            *modo = m;
+            e.vistas.modo_quintal = m;
         }
         self.aberta = true;
         self.na_frente = true;
@@ -416,7 +419,42 @@ impl JanelaQuintal {
 
 /// Um clique esquerdo (simples ou duplo) na área cliente da janela do quintal, com a partida:
 /// PLACE pendente coloca a rainha; senão escolhe o patch e, no duplo clique, troca (`_XferPatch`).
-pub fn clicar(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Partida, x: i32, y: i32, duplo: bool) -> Result<RespostaQuintal, String> {
+/// Com o PLACE, Shift apertado no clique repete o laço (outra rainha, ou outra tentativa).
+pub fn clicar(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Partida, x: i32, y: i32, duplo: bool, shift: bool) -> Result<RespostaQuintal, String> {
+    let r = clicar_sem_parada(j, cfg, p, x, y, duplo, shift);
+    p.parada_pela_interface = j.colocando_rainha;
+    r
+}
+
+/// `_SpecialXfer` pedido pelo tick: começa a escolha (o quintal na Strategic View, a mensagem) e
+/// devolve se começou. Quem chama abre o quintal na frente.
+pub fn iniciar_escolha_de_colonia(j: &mut JanelaQuintal, p: &mut Partida) -> bool {
+    if !p.escolher_colonia || j.escolhendo_colonia || p.avisos.tem_modal() {
+        return false;
+    }
+    troca_patch::iniciar_transferencia_especial(&mut p.estado);
+    p.nav.plano_mapa = 0;
+    j.escolhendo_colonia = true;
+    j.colocando_rainha = false;
+    j.aberta = true;
+    j.na_frente = true;
+    p.processar_eventos_do_estado();
+    true
+}
+
+/// Fim de um laço modal do quintal sem clique (o quintal deixou de ser a janela da frente): limpa a
+/// faixa e a simulação volta (`_PlaceQueenInYard`). A escolha do `_SpecialXfer` não tem saída.
+pub fn cancelar_colocacao(j: &mut JanelaQuintal, p: &mut Partida) {
+    if j.colocando_rainha {
+        j.colocando_rainha = false;
+        troca_patch::limpar_faixa(&mut p.estado);
+        p.processar_eventos_do_estado();
+    }
+    p.parada_pela_interface = false;
+}
+
+#[allow(clippy::too_many_arguments)]
+fn clicar_sem_parada(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Partida, x: i32, y: i32, duplo: bool, shift: bool) -> Result<RespostaQuintal, String> {
     j.na_frente = true;
     let Some((px, py)) = cfg.patch_em(x, y) else {
         return Ok(RespostaQuintal::Nada);
@@ -425,9 +463,25 @@ pub fn clicar(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Partida, x
     // o PLACE também chega aqui, dentro ou fora do alcance (bancada: acoes/place e place_fora).
     p.nav.pontos[0] = (i32::from(px), i32::from(py));
     p.estado.vistas.ponto_quintal = (px, py);
+    if j.escolhendo_colonia {
+        let geracao = p.regras.geracao.as_ref().ok_or("tabelas de geração não carregadas (troca de patch)")?;
+        let r = troca_patch::escolher_colonia(&mut p.estado, geracao, &p.cfg_simulacao, px, py)?;
+        if let troca_patch::ResultadoColonia::Trocou(t) = r {
+            j.escolhendo_colonia = false;
+            p.escolher_colonia = false;
+            if let ResultadoTroca::Trocou { .. } = t {
+                let e = &p.estado;
+                let par = |(x, y): (i16, i16)| (i32::from(x), i32::from(y));
+                p.nav.pontos = [par(e.vistas.ponto_quintal), par(e.vistas.ponto_superficie), par(e.preta.vista_ninho), par(e.vermelha.vista_ninho)];
+                p.estado.eventos.push(Evento::CentralizarNaAmarela);
+            }
+        }
+        p.processar_eventos_do_estado();
+        return Ok(RespostaQuintal::Colonia(r));
+    }
     if j.colocando_rainha {
-        j.colocando_rainha = false;
         let r = troca_patch::colocar_rainha(&mut p.estado, px, py);
+        j.colocando_rainha = troca_patch::continuar_colocacao(&mut p.estado, r, shift);
         p.processar_eventos_do_estado();
         return Ok(RespostaQuintal::Rainha(r));
     }

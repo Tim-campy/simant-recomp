@@ -268,6 +268,11 @@ pub struct Partida {
     pub janelas_desenho: JanelasDesenho,
     /// Contadores de `MYTIMERFUNC`/`_UpdateWindows` (fora do save).
     pub contadores_redesenho: ContadoresRedesenho,
+    /// `_SpecialXfer` pedido pelo tick e ainda não escolhido (a simulação fica parada).
+    pub escolher_colonia: bool,
+    /// A interface está num laço modal do original que para a simulação (`_StopSimulation`), como o
+    /// PLACE esperando o clique (`_PlaceQueenInYard`).
+    pub parada_pela_interface: bool,
     /// Efeito do último Mystery (para a interface escrever).
     pub ultimo_misterio: Option<crate::rules::misterio::EfeitoMisterio>,
     /// Scripts Lua dos mods (docs/api-mods.md, "Scripts Lua"). `None`: nenhum mod com script, e o
@@ -333,6 +338,8 @@ impl Partida {
             janelas_desenho: JanelasDesenho { ativa: true, edicao_aberta: true, edicao_na_frente: true, ..Default::default() },
             contadores_redesenho: ContadoresRedesenho::default(),
             ultimo_misterio: None,
+            escolher_colonia: false,
+            parada_pela_interface: false,
             scripts: None,
             registro_scripts: Vec::new(),
             tabelas_trapaca: TabelasTrapaca::padrao().clone(),
@@ -406,7 +413,7 @@ impl Partida {
         for id in self.avisos.retirar_sons() {
             self.eventos.push_back(Evento::Som(id));
         }
-        if self.avisos.tem_modal() {
+        if self.avisos.tem_modal() || self.escolher_colonia || self.parada_pela_interface {
             self.resto_ms = 0;
             self.laco = LacoTimer::default();
             return Avanco::default();
@@ -669,9 +676,17 @@ impl Partida {
                     use super::avisos::TextoFaixa;
                     let agora = self.agora();
                     let opcao = self.estado.partida.opcoes[4] != 0;
-                    let texto = TextoFaixa::Lista { lista: m.lista, indice: m.indice as usize };
-                    self.avisos.editar(Some(texto), Some(u32::from(m.duracao)), m.importante, opcao, agora);
+                    // Lista 0: limpar (`_EditMessage(0, …)`); duração 0xFFFE: permanente.
+                    let texto = (m.lista != 0).then_some(TextoFaixa::Lista { lista: m.lista, indice: m.indice as usize });
+                    let duracao = (m.duracao != 0xFFFE && m.lista != 0).then_some(u32::from(m.duracao));
+                    self.avisos.editar(texto, duracao, m.importante, opcao, agora);
                     self.redesenhar = true;
+                }
+                Evento::EscolherColonia => {
+                    // _SpecialXfer: a interface abre o quintal e espera o clique numa colônia, depois
+                    // do quadro 10058; a simulação fica parada até lá.
+                    self.escolher_colonia = true;
+                    self.eventos.push_back(ev);
                 }
                 Evento::QuadroAmarela(imagem) => {
                     // _YellowDialog: só com Options → Events (_OptionStates[3]).

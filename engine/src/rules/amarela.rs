@@ -1900,6 +1900,7 @@ fn reencarnar(e: &mut Estado, t: &TabelasAmarela) {
                 // escolha; o efeito existe (`vetor_tick::transferencia_especial` + troca de patch), mas só
                 // os vetores o chamam: a interface ainda não liga a escolha [lacuna: interface].
                 e.eventos.push(Evento::Mensagem(t.mensagens.outra_colonia));
+                e.eventos.push(Evento::EscolherColonia);
             } else {
                 e.partida.fim_de_jogo = 1;
                 e.partida.pretas_venceram = 0;

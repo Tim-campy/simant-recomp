@@ -299,6 +299,9 @@ pub fn aplicar_acao_quintal(s: &mut Sessao, a: AcaoQuintal, trazer: bool) {
         _ => {
             let aberta = s.janelas.aberta(Controle::Quintal);
             s.modos.janela.aplicar(a, &mut s.partida.estado);
+            // _PlaceQueenInYard: _StopSimulation até o clique.
+            s.partida.parada_pela_interface = s.modos.janela.colocando_rainha;
+            s.partida.processar_eventos_do_estado();
             let abre = matches!(
                 a,
                 AcaoQuintal::Abrir | AcaoQuintal::ModoQuintal | AcaoQuintal::ModoCasa | AcaoQuintal::ModoEstrategico | AcaoQuintal::ModoGrafico | AcaoQuintal::AlternarCasa
@@ -392,9 +395,9 @@ pub fn clique_na_edicao(s: &mut Sessao, x: i32, y: i32, ctrl: bool) -> bool {
 }
 
 /// Clique na área cliente do quintal (que é a janela da frente): patch, troca de patch, PLACE.
-pub fn clique_no_quintal(s: &mut Sessao, x: i32, y: i32, duplo: bool) {
+pub fn clique_no_quintal(s: &mut Sessao, x: i32, y: i32, duplo: bool, shift: bool) {
     let m = &mut s.modos;
-    match quintal_mapa::clicar(&mut m.janela, &m.quintal.cfg, &mut s.partida, x, y, duplo) {
+    match quintal_mapa::clicar(&mut m.janela, &m.quintal.cfg, &mut s.partida, x, y, duplo, shift) {
         Ok(r) => println!("quintal: clique {} em ({x}, {y}): {r:?}", if duplo { "duplo" } else { "simples" }),
         Err(e) => eprintln!("quintal: {e}"),
     }

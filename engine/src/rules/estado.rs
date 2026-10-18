@@ -970,6 +970,10 @@ pub enum Evento {
     /// `_YellowDialog(bitmap)` (`1000:8262`): quadro com imagem da amarela (trofalaxia: 9110). A
     /// interface só o mostra com Options → Events.
     QuadroAmarela(u16),
+    /// `_SpecialXfer` (`1000:7eb6`): depois do quadro 10058, o jogador escolhe outra colônia preta no
+    /// mapa do quintal. A interface chama `troca_patch::iniciar_transferencia_especial` e, no clique,
+    /// `troca_patch::escolher_colonia` (no original, dentro do tick; no port, logo depois).
+    EscolherColonia,
     /// Música (`_myBeginSong`), pelo id do cabeçalho tipo 18 do banco SOUND.
     Musica(u16),
     /// Efeito sonoro (`_myBeginSound`), pelo id do objeto tipo 5 do banco SOUND
