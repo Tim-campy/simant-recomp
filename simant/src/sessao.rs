@@ -405,7 +405,7 @@ impl Sessao<'_> {
         } else {
             &self.menus_cfg.formiga
         };
-        let [dx, dy] = self.menus_cfg.deslocamento_formiga;
+        let [dx, dy] = cfg.deslocamento.unwrap_or(self.menus_cfg.deslocamento_formiga);
         let limite = Retangulo { esq: 0, topo: 0, dir: self.tela.cfg.largura as i16, base: self.tela.cfg.altura as i16 };
         match MenuAberto::abrir(self.recursos, &self.interface, cfg, x + i32::from(dx), y + i32::from(dy), limite) {
             Ok(m) => self.menu = Some((m, AlvoMenu::Amarela)),
