@@ -181,11 +181,13 @@ pub(crate) fn carregar<'a>(s: &Sessao<'a>, arquivo: &Path, o: &Opcoes) -> Result
         println!("Load: {} é o tutorial: _GenerateTutorial", arquivo.display());
         let mut nova = Sessao::abrir(s.recursos, &o.dados, Origem::Tutorial(&s.partida.estado, semente), s.cores.clone())?;
         nova.herdar_janelas(s);
+        nova.herdar_opcoes(s, false);
         return Ok(nova);
     }
     let mut nova = Sessao::abrir(s.recursos, &o.dados, Origem::Save(arquivo, r, tipo), s.cores.clone())?;
-    // As janelas da partida anterior ficam (o Load não as fecha).
+    // As janelas da partida anterior ficam (o Load não as fecha); as opções vêm do arquivo.
     nova.herdar_janelas(s);
+    nova.herdar_opcoes(s, true);
     Ok(nova)
 }
 

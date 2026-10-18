@@ -9,6 +9,7 @@
 //!   opções da janela: [--escala N] [--janela LxA] [--sair-apos-ms N [--capturar-janela ARQ.png]]
 //!   (padrões em data/video.json: escala 1 = 640×480 como o original; simant/src/video.rs)
 //!   som (simant/src/som): [--sem-som] [--soundfont ARQ.sf2] [--exportar-som DIR]
+//!   preferências do jogador (simant/src/preferencias.rs): [--preferencias ARQ] [--sem-preferencias]
 //!
 //! Padrões: --jogo $SIMANT_DIR ou SimAnt-T/MAXIS/ANTWIN, --dados data, --mods mods (relativos à
 //! pasta atual). Sem --save nem --novo-jogo, mostra a abertura. Com um deles, a simulação roda ao
@@ -19,6 +20,7 @@
 mod arquivos;
 mod jogo;
 mod opcoes;
+mod preferencias;
 mod sessao;
 mod som;
 mod video;
@@ -272,6 +274,7 @@ fn principal() -> Result<(), String> {
         _ => None,
     };
     if let Some(origem) = origem {
+        let de_save = matches!(origem, Origem::Save(..));
         let nome = match &origem {
             Origem::Save(save, ..) => save.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
             Origem::Novo(_, tipo) => format!("{tipo:?}"),
@@ -377,7 +380,14 @@ fn principal() -> Result<(), String> {
             return Ok(());
         }
         let jogo_novo = o.novo_jogo;
-        return executar_partida(s, &format!("SimAnt - {nome}"), &o, jogo_novo);
+        // Preferências do jogador (o `[SimAnt]` do `WIN.INI`): só a partida com janela lê e grava.
+        if o.preferencias.is_none() && !o.sem_preferencias {
+            o.preferencias = preferencias::Preferencias::caminho_padrao();
+        }
+        if o.sem_preferencias {
+            o.preferencias = None;
+        }
+        return executar_partida(s, &format!("SimAnt - {nome}"), &o, jogo_novo, de_save);
     }
 
     let seq: Sequencia = recursos.dados("telas.json")?;

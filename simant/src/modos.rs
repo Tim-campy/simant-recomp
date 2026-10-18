@@ -255,6 +255,11 @@ pub fn aplicar_acao_quintal(s: &mut Sessao, a: AcaoQuintal, trazer: bool) {
                 a,
                 AcaoQuintal::Abrir | AcaoQuintal::ModoQuintal | AcaoQuintal::ModoCasa | AcaoQuintal::ModoEstrategico | AcaoQuintal::ModoGrafico | AcaoQuintal::AlternarCasa
             );
+            // _ProcMenu 0x21–0x24 (Ctrl+Y/5/6/7): _SetMapPlane(0) se _MapPlane ≠ 0, antes de abrir.
+            let tecla_de_modo = matches!(a, AcaoQuintal::ModoQuintal | AcaoQuintal::ModoCasa | AcaoQuintal::ModoEstrategico | AcaoQuintal::ModoGrafico);
+            if trazer && tecla_de_modo && s.partida.nav.plano_mapa != 0 {
+                s.partida.ir_para_quintal();
+            }
             if abre && (trazer || !aberta) {
                 s.abrir_quintal();
             }
@@ -323,6 +328,36 @@ mod testes {
     }
 
     #[test]
+    fn opcoes_e_botoes_passam_ao_jogo_novo_mas_o_save_traz_as_suas() {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
+        let mut velha = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores.clone()).unwrap();
+        let do_arquivo = velha.partida.estado.partida.opcoes;
+        // O jogador liga AutoTrack e Silly e troca a função do último botão configurável.
+        velha.partida.estado.partida.opcoes[0] = 1;
+        velha.partida.estado.partida.opcoes[5] = 1;
+        velha.partida.funcoes_botoes[7] = 11;
+        // Jogo novo (_NewGame não toca em _OptionStates): ficam as opções e os botões do momento.
+        let mut nova = Sessao::abrir(&recursos, &dados, Origem::NovoNaPartida(&velha.partida.estado, TipoJogo::Rapido), cores.clone()).unwrap();
+        nova.herdar_opcoes(&velha, false);
+        assert_eq!(nova.partida.estado.partida.opcoes, velha.partida.estado.partida.opcoes);
+        assert_eq!(nova.partida.funcoes_botoes[7], 11);
+        // Load de um .ANT: as opções vêm do arquivo; os botões (fora do save) ficam.
+        let mut lida = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
+        lida.herdar_opcoes(&velha, true);
+        assert_eq!(lida.partida.estado.partida.opcoes, do_arquivo);
+        assert_eq!(lida.partida.funcoes_botoes[7], 11);
+    }
+
+    #[test]
     fn ciclo_do_botao_yard_patch() {
         let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
         if !jogo.join("SHARED.NDX").is_file() {
@@ -342,8 +377,21 @@ mod testes {
         // Bancada (qemu_patch_rolagem.txt, p01–p06): o mesmo lugar da faixa é o Yard da 34 e o Patch
         // da 35; seis cliques alternam quintal (faixa 35) e mapa da superfície (faixa 34), sempre
         // com o modo do quintal mantido. Nunca fecha as duas.
+        assert_eq!(s.partida.nav.plano_mapa, 2, "QUICK2.ANT abre no ninho preto");
         for i in 0..6 {
+            let canto = (s.partida.nav.vista.x, s.partida.nav.vista.y);
             clicar(&mut s, x, y);
+            if i % 2 == 0 {
+                // _MapToYard → _SetMapPlane(0): a edição mostra a superfície no mesmo canto (p01, p03).
+                assert_eq!(s.partida.nav.plano_mapa, 0, "clique {i}: _MapPlane 0");
+                assert_eq!(s.partida.nav.vista.plano, engine::core::mapa::Plano::Superficie);
+                assert_eq!((s.partida.nav.vista.x, s.partida.nav.vista.y), canto, "clique {i}: sem centralizar");
+                assert_eq!(s.partida.estado.vistas.plano, 0);
+                assert_eq!(s.partida.estado.vistas.plano_anterior, 0);
+                let p = s.partida.estado.ambiente.patch;
+                assert_eq!(s.partida.nav.pontos[0], (i32::from(p.0), i32::from(p.1)), "_YMapPnt = _CurYardPnt");
+                s.quadro_rgb().unwrap();
+            }
             let estado = (s.janelas.gerente.topo(), s.janelas.aberta(Controle::Quintal), s.janelas.aberta(Controle::Mapa), s.modos.janela.na_frente);
             if i % 2 == 0 {
                 assert_eq!(estado, (Some(quintal), true, false, true), "clique {i}: quintal na frente, faixa 35");
