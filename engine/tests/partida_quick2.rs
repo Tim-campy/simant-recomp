@@ -51,18 +51,19 @@ fn cinquenta_ticks_do_quick2() {
 
 #[test]
 fn relogio_em_tempo_real_no_quick2() {
-    // QUICK2: _GameSpeed = 1 (normal), não pausado: 1 tick a cada 2 mensagens de 17 ms.
+    // QUICK2: _GameSpeed = 1 (normal), não pausado: o timer de 17 ms dá uma WM_TIMER a cada 55 ms e
+    // o laço de MYTIMERFUNC roda 1 tick a cada 3 delas: 6 ticks/s, como na bancada.
     let mut p = partida();
     assert_eq!(p.estado.partida.velocidade, 1);
     assert_eq!(p.estado.partida.pausado, 0);
     let antes = p.estado.partida.tempo;
     let mut ticks = 0;
     for _ in 0..100 {
-        ticks += p.avancar(17).ticks;
+        ticks += p.avancar(33).ticks;
     }
-    assert_eq!(ticks, 50);
-    assert_eq!(p.estado.partida.tempo, antes + 50);
-    assert_eq!(p.estado.ciclos_jogo, 100, "_gameCycles conta toda mensagem");
+    assert_eq!(ticks, 20, "3,3 s de tempo real");
+    assert_eq!(p.estado.partida.tempo, antes + 20);
+    assert!(p.estado.ciclos_jogo > 20 * 20, "_gameCycles conta as voltas do laço ocupado");
 }
 
 /// Salvar (`Estado::para_save`, o que Ctrl+S grava) e recarregar dá o mesmo estado, depois de 50
@@ -156,9 +157,9 @@ fn botao_de_velocidade_e_espera_do_clique() {
     let (x, y) = (p.estado.amarela.x as i32, p.estado.amarela.y as i32);
     p.clicar(x, y + 1, false);
     assert_eq!(p.avancar(329).mensagens, 0);
-    assert_eq!(p.avancar(1 + 17).mensagens, 1);
+    assert_eq!(p.avancar(1 + 55).mensagens, 1);
     p.clicar(x, y + 1, true);
-    assert_eq!(p.avancar(17).mensagens, 1);
+    assert_eq!(p.avancar(55).mensagens, 1);
 }
 
 /// File → Load (`_DoLoadInitializations`): `_FullCount` já detecta a rainha que sumiu (C-10 na
