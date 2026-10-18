@@ -1,0 +1,27 @@
+{
+ "antes": {
+  "SementeS": 56524,
+  "SementeR": 3,
+  "gameCycles": 205939,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1712,
+  "Cycle": 1712,
+  "posicao": "livre"
+ },
+ "depois": {
+  "SementeS": 10489,
+  "SementeR": 3173050,
+  "gameCycles": 206906,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1712,
+  "Cycle": 1712,
+  "posicao": "livre"
+ },
+ "acao": {
+  "misterio": 3
+ }
+}

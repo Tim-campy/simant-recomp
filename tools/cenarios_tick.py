@@ -849,6 +849,41 @@ def cenario_exp_ctrl2(c: Sessao, saida, n):
     return []
 
 
+def semente_r_para(k, n=15, inicio=1):
+    """Um estado de R cujo próximo rand() % n dá k (o rand do Microsoft C, rng.md)."""
+    s = inicio
+    while True:
+        prox = (s * 0x343FD + 0x269EC3) & 0xFFFFFFFF
+        if ((prox >> 16) & 0x7FFF) % n == k:
+            return s
+        s += 1
+
+
+def cenario_misterio(c: Sessao, saida, n):
+    """Mystery (_MysteryButton, rules/misterio.rs) com o jogo pausado: a função do 6º botão
+    configurável da faixa (ribUserDef1F, (159, 96)) vira 8 na tabela DGROUP:0x0012 e R é posto num estado
+    cujo _RRand(15) dá `n` (--ticks K)."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    tabela = c.mj.ler_variavel("10:12", 16)
+    c.log(f"tabela dos botões (10:0012): {tabela.hex(' ')}")
+    largura = 2 if tabela[1] == 0 and tabela[3] == 0 else 1
+    c.mj.escrever_variavel(f"10:{0x12 + 5 * largura:x}", (8).to_bytes(largura, "little"), largura)
+    semente = semente_r_para(n)
+    c.mj.escrever_variavel("SementeR", semente.to_bytes(4, "little"))
+    c.log(f"botão 6 -> função 8 (largura {largura}); SementeR = {semente:#x} (RRand(15) = {n})")
+    c.dep.retomar()
+    time.sleep(0.5)
+    antes = fotografar(c, saida, "antes")
+    clicar_tela(c, 159, 96)
+    time.sleep(4)
+    tela(c, saida, "depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"misterio": n})
+    return []
+
+
 def cenario_explorar(c: Sessao, saida, n):
     """Exploração da tela: CLIQUES = "x,y;x,y;..." (variável de ambiente); captura depois de cada um."""
     import os
