@@ -17,7 +17,10 @@ pub const ARQUIVO_CONFIG: &str = "exame.json";
 pub struct ConfigExame {
     pub janela: u16,
     pub fonte: usize,
-    pub cor_texto: u8,
+    /// Cor de cada linha: na bancada, a 1ª (casta/estágio) em preto e as outras duas em azul (12).
+    pub cores_texto: [u8; 3],
+    /// Cor da moldura (na bancada, azul-escuro, índice 4; as janelas de controle usam outra).
+    pub cor_borda: u8,
     /// Objetos das três linhas (`examStr1..3`).
     pub objetos: [String; 3],
     /// Listas SHARED 4: estágio do ovo, casta (grupo), modo, carga.
@@ -27,6 +30,14 @@ pub struct ConfigExame {
     pub cargas: u16,
     /// Lado do tile da janela de edição (`_tileWidth`/`_tileHeight`).
     pub lado_tile: i32,
+    /// Medido na bancada (2026-10-18): deslocamento do canto calculado até o contorno preto da janela,
+    /// largura da moldura azul e deslocamento do conteúdo (bitmap) dentro dela.
+    #[serde(default)]
+    pub ajuste_canto: [i32; 2],
+    #[serde(default)]
+    pub largura_borda: Option<i16>,
+    #[serde(default)]
+    pub ajuste_conteudo: [i16; 2],
 }
 
 /// Janela 29 carregada, com as listas de texto.
@@ -66,7 +77,7 @@ impl JanelaExame {
         if x + w > tela.0 {
             x = (x - w).max(0);
         }
-        (x, y)
+        (x + self.cfg.ajuste_canto[0], y + self.cfg.ajuste_canto[1])
     }
 
     /// Textos das três linhas: estágio (ovo) ou casta; modo; carga.
@@ -84,18 +95,21 @@ impl JanelaExame {
         let (w, h) = self.tamanho();
         let (w, h) = (w as i16, h as i16);
         let (lw, lh) = if t > 0 { (w - 2 * t - 1, h - 2 * t - 1) } else { (w, h) };
-        let b = m.borda.largura;
+        let b = self.cfg.largura_borda.unwrap_or(m.borda.largura);
         let (ex0, ey0) = (x as i16, y as i16);
         let externo = Retangulo { esq: ex0, topo: ey0, dir: ex0 + lw + 2 * b, base: ey0 + lh + 2 * b };
         let interno = Retangulo { esq: ex0 + b, topo: ey0 + b, dir: ex0 + b + lw, base: ey0 + b + lh };
-        q.preencher(externo, m.borda.cor, m.borda.cor);
+        q.preencher(externo, self.cfg.cor_borda, self.cfg.cor_borda);
         q.contorno(Retangulo { dir: externo.dir - 1, base: externo.base - 1, ..externo }, m.borda.cor_externa);
-        let origem = (interno.esq - t + m.borda.ajuste_x_contorno * i16::from(t > 0), interno.topo - t);
+        let origem = (
+            interno.esq - t + m.borda.ajuste_x_contorno * i16::from(t > 0) + self.cfg.ajuste_conteudo[0],
+            interno.topo - t + self.cfg.ajuste_conteudo[1],
+        );
         let (o0x, o0y) = (ob0.retangulo.esq, ob0.retangulo.topo);
         desenhar_objetos(q, recursos, interface, &self.janela, origem, Some(interno));
         let Some(f) = interface.fontes.get(self.cfg.fonte).and_then(|f| f.as_ref()) else { return };
         let antes = q.recorte.replace(interno);
-        for (nome, texto) in self.cfg.objetos.iter().zip(self.textos(ex)) {
+        for ((nome, texto), cor) in self.cfg.objetos.iter().zip(self.textos(ex)).zip(self.cfg.cores_texto) {
             let Some(o) = self.janela.objetos.iter().find(|o| &o.nome == nome) else { continue };
             let r = o.retangulo;
             // Centrado na largura do objeto, a partir do topo dele [hipótese: sem captura].
@@ -106,7 +120,7 @@ impl JanelaExame {
             for j in 0..img.altura {
                 for i in 0..img.largura {
                     if img.bits[j * img.largura + i] {
-                        q.ponto(tx + i as i32, ty + j as i32, self.cfg.cor_texto);
+                        q.ponto(tx + i as i32, ty + j as i32, cor);
                     }
                 }
             }

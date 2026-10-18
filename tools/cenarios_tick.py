@@ -884,6 +884,79 @@ def cenario_misterio(c: Sessao, saida, n):
     return []
 
 
+def cenario_capturas(c: Sessao, saida, n):
+    """Capturas do original para comparar com o port (jogo pausado, snapshot rico): o estado vira
+    `capt.ANT` (o port o abre com --save); Examine sobre três formigas diferentes da vista do ninho;
+    janela do mapa (Ctrl+M) na superfície e com cada botão de cheiro da faixa; balão do menino na Yard
+    View (estado em `balao.ANT`); "Saved correctly" (Ctrl+S). Grava `capturas.json` com o que foi
+    feito (células, modos), para gerar as telas equivalentes do port."""
+    import os
+    reg = {}
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    (pasta / "capt.ANT").write_bytes(c.mj.estado())
+    s = c.save()
+    mx, my, plano = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2), s.ler("MapPlane")
+    reg["vista"] = [plano, mx, my]
+    lista = {1: "A", 2: "B", 3: "R"}[plano]
+    me = (s.ler("MeLocX"), s.ler("MeLocY")) if s.ler("MePlane") == plano else None
+    vistos, escolhidas = set(), []
+    for _, f in formigas(s, lista):
+        x, y, g = f["X"], f["Y"], (f["T"] & 0x78) >> 3
+        if not (mx <= x < mx + COLS and my <= y < my + LINS) or (x, y) == me or g in vistos:
+            continue
+        vistos.add(g)
+        escolhidas.append((x, y, f["T"], f["M"]))
+        if len(escolhidas) == 3:
+            break
+    reg["examine"] = escolhidas
+    for k, (x, y, _, _) in enumerate(escolhidas):
+        c.dep.retomar()
+        qb.mouse_canto(c.q)
+        qb.mover_rel(c.q, MAPA_X0 + (x - mx) * TILE + 8, MAPA_Y0 + (y - my) * TILE + 8)
+        time.sleep(0.3)
+        c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": True, "button": "left"}}])
+        time.sleep(1.5)
+        tela(c, saida, f"examine_{k}")
+        c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": False, "button": "left"}}])
+        time.sleep(1)
+    # janela do mapa e botões de cheiro (posições da faixa 34 na tela)
+    c.teclas("ctrl+m")
+    time.sleep(2)
+    c.mj.sessao_gdb()
+    reg["mapa"] = [[c.ler("MapMode"), "mapa_0"]]
+    tela(c, saida, "mapa_0")
+    for k, (x, y) in enumerate([(418, 46), (482, 46), (450, 57), (418, 70), (482, 70)]):
+        clicar_tela(c, x, y)
+        time.sleep(2)
+        c.mj.sessao_gdb()
+        reg["mapa"].append([c.ler("MapMode"), f"mapa_{k + 1}", [x, y]])
+        tela(c, saida, f"mapa_{k + 1}")
+    # balão do menino na Yard View
+    c.mj.sessao_gdb()
+    for nome, v in (("BoyMessOn", 1), ("BoyMsgOffset", 2), ("BoyHere", 1)):
+        c.escrever(nome, v)
+    c.escrever("BoyMsgCnt", 0x7FFFFFFF, 4)
+    (pasta / "balao.ANT").write_bytes(c.mj.estado())
+    c.dep.retomar()
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    tela(c, saida, "balao")
+    # Saved correctly
+    c.teclas("ctrl+s")
+    time.sleep(3)
+    tela(c, saida, "salvo")
+    c.teclas("ret")
+    time.sleep(1)
+    (pasta / "capturas.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"capturas: {reg}")
+    _ = os
+    return []
+
+
 def cenario_explorar(c: Sessao, saida, n):
     """Exploração da tela: CLIQUES = "x,y;x,y;..." (variável de ambiente); captura depois de cada um."""
     import os

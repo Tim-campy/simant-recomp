@@ -1,9 +1,18 @@
 {
-  "_comentario": "Examine (_MagnifyMenu 1010:6b4c, _win_DrawExamineWindow 1010:69c0; telas/janelas.md §4.3): janela 29 (examineWin: bitmap 4510 de fundo e os textos examStr1..3, fonte 2). Linha 1: estágio do ovo (lista 1100, grupo 0) ou casta (1101, grupo = (vida & 0x78) >> 3); linha 2: modo da formiga achada na lista (1102); linha 3: carga (1103, pelo grupo). lado_tile: _tileWidth da janela de edição. Cor e alinhamento do texto [hipótese].",
+  "_comentario": "Examine (_MagnifyMenu 1010:6b4c, _win_DrawExamineWindow 1010:69c0; telas/janelas.md §4.3): janela 29 (examineWin: bitmap 4510 de fundo e os textos examStr1..3, fonte 2). Linha 1: estágio do ovo (lista 1100, grupo 0) ou casta (1101, grupo = (vida & 0x78) >> 3); linha 2: modo da formiga achada na lista (1102); linha 3: carga (1103, pelo grupo). lado_tile: _tileWidth da janela de edição. Cores medidas na bancada (2026-10-18, examine_0..2 do snapshot rico): moldura azul-escura (4), 1ª linha preta, 2ª e 3ª azuis (12); alinhamento [hipótese].",
   "janela": 29,
   "fonte": 2,
-  "cor_texto": 0,
-  "objetos": ["examStr1", "examStr2", "examStr3"],
+  "cores_texto": [
+    0,
+    12,
+    12
+  ],
+  "cor_borda": 4,
+  "objetos": [
+    "examStr1",
+    "examStr2",
+    "examStr3"
+  ],
   "estagios": 1100,
   "grupos": 1101,
   "modos": 1102,
