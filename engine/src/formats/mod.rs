@@ -6,6 +6,7 @@ pub mod fonte;
 pub mod hlp;
 pub mod janela;
 pub mod lzss;
+pub mod menu;
 pub mod midi;
 pub mod ne;
 pub mod save;

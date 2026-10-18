@@ -123,9 +123,58 @@ pub fn cursores(exe: &[u8]) -> Result<HashMap<String, Cursor>, String> {
     Ok(saida)
 }
 
+const RT_ACCELERATOR: u16 = 9;
+
+/// Entrada de um recurso ACCELERATORS (5 bytes no NE): `flags` (1 = tecla virtual, 4 = Shift, 8 = Ctrl,
+/// 0x10 = Alt), a tecla (código virtual ou caractere) e o comando.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Acelerador {
+    pub flags: u8,
+    pub tecla: u16,
+    pub comando: u16,
+}
+
+/// Tabelas ACCELERATORS do executável pelo nome (ou `#número`).
+pub fn aceleradores(exe: &[u8]) -> Result<HashMap<String, Vec<Acelerador>>, String> {
+    let mut saida = HashMap::new();
+    for r in recursos(exe)?.iter().filter(|r| r.tipo == RT_ACCELERATOR) {
+        let Some(nome) = r.nome.clone().or_else(|| r.numero.map(|n| format!("#{n}"))) else { continue };
+        let mut v = Vec::new();
+        for c in r.dados.chunks_exact(5) {
+            v.push(Acelerador { flags: c[0] & 0x7F, tecla: u16::from_le_bytes([c[1], c[2]]), comando: u16::from_le_bytes([c[3], c[4]]) });
+            if c[0] & 0x80 != 0 {
+                break;
+            }
+        }
+        saida.insert(nome, v);
+    }
+    Ok(saida)
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;
+
+    /// O executável não tem recurso MENU (a barra vem do objeto 6/0 do banco, formats/menu.rs); a tabela
+    /// ACCELERATORTABLE tem os atalhos que os itens mostram (docs/spec/telas/menus.md).
+    #[test]
+    fn aceleradores_do_simantw() {
+        let dir = std::env::var_os("SIMANT_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../SimAnt-T/MAXIS/ANTWIN"));
+        let Ok(exe) = std::fs::read(dir.join("SIMANTW.EXE")) else {
+            eprintln!("AVISO: SIMANTW.EXE não encontrado; teste ignorado");
+            return;
+        };
+        assert!(recursos(&exe).unwrap().iter().all(|r| r.tipo != 4), "sem recurso MENU");
+        let t = &aceleradores(&exe).unwrap()["ACCELERATORTABLE"];
+        assert_eq!(t.len(), 47);
+        // Ctrl+N → 0xFD03 (File → New), Ctrl+Q → 0xFD08 (Quit), Ctrl+T → 0xFD17 (Window → Status),
+        // Shift+0 → 0xFD41 (Pause), Ctrl+F4 → 0xFDA0 (fecha a janela de cima).
+        for (flags, tecla, comando) in [(9, 0x4E, 0xFD03), (9, 0x51, 0xFD08), (9, 0x54, 0xFD17), (5, 0x30, 0xFD41), (9, 0x73, 0xFDA0)] {
+            assert!(t.contains(&Acelerador { flags, tecla, comando }), "{comando:#x}");
+        }
+    }
 
     #[test]
     fn cursores_do_simantw() {

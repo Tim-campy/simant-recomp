@@ -1,0 +1,67 @@
+# Segunda rodada da barra de menus: Status (Ctrl+T) com mais tempo, Speed com o jogo pausado, ritmo
+# da rolagem do About e o About pelo teclado.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_menus2.txt --overlay re_trabalho/qemu/ov_menus_quick.qcow2
+snapshot_carregar quick
+esperar 3
+mouse_canto
+mover 600 300
+teclas ctrl+t
+esperar 1
+capturar re_trabalho/agente_menus/n01_status_1s.png
+esperar 5
+capturar re_trabalho/agente_menus/n02_status_6s.png
+teclas spc
+esperar 2
+capturar re_trabalho/agente_menus/n03_status_espaco.png
+clicar_em 600 300
+esperar 2
+capturar re_trabalho/agente_menus/n04_status_clique.png
+# Pausa pelo acelerador e o Speed aberto
+teclas shift+0
+esperar 1
+teclas alt+s
+esperar 1
+capturar re_trabalho/agente_menus/n05_speed_pausado.png
+teclas esc
+esperar 1
+capturar re_trabalho/agente_menus/n06_esc_uma_vez.png
+teclas esc
+esperar 1
+teclas shift+0
+esperar 1
+# About pelo teclado: Alt+F, Enter (About realçado)
+teclas alt+f
+teclas ret
+esperar 1
+capturar re_trabalho/agente_menus/n07_about_0.png
+esperar 1
+capturar re_trabalho/agente_menus/n08_about_1.png
+esperar 1
+capturar re_trabalho/agente_menus/n09_about_2.png
+esperar 1
+capturar re_trabalho/agente_menus/n10_about_3.png
+esperar 1
+capturar re_trabalho/agente_menus/n11_about_4.png
+esperar 1
+capturar re_trabalho/agente_menus/n12_about_5.png
+teclas spc
+esperar 2
+capturar re_trabalho/agente_menus/n13_about_espaco.png
+# Window > Map pelo menu (mouse: apertar no título, arrastar até o item e soltar)
+ir_para 72 27
+apertar
+mover 0 37
+esperar 1
+capturar re_trabalho/agente_menus/n14_window_arrasto.png
+soltar
+esperar 2
+capturar re_trabalho/agente_menus/n15_window_map.png
+# Options > Silly pelo teclado (Alt+O, G?): letra sublinhada "l" de Si&lly
+teclas alt+o
+teclas l
+esperar 1
+teclas alt+o
+esperar 1
+capturar re_trabalho/agente_menus/n16_options_silly.png
+teclas esc esc
+fim
