@@ -282,7 +282,8 @@ fn principal() -> Result<(), String> {
                 3 => {
                     s.partida.navegar(Acao::NinhoVermelho);
                 }
-                4..=8 => s.partida.botao_de_cheiro(m),
+                // O botão alterna: com o save já nesse modo, não aperta (senão desligaria o feromônio).
+                4..=8 if s.partida.estado.vistas.modo_mapa != m => s.partida.botao_de_cheiro(m),
                 _ => {}
             }
         }
