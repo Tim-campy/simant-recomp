@@ -5,7 +5,8 @@
 //! pausa) e docs/spec/telas/jogo.md (seção "Simulação ao vivo"). Dados: data/partida.json.
 //!
 //! O executável chama [`Partida::avancar`] com o tempo real passado; aqui o tempo vira "mensagens
-//! de temporizador" (17 ms no original), e cada mensagem passa pela regra de velocidade e pausa do
+//! de temporizador" (o `SetTimer` de 17 ms, que no Windows 3.1 dispara a cada 55 ms), no laço de
+//! `MYTIMERFUNC` (3 mensagens por chamada); cada volta passa pela regra de velocidade e pausa do
 //! [`Relogio`]. Entradas do jogador (clique numa célula, tecla de comando, aceleradores) chegam já
 //! sem SDL. Os pedidos das regras à interface (mensagens, músicas, fim de jogo) ficam numa fila que a
 //! interface esvazia; o pedido de centralizar a vista na formiga amarela é tratado aqui mesmo.

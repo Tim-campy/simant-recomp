@@ -281,7 +281,7 @@ pub fn simulacao_liberada(e: &Estado) -> bool {
 }
 
 /// Contador de mensagens de temporizador desde o último tick (DGROUP `0x02EE` no original).
-/// A camada de cima chama [`Relogio::contar_mensagem`] a cada "batida" (17 ms no original) e roda
+/// A camada de cima chama [`Relogio::contar_mensagem`] a cada `WM_TIMER` (55 ms no original) e roda
 /// um tick sempre que [`Relogio::liberar_tick`] devolver `true`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Relogio {
