@@ -75,4 +75,8 @@ Medida com "SimAnt Load" [bancada l1]: 348×129 em (144, 138) da área cliente, 
 | Save As, metade esquerda | l4 | (56, 15)–(250, 262) | 99,48% |
 | Pergunta do Load | l1 | (144, 138)–(492, 267) | 99,52% (o ícone é desenho próprio) |
 
-**Não verificado:** a caixa "Saved correctly" (sem captura), o comportamento com muitos arquivos (rolagem), o arquivo `Tutorial.Ant`, a mudança de pasta ou de unidade no diálogo.
+**"Saved correctly" (bancada, 2026-10-18, `cenarios_tick.py salvo`):** o Quick Game não tem nome, então Ctrl+S abre "Save Ant Hill As"; com um nome que já existe o diálogo comum pergunta "This file already exists. Replace existing file?" (Yes/No); depois, a caixa "Message" com o ícone de informação **azul-escuro** e o texto `C:\MAXIS\ANTWIN\QUICK1.ANT` / `Saved correctly` em **duas linhas** (o caminho completo, e o Windows quebra a linha). Port (`simant --dialogo salvo`): **87,1%** na caixa (178, 137)–(471, 268). Corrigido: a cor do ícone "i" (`icone_informacao` = 4, era verde). Diferenças restantes: o port escreve só o nome (`QUICK1.ANT Saved correctly`, uma linha) e por isso a caixa sai mais estreita e mais baixa [interface: passar o caminho completo e quebrar a linha como o `MessageBox`].
+
+**Load de `Tutorial.Ant` (bancada, 2026-10-18, `cenarios_tick.py load_tutorial`):** o arquivo precisa existir para o diálogo de abrir (salvei o Quick Game como TUTORIAL.ANT); carregado, o original **não lê o arquivo**: gera o tutorial (`_GenerateTutorial`, geracao-mundo.md §6) — título "Tutorial Game", `_CurGameType = 2`, `_GameTime = 0`, `_TutLesson = 1`, 64 formigas novas na superfície (`_ListIndexA` = 65), populações do quintal nos 30 patches da tabela (conferidos: 18 pretos e 12 vermelhos, os da spec), a amarela no ninho preto em (29, 10). O port ainda não trata esse nome [interface].
+
+**Não verificado:** o comportamento com muitos arquivos (rolagem), a mudança de pasta ou de unidade no diálogo.

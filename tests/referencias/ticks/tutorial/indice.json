@@ -62,7 +62,6 @@
   "23",
   "46-47"
  ],
- "pendentes": {
-  "tick_000023": "caixa modal dentro do tick com ticks aninhados: _Feedback -> _GiveLesson(3) abre a lição com _PictStrnDialog (captura re_trabalho/cen/dialogo_23_0.png, \"In SimAnt you are the yellow ant...\"); enquanto a caixa está aberta o temporizador continua e o _DoAntSim roda de novo dentro dela (GameTime 23 -> 40 no retorno do tick de entrada) [hipótese: MYTIMERFUNC reentrante pelo laço modal]. O port faz um tick e pede a mensagem (Evento::Mensagem); o resto é da interface"
- }
+ "pendentes": {},
+ "_regravado_23": "2026-10-17: o 23 foi regravado fechando a caixa da lição com o breakpoint do retorno já armado; o tick volta com GameTime 24 e bate 307/307. O GameTime 23 -> 40 da 1ª gravação era artefato do script (o tick terminava sem ser visto e os seguintes rodavam soltos)"
 }

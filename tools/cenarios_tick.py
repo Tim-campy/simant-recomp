@@ -120,44 +120,71 @@ class Sessao:
             self.b.executar(f"teclas {c}")
         self.log(f"teclas {' '.join(combos)}")
 
-    def capturar_tick(self):
-        """Como Depurador.capturar_tick, mas um tick que abre uma caixa de mensagem modal (morte da amarela,
-        fim de jogo...) não volta sozinho: depois de 15 s sem chegar ao retorno de _DoAntSim, captura a
-        tela, aperta Enter e espera o retorno de novo (até 5 vezes). O relógio lido até a caixa é
-        guardado; o que a caixa lê depois não."""
+    def capturar_tick(self, espera=5):
+        """Como Depurador.capturar_tick, mas um tick que abre uma caixa de mensagem modal (lição do
+        tutorial, morte da amarela, fim de jogo) não volta sozinho: depois de `espera` s sem chegar ao
+        retorno de _DoAntSim, captura a tela e fecha a caixa com o breakpoint do retorno JÁ ARMADO e a VM
+        correndo (clique em (320, 310), dentro das caixas vistas; depois Enter), até 5 vezes. Armar
+        antes importa: sem isso o tick terminava sem ser visto e os ticks seguintes rodavam soltos até o
+        breakpoint, o que parecia "ticks aninhados" (tutorial/23, inseticida_morte/21 da 1ª gravação).
+        O relógio lido até a caixa é guardado; o que a caixa lê depois não."""
         dep, mj = self.dep, self.mj
         dep.ir_entrada()
         out = {"estado_antes.bin": mj.estado(), "vida_antes.bin": dep.vida()}
         ex = {"antes": dep.extras()}
         relogio = []
         try:
-            dep.ir_saida(timeout=15, relogio=relogio)
-        except RuntimeError as err:
+            dep.ir_saida(timeout=espera, relogio=relogio)
+        except RuntimeError:
             gt = ex["antes"]["GameTime"]
             for k in range(5):
-                self.log(f"tick {gt} parado ({err}); tela em re_trabalho/cen/dialogo_{gt}_{k}.png e Enter")
+                self.log(f"tick {gt} parado: tela em re_trabalho/cen/dialogo_{gt}_{k}.png; fechando a caixa")
                 self.b.executar(f"capturar re_trabalho/cen/dialogo_{gt}_{k}.png")
-                dep.retomar()
-                # caixa de morte da amarela: "Click here to continue": (320, 310) cai dentro das caixas vistas (morte, GAME OVER, Tutorial)
-                self.b.executar("clicar_em 320 310")
-                time.sleep(1)
-                self.b.executar("teclas ret")
-                time.sleep(2)
-                try:
-                    dep._rodar_ate(dep.retorno, 15)
+                if self.fechar_caixa_ate_o_retorno(k):
                     break
-                except RuntimeError as e2:
-                    err = e2
             else:
-                raise
+                raise RuntimeError(f"tick {gt}: a caixa não fechou")
             ex["dialogos"] = k + 1
         out["estado_depois.bin"] = mj.estado()
         out["vida_depois.bin"] = dep.vida()
         ex["depois"] = dep.extras()
-        ex["antes"]["MacTickCount"] = relogio[0] if relogio else None
+        ex["antes"]["MacTickCount"] = relogio[0] if relogio and relogio[0] is not None else None
         ex["MacTickCount_lidos"] = relogio
         out["extras.json"] = ex
         return out
+
+    def fechar_caixa_ate_o_retorno(self, k, limite=15):
+        """Com a VM parada dentro do tick: arma o breakpoint do retorno de _DoAntSim, deixa a VM correr,
+        fecha a caixa (clique ou, nas tentativas ímpares, Enter) e espera parar no retorno."""
+        import socket
+        dep = self.dep
+        g = self.mj.sessao_gdb()
+        g.breakpoint(dep.retorno)
+        try:
+            g.drenar()
+            g.s.sendall(b"$c#63")
+            time.sleep(0.2)
+            if k % 2 == 0:
+                qb.mouse_canto(self.q)
+                qb.mover_rel(self.q, 320, 310)
+                time.sleep(0.2)
+                self.botoes(False)
+            else:
+                self.q.cmd("send-key", keys=[{"type": "qcode", "data": "ret"}], **{"hold-time": 150})
+            g.s.settimeout(limite)
+            try:
+                while not g._e_parada(g._proximo()):
+                    pass
+            except socket.timeout:
+                g.s.settimeout(30)
+                g.interromper()
+                return False
+            finally:
+                g.s.settimeout(30)
+        finally:
+            g.breakpoint(dep.retorno, False)
+        pc, _ = dep.pc()
+        return pc == dep.retorno
 
     def gravar(self, saida, n, parar=None):
         """Grava n ticks consecutivos em saida/tick_NNNNNN; `parar(save_depois)` encerra antes."""
@@ -819,6 +846,199 @@ def cenario_exp_ctrl2(c: Sessao, saida, n):
     tela(c, saida, "depois")
     depois = fotografar(c, saida, "depois")
     gravar_acao(saida, antes, depois, {"exp": passos})
+    return []
+
+
+def semente_r_para(k, n=15, inicio=1):
+    """Um estado de R cujo próximo rand() % n dá k (o rand do Microsoft C, rng.md)."""
+    s = inicio
+    while True:
+        prox = (s * 0x343FD + 0x269EC3) & 0xFFFFFFFF
+        if ((prox >> 16) & 0x7FFF) % n == k:
+            return s
+        s += 1
+
+
+def cenario_misterio(c: Sessao, saida, n):
+    """Mystery (_MysteryButton, rules/misterio.rs) com o jogo pausado: a função do 6º botão
+    configurável da faixa (ribUserDef1F, (159, 96)) vira 8 na tabela DGROUP:0x0012 e R é posto num estado
+    cujo _RRand(15) dá `n` (--ticks K)."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    tabela = c.mj.ler_variavel("10:12", 16)
+    c.log(f"tabela dos botões (10:0012): {tabela.hex(' ')}")
+    largura = 2 if tabela[1] == 0 and tabela[3] == 0 else 1
+    c.mj.escrever_variavel(f"10:{0x12 + 5 * largura:x}", (8).to_bytes(largura, "little"), largura)
+    semente = semente_r_para(n)
+    c.mj.escrever_variavel("SementeR", semente.to_bytes(4, "little"))
+    c.log(f"botão 6 -> função 8 (largura {largura}); SementeR = {semente:#x} (RRand(15) = {n})")
+    c.dep.retomar()
+    time.sleep(0.5)
+    antes = fotografar(c, saida, "antes")
+    clicar_tela(c, 159, 96)
+    time.sleep(4)
+    tela(c, saida, "depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"misterio": n})
+    return []
+
+
+def cenario_capturas(c: Sessao, saida, n):
+    """Capturas do original para comparar com o port (jogo pausado, snapshot rico): o estado vira
+    `capt.ANT` (o port o abre com --save); Examine sobre três formigas diferentes da vista do ninho;
+    janela do mapa (Ctrl+M) na superfície e com cada botão de cheiro da faixa; balão do menino na Yard
+    View (estado em `balao.ANT`); "Saved correctly" (Ctrl+S). Grava `capturas.json` com o que foi
+    feito (células, modos), para gerar as telas equivalentes do port."""
+    import os
+    reg = {}
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    (pasta / "capt.ANT").write_bytes(c.mj.estado())
+    s = c.save()
+    mx, my, plano = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2), s.ler("MapPlane")
+    reg["vista"] = [plano, mx, my]
+    lista = {1: "A", 2: "B", 3: "R"}[plano]
+    me = (s.ler("MeLocX"), s.ler("MeLocY")) if s.ler("MePlane") == plano else None
+    vistos, escolhidas = set(), []
+    for _, f in formigas(s, lista):
+        x, y, g = f["X"], f["Y"], (f["T"] & 0x78) >> 3
+        if not (mx <= x < mx + COLS and my <= y < my + LINS) or (x, y) == me or g in vistos:
+            continue
+        vistos.add(g)
+        escolhidas.append((x, y, f["T"], f["M"]))
+        if len(escolhidas) == 3:
+            break
+    reg["examine"] = escolhidas
+    for k, (x, y, _, _) in enumerate(escolhidas):
+        c.dep.retomar()
+        qb.mouse_canto(c.q)
+        qb.mover_rel(c.q, MAPA_X0 + (x - mx) * TILE + 8, MAPA_Y0 + (y - my) * TILE + 8)
+        time.sleep(0.3)
+        c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": True, "button": "left"}}])
+        time.sleep(1.5)
+        tela(c, saida, f"examine_{k}")
+        c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": False, "button": "left"}}])
+        time.sleep(1)
+    # janela do mapa e botões de cheiro (posições da faixa 34 na tela)
+    c.teclas("ctrl+m")
+    time.sleep(2)
+    c.mj.sessao_gdb()
+    reg["mapa"] = [[c.ler("MapMode"), "mapa_0"]]
+    tela(c, saida, "mapa_0")
+    for k, (x, y) in enumerate([(418, 46), (482, 46), (450, 57), (418, 70), (482, 70)]):
+        clicar_tela(c, x, y)
+        time.sleep(2)
+        c.mj.sessao_gdb()
+        reg["mapa"].append([c.ler("MapMode"), f"mapa_{k + 1}", [x, y]])
+        tela(c, saida, f"mapa_{k + 1}")
+    # balão do menino na Yard View
+    c.mj.sessao_gdb()
+    for nome, v in (("BoyMessOn", 1), ("BoyMsgOffset", 2), ("BoyHere", 1)):
+        c.escrever(nome, v)
+    c.escrever("BoyMsgCnt", 0x7FFFFFFF, 4)
+    (pasta / "balao.ANT").write_bytes(c.mj.estado())
+    c.dep.retomar()
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    tela(c, saida, "balao")
+    # Saved correctly
+    c.teclas("ctrl+s")
+    time.sleep(3)
+    tela(c, saida, "salvo")
+    c.teclas("ret")
+    time.sleep(1)
+    (pasta / "capturas.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"capturas: {reg}")
+    _ = os
+    return []
+
+
+def cenario_capturas_mapa(c: Sessao, saida, n):
+    """Janela do mapa com os feromônios: com o jogo pausado o original não regera o mapa ao trocar o
+    modo (só depois de um tick, em _UpdateWindows); então, para cada botão de cheiro: clique, um tick
+    (Shift+0 duas vezes, com a entrada de _DoAntSim como trava), captura e o estado em capt_mapa_K.ANT."""
+    reg = {"mapa": []}
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+m")
+    time.sleep(2)
+    for k, (x, y) in enumerate([(418, 46), (482, 46), (450, 57), (418, 70), (482, 70)]):
+        clicar_tela(c, x, y)
+        time.sleep(1)
+        c.teclas("shift+0")          # despausa
+        c.dep.ir_entrada()           # para na entrada do próximo tick
+        c.dep.ir_saida()             # um tick
+        c.dep.retomar()
+        c.teclas("shift+0")          # pausa de novo (o redesenho do tick já aconteceu)
+        time.sleep(1.5)
+        c.mj.sessao_gdb()
+        modo = c.ler("MapMode")
+        (pasta / f"capt_mapa_{k}.ANT").write_bytes(c.mj.estado())
+        reg["mapa"].append([modo, f"mapa_t{k}", f"capt_mapa_{k}.ANT"])
+        tela(c, saida, f"mapa_t{k}")
+    (pasta / "capturas_mapa.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"{reg}")
+    return []
+
+
+def cenario_salvo(c: Sessao, saida, n):
+    """'Saved correctly': jogo pausado, Ctrl+S abre "Save Ant Hill As" (o Quick Game não tem nome),
+    digita QUICK1 e Enter, confirma a substituição (Y); a caixa "%s Saved correctly" aparece; captura e fecha."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+s")
+    time.sleep(2)
+    tela(c, saida, "salvar_como")
+    c.b.executar("digitar quick1")
+    time.sleep(0.5)
+    c.teclas("ret")
+    time.sleep(2)
+    tela(c, saida, "substituir")     # "This file already exists. Replace existing file?" (diálogo comum)
+    c.teclas("y")
+    time.sleep(3)
+    tela(c, saida, "salvo")
+    c.teclas("ret")
+    time.sleep(1)
+    tela(c, saida, "salvo_depois")
+    return []
+
+
+def cenario_load_tutorial(c: Sessao, saida, n):
+    """File → Load de um arquivo chamado Tutorial.Ant (arquivos.md §1, passo 4): o Quick Game pausado
+    é salvo como TUTORIAL.ANT (Ctrl+S, o arquivo precisa existir para o diálogo de abrir) e depois
+    carregado (Ctrl+L). Grava o estado antes do load (o do arquivo), o de depois e as capturas."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+s")
+    time.sleep(2)
+    c.b.executar("digitar tutorial")
+    c.teclas("ret")
+    time.sleep(3)
+    tela(c, saida, "1_salvo")
+    c.teclas("ret")
+    time.sleep(1)
+    antes = fotografar(c, saida, "antes")
+    c.dep.retomar()
+    c.teclas("ctrl+l")
+    time.sleep(2)
+    tela(c, saida, "2_load")
+    c.b.executar("digitar tutorial")
+    c.teclas("ret")
+    time.sleep(4)
+    tela(c, saida, "3_depois")
+    c.teclas("ret")
+    time.sleep(3)
+    tela(c, saida, "4_depois")
+    depois = fotografar(c, saida, "depois")
+    gravar_acao(saida, antes, depois, {"load_tutorial": 1})
+    s = Save(c.mj.estado())
+    c.log("depois: " + str({k: s.ler(k) for k in ("CurGameType", "GameTime", "TutLesson", "TutGiven", "MePlane", "MeLocX", "MeLocY", "CurYardPnt")}))
     return []
 
 

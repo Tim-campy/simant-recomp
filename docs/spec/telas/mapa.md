@@ -1,6 +1,6 @@
 # Janela do mapa (`mapWin`, janela 1)
 
-Visão geral do plano atual: superfície, ninho preto, ninho vermelho ou um dos cinco mapas de feromônio, com as formigas, a aranha, a pegada do menino e o retângulo da vista de edição. Fonte: pseudocódigo do Ghidra (análise de 2026-10-18; endereços abaixo) e os layouts do WINGANT/SHARED. **Não há captura do original com a janela aberta**: tudo o que é visual está verificado só no código [lacuna: capturar superfície, ninho, feromônio e trilhas na bancada].
+Visão geral do plano atual: superfície, ninho preto, ninho vermelho ou um dos cinco mapas de feromônio, com as formigas, a aranha, a pegada do menino e o retângulo da vista de edição. Fonte: pseudocódigo do Ghidra (análise de 2026-10-18; endereços abaixo) e os layouts do WINGANT/SHARED. **Capturas do original** (bancada, 2026-10-18; seção 6): ninho e os cinco feromônios; trilhas ainda sem captura.
 
 ## 1. Janela
 
@@ -47,3 +47,19 @@ Geração: um byte de cor por célula num buffer de 128 × 64, comparado linha a
 - **Fora (lacunas):** `_ELayerMode` na janela de edição; o Shift+clique no mapa; o mini mapa; a alternância "um redesenho sim, outro não" com a janela atrás; a troca mapa ↔ quintal no mesmo lugar (`_win_Swap`) e o painel `_DrawMapData`; a cor real de `_ConvColor` [hipótese].
 
 Testes: `core/janela_mapa.rs` (tabelas convertidas; formiga por cima na superfície e trilhas que acumulam; feromônio em blocos 2 × 2, ninho centrado com faixas; célula do clique; alternância do botão de cheiro).
+
+## 6. Verificação contra o original (2026-10-18)
+
+Bancada: `tools/cenarios_tick.py capturas` e `capturas_mapa` (snapshot rico pausado; Ctrl+M abre o mapa no plano mostrado; os botões de cheiro da faixa em (418, 46), (482, 46), (450, 57), (418, 70), (482, 70) dão os modos 4, 6, 8, 5, 7). Port: `tools/comparar_capturas.py` (`simant --save <estado do original> --janela-mapa N --exportar-tela-jogo`, `comparar_captura.py --mapear` na janela, (118, 60)–(634, 376) da área cliente):
+
+| Modo | Iguais |
+|---|---|
+| 2, ninho preto | **99,89%** |
+| 4, Black Nest Marker | 96,28% |
+| 5, Black Trail Marker | 98,48% |
+| 6, Red Nest Marker | 93,78% |
+| 7, Red Trail Marker | 99,52% |
+| 8, Alarm | 99,78% |
+
+**Achado:** com o jogo pausado o botão de cheiro troca o título e o modo, mas o conteúdo do mapa **não** é regerado (fica o da superfície, de `_SetMapPlane(1)`): a geração só acontece em `_UpdateWindows`, depois de um tick. Por isso as capturas de feromônio foram feitas depois de um tick (Shift+0, um tick, Shift+0). O port gera ao trocar o modo, também pausado [divergência pequena, de interface]. As diferenças restantes nos feromônios (até ~6% no 6) ficam nos blocos da rampa pontilhada (cores 16+ convertidas pelo `--mapear`); não foram isoladas. Outro achado do port: `--janela-mapa N` com `_MapMode` já = N no save alterna e desliga o feromônio (como o botão do original); `comparar_capturas.py` parte de `_MapMode` = 1.
+

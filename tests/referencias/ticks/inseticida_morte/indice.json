@@ -58,6 +58,6 @@
   "19-21"
  ],
  "pendentes": {
-  "tick_000021": "fim de jogo com interface dentro do tick: a amarela morre pelo inseticida (_YellowDeath(9)) sem corpo e sem outra colônia (_ColonyTotalBlack = 1) e o tick abre as caixas \"covered with insecticide\" e \"GAME OVER\" (_EndGameDialog, passo 22); a bancada clicou para continuar e o original começou um Jogo Completo novo dentro do mesmo tick (mundo novo, _CurYardPnt (11, 8), GameTime 8, _IsGameOver de volta a 0). O port pára em _IsGameOver = 1 com o mundo intacto, como manda a regra; o reinício é da interface (simant/, core/), não do tick. Os 70 blocos diferentes são o mundo novo"
+  "tick_000021": "fim de jogo com a interface inteira dentro do tick (regravado em 2026-10-17 com o breakpoint do retorno armado antes de fechar cada caixa): a amarela morre pelo inseticida sem corpo e sem outra colônia preta; dentro do mesmo _DoAntSim abrem-se a caixa 10042, a 10056 (_PictStrnDialog em _YellowDeath), o GAME OVER (pontuação 27572) e a tela \"Select a Game\" (_EndGameDialog -> _NewGame); a bancada escolheu Full Game e o tick volta com um Jogo Completo novo (GameTime 0, _CurYardPnt (11, 8)). O GameTime 8 da 1ª gravação era artefato do script. O port termina o tick com _IsGameOver = 1 e o mundo intacto; o jogo novo é da interface (engine/tests/fim_de_jogo_interface.rs)"
  }
 }

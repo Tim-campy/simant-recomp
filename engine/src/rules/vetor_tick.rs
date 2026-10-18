@@ -641,6 +641,12 @@ pub fn aplicar_acao(
         super::desenho::desenhar_colonias(e);
         return Ok(format!("{:?}", super::troca_patch::trocar_patch(e, tab, cfg)?));
     }
+    if acao.get("misterio").is_some() {
+        // Botão Mystery com o jogo pausado: o efeito vem do `_RRand(15)` com o R do vetor.
+        let mut regras = super::tick::RegrasOriginais::default();
+        let t = super::amarela::TabelasAmarela::padrao();
+        return Ok(format!("{:?}", super::misterio::botao_misterio(e, &mut regras, t)));
+    }
     if let Some(m) = acao.get("desenho_quintal").and_then(|v| v.as_i64()) {
         // Entre dois ticks com a Yard/House View aberta e na frente: um redesenho do quintal.
         return Ok(format!("{} passos de S", super::desenho::desenhar_quintal(e, m as i16)));
