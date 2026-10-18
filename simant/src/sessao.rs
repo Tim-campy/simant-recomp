@@ -530,6 +530,11 @@ impl Sessao<'_> {
         j.quintal_na_frente = topo == Some(quintal);
         j.edicao_aberta = g.aberta(janelas::ID_EDICAO);
         j.edicao_na_frente = topo == Some(janelas::ID_EDICAO);
+        // `_win_IsWinInFront(0)` das animações de morte e de loucura da amarela (quantos quadros e
+        // sorteios): a ordem real do gerenciador, no lugar do valor fixo de amarela.json.
+        let frente = j.edicao_na_frente;
+        self.partida.regras.amarela.animacao.janela_edicao_na_frente = frente;
+        self.partida.tabelas_amarela.animacao.janela_edicao_na_frente = frente;
         // O tutorial pergunta `_win_IsWinInFront(janela)`: o número da janela de cima (prop INDEX).
         self.partida.regras.interface_tutor.janelas = topo.map(|t| vec![t << 8]).unwrap_or_default();
     }

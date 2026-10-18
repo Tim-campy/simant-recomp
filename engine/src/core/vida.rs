@@ -170,11 +170,15 @@ fn definir_amarela(c: &mut CamadasVida, me: &FormigaAmarela, pendencias: &mut Ve
         return;
     }
     if me.tipo == TIPO_RAINHA {
-        // A segunda metade (0xFE) não é gravada aqui: jogo.md (mapa de vida) diz que a tabela de direções
-        // não foi localizada. As regras do tick já põem a cauda em `_Dx8/_Dy8[_MeDir ^ 4]`
-        // (`rules/amarela.rs`, `cauda`; formiga-amarela.md, `_DoLifeExchange`), que é provavelmente a
-        // mesma tabela [hipótese: não conferido contra uma captura da rainha amarela].
-        pendencias.push("segunda metade da formiga amarela rainha (tabela de direções em aberto)".into());
+        // `_SetMyLife` (`1020:6536`): com `_MeType` = 0x60, a segunda metade (0xFE) vai para
+        // (x + _Dx8[dir ^ 4], y + _Dy8[dir ^ 4]) — as tabelas em DS:0 e DS:8 [código]. As do
+        // `data/comum.json` embutido (a reconstrução não recebe as tabelas com mods).
+        let t = crate::rules::amarela::TabelasAmarela::padrao();
+        let d = ((me.dir as i32) ^ 4) as usize & 7;
+        let (x, y) = (me.x as i32 + i32::from(t.dx8[d]), me.y as i32 + i32::from(t.dy8[d]));
+        if !c.definir(plano, x, y, AMARELA_METADE) {
+            pendencias.push(format!("segunda metade da rainha amarela fora do mapa em ({x}, {y})"));
+        }
     }
 }
 

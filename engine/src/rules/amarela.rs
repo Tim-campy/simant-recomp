@@ -72,8 +72,8 @@ pub struct ConstantesAmarela {
 /// Quadros das animações que consomem sorteios (§10.2) e o estado de interface assumido.
 #[derive(Clone, Debug, Deserialize)]
 pub struct AnimacaoAmarela {
-    /// [hipótese] `_win_IsWinInFront(0)`: a janela de edição está à frente. O port tem a janela, mas o
-    /// tick não consulta a ordem real das janelas: este valor fixo decide quantos quadros (e sorteios)
+    /// `_win_IsWinInFront(0)`: a janela de edição está à frente. Sem interface vale o do JSON; ao vivo a
+    /// interface põe aqui a ordem real a cada quadro. Decide quantos quadros (e sorteios)
     /// as animações de morte e de loucura gastam (com a edição atrás, o original gasta menos).
     pub janela_edicao_na_frente: bool,
     pub quadros_luta: i32,
