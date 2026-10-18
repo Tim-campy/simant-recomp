@@ -903,8 +903,10 @@ pub fn iniciar_amarela(e: &mut Estado, c: Contexto) {
     let ta = c.amarela;
     e.amarela.base = 0;
     e.amarela.ovo_carregado = r.amarela_ovo_carregado;
-    // `_ELayerMode` = −1 (camada de cheiro mostrada) é interface.
-    e.amarela.soltando_alarme = 0;
+    if e.amarela.soltando_alarme != 0 {
+        e.amarela.soltando_alarme = 0;
+        e.camada_edicao = -1;
+    }
     amarela::definir_saude(e, ta, r.amarela_saude);
     if e.partida.tipo_jogo == TIPO_EXPERIMENTAL {
         let a = &mut e.amarela;

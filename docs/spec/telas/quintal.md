@@ -153,7 +153,7 @@ Com `t = (tx, ty) = _YMapPnt` e `i = tx × 16 + ty` [código]:
 
 Consequências [código]: o que é do quintal inteiro fica (`_YMapPop*`, `_YMapSeeds`, menino, bichos, chuva do quintal, contadores de colônias, `_GameTime`, controles, histórico); o que é do patch é refeito por `_RandWorld` (mapas, listas, vida, feromônios, buracos, comida, saúde das colônias = 100, aranha, formigas-leão, bichos-de-conta, amarela). O estado de S antes da troca não importa (a semente é redefinida); R não é usado.
 
-**No port** (`rules/troca_patch.rs`, `trocar_patch`): segue os passos acima e aplica o `Mundo` gerado ao `Estado` (`aplicar_patch`), trocando só os campos que `_RandWorld` escreve. Os pedidos de som de erro não geram evento (o port ainda não tem som de efeito pela fila); músicas e textos saem como `Evento::Musica` e `Evento::Mensagem`. A janela de edição troca o conjunto de tiles quando `_TERRAINset` muda (quintal ↔ casa).
+**No port** (`rules/troca_patch.rs`, `trocar_patch`): segue os passos acima e aplica o `Mundo` gerado ao `Estado` (`aplicar_patch`), trocando só os campos que `_RandWorld` escreve. O som de erro das recusas sai como `Evento::Som(1)`; músicas e textos saem como `Evento::Musica` e `Evento::Mensagem`. Os textos viram o quadro de mensagem modal de `_PictStrnDialog` (mensagens.md §3; as recusas 10000/10002/10004 têm o terceiro parâmetro 1 e aparecem mesmo com Options → Events desligado), desenhado **por cima** da janela do quintal (até 2026-10-18 o port o desenhava embaixo dela, e a recusa só aparecia no terminal). A janela de edição troca o conjunto de tiles quando `_TERRAINset` muda (quintal ↔ casa).
 
 ### 5.3 `_PlaceQueenInYard` (`1000:ad12`)
 

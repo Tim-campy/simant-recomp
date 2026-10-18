@@ -282,7 +282,9 @@ Em todos: `_MeHealthCntDwn = 0` e `_MeWantFood` recalculado como em `_SetMyHealt
 
 ### 7.3 Alarme: `_SetAlarmDropState` (`1000:84cc`) e comando 7
 
-Ligar só é possível na superfície e como formiga (`_MeMode = 0`); liga `_MeDropAlarm` e seleciona o botão `editScent` da janela de edição. A cada passo na superfície, +50 de alarme (máximo 200). Entrar num ninho desliga. Som 0xF (ok) ou 1 (erro).
+Ligar só é possível na superfície e como formiga (`_MeMode = 0`); liga `_MeDropAlarm`, põe `_ELayerMode = 0` e seleciona o botão `editScent` da janela de edição. A cada passo na superfície, +50 de alarme (máximo 200). Entrar num ninho, morrer ou reiniciar a amarela desliga (`_MeDropAlarm = 0`, `_ELayerMode = −1`). Som 0xF (ok) ou 1 (erro) [código: `_YellowCommandKey` caso 7 `1000:8562`, `_SetAlarmDropState` `1000:84cc`, `_EnterNest`, `_YellowDeath`, `_InitYellow`].
+
+**O que se vê** [código]: com `_ELayerMode = 0`, a janela de edição desenha, na superfície, o feromônio de alarme no lugar do chão (`_DoCalcTile`: valor > 0x10 → tiles 0xF1–0xFF, pontos amarelos a vermelhos; jogo.md, "Camada de cheiro na janela de edição"). Logo depois de apertar 0 nada muda, porque ainda não há alarme: os pontos aparecem atrás da amarela quando ela anda. As formigas que forrageiam e pisam numa célula com alarme passam ao modo Alarmed e sobem o gradiente; as de Defense também o seguem ([feromonios.md](feromonios.md) §4). O alarme se espalha e enfraquece a cada 64 ticks (`_SmoothAlarm`). **No port** (2026-10-18): a tecla 0 já ligava o alarme e o depósito (+50 por passo), mas a janela de edição não mostrava a camada, e o usuário "não percebia nada de diferente"; agora `Estado::camada_edicao` (`_ELayerMode`) é ligado aqui e pelos botões de cheiro da faixa, e a tela de jogo o desenha. **Conferido na bancada** (`qemu_alarme.txt`): `_ELayerMode` = 0 depois da tecla 0 e o rastro amarelo na janela de edição depois de andar (jogo.md, "Camada de cheiro na janela de edição").
 
 ## 8. Troca de corpo e alvo: `_ExchangeLives`, `_DoLifeExchange`
 

@@ -5,7 +5,8 @@
 //! pausa) e docs/spec/telas/jogo.md (seção "Simulação ao vivo"). Dados: data/partida.json.
 //!
 //! O executável chama [`Partida::avancar`] com o tempo real passado; aqui o tempo vira "mensagens
-//! de temporizador" (17 ms no original), e cada mensagem passa pela regra de velocidade e pausa do
+//! de temporizador" (o `SetTimer` de 17 ms, que no Windows 3.1 dispara a cada 55 ms), no laço de
+//! `MYTIMERFUNC` (3 mensagens por chamada); cada volta passa pela regra de velocidade e pausa do
 //! [`Relogio`]. Entradas do jogador (clique numa célula, tecla de comando, aceleradores) chegam já
 //! sem SDL. Os pedidos das regras à interface (mensagens, músicas, fim de jogo) ficam numa fila que a
 //! interface esvazia; o pedido de centralizar a vista na formiga amarela é tratado aqui mesmo.
@@ -35,18 +36,36 @@ pub const ARQUIVO_CONFIG: &str = "partida.json";
 /// Ritmo das mensagens de temporizador e do redesenho (data/partida.json, "relogio").
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct ConfigRelogio {
-    /// Intervalo do `SetTimer` com o aplicativo em foco (17 ms).
+    /// Intervalo pedido ao `SetTimer` com o aplicativo em foco (17 ms).
     pub intervalo_mensagem_ms: u32,
     /// Intervalo sem foco (`WM_ACTIVATEAPP` com wParam = 0: 170 ms).
     pub intervalo_sem_foco_ms: u32,
-    /// Voltas do laço de `MYTIMERFUNC` por mensagem, por `_GameSpeed`.
-    pub iteracoes_por_mensagem: Vec<u32>,
+    /// Resolução do temporizador do Windows 3.1 (55 ms, 18,2 Hz): o intervalo pedido é arredondado
+    /// para cima até um múltiplo dela (o de 17 ms vira 55 ms).
+    pub resolucao_timer_ms: u32,
+    /// Voltas do laço ocupado de `MYTIMERFUNC` entre duas mensagens, por `_GameSpeed` (depende da
+    /// CPU no original; os padrões vêm da bancada).
+    pub voltas_por_periodo: Vec<u32>,
     /// Máximo de mensagens geradas numa chamada de `avancar`; o resto do tempo é descartado.
     pub max_mensagens_por_avanco: u32,
     /// Redesenho do mapa a cada N ticks, por `_GameSpeed` (`_UpdateWindows`).
     pub redesenho_mapa_a_cada: Vec<u32>,
     /// Sem foco, redesenha só a cada N ticks (`quadros & 7 == 0`).
     pub redesenho_sem_foco_a_cada: u32,
+}
+
+/// Estado de uma chamada de `MYTIMERFUNC` em andamento (simulacao-visao-geral.md §2): o laço só
+/// devolve o controle ao Windows depois de drenar 2 ou 3 `WM_TIMER` novas.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct LacoTimer {
+    /// Dentro do laço (a mensagem seguinte é drenada, não abre outra chamada).
+    dentro: bool,
+    /// `WM_TIMER` retiradas por `PeekMessage` nesta chamada.
+    drenadas: u32,
+    /// Voltas do laço nesta chamada.
+    voltas: u32,
+    /// Mensagens que chegaram e serão drenadas no fim da volta em curso.
+    pendentes: u32,
 }
 
 /// Ações dos aceleradores do menu Speed e Options.
@@ -176,6 +195,16 @@ impl ConfigPartida {
     }
 }
 
+/// `_ELayerMode` que o botão de cheiro da faixa (`_MapMode` n) liga: 4 ninho preto → 1, 5 trilha preta
+/// → 2, 6 ninho vermelho → 3, 7 trilha vermelha → 4, 8 alarme → 0 (`_ProcMapRibbonEvent`, `1010:c4f0`).
+pub fn camada_do_modo_de_cheiro(n: i16) -> i16 {
+    match n {
+        4..=7 => n - 3,
+        8 => 0,
+        _ => -1,
+    }
+}
+
 /// Resultado de [`Partida::avancar`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Avanco {
@@ -196,6 +225,8 @@ pub struct Partida {
     pub cfg_simulacao: ConfigSimulacao,
     pub cfg: ConfigPartida,
     pub relogio: Relogio,
+    /// Chamada de `MYTIMERFUNC` em andamento.
+    laco: LacoTimer,
     /// Tempo real acumulado que ainda não completou uma mensagem.
     resto_ms: u64,
     /// Tempo real total passado a `avancar` (o `GetTickCount` do port, ms).
@@ -265,6 +296,7 @@ impl Partida {
             cfg_simulacao,
             cfg,
             relogio: Relogio::default(),
+            laco: LacoTimer::default(),
             resto_ms: 0,
             ms_total: 0,
             mac_inicial,
@@ -303,10 +335,13 @@ impl Partida {
             .unwrap_or(padrao)
     }
 
-    /// Intervalo atual entre mensagens de temporizador (ms).
+    /// Intervalo atual entre mensagens de temporizador (ms): o pedido ao `SetTimer` (17 ms, ou
+    /// 170 ms sem foco) arredondado para cima até a resolução do temporizador do Windows 3.1 (55 ms).
     pub fn intervalo_ms(&self) -> u64 {
         let r = &self.cfg.relogio;
-        u64::from(if self.ativo { r.intervalo_mensagem_ms } else { r.intervalo_sem_foco_ms }).max(1)
+        let pedido = u64::from(if self.ativo { r.intervalo_mensagem_ms } else { r.intervalo_sem_foco_ms }).max(1);
+        let resolucao = u64::from(r.resolucao_timer_ms).max(1);
+        pedido.div_ceil(resolucao) * resolucao
     }
 
     /// Foco do aplicativo (`WM_ACTIVATEAPP`): sem foco, o temporizador fica em 170 ms.
@@ -319,7 +354,7 @@ impl Partida {
         self.ms_total / self.avisos.cfg.ms_por_tickcount.max(1)
     }
 
-    /// Passa `ms` de tempo real: gera as mensagens de temporizador que couberem (no máximo
+    /// Passa `ms` de tempo real: gera as mensagens de temporizador (a cada `intervalo_ms`) que couberem (no máximo
     /// `max_mensagens_por_avanco`, descartando o excesso) e roda os ticks que a velocidade e a
     /// pausa liberarem. Com um aviso modal na tela, ou durante a espera do clique simples, o tempo
     /// passa sem mensagens (o original mata o temporizador ou fica num laço de espera).
@@ -332,6 +367,7 @@ impl Partida {
         }
         if self.avisos.tem_modal() {
             self.resto_ms = 0;
+            self.laco = LacoTimer::default();
             return Avanco::default();
         }
         let espera = ms.min(self.bloqueio_ms);
@@ -355,6 +391,7 @@ impl Partida {
             if self.avisos.tem_modal() {
                 // _StopSimulation: KillTimer, e as WM_TIMER pendentes são descartadas.
                 self.resto_ms = 0;
+                self.laco = LacoTimer::default();
                 self.redesenhar = true;
                 break;
             }
@@ -362,25 +399,48 @@ impl Partida {
         av
     }
 
-    /// Uma chamada de `MYTIMERFUNC` com uma mensagem: atraso + 1 e as voltas do laço (cada uma
-    /// roda no máximo um tick, se `Relogio::liberar_tick` deixar). Devolve os ticks rodados.
+    /// Uma mensagem `WM_TIMER` (a cada 55 ms): fora do laço, abre uma chamada de `MYTIMERFUNC`
+    /// (atraso + 1); dentro dele, a mensagem é drenada pelo `PeekMessage` no fim da volta em curso
+    /// (atraso + 1, drenadas + 1). Em seguida rodam as voltas do laço ocupado até a próxima mensagem
+    /// (`voltas_por_periodo`): cada uma soma 1 a `_gameCycles`, roda no máximo um tick (se
+    /// `Relogio::liberar_tick` deixar) e termina com o teste de saída do original (drenadas > 1 e
+    /// (voltas > 2 ou drenadas > 2)). Devolve os ticks rodados. Ver simulacao-visao-geral.md §2–3.
     pub fn mensagem_de_timer(&mut self) -> u32 {
-        // `_gameCycles` (9:9b2c) conta o laço do temporizador mesmo sem tick (pausa, velocidade).
-        // O port conta uma vez por mensagem: o quintal o usa também como relógio do Mac (1/60 s ≈
-        // 17 ms) [hipótese; o original soma 1 por volta do laço, ver jogo.md "Simulação ao vivo"].
-        // Zero significa "sem relógio do laço" para `quintal::Relogios`: pula o 0 na volta.
-        self.estado.ciclos_jogo = self.estado.ciclos_jogo.wrapping_add(1).max(1);
-        // Minimizado: o ícone animado sorteia SRand1(7) a cada chamada, se não pausado nem no fim.
-        if self.janelas_desenho.minimizada && self.estado.partida.pausado == 0 && self.estado.partida.fim_de_jogo == 0 {
-            self.estado.s.rand1(7);
+        if self.laco.dentro {
+            self.laco.pendentes += 1;
+        } else {
+            // Minimizado: o ícone animado sorteia SRand1(7) a cada chamada, se não pausado nem no fim.
+            if self.janelas_desenho.minimizada && self.estado.partida.pausado == 0 && self.estado.partida.fim_de_jogo == 0 {
+                self.estado.s.rand1(7);
+            }
+            self.relogio.contar_mensagem();
+            self.laco = LacoTimer { dentro: true, ..LacoTimer::default() };
         }
-        self.relogio.contar_mensagem();
-        let voltas = self.indice_velocidade(&self.cfg.relogio.iteracoes_por_mensagem.clone(), 1).max(1);
+        let voltas = self.indice_velocidade(&self.cfg.relogio.voltas_por_periodo.clone(), 1).max(1);
         let mut ticks = 0;
+        let havia_modal = self.avisos.tem_modal();
         for _ in 0..voltas {
+            // `_gameCycles` (9:9b2c) conta as voltas do laço, rode ou não o tick. Zero significa
+            // "sem relógio do laço" para `quintal::Relogios`: pula o 0 na volta.
+            self.estado.ciclos_jogo = self.estado.ciclos_jogo.wrapping_add(1).max(1);
             if self.relogio.liberar_tick(&self.estado, &self.cfg_simulacao) {
                 self.rodar_tick();
                 ticks += 1;
+                if !havia_modal && self.avisos.tem_modal() {
+                    // _StopSimulation: o quadro para o temporizador; o port encerra a chamada.
+                    self.laco = LacoTimer::default();
+                    return ticks;
+                }
+            }
+            let l = &mut self.laco;
+            for _ in 0..l.pendentes {
+                self.relogio.contar_mensagem();
+            }
+            l.drenadas += std::mem::take(&mut l.pendentes);
+            l.voltas += 1;
+            if l.drenadas > 1 && (l.voltas > 2 || l.drenadas > 2) {
+                l.dentro = false;
+                break;
             }
         }
         ticks
@@ -701,7 +761,8 @@ impl Partida {
 
     /// Botão de cheiro da faixa (`ribBNestScent`… → `_SetMapModeAnt(n)`, n de 4 a 8): os feromônios
     /// só existem na superfície (antes, `_SetMapPlane(1)`); o mesmo botão de novo volta ao mapa
-    /// simples. [o original também grava `_ELayerMode` para a janela de edição; o port não.]
+    /// simples. A janela de edição mostra a mesma camada (`_ELayerMode`, `_ProcMapRibbonEvent`
+    /// `0x220b`–`0x220f`), ou nenhuma quando o botão desliga.
     pub fn botao_de_cheiro(&mut self, n: i16) {
         if self.nav.plano_mapa != 1 {
             self.navegar(Acao::Superficie);
@@ -709,6 +770,7 @@ impl Partida {
         self.vistas_para_estado();
         let e = &mut self.estado;
         e.vistas.modo_mapa = super::janela_mapa::modo_do_botao_de_cheiro(e.vistas.modo_mapa, n);
+        e.camada_edicao = if e.vistas.modo_mapa == n { camada_do_modo_de_cheiro(n) } else { -1 };
         self.redesenhar = true;
     }
 
@@ -972,12 +1034,14 @@ mod testes {
     }
 
     #[test]
-    fn mensagens_a_cada_17_ms_com_resto() {
+    fn timer_de_17_ms_vira_55_ms_com_resto() {
+        // SetTimer(17 ms) no Windows 3.1: uma WM_TIMER a cada 55 ms (resolução do relógio).
         let mut p = partida(1);
-        assert_eq!(p.avancar(16).mensagens, 0);
+        assert_eq!(p.intervalo_ms(), 55);
+        assert_eq!(p.avancar(54).mensagens, 0);
         assert_eq!(p.avancar(1).mensagens, 1);
-        assert_eq!(p.avancar(33).mensagens, 1);
-        assert_eq!(p.avancar(1).mensagens, 1, "o resto de 16 ms foi guardado");
+        assert_eq!(p.avancar(109).mensagens, 1);
+        assert_eq!(p.avancar(1).mensagens, 1, "o resto de 54 ms foi guardado");
     }
 
     #[test]
@@ -994,16 +1058,29 @@ mod testes {
     }
 
     #[test]
-    fn velocidades_seguem_speed_delay_vals() {
-        // slow: atraso 6 → 1 tick a cada 6 mensagens; normal: a cada 2; fast e ultra: toda volta.
-        assert_eq!(ticks_em(&mut partida(0), 60), 10);
-        assert_eq!(ticks_em(&mut partida(1), 60), 30);
-        assert_eq!(ticks_em(&mut partida(2), 60), 120);
-        assert_eq!(ticks_em(&mut partida(3), 60), 120);
+    fn velocidades_seguem_o_laco_de_mytimerfunc() {
+        // Cada chamada de MYTIMERFUNC consome 3 mensagens (a dela e 2 drenadas); o atraso é testado
+        // na entrada e depois da primeira drenada. Bancada: slow 3,0 ticks/s, normal 6,0, fast
+        // 55–63, ultra 91 (18 mensagens = 6 chamadas = 0,99 s; o estado vazio abre um quadro no
+        // tick 128, por isso a conta para antes).
+        assert_eq!(ticks_em(&mut partida(0), 18), 2, "slow: 1 tick a cada 6 mensagens (330 ms)");
+        assert_eq!(ticks_em(&mut partida(1), 18), 6, "normal: 1 tick a cada 3 mensagens (165 ms)");
+        assert_eq!(ticks_em(&mut partida(2), 18), 66, "fast: 2 × 5 + 1 por chamada");
+        assert_eq!(ticks_em(&mut partida(3), 18), 90, "ultra: 2 × 7 + 1 por chamada");
         let mut p = partida(0);
-        assert_eq!(ticks_em(&mut p, 5), 0);
-        assert_eq!(ticks_em(&mut p, 1), 1, "o sexto libera");
+        assert_eq!(ticks_em(&mut p, 6), 0);
+        assert_eq!(ticks_em(&mut p, 1), 1, "a sétima mensagem abre a terceira chamada com atraso 7");
         assert_eq!(p.estado.partida.tempo, 1);
+        // _gameCycles conta as voltas do laço: em normal passa de 20 entre dois ticks (o pássaro
+        // é testado em todo tick, testes-tick.md); em fast/ultra anda 1 por tick.
+        let mut p = partida(1);
+        ticks_em(&mut p, 3);
+        let antes = p.estado.ciclos_jogo;
+        assert_eq!(ticks_em(&mut p, 3), 1);
+        assert!(p.estado.ciclos_jogo - antes > 20);
+        let mut p = partida(3);
+        let t = ticks_em(&mut p, 30);
+        assert_eq!(p.estado.ciclos_jogo, t);
     }
 
     #[test]
@@ -1026,6 +1103,31 @@ mod testes {
     }
 
     #[test]
+    fn alarme_e_botoes_de_cheiro_mostram_a_camada_na_edicao() {
+        // Tecla 0 na superfície (_SetAlarmDropState(1)): _ELayerMode = 0; de novo, −1.
+        let mut p = partida(1);
+        p.estado.amarela.plano = 1;
+        p.estado.amarela.modo = 0;
+        let sem = Modificadores::default();
+        p.tecla_amarela(48, sem);
+        assert_eq!((p.estado.amarela.soltando_alarme, p.estado.camada_edicao), (1, 0));
+        p.tecla_amarela(48, sem);
+        assert_eq!((p.estado.amarela.soltando_alarme, p.estado.camada_edicao), (0, -1));
+        // No ninho não liga (som de erro) e a camada não muda.
+        p.estado.amarela.plano = 2;
+        p.tecla_amarela(48, sem);
+        assert_eq!((p.estado.amarela.soltando_alarme, p.estado.camada_edicao), (0, -1));
+        // Botões de cheiro: o mesmo botão de novo desliga.
+        p.botao_de_cheiro(4);
+        assert_eq!(p.estado.camada_edicao, 1);
+        p.botao_de_cheiro(8);
+        assert_eq!(p.estado.camada_edicao, 0);
+        p.botao_de_cheiro(8);
+        assert_eq!(p.estado.camada_edicao, -1);
+        assert_eq!((5..=7).map(camada_do_modo_de_cheiro).collect::<Vec<_>>(), [2, 3, 4]);
+    }
+
+    #[test]
     fn velocidade_e_auto_track_pelos_aceleradores() {
         let mut p = partida(1);
         p.aplicar(AcaoPartida::VelocidadeUltra);
@@ -1040,10 +1142,11 @@ mod testes {
     }
 
     #[test]
-    fn sem_foco_o_temporizador_fica_em_170_ms() {
+    fn sem_foco_o_temporizador_de_170_ms_vira_220_ms() {
         let mut p = partida(1);
         p.definir_foco(false);
-        assert_eq!(p.avancar(169).mensagens, 0);
+        assert_eq!(p.intervalo_ms(), 220);
+        assert_eq!(p.avancar(219).mensagens, 0);
         assert_eq!(p.avancar(1).mensagens, 1);
     }
 

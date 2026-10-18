@@ -240,10 +240,13 @@ impl Sessao<'_> {
             self.tela.compor_com(self.recursos, &self.interface, &self.partida.nav, &mut |q| desenhar(q, atras))?;
         pendentes.extend(desenhar(&mut q, frente)?);
         let agora = self.partida.agora();
-        let (clique, p) = self.tela.desenhar_avisos(&mut q, self.recursos, &self.interface, &mut self.partida.avisos, agora)?;
+        self.tela.desenhar_mensagem_da_faixa(&mut q, self.recursos, &self.interface, &mut self.partida.avisos, agora)?;
+        pendentes.extend(modos::desenhar(self, &mut q)?);
+        // O aviso modal fica por cima da janela do quintal (e do resto dos modos): o quadro de recusa
+        // da troca de patch (10000/10002/10004) sai de um duplo clique nela.
+        let (clique, p) = avisos::desenhar_modal(&mut q, self.recursos, &self.interface, &self.partida.avisos)?;
         self.clique_modal = clique;
         pendentes.extend(p);
-        pendentes.extend(modos::desenhar(self, &mut q)?);
         if let Some((m, _)) = &self.menu {
             pendentes.extend(m.desenhar(&mut q, self.recursos, &self.interface)?);
         }

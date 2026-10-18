@@ -40,6 +40,7 @@ Aceito: prazo = permanente se a duração é negativa (as chamadas usam `0xfffe,
 | `_Feedback` (todo tick), conselhos | 1020[0..4] ([conselhos.md](../regras/conselhos.md) §2) | 0x78 → 180 (≈ 9,9 s) | só o nº 0 |
 | `_Feedback` → `_SetDefaultWindPrompt(0)` | o mesmo texto de pausa/ferramenta, ou limpa | permanente | não |
 | `_DoUserButton` caso 6 (botão de velocidade) | "Game speed now slow./normal./fast./ultra." (DGROUP `1048:014b`, `0160`, `0177`, `018c`), pela velocidade nova | 0xb4 → 270 (≈ 14,9 s) | sim |
+| Speed → Slow/Normal/Fast/Ultra e Shift+1..4 (`_ProcMenu` 0x43–0x46) | **nada**: só trocam `_GameSpeed` e as marcas do menu [código; bancada `qemu_ritmo.txt`, simulacao-visao-geral.md §3.2] | — | — |
 | `_DoBookMark` | "Bookmark has been placed." / "…has not been placed." (`1048:01a2`, `01bc`) | 0xb4 | sim |
 | `_EndGameDialog` | limpa | permanente | sim |
 
@@ -52,6 +53,8 @@ Mensagens pedidas pelas regras (`Evento::MensagemFaixa { lista, indice, duracao,
 | `_GstrR` / `_StartAttack` (ataque vermelho) | 1020[5] "The red ants are attacking!" | 0x78 | não |
 | `_EatMyFood` tipo 1 (trofalaxia) / 2 (doação) / 3 (ovo comido) | 1010[11] / [12] / [13] | 0x78 / 0x78 / 0xb4 | não |
 | `_DoAntMoveY`, passagem para o ninho vermelho | 1010[4] "You have entered the red nest" | 0x168 | não |
+
+"You have entered the red nest" só sai quando a amarela atravessa a **passagem entre os ninhos** (tile 0x14, do ninho preto para o vermelho). Entrar no ninho vermelho pelo buraco da superfície (`_EnterNest`, `1028:8408`) não escreve nada na faixa [código]. Como não é importante, também não aparece se a faixa já tem uma mensagem com prazo (um conselho, por exemplo) ou se Options → Messages está desligado (§2.2). O port segue as três regras (`rules/amarela.rs`, teste `mensagem_do_ninho_vermelho_so_pela_passagem` em `engine/tests/partida_quick2.rs`).
 
 Marcadores (`_DoBookMark`, `1000:08a6`, botões `ribBM1`–`7`): **Ctrl**+clique (`GetAsyncKeyState(VK_CONTROL)`: o código empurra 0x11) guarda plano, `_MapPnt`, `_MapMode` e `_YardMode` e troca os bitmaps do botão (`0x38dd + i`/`0x38ab + i`), com "Bookmark has been placed."; clique sem Ctrl num marcador vazio toca o som 1 e mostra "Bookmark has not been placed."; num marcador posto, `_GotoMapPoint(plano, _editWidth/2 + x, _editHeight/2 + y)` [código]. Os marcadores não estão no save; `_NewGame` os limpa. **Bancada:** o Ctrl+clique no `ribBM1` deu a mensagem e os bitmaps iguais ao port (99,73% na faixa; j05) e o clique no `ribBM2` vazio deu "Bookmark has not been placed." (j06). O port não guarda o modo do quintal (a janela do quintal é de outro módulo).
 
@@ -188,5 +191,16 @@ Comparação pixel a pixel com `tools/comparar_captura.py --regiao … --mapear`
 | fim de jogo (janela 4) | `mensagens/m8_apos_clique2.png` | (128, 128)–(464, 346) | 97,95% (pontos de outro `_GameTime`: 19787 contra 19785; a linha da avaliação 1 pixel abaixo; o cursor do mouse) |
 
 Testes: `core/avisos.rs` (prazo e regras de `_EditMessage`, pausa, velocidade, quadros forçados, prazo de 270, imagens, avaliação, pontuação), `engine/tests/partida_quick2.rs` (salvar e recarregar, quadros param a simulação até fechar, botão de velocidade, espera do clique).
+
+## 9. Barras e números da faixa (`_DrawMapData`, `1010:cb60`)
+
+A cada `_UpdateWindows` (e com o mapa: `_DrawMap`), com a faixa aberta [código]:
+
+- **Números** (`_win_PrintfAtObj` com "%d", fonte 3, cores do objeto): `ribBlacks` = `_BpopT`, `ribReds` = `_RpopT`. Centralizados no objeto, como a mensagem da faixa.
+- **Barras** (`_win_DrawHBar(objeto, fração em 1/65536)`): `ribYellowHealth` = `_MeHealth`/100; `ribBlackHealth` = `_HealthB`/100; `ribBlackP` = `_BpopT`/m; `ribRedHealth` = `_HealthR`/100, ou 0 se `_RpopT` = 0; `ribRedP` = `_RpopT`/m; com m = max(1, `_BpopT`, `_RpopT`). As cores vêm de `_win_SetColorFromObjNum`: entrada `cor` do objeto na tabela de cores (WINGANT 0/129), frente até a fração e fundo no resto (amarela: cor 4; pretas: 9; vermelhas: 10).
+- **Marcas** (`_GInvBox`, inverte uma coluna): em `ribBlackHealth` no `_BlkWarnHealth` e em `ribYellowHealth` no `_MeWarnHealth` (os dois valem 30 num jogo novo), na coluna `esq + ⌊largura × limiar / 100⌋`.
+- `_ConvColor` só muda a cor com `_displayType` = 10 (tabela DGROUP `0x7238`); não é chamado aqui (o fundo da mensagem da faixa usa `_ConvColor(0xc)`).
+
+Geometria **medida** (bancada, roteiro `qemu_barras_faixa.txt`: três capturas com a VM pausada e os sete valores lidos logo depois): as barras pintam as colunas `esq..dir − 1` do objeto (64 pixels; a coluna `dir` é a moldura do bitmap da faixa) e as linhas `topo..base − 1` (5 ou 8); a divisão usa a largura 63: `s = esq + ⌊63 × fração / 65536⌋`, frente em `esq..s − 1` e fundo em `s..dir − 1` (cheia: tudo frente). As 15 barras das três capturas e as duas marcas batem com essa regra; o pseudocódigo (`dir + 1` com `_ribbonBarHeight` ≠ 0, e o retângulo do layout) daria 65, e a diferença deve vir de `_win_Recalc` (não estudado). O port põe os valores em `data/tela_jogo.json` (`barras_faixa`, `encolher` = 1) e desenha em `core/barras_faixa.rs`. **Conferido:** com o `QUICK3.ANT`, a região das barras e dos números (x ≥ 512, linhas 38–110 da tela) é igual à captura `qs_salvo.png` do mesmo instante, exceto a cor exata da marca na barra amarela (azul-escuro da paleta do port, (0, 0, 128), contra (0, 0, 168) do VGA do QEMU).
 
 **Não verificado:** quadros com imagem (mortes da amarela, tutorial), o prazo de 270 da faixa, o fim de jogo com vitória e no Full Game, a pontuação com parciais 4–7, outras resoluções (800×600).
