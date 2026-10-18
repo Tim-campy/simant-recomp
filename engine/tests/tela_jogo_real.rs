@@ -173,7 +173,9 @@ fn camada_de_cheiro_na_janela_de_edicao() {
 
 // 2026-10-18: com as barras e os números da faixa (core/barras_faixa.rs), conferidos contra a bancada
 // (mensagens.md §9); o resto da tela não mudou.
-const HASH_TELA_JOGO: &str = "e64b597926c6d37602354594778fdb915b6534efc64c199a5fcc57ead95a2cd9";
+// 2026-10-18: setas e polegares das barras de rolagem (gerenciador de janelas, janelas.md §8);
+// a região da janela de edição dá 99,59% contra j00 (resta o texto do título).
+const HASH_TELA_JOGO: &str = "1274ad6e2390bd2b28b41185e66c8d0d39f8d1fb4fdfe150516a6d6fbd3a1f8e";
 
 /// Janelas de controle (janelas.md): o clique no triângulo do Caste Control (na frente) muda
 /// `_casteLevels`, passa para Manual e recalcula `_IdealCaste`; Auto e os conjuntos.
