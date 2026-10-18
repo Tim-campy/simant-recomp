@@ -337,7 +337,8 @@ fn principal() -> Result<(), String> {
                 let (r, _) = s.tela.objeto_da_faixa(nome).ok_or("--menu: botão desconhecido")?;
                 s.abrir_menu_de_icones(i32::from(r.esq) + 2, i32::from(r.topo) + 2);
             }
-            Some(_) => return Err("--menu amarela@X,Y ou icones@OBJETO".into()),
+            Some(("mod", tecla)) => mods_ui::menu_pela_linha_de_comando(&mut s, tecla)?,
+            Some(_) => return Err("--menu amarela@X,Y, icones@OBJETO ou mod@TECLA[#ITEM]".into()),
             None => {}
         }
         match o.dialogo.as_deref() {

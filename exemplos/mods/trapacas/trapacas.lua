@@ -124,7 +124,7 @@ item("Formiga-leão perto da amarela", function(e)
 end)
 separador()
 -- Amarela ---------------------------------------------------------------------------------
-item("Luta: soldado vermelho ao lado da amarela", function(e)
+item("Luta: soldado vermelho junto da amarela", function(e)
   local a = e:amarela()
   if a.plano ~= "superficie" then
     return "a amarela não está na superfície"

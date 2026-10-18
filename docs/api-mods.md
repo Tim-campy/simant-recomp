@@ -1,6 +1,6 @@
 # API de mods
 
-Versão da API: **0.16**. Mods sobrescrevem dados (objetos do banco, `data/*.json`, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua").
+Versão da API: **0.17**. Mods sobrescrevem dados (objetos do banco, `data/*.json`, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua"); desde a 0.17, os scripts podem ter menu, painel e ações sobre o jogo (para testes, como o mod de trapaças de `exemplos/mods/trapacas/`).
 
 ## Estrutura
 
@@ -57,6 +57,8 @@ mods/
   - `mapa.json` (API 0.11): janela do mapa — tabelas `ctab`/`htab`/`ltab`/`ctab_r` (índices da paleta), `blocos` das cores 16–31, `conv` (`_ConvColor`), bitmaps da aranha, do pé e do cortador, `botoes_cheiro` (objeto da faixa → `_MapMode`). Ver `docs/spec/telas/mapa.md`.
   - `som.json` (API 0.6): som e música. `musicas` (id do cabeçalho tipo 18 → nome do `.mid` sem extensão, a tabela do original), `pasta_musicas`, `fonte_musica` (`arquivos` = `.MID` pela tabela, como o MCI; `banco` = objeto tipo 20 com a transposição do cabeçalho, como o modo Sound Blaster), `exigir_cabecalho`, `canais_midi`, `canal_percussao`, `taxa_efeitos` (Hz dos efeitos tipo 5), `taxa_saida`, `volume_musica`, `volume_efeitos` (0–1), `soundfont` (caminho de uma `.sf2` ou `null`), `musica_abertura`, `musica_jogo_novo`, `cauda_exportacao_s`. Ver `docs/spec/regras/som.md`.
   - `video.json` (API 0.16, opcional): vídeo do port — `escala` (inteira; 0 = a maior que cabe no monitor; padrão 1 = 640×480), `janela` (`[largura, altura]` inicial ou `null`), `redimensionavel`, `escala_inteira`. Todas as chaves são opcionais. A linha de comando (`--escala`, `--janela`) vence o arquivo. Ver `docs/decisoes.md` e o README.
+  - `codigos_trapaca.json` (API 0.17): os códigos de trapaça do **original** (`_CheatKeys`, `docs/spec/regras/trapacas.md`): `codigos` (lista de `codigo` de 4 letras A–Z/a–z e `efeito`), `valores`, `sons`, `mensagens`. Um mod pode trocar o texto de um código ou tirá-lo da lista (o efeito é o do original). Validado ao carregar.
+  - `menus_mods.json` (API 0.17): aparência do menu e do painel dos scripts (`menu`: fontes, alturas, margens e cores; `painel`: fontes, `canto` — `cima_direita`, `cima_esquerda`, `baixo_direita`, `baixo_esquerda` —, margens e cores). Extensão do port.
 - **Arquivos soltos do jogo:** `arquivos/<nome>` substitui um arquivo da pasta do jogo lido pelo port (as fontes `font1`–`font4` e `FONTRES.FON`; a partir da API 0.6, também caminhos com subpasta, como `arquivos/sound/gamethme.mid`, sem diferenciar maiúsculas).
 - **Ordem:** os mods são ordenados de modo que cada um venha depois das suas dependências; entre mods independentes, a ordem é alfabética. Se dois mods sobrescrevem a mesma coisa, vale o que vier por último.
 - **Erros:** dependência ausente, nome duplicado ou ciclo de dependências impedem o jogo de iniciar, com mensagem de erro.
@@ -82,6 +84,7 @@ O script define funções **globais** com estes nomes (no corpo do arquivo ou de
 | `ao_iniciar(estado)` | Uma vez, quando a partida começa (no Load, depois do `_FullCount`). |
 | `antes_do_tick(estado)` | Antes de cada tick da simulação (`_DoAntSim`). |
 | `depois_do_tick(estado)` | Depois de cada tick. |
+| `ao_menu(indice, texto, estado)` | (API 0.17) O jogador escolheu o item `indice` (a partir de 1, contando os separadores) do menu do mod (`definir_menu`). |
 | `ao_evento(evento, estado)` | Para cada pedido das regras à interface, antes de a interface tratá-lo. `evento.tipo` é `"som"`, `"musica"`, `"mensagem"` (com `id`), `"mensagem_faixa"` (com `lista`, `indice`), `"tema_do_ninho"`, `"fim_de_jogo"`, `"centralizar_na_amarela"` ou, desde a 0.16, `"espera"` (com `ms`: uma animação do tick espera esse tempo entre dois quadros; a interface atrasa os efeitos seguintes). |
 
 Os ganchos rodam **fora** do tick (antes e depois dele): a ordem interna do tick do original não muda. Sem nenhum mod com script, o laço do jogo é exatamente o mesmo de antes (os vetores de tick do original continuam iguais).
@@ -100,12 +103,19 @@ Leitura:
 | `estado:velocidade()` | 0 lenta … 3 ultra. |
 | `estado:pausado()`, `estado:fim_de_jogo()` | booleanos. |
 | `estado:comida_superficie()` | `_FoodA`. |
-| `estado:colonia(cor)` | tabela `saude`, `comida`, `adultos`, `ovos`, `operarias`, `soldados`, `machos`, `rainhas_novas`, `rainha`, `modo_estrategico` (castas da última contagem `_CountAnts`, a cada 64 ticks). |
+| `estado:colonia(cor)` | tabela `saude`, `comida`, `adultos`, `ovos`, `operarias`, `soldados`, `machos`, `rainhas_novas`, `rainha`, `modo_estrategico` (castas da última contagem `_CountAnts`, a cada 64 ticks); desde a 0.17, `rainhas_guardadas` (`_QueenStorage*`) e `rainhas_vivas` (`_BlkQueens`/`_RedQueens`). |
 | `estado:amarela()` | tabela `plano` (nome ou `nil`), `x`, `y`, `saude`, `cor`, `morreu`. |
 | `estado:dimensoes(plano)` | largura, altura. |
 | `estado:celula(plano, x, y)` | valor do tile (0..255, ver `docs/spec/regras/tiles-valores.md`) ou `nil` fora do mapa. |
 | `estado:ocupante(plano, x, y)` | byte do mapa de vida (0 = vazio; T da formiga; 0xFE/0xFF = amarela) ou `nil`. |
 | `estado:formigas(plano)` | lista das formigas da lista do plano (A, B ou R): `x`, `y`, `tipo` (T), `modo` (M), `cor`, `grupo` (`(T & 0x78) >> 3`), `direcao` (`T & 7`). |
+| `estado:sementes()` | (0.17) estado do gerador S (16 bits) e do R (32 bits). |
+| `estado:chuva()` | (0.17) tabela `chovendo` (`_RainOn`), `contagem` (`_RainCnt`), `lencol` (`_WaterTable`: linha da água nos ninhos; cai quando a água sobe). |
+| `estado:revoada(cor)` | (0.17) `_FlyAwayB`/`_FlyAwayR` (contagem regressiva da revoada; 0 = desarmada). |
+| `estado:menino()` | (0.17) tabela `dentro_de_casa` (`_NodeNum` < 0x26), `no` (`_NodeNum`), `presente` (`_BoyHere`), `cortando_grama`, `px`, `py`. |
+| `estado:patch()` | (0.17) patch atual do quintal (`_CurYardPnt`): x, y. |
+| `estado:quintal(cor, x, y)` | (0.17) população da cor no patch (x, y) do quintal (`_YMapPop*`). |
+| `estado:licao()` | (0.17) lição do tutorial (`_TutLesson`) e se já foi dada. |
 
 Escrita (sempre validada; uma recusa devolve `false` e não muda nada):
 
@@ -113,10 +123,34 @@ Escrita (sempre validada; uma recusa devolve `false` e não muda nada):
 |---|---|
 | `estado:colocar_comida(plano, x, y)` | Uma unidade de comida numa célula sem formiga: chão vira comida, comida ainda não cheia ganha uma unidade (a regra da ferramenta Comida do Experimental, `_IncFoodHere` sem Ctrl), e conta em `_FoodA`/`_FoodB`/`_FoodR`. Outros tiles recusam. |
 | `estado:colocar_pedra(x, y)` | Pedrinha (`regras.pedrinha` de `experimental.json`) numa célula livre da superfície (tile abaixo de `barreira_abaixo_de`, sem formiga). |
-| `estado:colocar_formiga(cor, x, y)` | Operária (T = `formiga_tipo`, + `formiga_vermelha` se vermelha; M = `formiga_modo_superficie`) numa célula livre da superfície, no fim da lista A (cheia: `false`). |
+| `estado:colocar_formiga(cor, x, y [, casta])` | Operária (T = `formiga_tipo`, + `formiga_vermelha` se vermelha; M = `formiga_modo_superficie`) numa célula livre da superfície, no fim da lista A (cheia: `false`). Desde a 0.17, `casta` = `"operaria"` (padrão) ou `"soldado"` (T = 0x30, grupo 6). |
 | `estado:definir_velocidade(v)` | `_GameSpeed` = v (0..3). |
 
 As tabelas usadas nas escritas vêm de `data/experimental.json` (com mods). Nenhuma escrita sorteia: os geradores S e R do jogo não são tocados.
+
+Ações (API 0.17). Diferente das escritas acima, uma ação é um **pedido**: o método valida os argumentos (argumento inválido é erro, que desliga o script) e devolve `true`; o jogo executa os pedidos **logo depois que o gancho termina**, na ordem em que foram feitos, com as tabelas das regras (com mods). Por isso uma leitura feita no mesmo gancho, depois da ação, ainda vê o estado de antes. Cada ação chama a rotina do original que faz aquilo e só sorteia o que essa rotina sorteia. Se o jogo recusar (o motivo está na tabela), nada muda e o motivo vai para o registro (`[mod] ... recusado: ...`) e para a faixa. Até 200 pedidos por chamada.
+
+| Método | Efeito (rotina do original) | Recusa |
+|---|---|---|
+| `estado:comecar_chuva()` | Começo da chuva de `_DoSimYard`: `_RainOn = 1`, `_RainCnt = SRand1(150) + 150`, `_InitWater` (100 gotas, R) e o balão do menino. | já chovendo; dentro de casa (`_TERRAINset` = 1) |
+| `estado:parar_chuva()` | `_RainCnt = 0`: a chuva acaba no tick seguinte, como no fim natural. | não está chovendo |
+| `estado:menino_cortar_grama()` | O menino lá fora, cortando a grama no meio do patch atual (os campos do estado 3 de `_SimKidOutside`: `_NodeNum` = 0x26, `_BoyHere` = 3, `_BoyIsMowing` = 1, posição e `_FootHere` = 1). | patch da casa |
+| `estado:menino_inseticida()` | O menino dentro de casa no nó 32 (parado com o inseticida); o veneno vale no patch (0, 12). | casa à venda |
+| `estado:criar_reprodutores(cor, n)` | Até `n` (1..200) operárias e soldados da cor (ninho primeiro, depois superfície) viram machos alados (grupo 4) em pré-voo (M = 14). O resto é do jogo: revoada vermelha armada sozinha com mais de 20 reprodutores. | nenhuma formiga adulta da cor |
+| `estado:armar_revoada(cor)` | `_FlyAway* = 200`, como o botão *Mate* do quintal (`ribMate`) e `_GstrR`. | já armada; sem machos nem rainhas aladas nas listas |
+| `estado:guardar_rainhas(cor, n)` | `_QueenStorage* += n` (1..100), como os códigos `just`/`oops`; habilita o botão PLACE. | — |
+| `estado:povoar_patch(cor, x, y, n)` | `_YMapPop*` do patch (x 0..11, y 0..15) = `n` (0..255). | — |
+| `estado:trocar_patch(x, y)` | `_XferPatch` para (x, y), com as mesmas recusas (só Full Game, poucas formigas, sem colônia preta) e o mesmo patch novo; a vista vai até a amarela. | as do original (texto 10000/10002/10004); mesmo patch |
+| `estado:trazer_gato()` | O gato entra no quintal (o fim de `_SimCat`, sem o sorteio). | o gato já está lá |
+| `estado:latir()` | `_MakeBark` (S4 escolhe o latido) e o atraso seguinte. | — |
+| `estado:trazer_aranha()` | A aranha entra no patch (o fim de `_MoveSpider` depois do sorteio de aparecer: S(1024), S(2)). | a aranha já está lá |
+| `estado:por_formiga_leao(x, y)` | `_AddAntLion(x, y)` na superfície (x 1..126, y 1..62), com a célula e as 8 vizinhas livres. | sem lugar; formigas-leão demais |
+| `estado:saude_amarela(v)` | `_SetMyHealth(v)` (0..100). | — |
+| `estado:matar_amarela()` | `_YellowDeath(8)` (fome), com mensagens e reencarnação. | — |
+| `estado:saude_colonia(cor, v)` | `_HealthB`/`_HealthR` = v (0..100), como `heal`/`zhea`. | — |
+| `estado:avancar_licao()` | Lição seguinte do tutorial (o que `_RunTutor` faz quando a lição foi concluída). | fora do tutorial |
+| `estado:terminar_jogo(resultado)` | `"vitoria"`: música e texto de vitória de `_SimColonies`, `_IsGameOver = 1`, `_BlackWon = 1`; `"derrota"`: texto de derrota, `_BlackWon = 0`. O quadro de fim de jogo vem no tick seguinte. | o jogo já acabou |
+| `estado:misterio()` | `_MysteryButton` (um `RRand(15)` e o efeito sorteado). | — |
 
 ### Funções globais
 
@@ -126,7 +160,11 @@ As tabelas usadas nas escritas vêm de `data/experimental.json` (com mods). Nenh
 | `mostrar_mensagem(texto [, duracao])` | Mensagem na faixa, como `_EditMessage` importante. Até 120 caracteres; `duracao` em unidades de `_TickCount` (1..10000; padrão: `faixa.duracao_conselho` de `mensagens.json`). |
 | `aleatorio()`, `aleatorio(n)`, `aleatorio(a, b)` | Gerador **do script** (real em [0, 1), inteiro em 1..n ou a..b). Determinístico: começa de uma semente tirada do nome do mod. `math.random` é o mesmo gerador. |
 | `semear_aleatorio(n)` | Troca a semente (também `math.randomseed`). |
-| `API_VERSAO`, `MOD_NOME` | `"0.12"` e o nome do mod. |
+| `definir_menu{titulo=..., tecla=..., itens={...}}` | (0.17) Menu do mod: até 40 itens de até 40 caracteres (`"-"` = separador); `tecla` = nome de tecla do SDL com `Ctrl+`, `Shift+`, `Alt+` (`"F12"`, `"Ctrl+Shift+T"`), que precisa ser F1–F24 ou ter Ctrl/Alt (letras e números são do jogo). Os atalhos do jogo (`partida.json`, `navegacao.json`, `janelas.json`) vêm antes: uma tecla já usada pelo jogo não abre o menu (o console avisa). A tecla abre o menu na tela de jogo (estilo menu do Windows 3.1, `data/menus_mods.json`); setas, Enter, clique, Esc. Com o menu aberto a simulação para. A escolha chama `ao_menu`. Chamar de novo troca o menu; `definir_menu(nil)` tira. |
+| `definir_painel(texto)` | (0.17) Painel de texto no canto da tela de jogo (até 16 linhas de 60 caracteres, separadas por `\n`), com o nome do mod; `nil` esconde. |
+| `avancar_ticks(n)` | (0.17) Pede `n` (1..10000) ticks seguidos, sem esperar o relógio e mesmo com o jogo pausado (com todos os ganchos de tick). Param no fim do jogo, num quadro modal ou com `parar_avanco()`. |
+| `parar_avanco()` | (0.17) Cancela os ticks pedidos que ainda faltam. |
+| `API_VERSAO`, `MOD_NOME` | `"0.17"` (era `"0.12"` até a 0.16) e o nome do mod. |
 
 ### Sandbox e limites
 
@@ -156,6 +194,7 @@ Saved correctly"`. `exame.json` ganhou `deslocamento_linhas` e `cor_fundo` (opci
 | 0.14 | `partida.json`, `relogio`: `iteracoes_por_mensagem` deu lugar a `resolucao_timer_ms` (55: o temporizador de 17 ms vira 55 ms, como no Windows 3.1) e `voltas_por_periodo` (voltas do laço de `MYTIMERFUNC` entre duas mensagens, por velocidade); o ritmo passou a ser o medido no original (6 ticks/s em normal). `tela_jogo.json` ganhou `barras_faixa` (opcional: sem ela, a faixa fica sem as barras). | Um `partida.json` de mod anterior precisa das duas chaves novas (o arquivo é trocado inteiro); a chave antiga é ignorada. `tela_jogo.json` antigo continua válido. |
 | 0.15 | `janelas.json` ganhou `quintal` (número da janela), `gerenciador` (tamanho mínimo, cores do contorno de arrasto, menu de sistema) e `teclas` (aceleradores de janela: `fechar_de_cima`, `menu_sistema`, `proxima`, `mover`, `maximizar_edicao`); `tela_jogo.json`, `edicao.moldura`, ganhou `titulo_inativo` e `cor_seta` (opcionais); `quintal_mapa.json` aceita a ação `para_mapa` (o botão Patch passou de `fechar` para ela). | Um `janelas.json` de mod anterior precisa das três chaves novas (o arquivo é trocado inteiro). Um `quintal_mapa.json` com `"ribPatch": "fechar"` continua válido (só fecha o quintal, sem virar o mapa). |
 | 0.16 | Novo arquivo sobrescrevível e opcional `data/video.json` (escala e janela). `amarela.json`, `animacao`: chave opcional `espera_quadro_ms` (padrão 165: tempo entre dois quadros de `_AnimYellowFight`, usado para espalhar os sons da luta e do choque). Novo pedido das regras `Evento::Espera(ms)`; nos scripts, `ao_evento` recebe `evento.tipo == "espera"` com `evento.ms`. | Compatível com 0.15: só acrescenta. Um `amarela.json` de mod sem a chave nova usa 165 ms; um script que trate só os tipos antigos ignora o novo. |
+| 0.17 | Scripts: gancho `ao_menu`; funções `definir_menu`, `definir_painel`, `avancar_ticks`, `parar_avanco`; leituras `sementes`, `chuva`, `revoada`, `menino`, `patch`, `quintal`, `licao` e os campos `rainhas_guardadas`/`rainhas_vivas` de `colonia`; `colocar_formiga` com `casta` opcional; ações (pedidos executados depois do gancho) de chuva, menino, revoada, rainhas, patch, bichos, amarela, colônia, lição, fim de jogo e Mystery. `API_VERSAO` passa a `"0.17"`. Novos arquivos sobrescrevíveis `data/codigos_trapaca.json` (códigos de trapaça do original) e `data/menus_mods.json`. Textos literais da faixa (inclusive `mostrar_mensagem`) passam a sair na codificação da fonte (Mac Roman nas fontes do Mac): acentos aparecem certos. | Compatível com 0.16: só acrescenta. Um script que compare `API_VERSAO == "0.12"` precisa aceitar `"0.17"`. Sem mod com script, nada muda no jogo; um mod que só defina menu e painel não muda o tick. |
 
 ## Planejado
 

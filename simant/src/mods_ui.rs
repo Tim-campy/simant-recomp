@@ -18,6 +18,28 @@ pub(crate) fn tecla_abre_menu(s: &mut Sessao, ev: &EventoNav) -> bool {
     true
 }
 
+/// `--menu mod@TECLA[#ITEM]` (com `--exportar-tela-jogo`): abre o menu do mod como se a tecla fosse
+/// apertada; com `#ITEM`, escolhe o item (a partir de 1) e fecha o menu.
+pub(crate) fn menu_pela_linha_de_comando(s: &mut Sessao, arg: &str) -> Result<(), String> {
+    let (tecla, item) = match arg.split_once('#') {
+        Some((t, i)) => (t, Some(i.parse::<usize>().map_err(|_| format!("--menu mod@{arg}: item inválido"))?)),
+        None => (arg, None),
+    };
+    let t = engine::scripts::TeclaMod::de_texto(tecla)?;
+    let ev = EventoNav::Tecla { nome: t.nome, ctrl: t.ctrl, shift: t.shift, alt: t.alt };
+    if !tecla_abre_menu(s, &ev) {
+        return Err(format!("--menu mod@{tecla}: nenhum menu de mod nessa tecla"));
+    }
+    if let Some(i) = item {
+        let dono = s.menu_mod.take().map(|m| m.dono).unwrap_or_default();
+        s.partida.escolher_no_menu_de_mod(&dono, i);
+        for l in s.partida.retirar_registro_scripts() {
+            println!("[script] {l}");
+        }
+    }
+    Ok(())
+}
+
 /// Avisa no console quando a tecla de um menu de mod já é de um acelerador do jogo (o jogo vence).
 pub(crate) fn avisar_teclas_ocupadas(s: &Sessao) {
     let Some(scripts) = s.partida.scripts.as_ref() else { return };

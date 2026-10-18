@@ -400,7 +400,11 @@ pub fn desenhar_faixa(q: &mut Quadro, recursos: &Recursos, interface: &Interface
     let c = interface.cores.get(cor as usize).copied().unwrap_or(crate::formats::janela::Cor { frente: 0, fundo: 15, fundo2: 15 });
     q.preencher(r, c.fundo, c.fundo);
     let (Some(t), Some(Some(f))) = (texto, interface.fontes.get(cfg.fonte)) else { return };
-    let bytes = bytes_da_faixa(recursos, t);
+    // Texto literal do port (velocidade, marcadores, scripts): na codificação da fonte da faixa.
+    let bytes = match t {
+        TextoFaixa::Literal(s) => f.codificar(s),
+        _ => bytes_da_faixa(recursos, t),
+    };
     let antes = q.recorte.replace(r);
     q.texto(Retangulo { dir: r.dir - 1, ..r }, f, &bytes, 3, c.frente, c.fundo);
     q.recorte = antes;

@@ -92,6 +92,8 @@ pub struct MenuModAberto {
     pub titulo: Retangulo,
     /// Retângulo de cada item (os separadores também, para o desenho).
     pub itens: Vec<Retangulo>,
+    /// x das linhas entre colunas (menu com mais de uma coluna).
+    pub colunas: Vec<i16>,
     pub realcado: Option<usize>,
 }
 
@@ -107,18 +109,13 @@ fn fonte<'i>(lista: &[usize], fontes: &'i [Option<Fonte>]) -> Option<&'i Fonte> 
     lista.iter().find_map(|&i| fontes.get(i).and_then(|f| f.as_ref()))
 }
 
-/// Texto do Lua (UTF-8) nos bytes da fonte do Windows (Latin-1; o resto vira '?').
-fn bytes(texto: &str) -> Vec<u8> {
-    texto.chars().map(|c| if (c as u32) < 256 { c as u8 } else { b'?' }).collect()
-}
-
 fn largura(f: Option<&Fonte>, texto: &str) -> i32 {
-    f.map_or(texto.chars().count() as i32 * 8, |f| f.largura_texto(&bytes(texto)) as i32)
+    f.map_or(texto.chars().count() as i32 * 8, |f| f.largura_texto(&f.codificar(texto)) as i32)
 }
 
 fn escrever(q: &mut Quadro, f: Option<&Fonte>, x: i32, y: i32, texto: &str, cor: u8) {
     let Some(f) = f else { return };
-    let img = f.imagem(&bytes(texto));
+    let img = f.imagem(&f.codificar(texto));
     for j in 0..img.altura {
         for i in 0..img.largura {
             if img.bits[j * img.largura + i] {
@@ -133,35 +130,63 @@ fn altura_fonte(f: Option<&Fonte>) -> i32 {
 }
 
 impl MenuModAberto {
-    /// Abre o menu centrado em x dentro de `area`, a `topo` pixels do alto dela.
+    /// Abre o menu centrado em x dentro de `area`, a `topo` pixels do alto dela. Se os itens não
+    /// cabem na altura, o menu ganha colunas (como um menu do Windows com quebra de coluna), quebrando
+    /// antes do item que passaria do fim; um separador no começo de coluna some.
     pub fn abrir(cfg: &ConfigMenusMods, fontes: &[Option<Fonte>], dono: &str, menu: &MenuMod, area: Retangulo) -> MenuModAberto {
         let c = &cfg.menu;
         let f = fonte(&c.fontes, fontes);
         let ft = fonte(&c.fontes_titulo, fontes);
-        let titulo = format!("{} ({})", menu.titulo, menu.tecla.texto());
-        let mut w = largura(ft, &titulo) + 2 * i32::from(c.margem_x);
+        let margem = 2 * i32::from(c.margem_x);
+        let max_itens = (i32::from(area.base - area.topo) - 2 * i32::from(c.topo) - i32::from(c.altura_titulo) - 3).max(i32::from(c.altura_item));
+        // Coluna, y relativo e altura de cada item.
+        let mut lugares = Vec::with_capacity(menu.itens.len());
+        let (mut col, mut y) = (0usize, 0i32);
         for item in &menu.itens {
-            w = w.max(largura(f, item) + 2 * i32::from(c.margem_x));
+            let mut a = i32::from(if e_separador(item) { c.altura_separador } else { c.altura_item });
+            if y > 0 && y + a > max_itens {
+                col += 1;
+                y = 0;
+            }
+            if y == 0 && e_separador(item) {
+                a = 0;
+            }
+            lugares.push((col, y, a));
+            y += a;
         }
-        let w = w.max(i32::from(c.largura_minima)) as i16;
-        let altura_itens: i16 = menu.itens.iter().map(|i| if e_separador(i) { c.altura_separador } else { c.altura_item }).sum();
-        let h = c.altura_titulo + altura_itens + 3;
+        let ncol = col + 1;
+        let mut larguras = vec![0i32; ncol];
+        let mut altura = 0;
+        for (item, &(col, y, a)) in menu.itens.iter().zip(&lugares) {
+            larguras[col] = larguras[col].max(largura(f, item) + margem);
+            altura = altura.max(y + a);
+        }
+        let titulo = format!("{} ({})", menu.titulo, menu.tecla.texto());
+        let soma: i32 = larguras.iter().sum::<i32>() + ncol as i32 - 1;
+        let w = soma.max(largura(ft, &titulo) + margem).max(i32::from(c.largura_minima));
+        // A sobra de largura vai para a última coluna.
+        larguras[ncol - 1] += w - soma;
+        let w = w as i16 + 2;
+        let h = c.altura_titulo + altura as i16 + 3;
         let esq = area.esq + ((area.dir - area.esq - w) / 2).max(0);
         let topo = (area.topo + c.topo).min((area.base - h).max(area.topo));
         let externo = Retangulo { esq, topo, dir: esq + w, base: topo + h };
         let titulo_r = Retangulo { esq: esq + 1, topo: topo + 1, dir: esq + w - 1, base: topo + 1 + c.altura_titulo };
-        let mut y = titulo_r.base + 1;
-        let itens = menu
-            .itens
+        let y0 = titulo_r.base + 1;
+        let mut x_col = vec![esq + 1];
+        for l in &larguras[..ncol - 1] {
+            let ultimo = *x_col.last().unwrap_or(&(esq + 1));
+            x_col.push(ultimo + *l as i16 + 1);
+        }
+        let itens = lugares
             .iter()
-            .map(|i| {
-                let a = if e_separador(i) { c.altura_separador } else { c.altura_item };
-                let r = Retangulo { esq: esq + 1, topo: y, dir: esq + w - 1, base: y + a };
-                y += a;
-                r
+            .map(|&(col, y, a)| {
+                let x = x_col[col];
+                Retangulo { esq: x, topo: y0 + y as i16, dir: x + larguras[col] as i16, base: y0 + (y + a) as i16 }
             })
             .collect();
-        MenuModAberto { dono: dono.to_string(), menu: menu.clone(), externo, titulo: titulo_r, itens, realcado: None }
+        let colunas = x_col[1..].iter().map(|&x| x - 1).collect();
+        MenuModAberto { dono: dono.to_string(), menu: menu.clone(), externo, titulo: titulo_r, itens, colunas, realcado: None }
     }
 
     /// Item (índice a partir de 0) sob o ponto, se não for separador.
@@ -224,7 +249,13 @@ impl MenuModAberto {
         let titulo = format!("{} ({})", self.menu.titulo, self.menu.tecla.texto());
         let yt = i32::from(t.topo) + (i32::from(t.base - t.topo) - altura_fonte(ft)) / 2;
         escrever(q, ft, i32::from(t.esq) + i32::from(c.margem_x) - 1, yt, &titulo, c.cor_texto_titulo);
+        for &x in &self.colunas {
+            q.linha(i32::from(x), i32::from(t.base) + 1, i32::from(x), i32::from(e.base) - 2, c.cor_separador);
+        }
         for (i, (r, texto)) in self.itens.iter().zip(&self.menu.itens).enumerate() {
+            if r.base == r.topo {
+                continue;
+            }
             if e_separador(texto) {
                 let y = i32::from(r.topo + r.base) / 2;
                 q.linha(i32::from(r.esq) + 1, y, i32::from(r.dir) - 2, y, c.cor_separador);
@@ -298,6 +329,18 @@ mod testes {
         m.tecla("Down");
         assert_eq!(m.realcado, Some(0), "dá a volta");
         assert_eq!(m.tecla("Escape"), RespostaMenuMod::Fechar);
+    }
+
+    #[test]
+    fn itens_demais_viram_colunas() {
+        let cfg = ConfigMenusMods::de_json(include_str!("../../../data/menus_mods.json")).unwrap();
+        let itens: Vec<String> = (0..40).map(|i| if i % 5 == 4 { "-".to_string() } else { format!("item {i}") }).collect();
+        let menu = MenuMod { titulo: "T".into(), tecla: TeclaMod::de_texto("F12").unwrap(), itens };
+        let area = Retangulo { esq: 0, topo: 40, dir: 640, base: 442 };
+        let m = MenuModAberto::abrir(&cfg, &[], "m", &menu, area);
+        assert!(!m.colunas.is_empty());
+        assert!(m.externo.base <= area.base && m.externo.dir <= area.dir);
+        assert!(m.itens.iter().all(|r| r.base <= m.externo.base));
     }
 
     #[test]
