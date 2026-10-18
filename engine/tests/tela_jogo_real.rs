@@ -195,8 +195,9 @@ fn janela_de_castas_muda_os_niveis() {
     assert_eq!(j.janelas_padrao(2), Some(Controle::Mapa));
     assert_eq!(j.gerente.ordem(), vec![19, 18, 1, 0]);
     j.trazer_para_frente(Some(Controle::Castas));
-    // Ápice do triângulo (casteTriangle (392, 342) no layout, deslocamento (0, −52)): reprodutores 100%.
-    assert_eq!(j.clicar(&r, &mut e, 447, 290, false).unwrap(), Clique::Cliente(19));
+    // Ápice do triângulo (casteTriangle (392, 342) no layout, deslocamento (0, −52); largura 108 no
+    // triângulo do clique, que é o do botão): reprodutores 100%.
+    assert_eq!(j.clicar(&r, &mut e, 446, 290, false).unwrap(), Clique::Cliente(19));
     assert!(j.soltar());
     assert_eq!(e.controles.castas[0], 0xFFFF);
     assert_eq!(e.controles.casta_automatica, 0);
