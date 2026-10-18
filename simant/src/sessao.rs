@@ -104,6 +104,10 @@ impl Sessao<'_> {
             // File → Load: _FullCount e o jogo pausado (mensagens.md §6).
             partida.ao_carregar();
         }
+        // Scripts Lua dos mods ativos (docs/api-mods.md, "Scripts Lua"): recomeçam a cada partida.
+        if let Some(scripts) = engine::scripts::Scripts::carregar(recursos, Default::default())? {
+            partida.ligar_scripts(scripts);
+        }
         let arquivo = match origem {
             Origem::Save(p, ..) => Some(p.to_path_buf()),
             Origem::Novo(..) => None,
@@ -425,6 +429,9 @@ impl Sessao<'_> {
     /// Escreve os pedidos das regras à interface (mensagens, músicas, fim de jogo) e os devolve
     /// (o som é tocado por `som::Audio`); por enquanto sem texto nem diálogo.
     pub(crate) fn registrar_eventos(&mut self) -> Vec<EventoRegras> {
+        for linha in self.partida.retirar_registro_scripts() {
+            println!("[script] {linha}");
+        }
         let eventos = self.partida.retirar_eventos();
         for ev in &eventos {
             let t = self.partida.estado.partida.tempo;

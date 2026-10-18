@@ -204,7 +204,8 @@ impl Scripts {
                     let i = s.mods.len() - 1;
                     recolher(&mut s.mods[i], &mut s.registro, &mut s.mensagens);
                 }
-                Err((m, e)) => {
+                Err(erro) => {
+                    let (m, e) = *erro;
                     if let Some(mut m) = m {
                         recolher(&mut m, &mut s.registro, &mut s.mensagens);
                     }
@@ -317,17 +318,17 @@ pub fn ler_scripts_do_mod(m: &Mod) -> Result<ArquivosScript, String> {
         .collect()
 }
 
-type ErroCarga = (Option<ScriptMod>, mlua::Error);
+type ErroCarga = Box<(Option<ScriptMod>, mlua::Error)>;
 
 fn carregar_mod(nome: &str, arquivos: &ArquivosScript, tabelas: Rc<TabelasExperimental>, limites: Limites) -> Result<ScriptMod, ErroCarga> {
-    let (lua, orcamento) = nova_maquina(nome, tabelas, limites).map_err(|e| (None, e))?;
+    let (lua, orcamento) = nova_maquina(nome, tabelas, limites).map_err(|e| Box::new((None, e)))?;
     let mut m = ScriptMod { nome: nome.to_string(), lua, ativo: true, ganchos: [false; 4], orcamento };
     for (arquivo, codigo) in arquivos {
         m.orcamento.reiniciar();
         let r = m.lua.load(codigo.as_str()).set_name(format!("@{nome}/{arquivo}")).set_mode(ChunkMode::Text).exec();
         if let Err(e) = r {
             m.ativo = false;
-            return Err((Some(m), e));
+            return Err(Box::new((Some(m), e)));
         }
     }
     m.ganchos = procurar_ganchos(&m.lua);
