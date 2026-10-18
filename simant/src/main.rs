@@ -338,7 +338,17 @@ fn principal() -> Result<(), String> {
                 s.abrir_menu_de_icones(i32::from(r.esq) + 2, i32::from(r.topo) + 2);
             }
             Some(("mod", tecla)) => mods_ui::menu_pela_linha_de_comando(&mut s, tecla)?,
-            Some(_) => return Err("--menu amarela@X,Y, icones@OBJETO ou mod@TECLA[#ITEM]".into()),
+            Some(("sistema", id)) => {
+                // Menu de sistema da janela ID (aberta se preciso), para comparar com a bancada (w04).
+                let id: u16 = id.parse().map_err(|_| "--menu sistema@ID")?;
+                if id == s.janelas.cfg.id(Controle::Castas) {
+                    s.botao_usuario(1);
+                }
+                if !s.janelas.gerente.abrir_menu(id) {
+                    return Err(format!("--menu sistema@{id}: janela fechada"));
+                }
+            }
+            Some(_) => return Err("--menu amarela@X,Y, icones@OBJETO, mod@TECLA[#ITEM] ou sistema@ID".into()),
             None => {}
         }
         match o.dialogo.as_deref() {

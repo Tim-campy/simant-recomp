@@ -354,6 +354,9 @@ pub struct ConfigMenuSistema {
     /// Folga embaixo do último item.
     pub folga_base: i16,
     pub margem_texto: i16,
+    /// Topo da célula da fonte em relação ao topo da faixa do item.
+    #[serde(default)]
+    pub topo_texto: i16,
     /// Distância do texto do atalho à borda esquerda.
     pub coluna_atalho: i16,
     pub fontes: Vec<usize>,
@@ -1045,18 +1048,34 @@ impl Gerenciador {
                 c.cor_texto
             };
             let Some(f) = fonte else { continue };
-            let texto: Vec<u8> = it.texto.bytes().filter(|&b| b != b'&').collect();
             let antes = q.recorte.replace(faixa);
-            let alt = f.altura() as i16;
-            let y0 = topo + (h as i16 - alt) / 2;
-            let tr = Retangulo { esq: r.esq + c.margem_texto, topo: y0, dir: r.dir - 1, base: y0 + alt };
-            q.texto(tr, f, &texto, 0, frente, fundo);
+            let y0 = topo + c.topo_texto;
+            // Win 3.1: o texto do item alinhado à esquerda na margem e o do atalho (depois do tab)
+            // alinhado à esquerda numa coluna comum [medido em w04].
+            texto_a_esquerda(q, f, &it.texto, r.esq + c.margem_texto, y0, frente, fundo);
             if !it.atalho.is_empty() {
-                let ta = Retangulo { esq: r.esq + c.coluna_atalho, ..tr };
-                q.texto(ta, f, it.atalho.as_bytes(), 0, frente, fundo);
+                texto_a_esquerda(q, f, &it.atalho, r.esq + c.coluna_atalho, y0, frente, fundo);
             }
             q.recorte = antes;
         }
+    }
+}
+
+/// Texto com a borda esquerda em `x` (o `Quadro::texto` com alinhamento 0 centraliza no retângulo;
+/// um retângulo da largura exata do texto deixa-o em `x`). `&` sublinha a letra seguinte, na linha
+/// de base + 2 e na largura da célula da letra [medido em w04: o "C" de Close e o "t" de Next].
+fn texto_a_esquerda(q: &mut Quadro, f: &Fonte, texto: &str, x: i16, topo: i16, frente: u8, fundo: u8) {
+    let bytes: Vec<u8> = texto.bytes().filter(|&b| b != b'&').collect();
+    let w = f.largura_texto(&bytes) as i16;
+    let alt = f.altura() as i16;
+    q.texto(Retangulo { esq: x, topo, dir: x + w, base: topo + alt }, f, &bytes, 0, frente, fundo);
+    if let Some(p) = texto.find('&') {
+        let antes = f.largura_texto(texto[..p].as_bytes()) as i32;
+        let letra = texto.as_bytes().get(p + 1).copied().unwrap_or(b' ');
+        let lw = f.largura_texto(&[letra]) as i32;
+        let yb = i32::from(topo) + f.ascendente() as i32 + 1;
+        let x0 = i32::from(x) + antes;
+        q.linha(x0, yb, x0 + lw - 1, yb, frente);
     }
 }
 
@@ -1189,11 +1208,12 @@ mod testes {
                 .collect(),
                 largura: 149,
                 altura_item: 18,
-                altura_separador: 4,
+                altura_separador: 7,
                 linha_separador: 3,
-                folga_base: 3,
-                margem_texto: 15,
-                coluna_atalho: 90,
+                folga_base: 0,
+                margem_texto: 16,
+                topo_texto: 0,
+                coluna_atalho: 88,
                 fontes: vec![],
                 cor_fundo: 15,
                 cor_texto: 0,
@@ -1451,5 +1471,17 @@ mod testes {
         g.abrir(27, r(100, 100, 300, 200), Estilo::do_layout([0x42, 0x08], false), FINA);
         assert_eq!(g.pressionar(30, 300, false), Clique::Nada);
         assert_eq!(g.topo(), Some(27));
+    }
+
+    /// Geometria do menu de sistema medida pixel a pixel na captura w04 da bancada (menu da Caste
+    /// Control): itens de 18 linhas a partir da linha 1 do contorno, separadores de 7, contorno de
+    /// baixo logo depois do último item (Close em 98, Next em 123, altura 142).
+    #[test]
+    fn geometria_do_menu_de_sistema_como_na_bancada() {
+        let g = Gerenciador::new(cfg(), r(0, 73, 640, 442));
+        let (itens, altura) = g.layout_menu();
+        let topos: Vec<i32> = itens.iter().map(|&(t, _)| t).collect();
+        assert_eq!(topos, [1, 19, 37, 55, 73, 91, 98, 116, 123]);
+        assert_eq!(altura, 142);
     }
 }
