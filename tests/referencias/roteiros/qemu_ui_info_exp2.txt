@@ -1,0 +1,29 @@
+# Info do Experimental segurada duas vezes na mesma formiga: posição da janela na 1.ª e na 2.ª abertura.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_info_exp2.txt --overlay re_trabalho/qemu/ov_ui_exp.qcow2
+snapshot_carregar exp
+esperar 3
+teclas shift+0
+esperar 2
+escrever_variavel CurExpTool 3
+escrever_variavel 8:8603 0 1
+clicar_em 112 246
+esperar 2
+escrever_variavel CurExpTool 0
+ir_para 112 246
+apertar
+esperar 2
+capturar re_trabalho/agente_ui/j01_primeira.png
+soltar
+esperar 2
+ir_para 112 246
+apertar
+esperar 2
+capturar re_trabalho/agente_ui/j02_segunda.png
+soltar
+esperar 2
+ir_para 112 246
+apertar
+esperar 2
+capturar re_trabalho/agente_ui/j03_terceira.png
+soltar
+fim

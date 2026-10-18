@@ -53,6 +53,8 @@ pub(crate) struct Sessao<'a> {
     /// Menus e painéis dos scripts de mods (API 0.17, simant/src/mods_ui.rs) e o menu aberto agora.
     pub(crate) menus_mods_cfg: engine::core::menus_mods::ConfigMenusMods,
     pub(crate) menu_mod: Option<engine::core::menus_mods::MenuModAberto>,
+    /// Ajuda: modo de ajuda, contextos e cursores (simant/src/ajuda_ui.rs).
+    pub(crate) ajuda: ajuda_ui::AjudaUi,
 }
 
 /// Para quem vai a escolha do menu aberto.
@@ -185,6 +187,7 @@ impl Sessao<'_> {
             info,
             menus_mods_cfg: recursos.dados(engine::core::menus_mods::ARQUIVO_CONFIG)?,
             menu_mod: None,
+            ajuda: ajuda_ui::AjudaUi::carregar(recursos)?,
         };
         for a in abertas.into_iter().flatten() {
             s.depois_de_abrir(a);
@@ -279,6 +282,7 @@ impl Sessao<'_> {
         }
         // Contorno do arrasto (mover, redimensionar, polegar) e menu de sistema.
         self.desenhar_gerente(&mut q);
+        ajuda_ui::desenhar(self, &mut q);
         mods_ui::desenhar(self, &mut q);
         self.desenhar_dialogo(&mut q);
         if !pendentes.is_empty() {

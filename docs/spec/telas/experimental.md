@@ -52,7 +52,7 @@ A ligação item → janela de submenu é pelos nomes dos objetos; o código só
 
 ## 3. Clique e arrasto: `_processExp` (`1010:7022`)
 
-No Experimental, todo clique na área do mapa da janela de edição (esquerdo ou direito, simples ou duplo) vai para `_processExp(x, y)` em vez de virar ordem da amarela (`_processEdit`, `1000:6a38`) [código]. Também vale na janela do mapa pequeno, com outra conversão de coordenadas.
+No Experimental, todo clique esquerdo na área do mapa da janela de edição (simples ou duplo) vai para `_processExp(x, y)` (o direito liga o modo de ajuda: [ajuda-contexto.md](ajuda-contexto.md) §1) em vez de virar ordem da amarela (`_processEdit`, `1000:6a38`) [código]. Também vale na janela do mapa pequeno, com outra conversão de coordenadas.
 
 1. `_ExpLastPnt = (x, y)`; se `_IsValidLocation(_MapPlane, x, y)`, `_DoTool(x, y)`.
 2. Enquanto o botão continua apertado (`_myButton`), a cada volta: lê o cursor; se mudou de célula, `_ExpLastPnt` = célula anterior e `_DoTool(nova)` (se válida); e, **com `_CurExpTool` > 4** (cheiro e inseticida), `_DoTool` de novo na célula do cursor em toda volta, mesmo parado.
@@ -73,6 +73,8 @@ No Experimental, todo clique na área do mapa da janela de edição (esquerdo ou
 - `examStr3`: a lista 4/1103 pelo grupo ("Nothing", "Egg", "Food", "Dirt"…).
 
 Não muda o estado. No port: `examinar(e, plano, x, y) -> Option<Exame>`.
+
+**Bancada (2026-10-18, `qemu_ui_info_exp.txt` e `qemu_ui_info_exp2.txt`, snapshot `exp` pausado):** formiga preta posta na célula (5, 5) com a ferramenta 3; com a Info, segurar o botão nela abre o Examine ("Worker / Foraging / Nothing") e soltar fecha (i01, i02); segurar numa célula vazia não abre nada (i04). O quadro fica com o contorno no canto calculado por `_MagnifyMenu`, exceto na **primeira** abertura da sessão, 3 pixels à direita (j01 contra j02 e j03, mesma célula; também visto em examine_0) [causa em aberto; o port usa sempre o canto calculado]. O port faz o mesmo (teste `info_do_experimental_abre_o_exame`). O relato "a Info não funciona" vinha, provavelmente, do menu de ferramentas: no original ele é de segurar o botão (abre ao apertar, escolhe ao soltar num item, i05/i06), e o port só escolhia num segundo clique — quem arrastava e soltava em "ANT INFO", como no original, ficava com a ferramenta anterior. Corrigido (ver "O que o port faz").
 
 ### 4.1 Barreira (`_DropWall`, `1010:7450`, e `_ConnectAll`, `1010:805a`)
 
@@ -160,9 +162,9 @@ O mundo (formigas, ninhos, comida) continua o mesmo. No port: `quick_para_experi
 
 `simant/src/modos.rs` e `engine/src/core/menu_ferramentas.rs` (dados em `data/menu_ferramentas.json`):
 
-- No Experimental, o botão `ribTools` da faixa mostra o bitmap 14500 (`_NewGame` troca o par para 14550/14500) e abre o menu da janela 9 abaixo do botão, com um contorno no item da ferramenta atual. Um item com submenu abre o submenu (janelas 12–17) ao lado; o clique num item do submenu grava `_ExpSubStates` e fecha o menu. Clique fora fecha sem escolher. A posição do menu é escolha do port [hipótese].
+- No Experimental, o botão `ribTools` da faixa mostra o bitmap 14500 (`_NewGame` troca o par para 14550/14500) e, ao ser **apertado**, abre o menu da janela 9 como no original (i05, 2026-10-18): centrado no botão pela conta de `_RibbonToolsMenu` (x = (direita − largura + esquerda) / 2, contorno 1 pixel depois), contorno na linha 74 da área cliente, 1 linha preta e 4 azuis, o item da ferramenta atual **invertido** (`__win_SetProxItem`) — 100% dos pixels iguais à captura. Com o botão apertado, o realce segue o mouse e o item com submenu abre o submenu (janelas 12–17) ao lado; **soltar** num item escolhe (no submenu, grava `_ExpSubStates`); soltar fora, ou no próprio botão, fecha sem escolher (i06). A simulação para com o menu aberto (`_SetPause(1)`). Não feito: a moldura dos submenus (sem captura) e o `_EditMessage` vazio que o original faz ao fechar (a mensagem "Game Paused" some da faixa em i06).
 - No Quick Game o mesmo botão passa a partida para o Experimental (`quick_para_experimental`) sem o menu de um item (janela 10); no Full Game e no Tutorial não faz nada (divergencias.md).
-- No Experimental, todo clique no mapa da janela de edição (esquerdo ou direito) vai para `experimental::pressionar`; mover o mouse com o botão apertado chama `arrastar` a cada evento de movimento (o original repete no ritmo do redesenho); soltar chama `soltar`. Ctrl é lido do estado do teclado no momento. Os sons e a música das ferramentas vão para a fila de eventos (tocados pelo som do port); avisos e o quadro de exame só aparecem no terminal.
+- No Experimental, todo clique esquerdo no mapa da janela de edição vai para `experimental::pressionar` (desde 2026-10-18 o direito liga o modo de ajuda, como no original); mover o mouse com o botão apertado chama `arrastar` a cada evento de movimento (o original repete no ritmo do redesenho); soltar chama `soltar`. Ctrl é lido do estado do teclado no momento. Os sons e a música das ferramentas vão para a fila de eventos (tocados pelo som do port); avisos só aparecem no terminal; o quadro de exame da Info (janela 29) é desenhado (seção 4.0). O cursor muda com a ferramenta sobre a área cliente da edição ([ajuda-contexto.md](ajuda-contexto.md) §5).
 
 ## 9. Verificação
 

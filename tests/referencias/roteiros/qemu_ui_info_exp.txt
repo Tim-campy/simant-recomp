@@ -1,0 +1,43 @@
+# Ferramenta Info do Experimental (_DoTool 0 -> _MagnifyMenu) e o menu de ferramentas.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_info_exp.txt --overlay re_trabalho/qemu/ov_ui_exp.qcow2
+# (ov_ui_exp.qcow2 = cópia do ov_exp2.qcow2, com o snapshot "exp"). Célula (c, l) da edição = tela (32 + 16c, 166 + 16l).
+snapshot_carregar exp
+esperar 3
+teclas shift+0
+esperar 2
+# Formiga preta (ferramenta 3, subopção 0) na célula (5, 5)
+escrever_variavel CurExpTool 3
+escrever_variavel 8:8603 0 1
+clicar_em 112 246
+esperar 2
+capturar re_trabalho/agente_ui/i00_formiga_posta.png
+# Info (ferramenta 0) segurando na formiga
+escrever_variavel CurExpTool 0
+ir_para 112 246
+apertar
+esperar 2
+capturar re_trabalho/agente_ui/i01_info_segurando.png
+soltar
+esperar 2
+capturar re_trabalho/agente_ui/i02_info_solto.png
+# Info num clique rápido na formiga
+clicar_em 112 246
+esperar 1
+capturar re_trabalho/agente_ui/i03_info_clique_rapido.png
+# Info segurando numa célula vazia (10, 8)
+ir_para 192 294
+apertar
+esperar 2
+capturar re_trabalho/agente_ui/i04_info_vazio.png
+soltar
+esperar 1
+# Menu de ferramentas pela faixa (botão ribTools) segurando, e escolha da Info pelo menu
+ir_para 354 70
+apertar
+esperar 2
+capturar re_trabalho/agente_ui/i05_menu_ferramentas.png
+soltar
+esperar 2
+capturar re_trabalho/agente_ui/i06_menu_solto.png
+ler_variavel CurExpTool re_trabalho/agente_ui/i06_tool.bin
+fim

@@ -52,7 +52,7 @@ fn select_a_game_bate_com_os_cliques_da_bancada() {
 fn menu_de_ferramentas_e_submenus() {
     let Some(r) = recursos() else { return };
     let mut m = MenuFerramentas::carregar(&r).unwrap();
-    m.abrir(Retangulo { esq: 100, topo: 40, dir: 125, base: 60 });
+    m.abrir(Retangulo { esq: 100, topo: 40, dir: 125, base: 60 }, None);
     // Itens de 17 pixels a partir de (3, 3) do objeto 0 (janela 9 do WINGANT).
     let (ox, oy) = (i32::from(m.origem.0), i32::from(m.origem.1));
     assert_eq!(m.item_em(ox + 10, oy + 5), Some(ItemMenu::Ferramenta(Ferramenta::Info)));
@@ -61,7 +61,9 @@ fn menu_de_ferramentas_e_submenus() {
     let (_, (sx, sy)) = m.submenu.unwrap();
     // Submenu cideMenu (janela 14): toolSpray e toolStream.
     assert_eq!(m.item_em(i32::from(sx) + 5, i32::from(sy) + 16), Some(ItemMenu::Subopcao(Ferramenta::Inseticida, 1)));
-    assert!(!m.contem(ox - 5, oy - 5));
+    // A moldura (5 pixels) é do menu; fora dela, não.
+    assert!(m.contem(ox - 5, oy - 5));
+    assert!(!m.contem(ox - 6, oy - 6));
 }
 
 #[test]

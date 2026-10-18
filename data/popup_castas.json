@@ -1,0 +1,21 @@
+{
+  "_comentario": "Área das barras da faixa (mapRibCaste 0x2227 em _ProcMapRibbonEvent, yardRibCaste 0x2324 em _ProcYardRibbonEvent): clique na barra de saúde da amarela -> _DoHealthSetY (_MeWarnHealth), na da colônia preta -> _DoWarnSetB (_BlkWarnHealth), no resto da área -> _DrawCastePopUp (1000:5d9e), o quadro da janela 23 (antPopWin) enquanto o botão fica apertado, com o jogo pausado. escala_x: colunas dos objetos ribYellowH2/ribBlackH2 da faixa 35, que o original usa nas duas faixas (limiar = (x - 567) * 100 / 64; bancada: x 580 -> 20, 620 -> 82, 590 -> 35). Geometria do quadro medida na bancada (b01_ribBlacks.png, 2026-10-18): contorno preto em (451, 76) da área cliente, encostado na borda direita (640), 189 x 149, 1 linha preta + 4 azuis; o conteúdo começa logo dentro da moldura e é cortado por ela à direita e embaixo. Ver docs/spec/telas/mensagens.md §9.1.",
+  "faixa_mapa": {"area": "mapRibCaste", "saude_amarela": "ribYellowHealth", "saude_preta": "ribBlackHealth"},
+  "faixa_quintal": {"area": "yardRibCaste", "saude_amarela": "ribYellowH2", "saude_preta": "ribBlackH2"},
+  "escala_x": [567, 631],
+  "janela": 23,
+  "objeto_grafico": "antPopGraphArea",
+  "objeto_preto": "antPopBlack",
+  "objeto_vermelho": "antPopRed",
+  "fonte": 2,
+  "externo": [189, 149],
+  "margem_direita": 0,
+  "topo": 76,
+  "largura_borda": 5,
+  "cor_borda": 4,
+  "cor_contorno": 0,
+  "cor_fundo": 15,
+  "ajuste_conteudo": [-2, -2],
+  "ajuste_numeros": [0, 0],
+  "ajuste_barras": [0, 0]
+}

@@ -14,6 +14,9 @@ Comandos de roteiro (um por linha, # = comentário):
     clicar_em X Y               leva o cursor a (X, Y) da tela emulada (canto + movimento exato) e clica
     ir_para X Y                 só leva o cursor a (X, Y)
     apertar / soltar            segura / solta o botão esquerdo do mouse
+    apertar_direito / soltar_direito   segura / solta o botão direito
+    clicar_direito              clique direito
+    clicar_direito_em X Y       leva o cursor a (X, Y) e dá um clique direito
     apertar_tecla K / soltar_tecla K   segura / solta a tecla K (qcode do QMP: ctrl, shift...)
     capturar ARQUIVO.png        screendump da tela emulada
     memoria INICIO TAMANHO ARQ  pmemsave (endereço físico)
@@ -660,9 +663,9 @@ def mouse_canto(q):
         time.sleep(0.02)
 
 
-def clicar(q):
+def clicar(q, botao="left"):
     for down in (True, False):
-        q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": down, "button": "left"}}])
+        q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": down, "button": botao}}])
         time.sleep(0.15)
 
 
@@ -994,6 +997,16 @@ class Bancada:
             clicar(q)
         elif c == "clicar":
             clicar(q)
+        elif c == "clicar_direito":
+            clicar(q, "right")
+        elif c == "clicar_direito_em":
+            mouse_canto(q)
+            mover_rel(q, int(a[0]), int(a[1]))
+            time.sleep(0.2)
+            clicar(q, "right")
+        elif c in ("apertar_direito", "soltar_direito"):
+            q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": c == "apertar_direito", "button": "right"}}])
+            time.sleep(0.15)
         elif c == "ir_para":
             # só posiciona o cursor em (X, Y), sem clicar
             mouse_canto(q)

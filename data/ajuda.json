@@ -1,0 +1,56 @@
+{
+  "_comentario": "Visor de ajuda (engine/src/core/ajuda.rs, docs/spec/telas/ajuda.md): o WinHelp 3.x que o original abre com WinHelp(..., 'SIMANT.HLP', HELP_CONTEXT, n). Geometria medida nas capturas a02/a04/a05/a06 da bancada (janela do WinHelp em x 213..637 da tela 640x480): moldura de 4, título de 18, linha, menu de 18, linha, botões de 59 x 21 (linhas pretas incluídas), texto a 8 da borda interna. 'externo' é a escolha do port na área cliente de 640x442 (o original vai de y 2 a 477 da tela, que no port não existe inteira): do topo à base da área cliente. Cores: índices de data/paleta.json. fontes: fonte do HLP (meios pontos, negrito) -> índice de interface.json. contexto_indice: contexto do índice (tópico 'SimAnt', 0x100). passo_tab e largura_barra são [hipótese].",
+  "arquivo": "SIMANT.HLP",
+  "titulo": "SimAnt Help - SIMANT.HLP",
+  "externo": [213, 0, 638, 442],
+  "espessura_moldura": 4,
+  "altura_titulo": 18,
+  "altura_menu": 18,
+  "altura_botoes": 20,
+  "largura_botao": 59,
+  "topo_texto_botao": 4,
+  "menu": [
+    {"texto": "&File", "x": 8},
+    {"texto": "&Edit", "x": 48},
+    {"texto": "Book&mark", "x": 89},
+    {"texto": "&Help", "x": 170}
+  ],
+  "botoes": [
+    {"texto": "&Contents", "acao": "conteudo"},
+    {"texto": "&Search", "acao": "busca"},
+    {"texto": "&Back", "acao": "voltar"},
+    {"texto": "His&tory", "acao": "historico"},
+    {"texto": "&<<", "acao": "anterior"},
+    {"texto": "&>>", "acao": "seguinte"}
+  ],
+  "margem_texto": 8,
+  "passo_tab": 48,
+  "largura_barra": 17,
+  "passo_rolagem": 16,
+  "fonte_sistema": 6,
+  "fonte_botoes": 7,
+  "fonte_padrao": 8,
+  "fontes": [
+    {"meios_pontos": 20, "negrito": false, "fonte": 8},
+    {"meios_pontos": 24, "negrito": false, "fonte": 9},
+    {"meios_pontos": 20, "negrito": true, "fonte": 10},
+    {"meios_pontos": 24, "negrito": true, "fonte": 11}
+  ],
+  "contexto_indice": 256,
+  "cores": {
+    "linha": 0,
+    "moldura": 8,
+    "titulo": 4,
+    "texto_titulo": 15,
+    "menu": 15,
+    "texto_menu": 0,
+    "botao": 8,
+    "relevo_claro": 15,
+    "relevo_escuro": 7,
+    "fundo_botoes": 7,
+    "fundo": 15,
+    "texto": 0,
+    "salto": 2,
+    "trilho": 8
+  }
+}

@@ -1243,7 +1243,8 @@ mod testes {
         assert_eq!(c.tecla_virtual("3"), Some(0x33));
         assert_eq!(c.tecla_virtual("keypad *"), Some(0x6A));
         assert_eq!(c.tecla_virtual("Backspace"), Some(0x08));
-        assert_eq!(c.botao_da_tecla("Delete"), Some(BotaoTeclado::Direito));
+        assert_eq!(c.botao_da_tecla("Delete"), None, "Delete é a tecla do modo de ajuda");
+        assert_eq!(c.botao_da_tecla("Insert"), Some(BotaoTeclado::Esquerdo));
     }
 
     #[test]

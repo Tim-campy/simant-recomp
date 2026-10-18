@@ -48,7 +48,8 @@ pub(crate) fn avisar_teclas_ocupadas(s: &Sessao) {
         let ev = EventoNav::Tecla { nome: t.nome.clone(), ctrl: t.ctrl, shift: t.shift, alt: t.alt };
         let ocupada = s.partida.cfg.acao_da_tecla(&ev).is_some()
             || s.nav_cfg.acao_da_tecla(&ev).is_some()
-            || s.janelas.cfg.acao_da_tecla(&t.nome, t.ctrl, t.shift, t.alt).is_some();
+            || s.janelas.cfg.acao_da_tecla(&t.nome, t.ctrl, t.shift, t.alt).is_some()
+            || s.ajuda.cfg.tecla(&ev).is_some();
         if ocupada {
             eprintln!("[script] [{dono}] a tecla {} do menu já é um atalho do jogo; o menu não abre por ela", t.texto());
         } else {

@@ -133,6 +133,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
     let criador = canvas.texture_creator();
     let mut textura = criador.create_texture_static(PixelFormatEnum::RGB24, lw, lh).map_err(|e| e.to_string())?;
     let mut eventos = sdl.event_pump()?;
+    let mut cursores = ajuda_ui::CursoresSdl::new(s);
     let mut audio = som::Audio::abrir(&sdl, s.recursos, &o.som);
     if jogo_novo {
         audio.musica_jogo_novo(true);
@@ -153,12 +154,13 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
     loop {
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
-            if s.exame.is_some() {
-                // _MagnifyMenu: a janela fica enquanto o botão (ou Espaço/Insert/Delete) estiver
-                // apertado; o laço do original não trata mensagens (a simulação não anda).
+            if s.exame.is_some() || modos::segurando(s) {
+                // _MagnifyMenu e _DrawCastePopUp: a janela fica enquanto o botão (ou Espaço/Insert)
+                // estiver apertado; a simulação não anda.
                 let solta = matches!(ev, Event::MouseButtonUp { .. } | Event::KeyUp { .. });
                 if solta || matches!(ev, Event::Quit { .. }) {
                     s.exame = None;
+                    modos::soltar_segurado(s);
                     redesenhar = true;
                 }
                 if matches!(ev, Event::Quit { .. }) {
@@ -212,6 +214,14 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 continue;
             }
             match ev {
+                // A janela de ajuda com o foco recebe as teclas; depois, _HelpKeyDown: F1 (índice),
+                // Shift+F1 e Delete (modo de ajuda), Esc (sai do modo).
+                Event::KeyDown { keycode: Some(k), keymod, .. }
+                    if ajuda_ui::tecla_no_visor(s, &k.name()) || ajuda_ui::tecla(s, &evento_de_tecla(k, keymod)) =>
+                {
+                    redesenhar = true
+                }
+                Event::MouseWheel { y: dy, .. } if ajuda_ui::rolar_visor(s, cursor.0, cursor.1, dy) => redesenhar = true,
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. }
                     if s.janelas.gerente.menu.is_some() || s.janelas.gerente.arrasto.is_some() =>
                 {
@@ -237,6 +247,11 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     // Arrasto da moldura (mover, redimensionar, polegar) e realce do menu de sistema.
                     if s.janelas.gerente.arrasto.is_some() || s.janelas.gerente.menu.is_some() {
                         redesenhar |= s.mover_nas_janelas(x, y);
+                        continue;
+                    }
+                    if mousestate.left() && modos::mover_no_menu(s, x, y) {
+                        // Menu de ferramentas do Experimental: realce segue o mouse.
+                        redesenhar = true;
                         continue;
                     }
                     let nas_janelas = mousestate.left() && s.janelas.mover(s.recursos, &mut s.partida.estado, x, y).unwrap_or(false);
@@ -280,6 +295,15 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                         ultima_tecla_clique = if duplo { None } else { Some((b, agora)) };
                         s.clicar_no_mapa(cursor.0, cursor.1, duplo);
                     }
+                }
+                Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. }
+                    if ajuda_ui::clique_no_visor(s, x, y, clicks >= 2)
+                        || ajuda_ui::clique(s, x, y)
+                        || (!s.modos.escolhendo && !s.modos.menu_aberto && ajuda_ui::botao_de_janela(s, x, y)) =>
+                {
+                    // Modo de ajuda: o clique num objeto abre a ajuda dele (_DoEvent com _bHelp).
+                    cursor = (x, y);
+                    redesenhar = true;
                 }
                 Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => {
                     cursor = (x, y);
@@ -365,21 +389,21 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     }
                 }
                 Event::MouseButtonDown { mouse_btn: MouseButton::Right, clicks, x, y, .. } => {
-                    if s.modos.escolhendo || s.modos.menu_aberto {
+                    if s.modos.escolhendo || s.modos.menu_aberto || ajuda_ui::sobre_visor(s, x, y) {
                         continue;
                     }
-                    // WM_MOUSEACTIVATE com WM_RBUTTONDOWN: a janela vem para a frente e recebe o clique
-                    // (só o esquerdo é comido, `MAINWNDPROC`); o direito só vale na área do mapa.
-                    if s.clicar_direito_nas_janelas(x, y) {
-                        // Experimental: _processExp recebe também o clique direito.
-                        if !modos::clique_na_edicao(s, x, y, ctrl_apertado(&eventos)) {
-                            // _processEdit: clique direito simples = simples; duplo direito = duplo.
-                            s.clicar_no_mapa(x, y, clicks >= 2);
-                        }
+                    // WM_RBUTTONDOWN em MAINWNDPROC (todas as janelas do jogo e a faixa): liga ou
+                    // desliga o modo de ajuda (_bHelp). A janela sob o cursor vem para a frente
+                    // (WM_MOUSEACTIVATE só come o esquerdo). O segundo clique de um duplo é
+                    // WM_RBUTTONDBLCLK, que o jogo não trata.
+                    s.clicar_direito_nas_janelas(x, y);
+                    if clicks < 2 {
+                        ajuda_ui::alternar_modo(s);
                     }
                     redesenhar = true;
                 }
                 Event::MouseButtonUp { mouse_btn: MouseButton::Left, x, y, .. } => {
+                    redesenhar |= modos::soltar_no_menu(s, x, y);
                     if s.menu.is_some() {
                         s.soltar_menu(x, y, shift_apertado(&eventos));
                         redesenhar = true;
@@ -395,6 +419,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 _ => {}
             }
         }
+        // WM_SETCURSOR: cursor do modo de ajuda e das ferramentas do Experimental.
+        cursores.atualizar(s, cursor.0, cursor.1);
         // WM_ACTIVATEAPP: o estado da janela é lido a cada quadro (não só pelos eventos de foco, que
         // podem ser engolidos por um laço modal como o do Examine).
         let ativa = janela_ativa(canvas.window());
@@ -423,7 +449,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         }
         // Com o "Select a Game" aberto (Ctrl+N), a simulação fica parada (_SetPause(1) em _NewGame).
         s.atualizar_janelas_desenho(minimizada);
-        if !s.modos.escolhendo && s.dialogo.is_none() && s.exame.is_none() && s.menu_mod.is_none() {
+        if !s.modos.escolhendo && !s.modos.menu_aberto && s.dialogo.is_none() && s.exame.is_none() && !modos::segurando(s) && s.menu_mod.is_none() {
             s.partida.avancar(ms);
         }
         let pedidos = s.registrar_eventos();

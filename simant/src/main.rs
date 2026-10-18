@@ -17,6 +17,7 @@
 //! sai (--salvar grava o .ANT do estado no fim). Na janela, Ctrl+S salva no arquivo da partida e
 //! Ctrl+A ("Save As") num nome novo (o de --salvar, ou SALVO01.ANT, SALVO02.ANT… na pasta atual).
 
+mod ajuda_ui;
 mod arquivos;
 mod jogo;
 mod opcoes;
@@ -344,7 +345,17 @@ fn principal() -> Result<(), String> {
                 s.abrir_menu_de_icones(i32::from(r.esq) + 2, i32::from(r.topo) + 2);
             }
             Some(("mod", tecla)) => mods_ui::menu_pela_linha_de_comando(&mut s, tecla)?,
-            Some(_) => return Err("--menu amarela@X,Y, icones@OBJETO ou mod@TECLA[#ITEM]".into()),
+            Some(("sistema", id)) => {
+                // Menu de sistema da janela ID (aberta se preciso), para comparar com a bancada (w04).
+                let id: u16 = id.parse().map_err(|_| "--menu sistema@ID")?;
+                if id == s.janelas.cfg.id(Controle::Castas) {
+                    s.botao_usuario(1);
+                }
+                if !s.janelas.gerente.abrir_menu(id) {
+                    return Err(format!("--menu sistema@{id}: janela fechada"));
+                }
+            }
+            Some(_) => return Err("--menu amarela@X,Y, icones@OBJETO, mod@TECLA[#ITEM] ou sistema@ID".into()),
             None => {}
         }
         match o.dialogo.as_deref() {
@@ -459,7 +470,7 @@ mod testes {
         assert_eq!(cfg.tecla_virtual(&Keycode::F9.name()), Some(0x78));
         assert_eq!(cfg.botao_da_tecla(&Keycode::Space.name()), Some(BotaoTeclado::Esquerdo));
         assert_eq!(cfg.botao_da_tecla(&Keycode::Insert.name()), Some(BotaoTeclado::Esquerdo));
-        assert_eq!(cfg.botao_da_tecla(&Keycode::Delete.name()), Some(BotaoTeclado::Direito));
+        assert_eq!(cfg.botao_da_tecla(&Keycode::Delete.name()), None, "Delete é a tecla do modo de ajuda");
     }
 
     #[test]
