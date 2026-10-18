@@ -81,6 +81,24 @@ pub struct CoresMenu {
     pub borda: u8,
 }
 
+/// Tecla (nome do SDL) com Ctrl/Shift que dispara um comando do menu.
+#[derive(Clone, Debug, Deserialize)]
+pub struct AceleradorMenu {
+    pub tecla: String,
+    #[serde(default)]
+    pub ctrl: bool,
+    #[serde(default)]
+    pub shift: bool,
+    pub comando: ComandoMenu,
+}
+
+impl ConfigBarraMenus {
+    /// Comando do acelerador da tecla (sem Alt).
+    pub fn acelerador(&self, nome: &str, ctrl: bool, shift: bool) -> Option<ComandoMenu> {
+        self.aceleradores.iter().find(|a| a.tecla.eq_ignore_ascii_case(nome) && a.ctrl == ctrl && a.shift == shift).map(|a| a.comando)
+    }
+}
+
 /// Conteúdo de data/barra_menus.json.
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigBarraMenus {
@@ -110,6 +128,13 @@ pub struct ConfigBarraMenus {
     pub texto_pausa: [String; 2],
     /// Comando (hexadecimal, "0xFD01") → o que faz.
     pub comandos: HashMap<String, ComandoMenu>,
+    /// Aceleradores da ACCELERATORTABLE que só existem pelo menu (os outros ficam em partida.json,
+    /// navegacao.json, modos.json e quintal_mapa.json).
+    #[serde(default)]
+    pub aceleradores: Vec<AceleradorMenu>,
+    /// Música do File → New (`_myBeginSong(0x2711)` antes de `_NewGame(0)`).
+    #[serde(default)]
+    pub musica_novo: Option<u16>,
     /// Window → Status (`_ScoreDialog`).
     pub status: super::status::ConfigStatus,
     /// File → About (`_AboutDialog`).

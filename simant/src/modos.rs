@@ -146,12 +146,8 @@ fn escolher(s: &mut Sessao, e: Escolha) -> Resposta {
     s.modos.escolhendo = false;
     match e {
         Escolha::Cancelar => Resposta::Tratada,
-        Escolha::Carregar => {
-            // Load Game ainda não existe no port (diálogo de arquivo): fica como estava.
-            println!("Load Game ainda não implementado no port");
-            Resposta::Tratada
-        }
-        novo => Resposta::NovoJogo(novo),
+        // Load Game e os jogos novos: o laço da janela decide (Load Game = File → Load, jogo.rs).
+        outra => Resposta::NovoJogo(outra),
     }
 }
 

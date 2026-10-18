@@ -64,6 +64,15 @@
     "0xFD45": "rapida",
     "0xFD46": "ultra"
   },
+  "_aceleradores": "Da ACCELERATORTABLE do SIMANTW.EXE (engine/src/formats/ne.rs): Ctrl+Q 0xFD08, Ctrl+T 0xFD17, Ctrl+J 0xFD32, Ctrl+K 0xFD33, que só existem pelo menu; os outros já estão em partida.json, navegacao.json, modos.json, quintal_mapa.json, janelas.json e ajuda_contexto.json. Nomes de tecla do SDL.",
+  "aceleradores": [
+    {"tecla": "Q", "ctrl": true, "comando": "sair"},
+    {"tecla": "T", "ctrl": true, "comando": "status"},
+    {"tecla": "J", "ctrl": true, "comando": "musica"},
+    {"tecla": "K", "ctrl": true, "comando": "efeitos"}
+  ],
+  "_musica_novo": "_ProcMenu 3 (File → New, Ctrl+N): _myBeginSong(0x2711, 0x7e) e _NewGame(0).",
+  "musica_novo": 10001,
   "status": {
     "_comentario": "Window → Status (Ctrl+T): _ScoreDialog (1000:5caa) abre a janela 24 com as notas 0–3 de _CalcScore nos objetos de texto da coluna COLONY (formato do próprio objeto, '%d%%'); _win_DrawScoreWindow (1000:5aca) escreve, com a fonte 4, as notas 4–7 no Full Game (DGROUP 0x956 '%d%%') ou 'N.A.' (4/1800 índice 16) nos outros, e embaixo 4/1800[13] + nome do tipo (4/1001) + 4/1800[14] e a pontuação ('%ld', DGROUP 0x95b); no Experimental, 4/1800[17] e [18]. O pé recebe 4/1010[14] ('Click here to continue'). A simulação continua andando com a janela aberta (bancada: GameTime 119 → 139 em 5 s, qemu_ui_menus3.txt).",
     "janela": 24,
