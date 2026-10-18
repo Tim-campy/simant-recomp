@@ -591,4 +591,61 @@ mod testes {
         soltar_segurado(&mut s);
         assert!(!segurando(&s));
     }
+
+    /// Abre o save do cenário `baloes` da bancada, põe a vista do ninho preto com o canto em (22, 0),
+    /// desenha a tela sem e com o balão e devolve (sem, com, largura). Com `SIMANT_SAIDA_TESTE`, grava
+    /// `<nome>.png` para comparar com tests/referencias/capturas/<nome>.png (fora do git; topo 38).
+    fn tela_com_balao(save: &str, balao: engine::rules::baloes::Balao, nome: &str) -> Option<(Vec<u8>, Vec<u8>, usize)> {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return None;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let save = raiz().join("tests/referencias/saves").join(save);
+        let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
+        s.partida.nav.vista.x = 22;
+        s.partida.nav.vista.y = 0;
+        let sem = s.quadro_rgb().unwrap();
+        s.partida.estado.baloes.desenhado = Some(balao);
+        let com = s.quadro_rgb().unwrap();
+        if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+            crate::salvar_png(&PathBuf::from(saida).join(format!("{nome}.png")), s.tela.cfg.largura, s.tela.cfg.altura, &com).unwrap();
+        }
+        Some((sem, com, s.tela.cfg.largura as usize))
+    }
+
+    fn pixel(rgb: &[u8], w: usize, x: usize, y: usize) -> [u8; 3] {
+        let i = (y * w + x) * 3;
+        [rgb[i], rgb[i + 1], rgb[i + 2]]
+    }
+
+    /// Bancada (cenário `baloes`, intervalo 18, 2026-10-18): Silly ligado; falas do ovo e da rainha
+    /// ligadas, só o balão do ovo (o primeiro pedido) aparece, com a fala 1 da lista 1240 ("Sure is
+    /// dark\nin here!") sobre o ovo em (34, 8). Comparado com a captura: a região do balão
+    /// (x 225–285, linhas 218–250 da área cliente) é igual pixel a pixel.
+    #[test]
+    fn balao_do_ovo_como_no_original() {
+        use engine::rules::baloes::{Balao, Fala};
+        let b = Balao { x: 34 * 16 + 8, y: 8 * 16 + 8, plano: 2, fala: Fala::Ovo, indice: 1 };
+        let Some((sem, com, w)) = tela_com_balao("BALAO_OVO.ANT", b, "balao_ovo") else { return };
+        // Captura: borda esquerda do balão na coluna 229, corpo branco nas linhas 224–245.
+        assert_eq!(pixel(&com, w, 260, 233), [255, 255, 255]);
+        assert_ne!(pixel(&sem, w, 260, 233), [255, 255, 255]);
+        assert_eq!(pixel(&com, w, 229, 233), [0, 0, 0]);
+    }
+
+    /// Bancada (cenário `baloes`, intervalo 6): só a fala da rainha ligada, fala 1 da lista 1250
+    /// ("Sometimes I think all I\ndo is lay eggs!") sobre a rainha em (34, 6).
+    #[test]
+    fn balao_da_rainha_como_no_original() {
+        use engine::rules::baloes::{Balao, Fala};
+        let b = Balao { x: 34 * 16 + 8, y: 6 * 16 + 8, plano: 2, fala: Fala::Rainha, indice: 1 };
+        let Some((sem, com, w)) = tela_com_balao("BALAO_RAINHA.ANT", b, "balao_rainha") else { return };
+        assert_eq!(pixel(&com, w, 260, 200), [255, 255, 255]);
+        assert_ne!(pixel(&sem, w, 260, 200), [255, 255, 255]);
+    }
 }

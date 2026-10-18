@@ -91,9 +91,13 @@ pub fn desenhar(q: &mut Quadro, forma: &FormaBalao, f: &Fonte, p: PecasBalao, x0
     }
     peca(q, "canto_inf_dir", colunas - 1, forma.y_baixo);
     peca(q, "cunha_esq", 1, forma.y_baixo);
+    // Cada linha começa na segunda coluna de peças (x0 + 8), deslocada ((−largura) & 6) / 2 pixels
+    // (`_font_MakeImage(texto, (-w & 6) >> 1)`); para a maior linha isso é o mesmo que centrar
+    // (bancada: balões do ovo e da rainha, telas/baloes.md).
     for (i, l) in forma.linhas.iter().enumerate() {
         let img = f.imagem(l);
-        let tx = x0 + (forma.largura() - img.largura as i32) / 2;
+        let w = f.largura_texto(l) as i32;
+        let tx = x0 + 8 + (((-w) & 6) >> 1);
         let ty = y0 + forma.altura_fonte * i as i32 + 6;
         for j in 0..img.altura {
             for k in 0..img.largura {

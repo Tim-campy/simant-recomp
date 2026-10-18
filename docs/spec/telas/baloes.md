@@ -57,6 +57,8 @@ O balão da aranha entra na lista depois dos de `_DrawCurBalloons`.
 
 ### 2.3 `_DrawBalloons` (`1010:57aa`)
 
+Texto de cada linha (`_MakeBalloon`): começa na coluna x0 + 8 (a segunda coluna de peças), deslocada `((−largura) & 6) / 2` pixels (`_font_MakeImage(texto, (−w & 6) >> 1)`, a imagem do texto vai para o byte seguinte da máscara); para a linha mais larga isso coincide com centrar, as outras ficam quase alinhadas à esquerda [código + bancada, abaixo]. A linha i fica em y0 + `altura_fonte × i` + 6.
+
 Com a fonte 2, percorre os pedidos e **desenha só o primeiro** que está na vista (o laço para depois do primeiro desenhado) [código]; zera a lista. O balão é feito por `_MakeBalloon(texto, 0)` (cunha da esquerda; a mesma rotina do balão do menino, telas/quintal.md §2.3) e copiado com máscara no buffer da janela de edição com o canto em (x + 4, y − (altura + 4)) em pixels do mapa (x, y = ponto do pedido; altura = a registrada por `_MakeBalloon`, `altura_fonte × n + 15`, uma a menos com uma linha). As células cobertas ficam marcadas para o próximo redesenho, que apaga o balão se ele não for pedido de novo [código]. O balão fica na tela até o próximo redesenho do buffer (pausado, fica parado).
 
 ## 3. Gráficos de saúde da janela de edição (`_DrawEditGraphs`, `1010:198a`)
@@ -73,10 +75,16 @@ Com a fonte 2, percorre os pedidos e **desenha só o primeiro** que está na vis
 Lacunas e hipóteses:
 
 - O redesenho da rolagem (`_DoEditScroll`, `FUN_1010_16d4` fora do timer) e os de dentro do tick (`_DoEditUpdateDraw`) não sorteiam no port (como os palpos) [lacuna].
-- O texto centrado na largura do balão [hipótese, a mesma do balão do menino].
 - O índice da fala é guardado sem volta no port; a interface o reduz ao tamanho da lista (equivalente à volta a 0 do original enquanto a lista não muda).
 - Num Load, os prazos e índices continuam os da sessão (o original também não os grava) [código].
 
 ## Verificação
 
-Pendente de captura da bancada (ver `docs/estado-do-projeto.md`). Os vetores de tick do repositório têm todos Silly = 0 (`_OptionStates` = 0,1,1,1,1,0 nos 150 estados conferidos), então não exercitam esta parte.
+Os vetores de tick do repositório têm todos Silly = 0 (`_OptionStates` = 0,1,1,1,1,0 nos 150 estados conferidos), então não exercitam esta parte. Conferência própria na bancada (2026-10-18, `tools/cenarios_tick.py gravar baloes`, snapshot `rico`): Silly escrito na entrada de um tick, vista do ninho preto com `_MapPnt` = (22, 0) (rainha em (34, 6), ovos em (34, 8)), 60 intervalos entre o fim de um tick e a entrada do seguinte, com 1,5 s de VM livre entre eles; em cada intervalo, as variáveis dos balões (tabela abaixo) e o gerador S.
+
+- **Sorteios:** nos três intervalos em que S andou, o número de passos e os valores batem com o modelo da §2.1: balão novo (contagem 0 → 1 para ovo e rainha, pontos atuais = últimos) com 4 passos, **ovo antes da rainha**, cada um `S32` + `S4`, e prazos `5993 = 2 + agora + 170` e `6003 = 2 + agora + 180` com o mesmo `agora` (5821); prazo vencido do ovo com `S32` = 7, `S4` = 2 (desliga: `_WantEggBalloon` 1 → 0) e prazo `6735 = 7 + 6558 + 170` (6558 > prazo anterior 6557); outro com `S4` = 0 (liga, índice 2 → 3). Nos outros 57 intervalos, sem prazo vencido, S não andou.
+- **Desenho:** com as falas do ovo e da rainha ligadas, só o balão do ovo aparece (o primeiro pedido); a primeira fala mostrada é a de índice 1. O port (`balao_do_ovo_como_no_original` e `balao_da_rainha_como_no_original`, `simant/src/modos.rs`, com os estados `tests/referencias/saves/BALAO_OVO.ANT` e `BALAO_RAINHA.ANT`) desenha a região do balão **100%** igual às capturas (`comparar_captura.py --topo 38 --mapear`; ovo: "Sure is dark\nin here!", rainha: "Sometimes I think all I\ndo is lay eggs!"). As duas capturas decidiram o alinhamento do texto (antes centrado [hipótese]).
+
+Não conferidos na bancada: balões de luta, de descanso e da aranha (mesmo código, outras constantes), a pausa e a troca de `_SMode` da aranha.
+
+Nomes das variáveis (`SIMANTW.SYM`): `_FightBalloonCnt` `9:7404`, `_RestBalloonCnt` `9:a07e`, `_QueenBalloonCnt` `9:8122`, `_EggBalloonCnt` `9:7d44`; `_Cur*Pnt`/`_Cur*Plane` (`_CurFightPnt` `9:7a52`, `_CurEggPnt` `9:7d2a`, `_CurQueenPnt` `9:7d64`, `_CurRestPnt` `9:7d40`); `_Last*Pnt`/`_Last*Plane`; prazos `_BFightBalloonTicks` `9:811e`, `_RFightBalloonTicks` `9:9e6a`, `_EggBalloonTicks` `9:a0e6`, `_QueenBalloonTicks` `9:78a8`, `_RestBalloonTicks` `9:9ce6`, `_SpidBalloonTicks` `8:87d6`; falas ligadas `_WantBFightBalloon` `9:9bea`, `_WantRFightBalloon` `9:a0d4`, `_WantEggBalloon` `9:9afe`, `_WantQueenBalloon` `9:7c3c`, `_WantRestBalloon` `9:72be`, `_WantSpiderBalloon` `9:75f8`; índices `_BFightBalloonIndex` `9:7a50`, `_RFightBalloonIndex` `9:810e`, `_EggBalloonIndex` `9:9eaa`, `_QueenBalloonIndex` `9:78d6`, `_RestBalloonIndex` `9:9e86` (o da aranha, `8:87da`, sem nome); `_LastSMode` `9:72f4`; lista de pedidos `_CurBalloonCnt` `9:9fd0`, `_CurBalloonPnts` `9:80d6`, `_CurBalloonPlane` `9:7d68`, `_CurBalloonFlags` `9:78be`, `_CurBalloonMsgs` `9:7c24`.
