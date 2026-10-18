@@ -59,6 +59,20 @@ def main():
         p = d / f"p_{nome}.png"
         rodar(a.simant, a.jogo, ["--save", str(d / "capt.ANT"), "--janela-mapa", str(modo)], p)
         linhas.append((f"{nome} (modo {modo})", comparar(p, d / f"{nome}.png", REGIOES["mapa"])))
+    extra = d / "capturas_mapa.json"
+    if extra.exists():
+        sys.path.insert(0, str(AQUI))
+        from ant_editar import Save
+        for modo, nome, save in json.loads(extra.read_text(encoding="utf-8"))["mapa"]:
+            p = d / f"p_{nome}.png"
+            # O save já tem _MapMode = modo; --janela-mapa N com o mesmo N desligaria o feromônio
+            # (o botão alterna): parte de _MapMode = 1.
+            s = Save.abrir(d / save)
+            s.escrever("MapMode", 1)
+            tmp = d / f"_{save}"
+            s.gravar(tmp)
+            rodar(a.simant, a.jogo, ["--save", str(tmp), "--janela-mapa", str(modo)], p)
+            linhas.append((f"{nome} (modo {modo}, depois de um tick)", comparar(p, d / f"{nome}.png", REGIOES["mapa"])))
     if (d / "balao.png").exists():
         p = d / "p_balao.png"
         rodar(a.simant, a.jogo, ["--save", str(d / "balao.ANT"), "--quintal", "0"], p)

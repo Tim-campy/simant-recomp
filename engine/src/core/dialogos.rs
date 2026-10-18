@@ -47,6 +47,8 @@ pub struct Cores {
     pub desabilitado: u8,
     pub moldura: u8,
     pub icone: u8,
+    /// Ícone de informação ("i" de `_PopMsg`): azul-escuro no original (bancada, "Saved correctly").
+    pub icone_informacao: u8,
     pub pasta: u8,
 }
 
@@ -264,7 +266,8 @@ fn icone(q: &mut Quadro, f: Option<&Fonte>, c: &Cores, x: i32, y: i32, letra: &s
         for i in 0..32 {
             if dentro(i, j) {
                 let borda = !(dentro(i - 1, j) && dentro(i + 1, j) && dentro(i, j - 1) && dentro(i, j + 1));
-                q.ponto(x + i, y + j, if borda { c.linha } else { c.icone });
+                let cor = if letra == "i" { c.icone_informacao } else { c.icone };
+                q.ponto(x + i, y + j, if borda { c.linha } else { cor });
             }
         }
     }

@@ -957,6 +957,58 @@ def cenario_capturas(c: Sessao, saida, n):
     return []
 
 
+def cenario_capturas_mapa(c: Sessao, saida, n):
+    """Janela do mapa com os feromônios: com o jogo pausado o original não regera o mapa ao trocar o
+    modo (só depois de um tick, em _UpdateWindows); então, para cada botão de cheiro: clique, um tick
+    (Shift+0 duas vezes, com a entrada de _DoAntSim como trava), captura e o estado em capt_mapa_K.ANT."""
+    reg = {"mapa": []}
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+m")
+    time.sleep(2)
+    for k, (x, y) in enumerate([(418, 46), (482, 46), (450, 57), (418, 70), (482, 70)]):
+        clicar_tela(c, x, y)
+        time.sleep(1)
+        c.teclas("shift+0")          # despausa
+        c.dep.ir_entrada()           # para na entrada do próximo tick
+        c.dep.ir_saida()             # um tick
+        c.dep.retomar()
+        c.teclas("shift+0")          # pausa de novo (o redesenho do tick já aconteceu)
+        time.sleep(1.5)
+        c.mj.sessao_gdb()
+        modo = c.ler("MapMode")
+        (pasta / f"capt_mapa_{k}.ANT").write_bytes(c.mj.estado())
+        reg["mapa"].append([modo, f"mapa_t{k}", f"capt_mapa_{k}.ANT"])
+        tela(c, saida, f"mapa_t{k}")
+    (pasta / "capturas_mapa.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"{reg}")
+    return []
+
+
+def cenario_salvo(c: Sessao, saida, n):
+    """'Saved correctly': jogo pausado, Ctrl+S abre "Save Ant Hill As" (o Quick Game não tem nome),
+    digita QUICK1 e Enter, confirma a substituição (Y); a caixa "%s Saved correctly" aparece; captura e fecha."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+s")
+    time.sleep(2)
+    tela(c, saida, "salvar_como")
+    c.b.executar("digitar quick1")
+    time.sleep(0.5)
+    c.teclas("ret")
+    time.sleep(2)
+    tela(c, saida, "substituir")     # "This file already exists. Replace existing file?" (diálogo comum)
+    c.teclas("y")
+    time.sleep(3)
+    tela(c, saida, "salvo")
+    c.teclas("ret")
+    time.sleep(1)
+    tela(c, saida, "salvo_depois")
+    return []
+
+
 def cenario_explorar(c: Sessao, saida, n):
     """Exploração da tela: CLIQUES = "x,y;x,y;..." (variável de ambiente); captura depois de cada um."""
     import os
