@@ -376,7 +376,7 @@ Como `_MeType` não tem cor, com `_Invincible = 1` a amarela sempre vence (a reg
 
 ### 10.2 `_AnimYellowFight` (`1028:7e56`): animação que consome sorteios
 
-**Fato visto no código.** Quadros: 6 na luta (código 0); 32 na morte por eletricidade (10); 8 nas mortes 1/2 com a janela de edição atrás; 32 (música desligada) ou 64 (música ligada, `_OptionStates[1]`) com a janela à frente. Cada quadro espera 6 ticks do relógio do Mac e sorteia: `S2()` (só na luta: som) ou `S2()` (só no choque: pisca o tile), e **sempre** `S8()` (direção desenhada). Na morte por formiga-leão, o centro da armadilha anima. Com música ligada e código 1–9, sai quando a música termina.
+**Fato visto no código.** Quadros: 6 na luta (código 0); 32 na morte por eletricidade (10); 8 nas mortes 1/2 com a janela de edição atrás; 32 (música desligada) ou 64 (música ligada, `_OptionStates[1]`) com a janela à frente. Cada quadro começa esperando o relógio do Mac passar de "início do quadro anterior + 6" (3 degraus de 55 ms = 165 ms; o primeiro quadro espera só o próximo degrau) e então sorteia: `S2()` (só na luta: som) ou `S2()` (só no choque: pisca o tile), e **sempre** `S8()` (direção desenhada). Na morte por formiga-leão, o centro da armadilha anima. Com música ligada e código 1–9, sai quando a música termina. O port pede `Evento::Espera(165)` entre os quadros da luta e do choque, para o som (regras/som.md, "Linha do tempo dos efeitos"); a simulação não para.
 
 **Peculiaridade A5:** o número de sorteios depende da janela à frente e da opção de música. Para o determinismo do port, reproduzir a mesma regra (com o mesmo estado de interface) ou aceitar divergência a partir de uma morte ou luta da amarela.
 
