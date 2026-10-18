@@ -32,6 +32,8 @@ pub mod ids {
     pub const MUSICA_TROCA: u16 = 0x2AFA;
     /// Música de rainha colocada.
     pub const MUSICA_RAINHA: u16 = 0x2AFB;
+    /// Som de erro das recusas (`_myBeginSound(1, …)`).
+    pub const SOM_ERRO: u16 = 1;
 }
 
 /// Índice do patch nos mapas `_YMapPop*` (`x * 16 + y`), se está no quintal.
@@ -64,6 +66,7 @@ pub fn trocar_patch(e: &mut Estado, tab: &TabelasGeracao, cfg: &ConfigSimulacao)
     }
     let i = indice_patch(tx, ty).ok_or(format!("patch ({tx}, {ty}) fora do quintal"))?;
     let recusa = |e: &mut Estado, id: u16| {
+        e.eventos.push(Evento::Som(ids::SOM_ERRO));
         e.eventos.push(Evento::Mensagem(id));
         Ok(ResultadoTroca::Recusada(id))
     };

@@ -489,11 +489,25 @@ impl TelaDeJogo {
         avisos: &mut Avisos,
         agora: u64,
     ) -> Result<(Option<Retangulo>, Vec<String>), String> {
+        self.desenhar_mensagem_da_faixa(q, recursos, interface, avisos, agora)?;
+        desenhar_modal(q, recursos, interface, avisos)
+    }
+
+    /// Só a mensagem da faixa (`_DrawRibbonMessage`), sem o aviso modal: quem desenha outras
+    /// janelas por cima da faixa chama esta e, no fim, `avisos::desenhar_modal`.
+    pub fn desenhar_mensagem_da_faixa(
+        &self,
+        q: &mut Quadro,
+        recursos: &Recursos,
+        interface: &Interface,
+        avisos: &mut Avisos,
+        agora: u64,
+    ) -> Result<(), String> {
         let cfg = avisos.cfg.faixa.clone();
         let (r, cor) = self.objeto_da_faixa(&cfg.objeto).ok_or(format!("faixa sem o objeto {}", cfg.objeto))?;
         let texto = avisos.texto_da_faixa(agora).cloned();
         desenhar_faixa(q, recursos, interface, &cfg, r, cor, texto.as_ref());
-        desenhar_modal(q, recursos, interface, avisos)
+        Ok(())
     }
 
     /// Retângulo (na área cliente) do objeto da faixa com esse nome.
