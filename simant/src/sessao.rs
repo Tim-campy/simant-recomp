@@ -212,6 +212,9 @@ impl Sessao<'_> {
 
     pub(crate) fn quadro_rgb(&mut self) -> Result<Vec<u8>, String> {
         self.tela.atualizar(&self.partida.estado);
+        if let Some((plano, q)) = self.partida.quadro_animado() {
+            self.tela.mostrar_quadro_animado(plano, q);
+        }
         self.tela.bitmaps_da_faixa = self.partida.bitmaps_dos_marcadores();
         self.tela.selecao_da_faixa.clear();
         for (nome, s, n, ligado) in self.partida.estado_dos_botoes() {
@@ -260,9 +263,14 @@ impl Sessao<'_> {
         pendentes.extend(modos::desenhar(self, &mut q)?);
         // O aviso modal fica por cima de todas as janelas (e do resto dos modos): o quadro de recusa
         // da troca de patch (10000/10002/10004) sai de um duplo clique no quintal.
-        let (clique, p) = avisos::desenhar_modal(&mut q, self.recursos, &self.interface, &self.partida.avisos)?;
-        self.clique_modal = clique;
-        pendentes.extend(p);
+        // Durante uma animação da amarela o quadro modal pedido no mesmo tick ainda não apareceu.
+        if !self.partida.animando() {
+            let (clique, p) = avisos::desenhar_modal(&mut q, self.recursos, &self.interface, &self.partida.avisos)?;
+            self.clique_modal = clique;
+            pendentes.extend(p);
+        } else {
+            self.clique_modal = None;
+        }
         if let Some((m, _)) = &self.menu {
             pendentes.extend(m.desenhar(&mut q, self.recursos, &self.interface)?);
         }
@@ -486,6 +494,7 @@ impl Sessao<'_> {
                 }
                 EventoRegras::Musica(id) => println!("[tick {t}] música {id}"),
                 EventoRegras::Som(_) | EventoRegras::TemaDoNinho | EventoRegras::Espera(_) => {} // tocados por som::Audio
+                EventoRegras::Animacao(_) => {} // a Partida guarda e mostra os quadros
                 EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
                 EventoRegras::CentralizarNaAmarela | EventoRegras::MensagemFaixa(_) => {} // a faixa é da Partida
             }

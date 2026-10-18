@@ -99,6 +99,7 @@ def extrair(exe):
             "cortador": {"base": 8800, "parado": [98, 181], "direita": [19, 15], "esquerda": [-15, 15]},
             "placa": {"id": 1260, "x": 170, "y": 186},
             "chuva": {"id": 7005, "gotas": 14, "x_min": 50, "x_faixa": 400, "y_faixa": 150},
+            "enxame": {"preta": 7006, "vermelha": 7007},
         },
         "_origem_sprites": "_Draw_SimYard 1010:b462, _DrawSimKid 1010:af14, _DrawDog 1010:b110, _DrawSimCat 1010:b200, _DrawSimBird 1010:b196, _DrawMower, _DrawRain 1010:ba9e",
         "botao_abrir": "ribToYard",

@@ -134,6 +134,16 @@ pub struct Chuva {
     pub y_faixa: i16,
 }
 
+/// Rodapé de mensagem do quintal (`_UpdateYardMessage`, `1010:ac0e`): o texto da faixa
+/// (`_mapMessage`, com o mesmo prazo) escrito no objeto `objeto` da janela `janela`, na fonte `fonte`,
+/// com as cores do objeto; sem mensagem, o retângulo é pintado com a cor de fundo.
+#[derive(Clone, Debug, Deserialize)]
+pub struct MensagemQuintal {
+    pub janela: u16,
+    pub objeto: String,
+    pub fonte: usize,
+}
+
 /// Balão de fala do menino (`_DrawSimKid` + `_MakeBalloon`; ver o comentário em data/quintal_mapa.json).
 #[derive(Clone, Debug, Deserialize)]
 pub struct BalaoMenino {
@@ -147,6 +157,13 @@ pub struct BalaoMenino {
     pub pecas: HashMap<String, Vec<String>>,
 }
 
+/// Enxame da revoada (`_DrawSwarm`): bitmap de cada formiga preta e vermelha.
+#[derive(Clone, Debug, Deserialize)]
+pub struct Enxame {
+    pub preta: u16,
+    pub vermelha: u16,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct Sprites {
     pub menino: SpriteQuadros,
@@ -156,6 +173,9 @@ pub struct Sprites {
     pub cortador: Cortador,
     pub placa: BitmapPosto,
     pub chuva: Chuva,
+    /// Ausente num mod anterior à API 0.18: o enxame não é desenhado.
+    #[serde(default)]
+    pub enxame: Option<Enxame>,
 }
 
 /// Ações da janela do quintal (botões da faixa 35, teclas).
@@ -181,6 +201,8 @@ pub enum AcaoQuintal {
     /// Botões Automatic / Manual (`_LayDownQueenMode`).
     RainhasAutomatico,
     RainhasManual,
+    /// Botão MATE (`ribMate`): arma a revoada preta (`rules::quintal::botao_revoada`).
+    Revoada,
 }
 
 /// Tecla → ação (mesmas regras de `navegacao::Atalho`).
@@ -223,6 +245,9 @@ pub struct ConfigQuintalMapa {
     pub transparente: u8,
     pub sprites: Sprites,
     pub balao_menino: BalaoMenino,
+    /// Mensagem da faixa repetida no rodapé do quintal (`_UpdateYardMessage`, API 0.18; ausente: nada).
+    #[serde(default)]
+    pub mensagem: Option<MensagemQuintal>,
     /// Botão da faixa 34 que abre o quintal.
     pub botao_abrir: String,
     /// Botões da faixa 35 → ação.
@@ -378,6 +403,8 @@ impl JanelaQuintal {
                 e.controles.modo_por_rainha = 0;
                 return;
             }
+            // Precisa das tabelas do quintal: quem chama é `Partida::botao_revoada`.
+            AcaoQuintal::Revoada => return,
         };
         if let Some(m) = novo {
             *modo = m;
@@ -428,6 +455,8 @@ pub struct DesenhoQuintal {
     bitmaps: HashMap<u16, Bitmap>,
     /// Falas do menino (lista 4/`balao_menino.lista`).
     falas_menino: Vec<Vec<u8>>,
+    /// Retângulo do rodapé de mensagem (relativo ao canto externo da janela) e a cor do objeto.
+    mensagem: Option<(Retangulo, u8)>,
 }
 
 /// Bit "selecionado" das flags de objeto (janela.md).
@@ -448,6 +477,7 @@ impl DesenhoQuintal {
             ids.extend((0..=sp.ultimo_quadro).map(|q| sp.base.wrapping_add(q)));
         }
         ids.extend([s.cortador.base, s.cortador.base + 1, s.cortador.base + 2, s.placa.id, s.chuva.id]);
+        ids.extend(s.enxame.iter().flat_map(|x| [x.preta, x.vermelha]));
         let mut bitmaps = HashMap::new();
         for id in ids {
             if let Ok(b) = recursos.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d)) {
@@ -460,7 +490,18 @@ impl DesenhoQuintal {
             }
         }
         let falas_menino = super::avisos::linhas_do_texto(recursos, cfg.balao_menino.lista);
-        Ok(DesenhoQuintal { cfg, faixa, origem_faixa, bitmaps, falas_menino })
+        let mensagem = match &cfg.mensagem {
+            Some(m) => {
+                let j = carregar_janela(recursos, m.janela)?;
+                let base = j.retangulo();
+                let o = j.objetos.iter().find(|o| o.nome == m.objeto).ok_or(format!("janela {}: objeto {} não existe", m.janela, m.objeto))?;
+                let r = o.retangulo;
+                let rel = Retangulo { esq: r.esq - base.esq, topo: r.topo - base.topo, dir: r.dir - base.esq, base: r.base - base.topo };
+                Some((rel, o.cor))
+            }
+            None => None,
+        };
+        Ok(DesenhoQuintal { cfg, faixa, origem_faixa, bitmaps, falas_menino, mensagem })
     }
 
     /// Desenha a janela 25 inteira (moldura e conteúdo do `_YardMode` do estado).
@@ -520,6 +561,20 @@ impl DesenhoQuintal {
                 }
             }
         }
+    }
+
+    /// `_UpdateYardMessage`: o texto da faixa (`texto`, já na codificação da fonte; `None` = sem
+    /// mensagem) no rodapé do quintal.
+    pub fn desenhar_mensagem(&self, q: &mut Quadro, interface: &Interface, texto: Option<&[u8]>) {
+        let (Some((r, cor)), Some(m)) = (self.mensagem, &self.cfg.mensagem) else { return };
+        let [ex, ey, _, _] = self.cfg.externo;
+        let r = Retangulo { esq: r.esq + ex, topo: r.topo + ey, dir: r.dir + ex, base: r.base + ey };
+        let c = interface.cores.get(cor as usize).copied().unwrap_or(crate::formats::janela::Cor { frente: 0, fundo: 15, fundo2: 15 });
+        q.preencher(r, c.fundo, c.fundo);
+        let (Some(t), Some(Some(f))) = (texto, interface.fontes.get(m.fonte)) else { return };
+        let antes = q.recorte.replace(r);
+        q.texto(r, f, t, 3, c.frente, c.fundo);
+        q.recorte = antes;
     }
 
     /// Balão de fala do menino por cima do quintal (modos 0 e 1, menino desenhado e `_BoyMessOn`).
@@ -639,6 +694,7 @@ impl DesenhoQuintal {
         if let Some((id, x, y)) = cortador {
             self.sprite(q, id, i32::from(x), i32::from(y));
         }
+        self.desenhar_enxame(q, e);
         if b.passaro_ligado != 0 {
             let (id, x, y) = quadro_de(&s.passaro, b.passaro_x, b.passaro_y, b.passaro_quadro);
             self.sprite(q, id, x, y);
@@ -658,6 +714,24 @@ impl DesenhoQuintal {
                 let x = i32::from(ch.x_min) + (v % ch.x_faixa.max(1) as u32) as i32;
                 let y = ((v >> 16) % ch.y_faixa.max(1) as u32) as i32;
                 self.sprite(q, ch.id, x, y);
+            }
+        }
+    }
+
+    /// `_DrawSwarm` (`1010:bb0e`), com `_MapMode` = 0: cada formiga do enxame (até
+    /// `min(_SwarmCnt, 16, _QueenStorage)` de cada cor) em `_SwarmCent` + (`_SwarmX[i]`, `_SwarmY[i]`).
+    /// As posições e os sorteios que as movem são do estado (`rules::desenho::desenhar_enxame`).
+    fn desenhar_enxame(&self, q: &mut Quadro, e: &Estado) {
+        let Some(ids) = &self.cfg.sprites.enxame else { return };
+        if e.vistas.modo_mapa != 0 {
+            return;
+        }
+        let (cx, cy) = (i32::from(e.ambiente.enxame_centro_x), i32::from(e.ambiente.enxame_centro_y));
+        for (c, id) in [(&e.preta, ids.preta), (&e.vermelha, ids.vermelha)] {
+            let n = c.enxame_contagem.min(crate::rules::desenho::ENXAME_MAXIMO).min(c.rainhas_guardadas).max(0) as usize;
+            for i in 0..n {
+                let (dx, dy) = (c.enxame_x.0[i] as i8, c.enxame_y.0[i] as i8);
+                self.sprite(q, id, cx + i32::from(dx), cy + i32::from(dy));
             }
         }
     }

@@ -30,7 +30,7 @@ use super::comum::{
     self, celula_livre, dentro, e_pedrinha, em_casa as casa, get_dir, get_dis, lista_do_plano as area,
     nao_e_obstaculo, tile, vida, vida_bruta, Direcoes, TabelaLuta,
 };
-use super::estado::{Estado, Evento, Feromonios, Grade, MensagemFaixa};
+use super::estado::{AnimacaoDaAmarela, Estado, Evento, Feromonios, Grade, MensagemFaixa, QuadroAnimacao};
 use super::geracao::Cor;
 use super::tick::{RegrasAmarela, RegrasOriginais};
 use crate::formats::save::{Formiga, Lista};
@@ -87,10 +87,26 @@ pub struct AnimacaoAmarela {
     /// `Evento::Espera` entre os quadros da luta e do choque, os que pedem som.
     #[serde(default = "espera_quadro_padrao")]
     pub espera_quadro_ms: u16,
+    /// `_AnimYellowInsane` espera "início + 3" no relógio do Mac: 1 degrau = 55 ms por quadro.
+    #[serde(default = "espera_loucura_padrao")]
+    pub espera_loucura_ms: u16,
+    /// Com música ligada, as mortes 1–9 saem no primeiro quadro (antes do sorteio), porque no
+    /// caminho MCI do Windows `_mySongIsDone` devolve sempre verdadeiro (regras/som.md). Falso: faz
+    /// todos os quadros, como o caminho Sound Blaster.
+    #[serde(default = "verdadeiro")]
+    pub morte_para_com_musica: bool,
 }
 
 fn espera_quadro_padrao() -> u16 {
     165
+}
+
+fn espera_loucura_padrao() -> u16 {
+    55
+}
+
+fn verdadeiro() -> bool {
+    true
 }
 
 /// Ids de música (`_myBeginSong`).
@@ -1520,8 +1536,43 @@ fn quadros_morte(e: &Estado, t: &TabelasAmarela) -> i32 {
     }
 }
 
-/// `_AnimYellowFight(plano, x, y, dir, tipo, código)`. O port não interrompe a animação pelo fim da
-/// música (códigos 1–9 com música ligada): a música não é simulada [divergência registrada].
+/// Fotografa a janela de edição do plano `plano` como `_DoEditUpdateDraw` a desenharia agora (mapa,
+/// vida e os campos `_Me*` da marca 0xFF). Só lê o estado.
+fn quadro_da_tela(e: &Estado, plano: i32) -> Option<QuadroAnimacao> {
+    let (mapa, vida) = match plano {
+        0 | 1 => (&e.superficie.mapa, &e.superficie.vida),
+        2 => (&e.ninho_b.mapa, &e.ninho_b.vida),
+        3 => (&e.ninho_r.mapa, &e.ninho_r.vida),
+        _ => return None,
+    };
+    let a = &e.amarela;
+    Some(QuadroAnimacao {
+        mapa: mapa.dados.clone(),
+        vida: vida.dados.clone(),
+        x: a.x,
+        y: a.y,
+        tipo: a.tipo,
+        dir: a.dir,
+        ovo: a.ovo,
+        base: a.base,
+    })
+}
+
+/// Junta os quadros desenhados de uma animação num `Evento::Animacao` (nada se não houve quadro).
+fn pedir_animacao(e: &mut Estado, codigo: i32, plano: i32, espera_ms: u16, quadros: Vec<QuadroAnimacao>) {
+    if quadros.is_empty() {
+        return;
+    }
+    let plano = if plano == 0 { 1 } else { plano } as i16;
+    e.eventos.push(Evento::Animacao(Box::new(AnimacaoDaAmarela { codigo: codigo as i16, plano, espera_ms, quadros })));
+}
+
+/// `_AnimYellowFight(plano, x, y, dir, tipo, código)`. Cada quadro espera o relógio
+/// (`Evento::Espera`, menos no primeiro), toca o som do quadro, sorteia, move a marca e é desenhado
+/// (`Evento::Animacao` com os quadros, pedido antes das esperas e dos sons para a interface parar a
+/// simulação a partir do primeiro quadro). Com música ligada e código 1–9, sai no primeiro quadro,
+/// antes do sorteio: no caminho MCI `_mySongIsDone` é sempre verdadeiro (regras/som.md); com
+/// `animacao.morte_para_com_musica` = falso, o port faz todos os quadros.
 #[allow(clippy::too_many_arguments)]
 fn animar_luta(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, dir: i32, tipo: i32, codigo: i32) {
     remarcar(e, t, MARCA_AMARELA);
@@ -1532,9 +1583,13 @@ fn animar_luta(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, d
         tile_original = tile(e, 1, x, y).max(0) as u8;
         quadros = t.animacao.quadros_choque;
     }
+    let para_com_musica = (1..10).contains(&codigo) && e.partida.opcoes[1] != 0 && t.animacao.morte_para_com_musica;
+    // Os pedidos de som e espera ficam numa fila à parte e vão depois do pedido da animação.
+    let fila_antes = std::mem::take(&mut e.eventos);
+    let mut fotos = Vec::new();
     let mut leao = 3;
     for q in 0..quadros {
-        if q > 0 && (codigo == 0 || codigo == 10) {
+        if q > 0 {
             // Cada quadro começa esperando o relógio (o som do quadro sai depois da espera); o
             // primeiro espera só o próximo degrau (até 55 ms), que o port não conta.
             e.eventos.push(Evento::Espera(t.animacao.espera_quadro_ms));
@@ -1547,6 +1602,9 @@ fn animar_luta(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, d
             let pisca = e.s.mascara(2) != 0;
             por_tile(e, 1, x, y, if pisca { tile_original.wrapping_sub(3) } else { tile_original });
         }
+        if para_com_musica {
+            break;
+        }
         if codigo == 2 {
             por_tile(e, plano, x, y, (leao + 0x38) as u8);
             if leao < 5 {
@@ -1557,7 +1615,11 @@ fn animar_luta(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, d
         }
         let d = e.s.mascara(8);
         mover_marca(e, t, plano, x, y, tipo, d);
+        fotos.extend(quadro_da_tela(e, plano));
     }
+    let pedidos = std::mem::replace(&mut e.eventos, fila_antes);
+    pedir_animacao(e, codigo, plano, t.animacao.espera_quadro_ms, fotos);
+    e.eventos.extend(pedidos);
     if codigo == 10 {
         por_tile(e, 1, x, y, tile_original);
     }
@@ -1587,7 +1649,12 @@ fn animar_loucura(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32
         t.animacao.quadros_loucura_atras
     };
     let (mut cx, mut cy) = (x, y);
+    let fila_antes = std::mem::take(&mut e.eventos);
+    let mut fotos = Vec::new();
     for k in 0..quadros {
+        if k > 0 {
+            e.eventos.push(Evento::Espera(t.animacao.espera_loucura_ms));
+        }
         let (mut ax, mut ay) = (x, y);
         if get_dis(cx, cy, x, y) == 0 && quadros - k != 1 {
             ay = e.r.rrand(7) + cy - 3;
@@ -1602,7 +1669,11 @@ fn animar_loucura(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32
             cy += dy;
         }
         mover_marca(e, t, plano, cx, cy, tipo, d);
+        fotos.extend(quadro_da_tela(e, plano));
     }
+    let pedidos = std::mem::replace(&mut e.eventos, fila_antes);
+    pedir_animacao(e, -1, plano, t.animacao.espera_loucura_ms, fotos);
+    e.eventos.extend(pedidos);
     let d = e.amarela.dir as i32;
     limpar_minha_vida(e, t, plano, cx, cy, tipo, d);
     let a = &mut e.amarela;

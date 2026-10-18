@@ -26,7 +26,7 @@ use crate::rules::amarela::{
     TabelasAmarela,
 };
 use crate::rules::desenho::{self, ContadoresRedesenho, JanelasDesenho};
-use crate::rules::estado::{ConfigSimulacao, Estado, Evento};
+use crate::rules::estado::{AnimacaoDaAmarela, ConfigSimulacao, Estado, Evento, QuadroAnimacao};
 use crate::rules::tick::{tick, Regras, RegrasOriginais, Relogio};
 use crate::rules::trapacas::{self, letra_da_tecla, AnelTrapaca, EfeitoTrapaca, TabelasTrapaca};
 use crate::scripts::{Gancho, PedidoMod, Scripts};
@@ -280,6 +280,15 @@ pub struct Partida {
     anel_trapaca: AnelTrapaca,
     /// Ticks pedidos por `avancar_ticks` dos scripts (API 0.17) ainda por rodar.
     ticks_de_mods: u32,
+    /// Animações da amarela pedidas no último tick (`_AnimYellowFight`, `_AnimYellowInsane`), em
+    /// ordem, e o `ms_total` em que a primeira começou. Enquanto duram, a simulação fica parada
+    /// (`bloqueio_ms`) e a janela de edição mostra o quadro da vez (`quadro_animado`).
+    animacoes: Vec<AnimacaoDaAmarela>,
+    animacao_inicio_ms: u64,
+    /// Quadro mostrado no último redesenho (animação, quadro), para só redesenhar quando muda.
+    quadro_mostrado: Option<(usize, usize)>,
+    /// Rodando os ticks pedidos pelos mods de uma vez: as animações não param nada.
+    avanco_rapido: bool,
 }
 
 impl Partida {
@@ -328,6 +337,10 @@ impl Partida {
             tabelas_trapaca: TabelasTrapaca::padrao().clone(),
             anel_trapaca: AnelTrapaca::default(),
             ticks_de_mods: 0,
+            animacoes: Vec::new(),
+            animacao_inicio_ms: 0,
+            quadro_mostrado: None,
+            avanco_rapido: false,
         };
         p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
         p.vistas_para_estado();
@@ -371,6 +384,18 @@ impl Partida {
     pub fn avancar(&mut self, ms: u64) -> Avanco {
         // O GetTickCount continua andando durante quadros modais e esperas.
         self.ms_total += ms;
+        if self.animando() {
+            // _AnimYellowFight: o programa inteiro espera; um quadro modal pedido no mesmo tick (a
+            // morte depois da luta perdida) só aparece depois da animação.
+            let espera = ms.min(self.bloqueio_ms);
+            self.bloqueio_ms -= espera;
+            self.acompanhar_animacao();
+            if self.animando() {
+                return Avanco::default();
+            }
+            self.resto_ms = 0;
+            return Avanco::default();
+        }
         if self.avisos.passar_tempo(self.agora()).is_some() {
             self.redesenhar = true;
             self.depois_de_fechar();
@@ -401,6 +426,12 @@ impl Partida {
         for _ in 0..n {
             av.mensagens += 1;
             av.ticks += self.mensagem_de_timer();
+            if self.bloqueio_ms > 0 {
+                // Uma animação da amarela parou o programa (_AnimYellowFight): o tempo que sobrou
+                // deste avanço não vira mensagens.
+                self.resto_ms = 0;
+                break;
+            }
             if self.avisos.tem_modal() {
                 // _StopSimulation: KillTimer, e as WM_TIMER pendentes são descartadas.
                 self.resto_ms = 0;
@@ -439,6 +470,11 @@ impl Partida {
             if self.relogio.liberar_tick(&self.estado, &self.cfg_simulacao) {
                 self.rodar_tick();
                 ticks += 1;
+                if self.bloqueio_ms > 0 {
+                    // Animação dentro do tick: o port encerra a chamada (a espera fica no avanço).
+                    self.laco = LacoTimer::default();
+                    return ticks;
+                }
                 if !havia_modal && self.avisos.tem_modal() {
                     // _StopSimulation: o quadro para o temporizador; o port encerra a chamada.
                     self.laco = LacoTimer::default();
@@ -480,7 +516,8 @@ impl Partida {
         // _UpdateWindows: os sorteios do desenho (quintal com chuva/enxame, palpos da aranha).
         let v = &self.nav.vista;
         let aranha = desenho::aranha_visivel(&self.estado, self.nav.plano_mapa, v.x, v.y, v.largura, v.altura);
-        let janelas = JanelasDesenho { ativa: self.ativo, aranha_visivel: aranha, ..self.janelas_desenho };
+        let som_cortador = self.regras.quintal.sons.cortador;
+        let janelas = JanelasDesenho { ativa: self.ativo, aranha_visivel: aranha, som_cortador, ..self.janelas_desenho };
         desenho::redesenho_do_timer(&mut self.estado, &janelas, &mut self.contadores_redesenho);
         // _UpdateWindows: em fast/ultra o mapa só é redesenhado a cada 2/4 ticks; sem foco, a cada 8.
         self.contador_mapa = self.contador_mapa.wrapping_add(1);
@@ -491,6 +528,57 @@ impl Partida {
             desenha &= self.quadros.is_multiple_of(u64::from(self.cfg.relogio.redesenho_sem_foco_a_cada.max(1)));
         }
         self.redesenhar |= desenha;
+    }
+
+    /// Botão MATE do quintal (`_ProcYardEvent` 0x2306): arma a revoada preta ou recusa, com a
+    /// mensagem na faixa.
+    pub fn botao_revoada(&mut self) -> bool {
+        let armou = crate::rules::quintal::botao_revoada(&mut self.estado, &self.regras.quintal);
+        self.processar_eventos_do_estado();
+        armou
+    }
+
+    /// Quadro de animação da amarela a mostrar agora na janela de edição: o plano animado e o
+    /// quadro (mapa, vida e marca da amarela naquele instante). Cada quadro fica `espera_ms` na tela;
+    /// o último aparece só no fim da espera (no original o tick continua logo depois dele).
+    pub fn quadro_animado(&self) -> Option<(i16, &QuadroAnimacao)> {
+        let (k, q) = self.indice_do_quadro()?;
+        let a = &self.animacoes[k];
+        Some((a.plano, &a.quadros[q]))
+    }
+
+    /// Há uma animação da amarela em andamento (a simulação está parada por ela).
+    pub fn animando(&self) -> bool {
+        !self.animacoes.is_empty()
+    }
+
+    fn indice_do_quadro(&self) -> Option<(usize, usize)> {
+        let mut t = self.ms_total.saturating_sub(self.animacao_inicio_ms);
+        for (k, a) in self.animacoes.iter().enumerate() {
+            let d = a.duracao_ms();
+            if t < d {
+                return Some((k, (t / u64::from(a.espera_ms.max(1))) as usize));
+            }
+            t -= d;
+        }
+        None
+    }
+
+    /// Depois de passar tempo: troca o quadro mostrado (pede redesenho) e, acabadas as esperas,
+    /// encerra as animações.
+    fn acompanhar_animacao(&mut self) {
+        if self.animacoes.is_empty() {
+            return;
+        }
+        let atual = self.indice_do_quadro();
+        if atual.is_none() || self.bloqueio_ms == 0 {
+            self.animacoes.clear();
+            self.quadro_mostrado = None;
+            self.redesenhar = true;
+        } else if atual != self.quadro_mostrado {
+            self.quadro_mostrado = atual;
+            self.redesenhar = true;
+        }
     }
 
     /// Devolve se a tela deve ser redesenhada (e limpa o pedido).
@@ -580,6 +668,17 @@ impl Partida {
                     self.avisos.receber_mensagem(id, self.estado.partida.opcoes[3] != 0, licoes);
                     self.eventos.push_back(ev);
                 }
+                Evento::Animacao(a) => {
+                    if !self.avanco_rapido && !a.quadros.is_empty() {
+                        if self.animacoes.is_empty() {
+                            self.animacao_inicio_ms = self.ms_total;
+                        }
+                        self.bloqueio_ms += a.duracao_ms();
+                        self.animacoes.push(*a);
+                        self.quadro_mostrado = None;
+                        self.redesenhar = true;
+                    }
+                }
                 outro => self.eventos.push_back(outro),
             }
         }
@@ -647,6 +746,7 @@ impl Partida {
     /// para no fim do jogo ou num aviso modal.
     fn rodar_ticks_de_mods(&mut self) -> Avanco {
         let mut av = Avanco::default();
+        self.avanco_rapido = true;
         let lote = self.ticks_de_mods.min(self.cfg.relogio.max_mensagens_por_avanco.max(1) * 50);
         for _ in 0..lote {
             if self.ticks_de_mods == 0 {
@@ -661,6 +761,7 @@ impl Partida {
             self.ticks_de_mods = self.ticks_de_mods.saturating_sub(1);
             av.ticks += 1;
         }
+        self.avanco_rapido = false;
         self.redesenhar = true;
         av
     }
@@ -1165,6 +1266,50 @@ mod testes {
     }
 
     /// Ticks em `n` mensagens seguidas.
+    #[test]
+    fn animacao_da_amarela_para_a_simulacao_e_mostra_os_quadros() {
+        // _AnimYellowFight: 6 quadros a cada 165 ms; o programa inteiro espera 825 ms, e a janela de
+        // edição mostra o quadro da vez. Depois, os ticks voltam.
+        let mut p = partida(1);
+        let quadro = |d: i16| crate::rules::estado::QuadroAnimacao {
+            mapa: vec![0; 4096],
+            vida: vec![0; 4096],
+            x: 5,
+            y: 6,
+            tipo: 0x70,
+            dir: d,
+            ovo: 0,
+            base: 0,
+        };
+        let a = AnimacaoDaAmarela { codigo: 0, plano: 2, espera_ms: 165, quadros: (0..6).map(quadro).collect() };
+        p.estado.eventos.push(Evento::Animacao(Box::new(a)));
+        p.processar_eventos_do_estado();
+        assert!(p.retirar_eventos().is_empty(), "a animação fica na partida");
+        assert!(p.animando());
+        let t0 = p.estado.partida.tempo;
+        assert_eq!(p.quadro_animado().map(|(pl, q)| (pl, q.dir)), Some((2, 0)));
+        assert_eq!(p.avancar(400).ticks, 0);
+        assert_eq!(p.quadro_animado().map(|(_, q)| q.dir), Some(2), "400 ms: terceiro quadro");
+        assert!(p.tomar_redesenho());
+        assert_eq!(p.avancar(400).ticks, 0);
+        assert_eq!(p.quadro_animado().map(|(_, q)| q.dir), Some(4));
+        assert_eq!(p.avancar(25).ticks, 0, "825 ms: acabou, sem tick neste avanço");
+        assert!(!p.animando());
+        assert_eq!(p.estado.partida.tempo, t0);
+        assert!(p.avancar(2000).ticks > 0, "a simulação volta");
+    }
+
+    #[test]
+    fn ticks_dos_mods_nao_param_nas_animacoes() {
+        let mut p = partida(1);
+        p.avanco_rapido = true;
+        let q = crate::rules::estado::QuadroAnimacao { mapa: Vec::new(), vida: Vec::new(), x: 0, y: 0, tipo: 0x70, dir: 0, ovo: 0, base: 0 };
+        let a = AnimacaoDaAmarela { codigo: 0, plano: 1, espera_ms: 165, quadros: vec![q.clone(), q] };
+        p.estado.eventos.push(Evento::Animacao(Box::new(a)));
+        p.processar_eventos_do_estado();
+        assert!(!p.animando());
+    }
+
     fn ticks_em(p: &mut Partida, n: u32) -> u32 {
         (0..n).map(|_| p.mensagem_de_timer()).sum()
     }

@@ -69,7 +69,8 @@ Ids do tipo 5. Os nomes são o contexto da chamada, não um rótulo do original.
 | 7 | `_SimBird` (`1030:28aa`): pássaro |
 | 9 | `_SimKidInside` (`1030:20b6`), `_ExpKillAnts` |
 | 10 | `_EatMyFood`, `_MoveSpider`, `_CheatKeys` |
-| 13 | `_SimCat` (`1030:2b24`): gato, quando `_SRand64()` = 0 no quintal |
+| 13 | `_SimCat` (`1030:2b24`): gato andando, quando `_MapMode` = 0, `_YardMode` < 2 e `_SRand64()` = 0 (0,49 s) |
+| 14 | `_SimCat`: o gato começa a fugir do cachorro (`_CatOn` = 3), com `_MapMode` = 0 e `_YardMode` < 2, sem sorteio (1,27 s) |
 | 15 | ok/centralizar: `_YellowCommandKey` (Home), `_processSpider`, `_ExchangeLives`, `_SetAlarmDropState` (ligou) |
 | 17 / 18 | escavação no ninho preto / vermelho: `_DoDigInB` (`1028:4bd0`) / `_DoDigInR` (`1028:6f0c`) (ninho.md: "som 0x11 (R: 0x12)") |
 | 19 | `_SetLife` (`1020:5d18`): a amarela cava ao entrar na terra |
@@ -81,7 +82,7 @@ Ids do tipo 5. Os nomes são o contexto da chamada, não um rótulo do original.
 | 30 | terra/pedrinha: `_DropMyRock`, `_PickupMyRock`, `_DoAntLions` |
 | 32 | `_AddFood`, `_DoTool`, `_ExpAddFood`, `_MysteryButton` |
 | 35 | passo humano: `_FootFall` (`1030:3386`) |
-| 36 | cortador de grama: `_DrawMower` (`1010:b2c4`) |
+| 36 | cortador de grama: `_DrawMower` (`1010:b2c4`), a cada redesenho do quintal (modos 0 e 1) com `_BoyHere` 3 ou 4 e o jogo não pausado |
 | 37 | luta: `_AnimYellowFight` (`1028:7e56`), `_LionDialog` |
 | 38 | formiga-leão: `_LionDialog`, `_DoAntLions` |
 | 41 | água: `_DoWater` (`1020:07c6`); aranha: comando 12 (laser) |
@@ -91,7 +92,7 @@ Ids do tipo 5. Os nomes são o contexto da chamada, não um rótulo do original.
 | 49 | `_YellowBirth`, `_AnimYellowFight` |
 | 55 | laser: `_DoLaserFire` (`1000:6ec8`) |
 
-Os ids 0, 3–6, 8, 11, 12, 14, 16, 20, 25, 26, 31, 33, 34, 39, 40, 43, 46, 48, 50–54 e 56 não aparecem como constante nas chamadas vistas [em aberto: podem vir de variáveis, como em `_MysteryButton` e `_CheatKeys`].
+Os ids 0, 3–6, 8, 11, 12, 16, 20, 25, 26, 31, 33, 34, 39, 40, 43, 46, 48, 50–54 e 56 não aparecem como constante nas chamadas vistas [em aberto: podem vir de variáveis, como em `_MysteryButton` e `_CheatKeys`].
 
 ## Port
 
@@ -102,7 +103,8 @@ Os ids 0, 3–6, 8, 11, 12, 14, 16, 20, 25, 26, 31, 33, 34, 39, 40, 43, 46, 48, 
 | Parte (`data/…json`) | Original | Pedido no port |
 |---|---|---|
 | quintal | `_SimDog`/`_MakeBark`: latido pelo sorteio `S(4)` (0x17, 0x15, 0x17, 0x16); latido 0x15 acompanhando o cortador | `cachorro` → `latir` |
-| quintal | `_SimCat`: 13 com a vista no quintal e `S(64)` = 0 | `gato` |
+| quintal | `_SimCat`: 13 com a vista no quintal e `S(64)` = 0; 14 ao começar a fugir do cachorro (desde 2026-10-18) | `gato`, `gato_fugindo` |
+| quintal | `_DrawMower`: 0x24 a cada redesenho do quintal com o menino cortando ou guardando o cortador, fora da pausa (desde 2026-10-18; pedido por `rules::desenho::desenhar_cortador`, chamado pela partida depois do tick) | `cortador` |
 | quintal | `_SimBird`: 7 quando o pássaro pega o enxame, vista no quintal e `S2` = 0 | `passaro` |
 | quintal | `_FootFall`: 0x23 a cada pisada (fora e dentro de casa); `_SimKidInside`: 9 (inseticida) e 0x18 nas combinações (contagem do nó, nó, quadro) = (3, 20, 900), (1, 21, 903), (6, 20, 6), (3, 21, 1) | `menino_fora`, `menino_dentro` |
 | quintal | `_DoWater`: 0x29 com chuva e `S(50)` = 0 | `simular_agua` |
@@ -125,7 +127,7 @@ Os ids 0, 3–6, 8, 11, 12, 14, 16, 20, 25, 26, 31, 33, 34, 39, 40, 43, 46, 48, 
 
 ### O que não está ligado
 
-- **Interface (menus, botões e diálogos), fora de `rules/`:** `_EditToolsMenu`/`_MapToolsMenu`/`_RibbonToolsMenu` (2 e 11003), `_DoTool`, `_DoBookMark`, `_CheatKeys`, `_MysteryButton`, `_LionDialog`, `_YellowDialog`, `_SpiderDialog`, `_EndGameDialog` (10008/10010 e o tema seguinte), `_DrawSimPayoff` (20003, 20004), `_ProcYardEvent`, `_XferPatch`/`_SpecialXfer`/`_PlaceQueenInYard` (1, 11002, 11003), `_StartAttack` (11018 pelo menu), `_DrawMower` (0x24, desenho do cortador). Ficam para o `simant` quando essas telas existirem.
+- **Interface (menus, botões e diálogos), fora de `rules/`:** `_EditToolsMenu`/`_MapToolsMenu`/`_RibbonToolsMenu` (2 e 11003), `_DoTool`, `_DoBookMark`, `_CheatKeys`, `_MysteryButton`, `_LionDialog`, `_YellowDialog`, `_SpiderDialog`, `_EndGameDialog` (10008/10010 e o tema seguinte), `_DrawSimPayoff` (20003, 20004), `_ProcYardEvent` (exceto o botão MATE, ligado em 2026-10-18), `_XferPatch`/`_SpecialXfer`/`_PlaceQueenInYard` (1, 11002, 11003), `_StartAttack` (11018 pelo menu). Ficam para o `simant` quando essas telas existirem.
 - **Modo Experimental** (`_ExpDig`, `_ExpAddAnt`, `_ExpAddFood`, `_ExpIncSmell`, `_ExpKillAnts`): o modo ainda não está no port.
 - `_myBeginSoundSection` (0x26 da formiga-leão) é vazia no Windows: nada a pedir (o `S8()` continua).
 
@@ -137,7 +139,7 @@ Os ids 0, 3–6, 8, 11, 12, 14, 16, 20, 25, 26, 31, 33, 34, 39, 40, 43, 46, 48, 
 - Foco (`WM_ACTIVATEAPP`), **em todas as telas** (abertura, "Select a Game" e partida): a cada quadro o executável lê se a janela tem o foco do teclado e não está minimizada (`janela_ativa` em `simant/src/jogo.rs`; antes só os eventos de foco da partida, que um laço modal podia engolir, e a abertura não tratava o foco). Ao ficar inativa: para a música, corta o efeito, esquece os agendados e não toca nada até voltar; ao voltar, nada recomeça. A música da abertura e a do jogo novo são pedidas ao criar a janela, antes de o SDL entregar o foco: ficam guardadas até o primeiro foco [escolha do port; no original, com o aplicativo inativo na abertura, `_songsOnFlag` = 0 e a música não tocaria]. O usuário observou no original a música da abertura parando sem foco. Lógica em `simant/src/som/controle.rs` (`ControleSom`), com testes.
 - Abertura e jogo novo tocam `musica_abertura` e `musica_jogo_novo` (10001).
 
-**Linha do tempo dos efeitos.** Dentro de um tick o original pode ficar parado em animações: `_AnimYellowFight` (`1028:7e56`) espera, no começo de cada quadro, `_MacTickCount() > início + 6` [código]; como o relógio do Mac anda de 3 em 3 a cada 55 ms (quintal.md, "Relógios"), são 3 degraus = **165 ms** entre dois quadros (o primeiro espera só o próximo degrau, até 55 ms; depois do último não há espera). O som do quadro (0x25 na luta com `S2` ≠ 0, 0x31 no choque) sai logo depois da espera. Na luta (6 quadros) os 0x25 ficam espalhados em ~825 ms, e o efeito pedido depois da animação (no mesmo tick ou no seguinte) só sai no fim dela. O port antes recebia os pedidos do tick inteiro no mesmo quadro de vídeo: cada efeito cortava o anterior na hora, e a luta virava, no máximo, um 0x25 — muitas vezes cortado logo em seguida pela escavação (0x11/0x12) ou por outro efeito do mesmo tick; é por isso que o som da luta quase não se ouvia. Agora as regras pedem `Evento::Espera(ms)` entre os quadros (`amarela.json`, `animacao.espera_quadro_ms` = 165) e o `ControleSom` agenda cada efeito no instante certo: os seguintes à espera vão para uma fila, e a fila do quadro seguinte começa depois das esperas já agendadas. A simulação do port **não** fica parada durante a animação (divergência registrada): só o som segue o tempo do original. Volume: o 0x25 tem 0,46 s e é dos efeitos mais baixos (RMS 0,19 contra 0,25–0,40 da maioria, medido nos WAV de `--exportar-som`); o port toca efeitos e música com `volume_efeitos` = `volume_musica` = 0,5 de `data/som.json`. A proporção entre o `waveOut` e o MIDI no original depende do mixer do Windows e da placa [não medido].
+**Linha do tempo dos efeitos.** Dentro de um tick o original pode ficar parado em animações: `_AnimYellowFight` (`1028:7e56`) espera, no começo de cada quadro, `_MacTickCount() > início + 6` [código]; como o relógio do Mac anda de 3 em 3 a cada 55 ms (quintal.md, "Relógios"), são 3 degraus = **165 ms** entre dois quadros (o primeiro espera só o próximo degrau, até 55 ms; depois do último não há espera). O som do quadro (0x25 na luta com `S2` ≠ 0, 0x31 no choque) sai logo depois da espera. Na luta (6 quadros) os 0x25 ficam espalhados em ~825 ms, e o efeito pedido depois da animação (no mesmo tick ou no seguinte) só sai no fim dela. O port antes recebia os pedidos do tick inteiro no mesmo quadro de vídeo: cada efeito cortava o anterior na hora, e a luta virava, no máximo, um 0x25 — muitas vezes cortado logo em seguida pela escavação (0x11/0x12) ou por outro efeito do mesmo tick; é por isso que o som da luta quase não se ouvia. Agora as regras pedem `Evento::Espera(ms)` entre os quadros (`amarela.json`, `animacao.espera_quadro_ms` = 165) e o `ControleSom` agenda cada efeito no instante certo: os seguintes à espera vão para uma fila, e a fila do quadro seguinte começa depois das esperas já agendadas. Desde 2026-10-18 a simulação do port também fica parada durante a animação e a janela de edição mostra os quadros (`Evento::Animacao`, [formiga-amarela.md](formiga-amarela.md) §10.2), como no original: nenhum som de outro tick pode cortar os da luta. Volume: o 0x25 tem 0,46 s e é dos efeitos mais baixos (RMS 0,19 contra 0,25–0,40 da maioria, medido nos WAV de `--exportar-som`); o port toca efeitos e música com `volume_efeitos` = `volume_musica` = 0,5 de `data/som.json`. A proporção entre o `waveOut` e o MIDI no original depende do mixer do Windows e da placa [não medido].
 - `--sem-som` desliga tudo; `--exportar-som DIR` grava os efeitos e as músicas decodificados em WAV, sem abrir áudio.
 
 **Sintetizador.** Ver `docs/decisoes.md` (2026-10-17). Com uma SoundFont (`--soundfont`, `SIMANT_SOUNDFONT` ou `soundfont` em `data/som.json`), usa `rustysynth`; sem ela, um sintetizador simples próprio (ondas básicas por família de instrumento GM, ruído para a percussão). O timbre, portanto, não é o do original (que dependia da placa e do *MIDI Mapper*): isso está em `docs/divergencias.md`.

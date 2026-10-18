@@ -64,7 +64,7 @@ Navegação na tela de jogo:
   
   A janela é ciente de DPI e amplia por vizinho mais próximo (sem borrar com a escala de tela do Windows). Sem foco (outra janela ativa ou minimizada), a música para e os efeitos se calam, em todas as telas, como no original.
 - Preferências: como o original faz com o `WIN.INI`, a partida guarda ao sair as opções (AutoTrack, Music, Sound Effects, Events, Messages, Silly) e as funções dos botões configuráveis da faixa em `preferencias.json`, na pasta de dados do usuário (no Windows, `%APPDATA%\SimAnt recomp\SimAnt\`), e as usa no próximo jogo novo (um `.ANT` carregado traz as suas opções). `--preferencias ARQ` usa outro arquivo; `--sem-preferencias` não lê nem grava.
-- Janela, para testes sem interação: `--sair-apos-ms N` fecha sozinha e `--capturar-janela ARQ.png` grava o que a janela mostrava. `--ticks N` roda N ticks sem janela (com `--exportar-tela-jogo`, grava a tela depois) e escreve o `GameTime` antes e depois.
+- Janela, para testes sem interação: `--sair-apos-ms N` fecha sozinha e `--capturar-janela ARQ.png` grava o que a janela mostrava. `--ticks N` roda N ticks sem janela (com `--exportar-tela-jogo`, grava a tela depois) e escreve o `GameTime` antes e depois; `--avancar-ms MS` passa em seguida MS ms de tempo real na partida (para exportar o quadro de uma animação da amarela em andamento).
 
 ### Mods com script (Lua)
 
