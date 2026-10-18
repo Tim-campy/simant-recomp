@@ -383,7 +383,8 @@ pub(crate) fn ctrl_apertado(eventos: &sdl2::EventPump) -> bool {
 /// Jogo novo escolhido no "Select a Game" do Ctrl+N: nova sessão com a semente do relógio.
 pub(crate) fn novo_jogo<'a>(s: &Sessao<'a>, e: engine::core::selecao::Escolha, o: &Opcoes) -> Result<Sessao<'a>, String> {
     let tipo = e.tipo_jogo().ok_or("escolha sem jogo novo")?;
-    let n = semente(&Opcoes { semente: None, ..o.clone() });
-    println!("novo jogo {e:?} com semente {n}");
-    Sessao::abrir(s.recursos, &o.dados, Origem::Novo(n, tipo), s.cores.clone())
+    // _NewGame não ressemeia: o mundo sai do R da partida aberta (geracao-mundo.md §1; conferido no
+    // vetor inseticida_morte/21, engine/tests/fim_de_jogo_interface.rs).
+    println!("novo jogo {e:?} com R = {:#010x}", s.partida.estado.r.estado());
+    Sessao::abrir(s.recursos, &o.dados, Origem::NovoNaPartida(&s.partida.estado, tipo), s.cores.clone())
 }

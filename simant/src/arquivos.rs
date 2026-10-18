@@ -71,7 +71,8 @@ impl Sessao<'_> {
             Ok(p) => {
                 println!("{} Saved correctly", p.display());
                 self.partida.estado.precisa_salvar = false;
-                let nome = p.display().to_string().to_uppercase();
+                // O caminho completo, como o diálogo comum o devolve no original.
+                let nome = std::path::absolute(&p).unwrap_or_else(|_| p.clone()).display().to_string();
                 self.dialogo = Some(Dialogo::Salvo(CaixaMensagem::salvo(&self.dialogos_cfg, &nome), depois_load));
                 true
             }
@@ -173,6 +174,13 @@ pub(crate) fn carregar<'a>(s: &Sessao<'a>, arquivo: &Path, o: &Opcoes) -> Result
     let r = s.partida.estado.r;
     let tipo = TipoJogo::de_i16(s.partida.estado.partida.tipo_jogo).unwrap_or(TipoJogo::Tutorial);
     println!("Load: {} (R da sessão, tipo {tipo:?})", arquivo.display());
+    let tut: engine::core::carregar::ConfigTutorialArquivo = s.recursos.dados("tutorial_arquivo.json")?;
+    if engine::core::carregar::e_o_tutorial(arquivo, &tut) {
+        // _LoadGame com o nome do tutorial: não lê o arquivo, gera o tutorial (_SeedSRand pelo relógio).
+        let semente = semente(&Opcoes { semente: None, ..o.clone() }) as u16;
+        println!("Load: {} é o tutorial: _GenerateTutorial", arquivo.display());
+        return Sessao::abrir(s.recursos, &o.dados, Origem::Tutorial(&s.partida.estado, semente), s.cores.clone());
+    }
     Sessao::abrir(s.recursos, &o.dados, Origem::Save(arquivo, r, tipo), s.cores.clone())
 }
 

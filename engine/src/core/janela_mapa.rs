@@ -62,6 +62,8 @@ pub struct JanelaMapa {
     ultimo_modo: Option<i16>,
     /// `_GameTime` da última geração (o original gera em `_UpdateWindows`, depois do tick).
     ultimo_tempo: Option<u32>,
+    /// Plano da última geração.
+    ultimo_plano: Option<i16>,
     bitmaps: HashMap<u16, Bitmap>,
     titulos: Vec<String>,
 }
@@ -95,7 +97,7 @@ impl JanelaMapa {
             .iter()
             .map(|l| l.iter().map(|&b| b as char).collect())
             .collect();
-        Ok(JanelaMapa { cfg, celulas: vec![0; COLUNAS * LINHAS], ultimo_modo: None, ultimo_tempo: None, bitmaps, titulos })
+        Ok(JanelaMapa { cfg, celulas: vec![0; COLUNAS * LINHAS], ultimo_modo: None, ultimo_tempo: None, ultimo_plano: None, bitmaps, titulos })
     }
 
     /// Título (`_SetMapTitle`): a entrada `_MapMode` da lista 1000.
@@ -107,11 +109,19 @@ impl JanelaMapa {
     /// trilhas (`_showTrails`) e o mesmo modo, parte das células da última geração e só escreve
     /// as que têm vida, acumulando os rastros.
     pub fn atualizar(&mut self, e: &Estado, trilhas: bool) {
-        let modo = e.vistas.modo_mapa;
         let tempo = e.partida.tempo;
-        if self.ultimo_modo == Some(modo) && self.ultimo_tempo == Some(tempo) {
-            return;
-        }
+        let plano = e.vistas.plano;
+        // A geração é de `_UpdateWindows` (depois de um tick). Sem tick, só a troca de plano
+        // (`_SetMapPlane` → `_DrawMap`) ou a abertura regeram, com o mapa simples do plano: com o
+        // jogo pausado, o botão de cheiro troca só o título [bancada, telas/mapa.md §6].
+        let modo = if self.ultimo_tempo == Some(tempo) {
+            if self.ultimo_modo.is_some() && self.ultimo_plano == Some(plano) {
+                return;
+            }
+            plano
+        } else {
+            e.vistas.modo_mapa
+        };
         let acumula = trilhas && self.ultimo_modo == Some(modo);
         if !acumula {
             self.celulas.iter_mut().for_each(|c| *c = 0);
@@ -177,6 +187,7 @@ impl JanelaMapa {
             }
         }
         self.ultimo_modo = Some(modo);
+        self.ultimo_plano = Some(plano);
         self.ultimo_tempo = Some(tempo);
     }
 
@@ -266,7 +277,7 @@ mod testes {
     }
 
     fn janela() -> JanelaMapa {
-        JanelaMapa { cfg: cfg(), celulas: vec![0; COLUNAS * LINHAS], ultimo_modo: None, ultimo_tempo: None, bitmaps: HashMap::new(), titulos: Vec::new() }
+        JanelaMapa { cfg: cfg(), celulas: vec![0; COLUNAS * LINHAS], ultimo_modo: None, ultimo_tempo: None, ultimo_plano: None, bitmaps: HashMap::new(), titulos: Vec::new() }
     }
 
     #[test]
@@ -314,6 +325,8 @@ mod testes {
         }
         assert_eq!(j.celulas[indice(8, 8)], j.cfg.conv(0xB));
         e.vistas.modo_mapa = 2;
+        e.vistas.plano = 2;
+        e.partida.tempo += 1;
         e.ninho_b.vida.definir(0, 0, 0x30);
         j.atualizar(&e, false);
         assert_eq!(j.celulas[indice(0, 0)], j.cfg.conv(0xF), "faixa lateral");
@@ -321,6 +334,17 @@ mod testes {
         let area = Retangulo { esq: 100, topo: 50, dir: 612, base: 306 };
         assert_eq!(j.celula_em(area, &e, 100 + 4 * 33, 50 + 4), Some((1, 1)));
         assert_eq!(j.celula_em(area, &e, 100 + 4, 50), None);
+        // Pausado (sem tick): o modo de cheiro não regera; a troca de plano regera o mapa simples.
+        let antes = j.celulas.clone();
+        e.vistas.modo_mapa = 7;
+        j.atualizar(&e, false);
+        assert_eq!(j.celulas, antes);
+        e.vistas.plano = 1;
+        j.atualizar(&e, false);
+        assert_eq!(j.celulas[indice(0, 0)], j.cfg.ctab[0], "superfície, não o feromônio");
+        e.partida.tempo += 1;
+        j.atualizar(&e, false);
+        assert_eq!(j.celulas[indice(0, 0)], j.cfg.conv(0xB), "depois do tick, o feromônio");
         assert_eq!(modo_do_botao_de_cheiro(5, 5), 1);
         assert_eq!(modo_do_botao_de_cheiro(1, 5), 5);
     }

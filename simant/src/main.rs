@@ -232,6 +232,9 @@ fn principal() -> Result<(), String> {
             None => return Ok(()),
         }
     }
+    // Estado do programa antes de qualquer jogo (o "anterior" de um Load de Tutorial.Ant no começo).
+    let mut inicial = Estado::vazio();
+    let tut: engine::core::carregar::ConfigTutorialArquivo = recursos.dados("tutorial_arquivo.json")?;
     let origem = match (&o.save, o.novo_jogo) {
         (Some(save), _) => {
             // _initStuff semeia S e R com o relógio; o Load do começo do programa roda _RandYard
@@ -240,7 +243,12 @@ fn principal() -> Result<(), String> {
             let mut s = GeradorS::new(0);
             let mut r = GeradorR::default();
             r.semear_com_ticks(&mut s, n, n);
-            Some(Origem::Save(save, r, TipoJogo::Tutorial))
+            if engine::core::carregar::e_o_tutorial(save, &tut) {
+                inicial.r = r;
+                Some(Origem::Tutorial(&inicial, s.semente()))
+            } else {
+                Some(Origem::Save(save, r, TipoJogo::Tutorial))
+            }
         }
         (None, true) => {
             let n = semente(&o);
@@ -253,6 +261,8 @@ fn principal() -> Result<(), String> {
         let nome = match &origem {
             Origem::Save(save, ..) => save.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
             Origem::Novo(_, tipo) => format!("{tipo:?}"),
+            Origem::Tutorial(..) => "Tutorial Game".into(),
+            Origem::NovoNaPartida(_, tipo) => format!("{tipo:?}"),
         };
         let mut s = Sessao::abrir(&recursos, &o.dados, origem, cores)?;
         for &a in &o.acoes {
@@ -272,7 +282,8 @@ fn principal() -> Result<(), String> {
                 3 => {
                     s.partida.navegar(Acao::NinhoVermelho);
                 }
-                4..=8 => s.partida.botao_de_cheiro(m),
+                // O botão alterna: com o save já nesse modo, não aperta (senão desligaria o feromônio).
+                4..=8 if s.partida.estado.vistas.modo_mapa != m => s.partida.botao_de_cheiro(m),
                 _ => {}
             }
         }
@@ -319,7 +330,7 @@ fn principal() -> Result<(), String> {
                 s.abrir_load();
             }
             Some("salvo") => {
-                let m = engine::core::dialogos::CaixaMensagem::salvo(&s.dialogos_cfg, "QUICK1.ANT");
+                let m = engine::core::dialogos::CaixaMensagem::salvo(&s.dialogos_cfg, r"C:\MAXIS\ANTWIN\QUICK1.ANT");
                 s.dialogo = Some(arquivos::Dialogo::Salvo(m, false));
             }
             Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como ou salvo")),

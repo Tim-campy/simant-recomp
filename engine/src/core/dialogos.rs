@@ -52,20 +52,34 @@ pub struct Cores {
     pub pasta: u8,
 }
 
+/// Estilo da caixa: espessura da moldura (contorno incluído: esquerda, cima, direita, baixo), a
+/// margem branca em volta do título e o centro na área cliente [medido: a pergunta do Load tem só o
+/// contorno; a "Message" do `_PopMsg`, a moldura de diálogo azul].
+#[derive(Clone, Debug, Deserialize)]
+pub struct EstiloCaixa {
+    pub borda: [i16; 4],
+    pub margem_titulo: i16,
+    pub centro: [i16; 2],
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigCaixaMensagem {
     pub fontes: Vec<usize>,
-    pub centro: [i16; 2],
+    pub estilos: Vec<EstiloCaixa>,
     pub altura_titulo: i16,
-    /// Canto da primeira linha do texto, relativo ao externo.
-    pub texto: [i16; 2],
+    /// x do ícone e do texto em relação ao interior; o ícone fica `icone_abaixo_titulo` linhas abaixo
+    /// da linha do título; o texto, centrado na altura do ícone quando é mais baixo que ele.
+    pub icone_x: i16,
+    pub icone_abaixo_titulo: i16,
+    pub lado_icone: i16,
+    pub texto_x: i16,
     pub margem_direita: i16,
     pub altura_linha: i16,
-    pub altura_minima: i16,
-    pub icone: [i16; 2],
+    /// Botões: `folga_botoes` abaixo do ícone ou do texto; o interior acaba `margem_baixo` abaixo deles.
+    pub folga_botoes: i16,
+    pub margem_baixo: i16,
     /// Largura e altura de cada botão.
     pub botao: [i16; 2],
-    pub y_botoes: i16,
     /// (número de botões, largura do grupo, x de cada botão no grupo).
     pub grupos_botoes: Vec<(usize, i16, Vec<i16>)>,
     pub titulo_load: String,
@@ -295,6 +309,16 @@ pub enum IconeMensagem {
     Informacao,
 }
 
+struct GeometriaCaixa {
+    externo: Retangulo,
+    interior: Retangulo,
+    titulo: Retangulo,
+    icone: (i16, i16),
+    texto: (i16, i16),
+    botoes: Vec<Retangulo>,
+    moldura: bool,
+}
+
 /// `MessageBox`: título, linhas de texto, ícone e botões (o padrão realçado).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CaixaMensagem {
@@ -303,6 +327,8 @@ pub struct CaixaMensagem {
     pub icone: IconeMensagem,
     pub botoes: Vec<String>,
     pub padrao: usize,
+    /// Índice em `estilos`.
+    pub estilo: usize,
 }
 
 impl CaixaMensagem {
@@ -315,53 +341,79 @@ impl CaixaMensagem {
             icone: IconeMensagem::Pergunta,
             botoes: vec![m.sim.clone(), m.nao.clone(), m.cancelar.clone()],
             padrao: m.padrao_load,
+            estilo: 0,
         }
     }
 
-    /// `_PopMsg("%s Saved correctly")`: título "Message", ícone de informação e OK.
+    /// `_PopMsg("%s\nSaved correctly")`: título "Message", ícone de informação e OK; `arquivo` é o
+    /// caminho completo, e o `\n` do formato quebra a linha.
     pub fn salvo(cfg: &ConfigDialogos, arquivo: &str) -> CaixaMensagem {
         let m = &cfg.caixa_mensagem;
         CaixaMensagem {
             titulo: m.titulo_mensagem.clone(),
-            linhas: vec![m.salvo.replace("%s", arquivo)],
+            linhas: m.salvo.replace("%s", arquivo).split('\n').map(str::to_owned).collect(),
             icone: IconeMensagem::Informacao,
             botoes: vec![m.ok.clone()],
             padrao: 0,
+            estilo: 1,
         }
     }
 
-    fn geometria(&self, cfg: &ConfigCaixaMensagem, f: Option<&Fonte>) -> (Retangulo, Vec<Retangulo>) {
+/// Geometria calculada: externo, interior, título, canto do ícone, y do texto e botões.
+    fn geometria(&self, cfg: &ConfigCaixaMensagem, f: Option<&Fonte>) -> GeometriaCaixa {
+        let est = cfg.estilos.get(self.estilo).or(cfg.estilos.first()).cloned().unwrap_or(EstiloCaixa { borda: [1; 4], margem_titulo: 0, centro: [320, 221] });
+        let [be, bt, bd, bb] = est.borda;
         let texto = self.linhas.iter().map(|l| f.map_or(8 * l.len() as i32, |f| largura(f, l))).max().unwrap_or(0) as i16;
         let (_, grupo, xs) =
             cfg.grupos_botoes.iter().find(|g| g.0 == self.botoes.len()).cloned().unwrap_or((1, cfg.botao[0], vec![0]));
-        let extra = cfg.altura_linha * (self.linhas.len().max(1) as i16 - 1);
-        let w = (cfg.texto[0] + texto + cfg.margem_direita).max(grupo + 2 * cfg.texto[0]);
-        let h = cfg.altura_minima + extra;
-        let (x, y) = (cfg.centro[0] - w / 2, cfg.centro[1] - h / 2);
+        let n = self.linhas.len().max(1) as i16;
+        // Alturas relativas ao topo do interior.
+        let linha_titulo = est.margem_titulo + cfg.altura_titulo;
+        let icone_y = linha_titulo + cfg.icone_abaixo_titulo;
+        let alto_texto = n * cfg.altura_linha;
+        let texto_y = icone_y + ((cfg.lado_icone - alto_texto) / 2).max(0);
+        let botoes_y = (icone_y + cfg.lado_icone).max(texto_y + alto_texto) + cfg.folga_botoes;
+        let h_interior = botoes_y + cfg.botao[1] + cfg.margem_baixo;
+        let w_interior = (cfg.texto_x + texto + cfg.margem_direita).max(grupo + 2 * cfg.texto_x);
+        let (w, h) = (be + w_interior + bd, bt + h_interior + bb);
+        let (x, y) = (est.centro[0] - w / 2, est.centro[1] - h / 2);
         let externo = Retangulo { esq: x, topo: y, dir: x + w, base: y + h };
-        let x0 = x + (w - grupo + 1) / 2;
-        let yb = y + cfg.y_botoes + extra;
+        let interior = Retangulo { esq: x + be, topo: y + bt, dir: x + w - bd, base: y + h - bb };
+        let m = est.margem_titulo;
+        let titulo = Retangulo { esq: interior.esq + m, topo: interior.topo + m, dir: interior.dir - m, base: interior.topo + linha_titulo };
+        let x0 = interior.esq + (w_interior - grupo + 1) / 2;
+        let yb = interior.topo + botoes_y;
         let botoes = xs.iter().map(|&dx| Retangulo { esq: x0 + dx, topo: yb, dir: x0 + dx + cfg.botao[0], base: yb + cfg.botao[1] }).collect();
-        (externo, botoes)
+        GeometriaCaixa {
+            externo,
+            interior,
+            titulo,
+            icone: (interior.esq + cfg.icone_x, interior.topo + icone_y),
+            texto: (interior.esq + cfg.texto_x, interior.topo + texto_y),
+            botoes,
+            moldura: be > 1,
+        }
     }
 
     pub fn desenhar(&self, q: &mut Quadro, interface: &Interface, cfg: &ConfigDialogos) {
         let m = &cfg.caixa_mensagem;
         let f = fonte(&m.fontes, interface);
         let c = &cfg.cores;
-        let (e, botoes) = self.geometria(m, f);
-        q.preencher(e, c.fundo, c.fundo);
+        let g = self.geometria(m, f);
+        let e = g.externo;
+        q.preencher(e, if g.moldura { c.moldura } else { c.fundo }, if g.moldura { c.moldura } else { c.fundo });
         q.contorno(Retangulo { dir: e.dir - 1, base: e.base - 1, ..e }, c.linha);
-        let t = Retangulo { esq: e.esq + 1, topo: e.topo + 1, dir: e.dir - 1, base: e.topo + 1 + m.altura_titulo };
-        titulo(q, fonte(&cfg.fontes_titulo, interface), c, t, &self.titulo);
+        q.preencher(g.interior, c.fundo, c.fundo);
+        titulo(q, fonte(&cfg.fontes_titulo, interface), c, g.titulo, &self.titulo);
         let letra = if self.icone == IconeMensagem::Pergunta { "?" } else { "i" };
-        icone(q, f, c, i32::from(e.esq + m.icone[0]), i32::from(e.topo + m.icone[1]), letra);
+        icone(q, f, c, i32::from(g.icone.0), i32::from(g.icone.1), letra);
         if let Some(f) = f {
             for (i, l) in self.linhas.iter().enumerate() {
-                let y = i32::from(e.topo + m.texto[1]) + i as i32 * i32::from(m.altura_linha);
-                escrever(q, f, i32::from(e.esq + m.texto[0]), y, l, c.texto);
+                let y = i32::from(g.texto.1) + i as i32 * i32::from(m.altura_linha);
+                escrever(q, f, i32::from(g.texto.0), y, l, c.texto);
             }
         }
+        let botoes = g.botoes;
         for (i, (r, b)) in botoes.iter().zip(&self.botoes).enumerate() {
             botao(q, f, c, *r, b, i == self.padrao);
         }
@@ -369,8 +421,8 @@ impl CaixaMensagem {
 
     /// Botão sob (x, y).
     pub fn botao_em(&self, interface: &Interface, cfg: &ConfigDialogos, x: i32, y: i32) -> Option<usize> {
-        let (_, botoes) = self.geometria(&cfg.caixa_mensagem, fonte(&cfg.caixa_mensagem.fontes, interface));
-        botoes.iter().position(|r| contem(*r, x, y))
+        let g = self.geometria(&cfg.caixa_mensagem, fonte(&cfg.caixa_mensagem.fontes, interface));
+        g.botoes.iter().position(|r| contem(*r, x, y))
     }
 
     /// Tecla: Enter = botão padrão, Esc = o último (Cancel), letra sublinhada = o botão dela.
@@ -631,7 +683,7 @@ mod testes {
     fn caixa_de_mensagem_do_load_tem_a_geometria_medida() {
         let c = cfg();
         let m = CaixaMensagem::pergunta_load(&c);
-        let (_, b) = m.geometria(&c.caixa_mensagem, None);
+        let b = m.geometria(&c.caixa_mensagem, None).botoes;
         assert_eq!(b.len(), 3);
         assert_eq!((b[1].esq - b[0].esq, b[2].esq - b[0].esq), (74, 150));
         assert_eq!(m.tecla("Return"), Some(1));

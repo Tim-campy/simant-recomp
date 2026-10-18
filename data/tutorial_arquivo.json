@@ -1,0 +1,13 @@
+{
+  "_comentario": "Load de um arquivo com o nome do tutorial (string 1800 do SHARED): _LoadGame não lê o arquivo e chama _GenerateTutorial (1030:6262; geracao-mundo.md §6, telas/arquivos.md). patches: [x, y, pretas/32, vermelhas/32] das tabelas DGROUP 25f0/260e/262c/264a (o original grava valor << 5 num byte). velocidade/aviso_saude: _InitSimVars (1030:5a70).",
+  "nome": "Tutorial.Ant",
+  "titulo": "Tutorial Game",
+  "velocidade": 1,
+  "aviso_saude": 30,
+  "patches": [
+    [0, 0, 2, 0], [1, 0, 4, 0], [2, 0, 6, 0], [5, 0, 5, 0], [7, 0, 7, 0], [2, 1, 4, 0], [2, 2, 2, 0], [7, 2, 2, 0],
+    [8, 2, 3, 0], [6, 3, 6, 0], [3, 4, 1, 0], [7, 4, 7, 0], [7, 5, 4, 0], [10, 5, 5, 0], [11, 5, 3, 0], [6, 6, 1, 0],
+    [8, 6, 1, 0], [10, 6, 0, 4], [11, 6, 0, 6], [9, 7, 0, 3], [10, 7, 0, 4], [11, 7, 0, 6], [9, 8, 0, 5], [10, 8, 0, 6],
+    [11, 8, 0, 3], [9, 9, 5, 0], [10, 9, 0, 4], [10, 10, 0, 3], [10, 11, 0, 2], [11, 11, 0, 5]
+  ]
+}
