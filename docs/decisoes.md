@@ -2,6 +2,13 @@
 
 Formato: data, decisão, motivo, alternativas descartadas.
 
+## 2026-10-18: Escala 1 por padrão e opções de vídeo em `data/video.json`
+
+- **Decisão (do usuário):** a janela abre em **640×480 em escala 1**, como o original (a área do jogo, 640×442, mais a moldura do sistema). Escala e tamanho ficam configuráveis em `data/video.json` (`escala`: inteira, 0 = a maior que cabe; `janela`: `[largura, altura]` inicial ou `null`; `redimensionavel`; `escala_inteira`) e na linha de comando (`--escala N`, `--janela LxA`), que vence o arquivo. A janela do sistema pode ser redimensionada e maximizada: com `escala_inteira` o jogo amplia só por múltiplos inteiros, centralizado com tarjas (o `set_integer_scale` do SDL); sem ela, ocupa o maior retângulo com a proporção do jogo. Nunca fica menor que a resolução do jogo (`set_minimum_size`). A nitidez da decisão abaixo (DPI + vizinho mais próximo) continua.
+- **Motivo:** o usuário achou a escala automática (a maior que cabe, 2 no monitor dele) "muito grande" e pediu a do original, com escala e tamanho configuráveis no futuro.
+- **Onde fica:** `data/video.json`, lido pelos `Recursos` (um mod pode trocá-lo; o arquivo é opcional: sem ele, os padrões acima). Código: `simant/src/video.rs` (com testes da conta do tamanho inicial e da precedência).
+- **Descartado:** um `simant.cfg` do port (confundiria com o `SIMANT.CFG` do original, de outro formato); um arquivo de preferências fora de `data/` (mais um lugar para procurar; pode vir depois, se houver mais preferências do jogador).
+
 ## 2026-10-18: Janela nítida: ciente de DPI, escala inteira por vizinho mais próximo
 
 - **Decisão:** antes do `SDL_Init`, `SDL_WINDOWS_DPI_AWARENESS = permonitorv2` e `SDL_RENDER_SCALE_QUALITY = 0`; a janela continua com resolução lógica (`set_logical_size`) e escala inteira (`set_integer_scale`), com tarjas quando o tamanho não é múltiplo.

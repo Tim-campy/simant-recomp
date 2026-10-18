@@ -5,6 +5,7 @@
 //! `--exportar-som DIR` (grava os efeitos e as músicas em WAV e sai, sem abrir áudio).
 
 pub mod config;
+pub mod controle;
 pub mod mixer;
 pub mod sintetizador;
 
@@ -18,6 +19,7 @@ use engine::recursos::Recursos;
 use engine::rules::estado::Evento;
 
 use config::{ConfigSom, FonteMusica};
+use controle::{Comando, ControleSom};
 use mixer::Mixer;
 use sintetizador::{SintSimples, SintSoundFont, Sintetizador};
 
@@ -115,17 +117,16 @@ impl sdl2::audio::AudioCallback for Saida {
     }
 }
 
-/// Som de uma janela do jogo. Sem dispositivo (erro ou `--sem-som`), tudo vira no-op.
+/// Som de uma janela do jogo. Sem dispositivo (erro ou `--sem-som`), tudo vira no-op. As decisões
+/// (opções, foco, linha do tempo dos efeitos) ficam em [`ControleSom`]; aqui só se executam.
 pub struct Audio<'a> {
     recursos: &'a Recursos,
     cfg: Option<ConfigSom>,
     dispositivo: Option<sdl2::audio::AudioDevice<Saida>>,
     taxa: u32,
     efeitos: HashMap<u16, Vec<f32>>,
-    /// `_OptionStates[1]` e `[2]` vistos por último.
-    musica_ligada: bool,
-    efeitos_ligados: bool,
-    foco: bool,
+    controle: ControleSom,
+    inicio: std::time::Instant,
     /// `_TryAntTheme`: último tema (relógio de parede) e posição no ciclo.
     ultimo_tema: Option<std::time::Instant>,
     proximo_tema: usize,
@@ -139,9 +140,8 @@ impl<'a> Audio<'a> {
             dispositivo: None,
             taxa: 0,
             efeitos: HashMap::new(),
-            musica_ligada: true,
-            efeitos_ligados: true,
-            foco: true,
+            controle: ControleSom::default(),
+            inicio: std::time::Instant::now(),
             ultimo_tema: None,
             proximo_tema: 0,
         };
@@ -170,12 +170,29 @@ impl<'a> Audio<'a> {
         Ok(())
     }
 
-    /// Toca a música `id` (cabeçalho tipo 18), se a música estiver ligada.
-    pub fn musica(&mut self, id: u16) {
-        let (Some(cfg), Some(_)) = (&self.cfg, &self.dispositivo) else { return };
-        if !self.musica_ligada || !self.foco {
-            return;
+    fn agora_ms(&self) -> u64 {
+        self.inicio.elapsed().as_millis() as u64
+    }
+
+    /// Executa os comandos decididos pelo controle.
+    fn executar(&mut self, comandos: Vec<Comando>) {
+        for c in comandos {
+            match c {
+                Comando::TocarMusica(id) => self.tocar_musica(id),
+                Comando::PararMusica => self.parar_musica(),
+                Comando::TocarEfeito(id) => self.tocar_efeito(id),
+                Comando::PararEfeito => {
+                    if let Some(d) = &mut self.dispositivo {
+                        d.lock().0.parar_efeito();
+                    }
+                }
+            }
         }
+    }
+
+    /// Toca a música `id` (cabeçalho tipo 18) no dispositivo; a nova corta a anterior.
+    fn tocar_musica(&mut self, id: u16) {
+        let (Some(cfg), Some(_)) = (&self.cfg, &self.dispositivo) else { return };
         match musica(self.recursos, cfg, id) {
             Ok(Ok(eventos)) => {
                 if let Some(d) = &mut self.dispositivo {
@@ -187,22 +204,10 @@ impl<'a> Audio<'a> {
         }
     }
 
-    pub fn musica_abertura(&mut self) {
-        if let Some(id) = self.cfg.as_ref().and_then(|c| c.musica_abertura) {
-            self.musica(id);
-        }
-    }
-
-    pub fn musica_jogo_novo(&mut self) {
-        if let Some(id) = self.cfg.as_ref().and_then(|c| c.musica_jogo_novo) {
-            self.musica(id);
-        }
-    }
-
-    /// Toca o efeito `id` (tipo 5), se os efeitos estiverem ligados.
-    pub fn efeito(&mut self, id: u16) {
+    /// Toca o efeito `id` (tipo 5) no dispositivo; o novo corta o anterior.
+    fn tocar_efeito(&mut self, id: u16) {
         let Some(cfg) = &self.cfg else { return };
-        if !self.efeitos_ligados || !self.foco || self.dispositivo.is_none() {
+        if self.dispositivo.is_none() {
             return;
         }
         if !self.efeitos.contains_key(&id) {
@@ -218,28 +223,35 @@ impl<'a> Audio<'a> {
         }
     }
 
-    /// Pedidos das regras de um quadro, e as opções Music/Sound Effects da partida
-    /// (`_OptionStates[1]` e `[2]`): desligar a música para a que toca.
+    /// Música da abertura (`_ShowIntro`), pedida ao abrir a janela: toca quando ela estiver ativa.
+    pub fn musica_abertura(&mut self) {
+        if let Some(id) = self.cfg.as_ref().and_then(|c| c.musica_abertura) {
+            let c = self.controle.musica_inicial(id);
+            self.executar(c);
+        }
+    }
+
+    /// Música do jogo novo. `inicial`: pedida ao abrir a janela da partida (espera o primeiro foco).
+    pub fn musica_jogo_novo(&mut self, inicial: bool) {
+        if let Some(id) = self.cfg.as_ref().and_then(|c| c.musica_jogo_novo) {
+            let c = if inicial { self.controle.musica_inicial(id) } else { self.controle.musica(id) };
+            self.executar(c);
+        }
+    }
+
+    /// Pedidos das regras de um quadro e as opções Music/Sound Effects da partida
+    /// (`_OptionStates[1]` e `[2]`; desligar a música para a que toca). Também solta os efeitos
+    /// agendados que venceram: chamar a cada quadro, mesmo sem eventos.
     pub fn tratar(&mut self, eventos: &[Evento], opcoes: &[i16]) {
         let musica = opcoes.get(1).is_none_or(|&v| v != 0);
         let efeitos = opcoes.get(2).is_none_or(|&v| v != 0);
-        if self.musica_ligada && !musica {
-            self.parar_musica();
-        }
-        if self.efeitos_ligados && !efeitos {
-            if let Some(d) = &mut self.dispositivo {
-                d.lock().0.parar_efeito();
-            }
-        }
-        self.musica_ligada = musica;
-        self.efeitos_ligados = efeitos;
-        for ev in eventos {
-            match ev {
-                Evento::Musica(id) => self.musica(*id),
-                Evento::Som(id) => self.efeito(*id),
-                Evento::TemaDoNinho => self.tema_do_ninho(std::time::Instant::now()),
-                _ => {}
-            }
+        let c = self.controle.opcoes(musica, efeitos);
+        self.executar(c);
+        let agora = self.agora_ms();
+        let c = self.controle.receber(eventos, agora);
+        self.executar(c);
+        if eventos.iter().any(|e| matches!(e, Evento::TemaDoNinho)) {
+            self.tema_do_ninho(std::time::Instant::now());
         }
     }
 
@@ -249,19 +261,17 @@ impl<'a> Audio<'a> {
         if let Some((id, quando)) = proximo_tema(&tema, self.ultimo_tema, self.proximo_tema, agora) {
             self.ultimo_tema = Some(quando);
             self.proximo_tema += 1;
-            self.musica(id);
+            let c = self.controle.musica(id);
+            self.executar(c);
         }
     }
 
-    /// Janela ativa ou não (`WM_ACTIVATEAPP`): sem foco, para a música e silencia até voltar.
+    /// Janela ativa ou não (`WM_ACTIVATEAPP`): sem foco, para a música, corta o efeito e silencia
+    /// até voltar. Chamar a cada quadro com o estado atual da janela (só as mudanças contam).
     pub fn foco(&mut self, ativo: bool) {
-        if !ativo {
-            self.parar_musica();
-            if let Some(d) = &mut self.dispositivo {
-                d.lock().0.parar_efeito();
-            }
-        }
-        self.foco = ativo;
+        let agora = self.agora_ms();
+        let c = self.controle.foco(ativo, agora);
+        self.executar(c);
     }
 
     pub fn parar_musica(&mut self) {

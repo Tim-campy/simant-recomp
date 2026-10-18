@@ -982,6 +982,11 @@ pub enum Evento {
     CentralizarNaAmarela,
     /// `_EditMessage(texto, duração, importante)`: mensagem da faixa (telas/mensagens.md §2).
     MensagemFaixa(MensagemFaixa),
+    /// Uma animação dentro do tick (`_AnimYellowFight`) espera tantos milissegundos de tempo real
+    /// entre dois quadros. No original o programa inteiro fica parado nesse tempo, então os sons
+    /// pedidos depois saem mais tarde; a interface usa a espera para espalhar no tempo os efeitos
+    /// da mesma fila (regras/som.md, "Linha do tempo dos efeitos").
+    Espera(u16),
 }
 
 /// Pedido de mensagem na faixa: string `indice` da lista SHARED 4/`lista`, com a duração do

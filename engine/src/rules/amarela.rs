@@ -82,6 +82,15 @@ pub struct AnimacaoAmarela {
     pub quadros_morte_frente_musica: i32,
     pub quadros_loucura_frente: i32,
     pub quadros_loucura_atras: i32,
+    /// Tempo real (ms) entre dois quadros de `_AnimYellowFight`: espera o relógio do Mac passar de
+    /// "início + 6"; como ele anda de 3 em 3 a cada 55 ms, são 3 degraus = 165 ms. Vira
+    /// `Evento::Espera` entre os quadros da luta e do choque, os que pedem som.
+    #[serde(default = "espera_quadro_padrao")]
+    pub espera_quadro_ms: u16,
+}
+
+fn espera_quadro_padrao() -> u16 {
+    165
 }
 
 /// Ids de música (`_myBeginSong`).
@@ -1524,7 +1533,12 @@ fn animar_luta(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, d
         quadros = t.animacao.quadros_choque;
     }
     let mut leao = 3;
-    for _ in 0..quadros {
+    for q in 0..quadros {
+        if q > 0 && (codigo == 0 || codigo == 10) {
+            // Cada quadro começa esperando o relógio (o som do quadro sai depois da espera); o
+            // primeiro espera só o próximo degrau (até 55 ms), que o port não conta.
+            e.eventos.push(Evento::Espera(t.animacao.espera_quadro_ms));
+        }
         if codigo == 0 && e.s.mascara(2) != 0 {
             e.pedir_som(t.sons.luta);
         }

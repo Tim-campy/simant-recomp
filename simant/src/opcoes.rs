@@ -16,8 +16,12 @@ pub(crate) struct Opcoes {
     pub(crate) sair_apos_ms: Option<u64>,
     /// Com --sair-apos-ms, grava o que a janela mostra (resolução da janela) antes de fechar.
     pub(crate) capturar_janela: Option<PathBuf>,
-    /// Escala inteira da janela; sem ela, a maior que cabe na área útil do monitor.
+    /// Escala inteira da janela (`--escala`; 0 = a maior que cabe); vence `data/video.json`.
     pub(crate) escala: Option<u32>,
+    /// Tamanho inicial da janela (`--janela LxA`); vence `data/video.json`.
+    pub(crate) janela: Option<(u32, u32)>,
+    /// Opções de vídeo resolvidas (`data/video.json` + linha de comando), preenchidas em `principal`.
+    pub(crate) video: video::ConfigVideo,
     /// Quick Game gerado pelo port.
     pub(crate) novo_jogo: bool,
     /// Semente do Quick Game (padrão: relógio).
@@ -70,6 +74,8 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         sair_apos_ms: None,
         capturar_janela: None,
         escala: None,
+        janela: None,
+        video: video::ConfigVideo::default(),
         novo_jogo: false,
         semente: None,
         ticks: None,
@@ -98,7 +104,8 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
             "--exportar-tela-jogo" => o.exportar_tela_jogo = Some(valor()?.into()),
             "--acoes" => o.acoes = ler_acoes(&valor()?)?,
             "--sair-apos-ms" => o.sair_apos_ms = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
-            "--escala" => o.escala = Some(valor()?.parse().ok().filter(|&e| e > 0).ok_or(format!("{a}: inteiro positivo"))?),
+            "--escala" => o.escala = Some(valor()?.parse().map_err(|_| format!("{a}: inteiro (0 = a maior que cabe)"))?),
+            "--janela" => o.janela = Some(video::ler_tamanho(&valor()?)?),
             "--capturar-janela" => o.capturar_janela = Some(valor()?.into()),
             "--novo-jogo" => o.novo_jogo = true,
             "--semente" => o.semente = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),

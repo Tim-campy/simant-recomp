@@ -477,7 +477,7 @@ impl Sessao<'_> {
                     println!("[tick {t}] mensagem {id}: {}", texto.join(" / "));
                 }
                 EventoRegras::Musica(id) => println!("[tick {t}] música {id}"),
-                EventoRegras::Som(_) | EventoRegras::TemaDoNinho => {} // tocados por som::Audio
+                EventoRegras::Som(_) | EventoRegras::TemaDoNinho | EventoRegras::Espera(_) => {} // tocados por som::Audio
                 EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
                 EventoRegras::CentralizarNaAmarela | EventoRegras::MensagemFaixa(_) => {} // a faixa é da Partida
             }

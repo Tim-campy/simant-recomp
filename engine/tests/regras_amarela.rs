@@ -303,6 +303,12 @@ fn y11_luta_por_ordem() {
         s.passo();
     }
     assert_eq!(e.s, s);
+    // Linha do tempo da luta (regras/som.md): 0x25 nos quadros com S2 ≠ 0 e uma espera de 165 ms
+    // entre dois quadros (5 esperas para 6 quadros), na ordem em que o original toca.
+    let linha: Vec<&Evento> = e.eventos.iter().filter(|ev| matches!(ev, Evento::Som(37) | Evento::Espera(_))).collect();
+    assert_eq!(linha.iter().filter(|ev| matches!(ev, Evento::Espera(165))).count(), 5);
+    assert!(linha.iter().any(|ev| matches!(ev, Evento::Som(37))), "S2 ≠ 0 em algum quadro com essa semente");
+    assert!(!matches!(linha.last(), Some(Evento::Espera(_))), "sem espera depois do último quadro");
 }
 
 #[test]

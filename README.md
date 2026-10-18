@@ -56,7 +56,14 @@ Navegação na tela de jogo:
 - **Ctrl+8 / Ctrl+9 / Ctrl+0** ou os botões *Surface*, *Nest* (preto) e *Nest* (vermelho) da faixa trocam para a superfície, o ninho preto e o ninho vermelho. Esc fecha.
 - As teclas e os botões ficam em `data/navegacao.json` (sobrescrevível por mod). Ações aceitas por `--acoes`: `linha_acima`, `linha_abaixo`, `linha_esquerda`, `linha_direita`, `pagina_acima`, `pagina_abaixo`, `pagina_esquerda`, `pagina_direita`, `superficie`, `ninho_preto`, `ninho_vermelho`.
 - Som: `--sem-som` desliga; `--soundfont ARQ.sf2` (ou `SIMANT_SOUNDFONT`) usa uma SoundFont General MIDI para as músicas; sem ela, um sintetizador simples. Volumes, taxa e a tabela de músicas ficam em `data/som.json` (sobrescrevível por mod). `--exportar-som DIR` grava os 57 efeitos (WAV de 8 bits a 4096 Hz, como o original toca) e as músicas sintetizadas, sem abrir o áudio. Ver `docs/spec/regras/som.md`.
-- Janela: `--escala N` (padrão: a maior escala inteira que cabe no monitor). Para testes sem interação: `--sair-apos-ms N` fecha sozinha e `--capturar-janela ARQ.png` grava o que a janela mostrava. `--ticks N` roda N ticks sem janela (com `--exportar-tela-jogo`, grava a tela depois) e escreve o `GameTime` antes e depois.
+- Vídeo: a janela abre em **640×480, escala 1**, como o original. Para mudar, edite `data/video.json` ou use a linha de comando (que vence o arquivo):
+  - `"escala"` / `--escala N`: pixels da tela por pixel do jogo (inteiro; `0` = a maior que cabe no monitor);
+  - `"janela"` / `--janela LxA`: tamanho inicial da janela em pixels da tela (ex.: `--janela 1280x960`); `null` = 640×480 × escala;
+  - `"redimensionavel"`: a janela pode ser redimensionada e maximizada pelo Windows;
+  - `"escala_inteira"`: ao redimensionar, o jogo amplia só por múltiplos inteiros, centralizado com tarjas pretas (nítido); com `false`, ocupa o máximo mantendo a proporção.
+  
+  A janela é ciente de DPI e amplia por vizinho mais próximo (sem borrar com a escala de tela do Windows). Sem foco (outra janela ativa ou minimizada), a música para e os efeitos se calam, em todas as telas, como no original.
+- Janela, para testes sem interação: `--sair-apos-ms N` fecha sozinha e `--capturar-janela ARQ.png` grava o que a janela mostrava. `--ticks N` roda N ticks sem janela (com `--exportar-tela-jogo`, grava a tela depois) e escreve o `GameTime` antes e depois.
 
 ### Mods com script (Lua)
 

@@ -6,7 +6,8 @@
 //!   simant (--save ARQ.ANT | --novo-jogo [--semente N]) [--acoes a,b,...]
 //!          [--ticks N] [--botoes F,F,...] [--fechar-avisos N] [--exportar-tela-jogo ARQ.png]
 //!          [--salvar ARQ.ANT]
-//!   opções da janela: [--escala N] [--sair-apos-ms N [--capturar-janela ARQ.png]]
+//!   opções da janela: [--escala N] [--janela LxA] [--sair-apos-ms N [--capturar-janela ARQ.png]]
+//!   (padrões em data/video.json: escala 1 = 640×480 como o original; simant/src/video.rs)
 //!   som (simant/src/som): [--sem-som] [--soundfont ARQ.sf2] [--exportar-som DIR]
 //!
 //! Padrões: --jogo $SIMANT_DIR ou SimAnt-T/MAXIS/ANTWIN, --dados data, --mods mods (relativos à
@@ -20,6 +21,7 @@ mod jogo;
 mod opcoes;
 mod sessao;
 mod som;
+mod video;
 
 use jogo::*;
 use opcoes::*;
@@ -95,40 +97,38 @@ fn exportar(seq: &Sequencia, recursos: &Recursos, interface: &Interface, cores: 
     Ok(())
 }
 
-/// Janela SDL com a resolução lógica (largura × altura) ampliada pela maior escala inteira que cabe
-/// na tela (no mínimo 1), e mantida em escala inteira ao redimensionar.
+/// Janela SDL com a resolução lógica (largura × altura) ampliada pela escala de `data/video.json`
+/// ou da linha de comando (padrão 1, como o original), centralizada com tarjas quando a janela
+/// do sistema não tem a proporção ou um múltiplo exato da resolução.
 struct Janela {
     sdl: sdl2::Sdl,
     canvas: sdl2::render::WindowCanvas,
 }
 
-fn abrir_janela(titulo: &str, largura: u32, altura: u32, escala: Option<u32>) -> Result<Janela, String> {
+fn abrir_janela(titulo: &str, largura: u32, altura: u32, cfg: &video::ConfigVideo) -> Result<Janela, String> {
     // Nitidez: sem ciência de DPI, o Windows com escala de tela (125%, 150%) amplia a janela inteira
     // com filtro bilinear e o jogo fica borrado. Com "permonitorv2" a janela e os limites da tela vêm
-    // em pixels físicos, e a ampliação é só a do renderizador: inteira, por vizinho mais próximo
-    // ("0") e com tarjas quando a janela não é múltipla da resolução lógica.
+    // em pixels físicos, e a ampliação é só a do renderizador: por vizinho mais próximo ("0"),
+    // inteira (com tarjas) se `escala_inteira`.
     sdl2::hint::set("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2");
     sdl2::hint::set("SDL_RENDER_SCALE_QUALITY", "0");
     let sdl = sdl2::init()?;
-    let video = sdl.video()?;
-    let escala = escala.unwrap_or_else(|| {
-        video
-            .display_usable_bounds(0)
-            .map(|r| (r.width() / largura).min(r.height() / altura))
-            .unwrap_or(2)
-            .clamp(1, 4)
-    });
-    let janela = video
-        .window(titulo, largura * escala, altura * escala)
-        .position_centered()
-        .resizable()
-        .build()
-        .map_err(|e| e.to_string())?;
+    let sistema = sdl.video()?;
+    let area = sistema.display_usable_bounds(0).ok().map(|r| (r.width(), r.height()));
+    let (escala, (w, h)) = cfg.tamanho_inicial(largura, altura, area);
+    let mut construtor = sistema.window(titulo, w, h);
+    construtor.position_centered();
+    if cfg.redimensionavel {
+        construtor.resizable();
+    }
+    let mut janela = construtor.build().map_err(|e| e.to_string())?;
+    // Menor que a resolução do jogo, a escala inteira cairia para zero.
+    janela.set_minimum_size(largura, altura).map_err(|e| e.to_string())?;
     let mut canvas = janela.into_canvas().present_vsync().build().map_err(|e| e.to_string())?;
     canvas.set_logical_size(largura, altura).map_err(|e| e.to_string())?;
-    canvas.set_integer_scale(true)?;
-    let (w, h) = canvas.output_size()?;
-    println!("janela: {largura}x{altura} em escala {escala} ({w}x{h} pixels)");
+    canvas.set_integer_scale(cfg.escala_inteira)?;
+    let (pw, ph) = canvas.output_size()?;
+    println!("janela: {largura}x{altura} em escala {escala} ({pw}x{ph} pixels)");
     Ok(Janela { sdl, canvas })
 }
 
@@ -145,7 +145,7 @@ fn executar(
     use sdl2::pixels::PixelFormatEnum;
 
     let (lw, lh) = seq.telas.first().map(|t| (t.largura, t.altura)).unwrap_or((640, 480));
-    let Janela { sdl, mut canvas } = abrir_janela("SimAnt", lw, lh, o.escala)?;
+    let Janela { sdl, mut canvas } = abrir_janela("SimAnt", lw, lh, &o.video)?;
     let criador = canvas.texture_creator();
     let mut eventos = sdl.event_pump()?;
     let selecao = modos::selecao_da_abertura(recursos, interface)?;
@@ -179,6 +179,8 @@ fn executar(
                 _ => {}
             }
         }
+        // WM_ACTIVATEAPP vale também na abertura e no "Select a Game": sem foco, a música para.
+        audio.foco(janela_ativa(canvas.window()));
         let agora = Instant::now();
         rep.passar_tempo((agora - antes).as_millis() as u64);
         antes = agora;
@@ -222,6 +224,9 @@ fn principal() -> Result<(), String> {
     }
 
     let mut o = o;
+    // data/video.json (opcional; um mod pode trocá-lo) e, por cima, --escala e --janela.
+    let arquivo_video = if recursos.existe_dado(video::ARQUIVO) { recursos.dados(video::ARQUIVO)? } else { video::ConfigVideo::default() };
+    o.video = arquivo_video.com_linha_de_comando(o.escala, o.janela);
     if !o.novo_jogo && o.save.is_none() && o.exportar.is_none() {
         // Abertura até o "Select a Game"; a escolha vira o jogo novo.
         let seq: Sequencia = recursos.dados("telas.json")?;

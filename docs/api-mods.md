@@ -1,6 +1,6 @@
 # API de mods
 
-Versão da API: **0.14**. Mods sobrescrevem dados (objetos do banco, `data/*.json`, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua").
+Versão da API: **0.16**. Mods sobrescrevem dados (objetos do banco, `data/*.json`, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua").
 
 ## Estrutura
 
@@ -56,6 +56,7 @@ mods/
   - `dialogos.json` (API 0.11): diálogos do Windows da partida (caixa de mensagem do Load e do "Saved correctly", diálogo de arquivo Load/Save As): fontes, cores, geometria e textos. Ver `docs/spec/telas/arquivos.md`.
   - `mapa.json` (API 0.11): janela do mapa — tabelas `ctab`/`htab`/`ltab`/`ctab_r` (índices da paleta), `blocos` das cores 16–31, `conv` (`_ConvColor`), bitmaps da aranha, do pé e do cortador, `botoes_cheiro` (objeto da faixa → `_MapMode`). Ver `docs/spec/telas/mapa.md`.
   - `som.json` (API 0.6): som e música. `musicas` (id do cabeçalho tipo 18 → nome do `.mid` sem extensão, a tabela do original), `pasta_musicas`, `fonte_musica` (`arquivos` = `.MID` pela tabela, como o MCI; `banco` = objeto tipo 20 com a transposição do cabeçalho, como o modo Sound Blaster), `exigir_cabecalho`, `canais_midi`, `canal_percussao`, `taxa_efeitos` (Hz dos efeitos tipo 5), `taxa_saida`, `volume_musica`, `volume_efeitos` (0–1), `soundfont` (caminho de uma `.sf2` ou `null`), `musica_abertura`, `musica_jogo_novo`, `cauda_exportacao_s`. Ver `docs/spec/regras/som.md`.
+  - `video.json` (API 0.16, opcional): vídeo do port — `escala` (inteira; 0 = a maior que cabe no monitor; padrão 1 = 640×480), `janela` (`[largura, altura]` inicial ou `null`), `redimensionavel`, `escala_inteira`. Todas as chaves são opcionais. A linha de comando (`--escala`, `--janela`) vence o arquivo. Ver `docs/decisoes.md` e o README.
 - **Arquivos soltos do jogo:** `arquivos/<nome>` substitui um arquivo da pasta do jogo lido pelo port (as fontes `font1`–`font4` e `FONTRES.FON`; a partir da API 0.6, também caminhos com subpasta, como `arquivos/sound/gamethme.mid`, sem diferenciar maiúsculas).
 - **Ordem:** os mods são ordenados de modo que cada um venha depois das suas dependências; entre mods independentes, a ordem é alfabética. Se dois mods sobrescrevem a mesma coisa, vale o que vier por último.
 - **Erros:** dependência ausente, nome duplicado ou ciclo de dependências impedem o jogo de iniciar, com mensagem de erro.
@@ -81,7 +82,7 @@ O script define funções **globais** com estes nomes (no corpo do arquivo ou de
 | `ao_iniciar(estado)` | Uma vez, quando a partida começa (no Load, depois do `_FullCount`). |
 | `antes_do_tick(estado)` | Antes de cada tick da simulação (`_DoAntSim`). |
 | `depois_do_tick(estado)` | Depois de cada tick. |
-| `ao_evento(evento, estado)` | Para cada pedido das regras à interface, antes de a interface tratá-lo. `evento.tipo` é `"som"`, `"musica"`, `"mensagem"` (com `id`), `"mensagem_faixa"` (com `lista`, `indice`), `"tema_do_ninho"`, `"fim_de_jogo"` ou `"centralizar_na_amarela"`. |
+| `ao_evento(evento, estado)` | Para cada pedido das regras à interface, antes de a interface tratá-lo. `evento.tipo` é `"som"`, `"musica"`, `"mensagem"` (com `id`), `"mensagem_faixa"` (com `lista`, `indice`), `"tema_do_ninho"`, `"fim_de_jogo"`, `"centralizar_na_amarela"` ou, desde a 0.16, `"espera"` (com `ms`: uma animação do tick espera esse tempo entre dois quadros; a interface atrasa os efeitos seguintes). |
 
 Os ganchos rodam **fora** do tick (antes e depois dele): a ordem interna do tick do original não muda. Sem nenhum mod com script, o laço do jogo é exatamente o mesmo de antes (os vetores de tick do original continuam iguais).
 
@@ -154,6 +155,7 @@ As tabelas usadas nas escritas vêm de `data/experimental.json` (com mods). Nenh
 Saved correctly"`. `exame.json` ganhou `deslocamento_linhas` e `cor_fundo` (opcionais). | Um `dialogos.json` de mod anterior precisa das chaves novas da `caixa_mensagem`; o resto é compatível. |
 | 0.14 | `partida.json`, `relogio`: `iteracoes_por_mensagem` deu lugar a `resolucao_timer_ms` (55: o temporizador de 17 ms vira 55 ms, como no Windows 3.1) e `voltas_por_periodo` (voltas do laço de `MYTIMERFUNC` entre duas mensagens, por velocidade); o ritmo passou a ser o medido no original (6 ticks/s em normal). `tela_jogo.json` ganhou `barras_faixa` (opcional: sem ela, a faixa fica sem as barras). | Um `partida.json` de mod anterior precisa das duas chaves novas (o arquivo é trocado inteiro); a chave antiga é ignorada. `tela_jogo.json` antigo continua válido. |
 | 0.15 | `janelas.json` ganhou `quintal` (número da janela), `gerenciador` (tamanho mínimo, cores do contorno de arrasto, menu de sistema) e `teclas` (aceleradores de janela: `fechar_de_cima`, `menu_sistema`, `proxima`, `mover`, `maximizar_edicao`); `tela_jogo.json`, `edicao.moldura`, ganhou `titulo_inativo` e `cor_seta` (opcionais); `quintal_mapa.json` aceita a ação `para_mapa` (o botão Patch passou de `fechar` para ela). | Um `janelas.json` de mod anterior precisa das três chaves novas (o arquivo é trocado inteiro). Um `quintal_mapa.json` com `"ribPatch": "fechar"` continua válido (só fecha o quintal, sem virar o mapa). |
+| 0.16 | Novo arquivo sobrescrevível e opcional `data/video.json` (escala e janela). `amarela.json`, `animacao`: chave opcional `espera_quadro_ms` (padrão 165: tempo entre dois quadros de `_AnimYellowFight`, usado para espalhar os sons da luta e do choque). Novo pedido das regras `Evento::Espera(ms)`; nos scripts, `ao_evento` recebe `evento.tipo == "espera"` com `evento.ms`. | Compatível com 0.15: só acrescenta. Um `amarela.json` de mod sem a chave nova usa 165 ms; um script que trate só os tipos antigos ignora o novo. |
 
 ## Planejado
 

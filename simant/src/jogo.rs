@@ -97,13 +97,13 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
     use sdl2::pixels::PixelFormatEnum;
 
     let (lw, lh) = (s.tela.cfg.largura, s.tela.cfg.altura);
-    let Janela { sdl, mut canvas } = abrir_janela(titulo, lw, lh, o.escala)?;
+    let Janela { sdl, mut canvas } = abrir_janela(titulo, lw, lh, &o.video)?;
     let criador = canvas.texture_creator();
     let mut textura = criador.create_texture_static(PixelFormatEnum::RGB24, lw, lh).map_err(|e| e.to_string())?;
     let mut eventos = sdl.event_pump()?;
     let mut audio = som::Audio::abrir(&sdl, s.recursos, &o.som);
     if jogo_novo {
-        audio.musica_jogo_novo();
+        audio.musica_jogo_novo(true);
     }
     let mut repeticao = Repeticao::default();
     let mut redesenhar = true;
@@ -113,6 +113,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
     let mut situacao = String::new();
     let mut faixa = None;
     let mut minimizada = false;
+    let mut foco: Option<bool> = None;
     let inicio = Instant::now();
     let mut antes = inicio;
     println!("partida: {} (Shift+0 pausa, Shift+1..4 velocidade, Ctrl+G AutoTrack)", s.situacao());
@@ -181,14 +182,6 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     redesenhar = true;
                 }
                 Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return Ok(()),
-                Event::Window { win_event: WindowEvent::FocusGained, .. } => {
-                    s.partida.definir_foco(true);
-                    audio.foco(true);
-                }
-                Event::Window { win_event: WindowEvent::FocusLost, .. } => {
-                    s.partida.definir_foco(false);
-                    audio.foco(false);
-                }
                 Event::Window { win_event: WindowEvent::Exposed, .. } => redesenhar = true,
                 Event::Window { win_event: WindowEvent::Minimized, .. } => minimizada = true,
                 Event::Window { win_event: WindowEvent::Restored | WindowEvent::Maximized, .. } => {
@@ -234,7 +227,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                         }
                         modos::Resposta::NovoJogo(e) => {
                             s = novo_jogo(&s, e, o)?;
-                            audio.musica_jogo_novo();
+                            audio.musica_jogo_novo(false);
                             redesenhar = true;
                             continue;
                         }
@@ -309,7 +302,7 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                         }
                         modos::Resposta::NovoJogo(e) => {
                             s = novo_jogo(&s, e, o)?;
-                            audio.musica_jogo_novo();
+                            audio.musica_jogo_novo(false);
                             redesenhar = true;
                             continue;
                         }
@@ -361,6 +354,15 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                 Event::MouseButtonUp { mouse_btn: MouseButton::Right, .. } => modos::soltar(&mut s),
                 _ => {}
             }
+        }
+        // WM_ACTIVATEAPP: o estado da janela é lido a cada quadro (não só pelos eventos de foco, que
+        // podem ser engolidos por um laço modal como o do Examine).
+        let ativa = janela_ativa(canvas.window());
+        if foco != Some(ativa) {
+            foco = Some(ativa);
+            println!("janela {}", if ativa { "ativa" } else { "inativa: som desligado" });
+            s.partida.definir_foco(ativa);
+            audio.foco(ativa);
         }
         let agora = Instant::now();
         let ms = (agora - antes).as_millis() as u64;
@@ -420,6 +422,12 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
         }
         canvas.present();
     }
+}
+
+/// A janela do port está ativa (`WM_ACTIVATEAPP` com o aplicativo ativo): tem o foco do teclado e
+/// não está minimizada.
+pub(crate) fn janela_ativa(w: &sdl2::video::Window) -> bool {
+    w.has_input_focus() && !w.is_minimized()
 }
 
 /// Shift apertado agora (`GetAsyncKeyState(VK_SHIFT)` de `_processEdit` e `_AntMenu`).
