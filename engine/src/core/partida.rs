@@ -1113,4 +1113,39 @@ mod testes {
         assert_eq!((p.nav.vista.x, p.nav.vista.y), (88, 0));
         assert_eq!(p.estado.vistas.plano, 1);
     }
+
+    fn scripts(codigo: &str) -> Scripts {
+        Scripts::de_fontes(
+            vec![("teste".into(), Ok(vec![("a.lua".into(), codigo.into())]))],
+            crate::rules::experimental::TabelasExperimental::padrao().clone(),
+            crate::scripts::Limites::default(),
+        )
+    }
+
+    #[test]
+    fn script_sem_ganchos_de_tick_nao_muda_o_tick() {
+        let mut sem = partida(1);
+        let mut com = partida(1);
+        com.ligar_scripts(scripts("function ao_evento(ev, estado) registrar(ev.tipo) end"));
+        for _ in 0..300 {
+            sem.rodar_tick();
+            com.rodar_tick();
+        }
+        assert_eq!(sem.estado, com.estado);
+    }
+
+    #[test]
+    fn mensagem_do_script_vai_para_a_faixa_e_registro_fica_guardado() {
+        use crate::core::avisos::TextoFaixa;
+        let mut p = partida(1);
+        p.ligar_scripts(scripts(
+            "function depois_do_tick(e) if e:tempo() == 3 then mostrar_mensagem('olá da faixa'); registrar('t', e:tempo()) end end",
+        ));
+        for _ in 0..3 {
+            p.rodar_tick();
+        }
+        let agora = p.agora();
+        assert_eq!(p.avisos.texto_da_faixa(agora), Some(&TextoFaixa::Literal("olá da faixa".into())));
+        assert_eq!(p.retirar_registro_scripts(), vec!["[teste] t\t3".to_string()]);
+    }
 }

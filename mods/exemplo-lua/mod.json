@@ -1,0 +1,6 @@
+{
+  "nome": "exemplo-lua",
+  "versao": "1.0",
+  "dependencias": [],
+  "scripts": ["chuva_de_comida.lua"]
+}
