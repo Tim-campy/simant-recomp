@@ -815,9 +815,11 @@ fn json_do_repositorio_igual_ao_embutido() {
     let texto = std::fs::read_to_string(raiz().join("data/inimigos.json")).unwrap();
     let t2 = TabelasInimigos::de_json(&texto).unwrap();
     assert_eq!(t2.turn_tab, t().turn_tab);
-    // Mesmas direções que as outras tabelas do projeto.
+    // As tabelas comuns vêm de data/comum.json (API 0.20) e não estão mais no inimigos.json.
+    let parte: serde_json::Value = serde_json::from_str(&texto).unwrap();
+    assert!(parte.get("sow_tab").is_none() && parte.get("dx8").is_none());
     let g: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(raiz().join("data/geracao.json")).unwrap())
+        serde_json::from_str(&std::fs::read_to_string(raiz().join("data/comum.json")).unwrap())
             .unwrap();
     assert_eq!(g["sow_tab"].as_array().unwrap().len(), 8);
     for i in 0..8 {

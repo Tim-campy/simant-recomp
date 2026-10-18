@@ -1,19 +1,6 @@
 {
-  "_comentario": "Tabelas e constantes da formiga amarela. As tabelas foram extraídas do SIMANTW.EXE por tools/extrair_amarela.py (endereços no topo do script); as seções regras/animacao/musicas/mensagens vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/formiga-amarela.md. Valores em decimal.",
-  "dx8": [0, 1, 1, 1, 0, -1, -1, -1],
-  "dy8": [-1, -1, 0, 1, 1, 1, 0, -1],
-  "dx9": [0, 0, 1, 1, 1, 0, -1, -1, -1],
-  "dy9": [0, -1, -1, 0, 1, 1, 1, 0, -1],
+  "_comentario": "Tabelas e constantes da formiga amarela. As tabelas foram extraídas do SIMANTW.EXE por tools/extrair_amarela.py (endereços no topo do script); as seções regras/animacao/musicas/mensagens vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/formiga-amarela.md. Valores em decimal. As tabelas que o original tem uma vez só (dx8, dy8, dx9, dy9, descarregar_grupo (comum.json: grupo_sem_carga), classe_luta, matriz_luta, borda_buraco) ficam em data/comum.json.",
   "desvios_busca": [0, 1, -1, 2, -2, 3, -3, 4],
-  "descarregar_grupo": [0, 2, 2, 2, 4, 2, 6, 6, 8, 6, 10, 11, 12, 13, 14, 15],
-  "classe_luta": [0, 0, 0, 0, 2, 0, 1, 1, 2, 1, 0, 0, 3, 3, 0, 0],
-  "matriz_luta": [
-    [5, 2, 7, 3],
-    [8, 5, 9, 4],
-    [3, 1, 5, 2],
-    [7, 6, 8, 5]
-  ],
-  "borda_buraco": [25, 26, 28, 31, 30, 29, 27, 24],
   "regras": {
     "rastro_inicial": 200,
     "rastro_minimo": 10,

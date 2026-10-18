@@ -1327,9 +1327,10 @@ impl Estado {
     /// Como [`Estado::de_save`], devolvendo também o que a reconstrução da vida não reproduziu
     /// (por exemplo, a segunda célula da amarela rainha).
     ///
-    /// [hipótese] O original, ao carregar, chama `_RandYard` antes de ler os blocos (rng.md, "A
-    /// semente está no save?"), então o estado de S depois de um load não é reproduzível; o port
-    /// usa a semente do patch atual como convenção determinística.
+    /// O original, ao carregar, chama `_RandYard` antes de ler os blocos (rng.md, "A semente está no
+    /// save?"; conferido na bancada, `qemu_load_rng.txt`), então S depois de um load depende do R da
+    /// sessão. Aqui, sem a sessão, o port usa a semente do patch atual como convenção determinística
+    /// (vetores de tick); o Load da interface refaz o `_RandYard` (`core::carregar::geradores_depois_do_load`).
     pub fn de_save_com_pendencias(j: &JogoSalvo) -> Result<(Estado, Vec<String>), String> {
         let rec = vida::reconstruir(j)?;
         let ambiente = Ambiente::ler(j)?;

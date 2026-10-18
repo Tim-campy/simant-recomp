@@ -1,33 +1,8 @@
 {
-  "_comentario": "Tabelas e constantes das regras da superfície. As tabelas foram extraídas do SIMANTW.EXE por tools/extrair_superficie.py (endereços no topo do script); as constantes de 'regras' vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/superficie.md. Valores em decimal.",
+  "_comentario": "Tabelas e constantes das regras da superfície. As tabelas foram extraídas do SIMANTW.EXE por tools/extrair_superficie.py (endereços no topo do script); as constantes de 'regras' vêm do pseudocódigo (origem em '_origem'). Ver docs/spec/regras/superficie.md. Valores em decimal. As tabelas que o original tem uma vez só (grupo_sem_carga, modos_operaria, modos_soldado, modo_por_grupo, classe_luta, matriz_luta) ficam em data/comum.json.",
   "carrega_carga": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0],
-  "grupo_sem_carga": [0, 2, 2, 2, 4, 2, 6, 6, 8, 6, 10, 11, 12, 13, 14, 15],
   "casta_por_escolha": [2, 6, 4, 8],
   "modo_por_tarefa": [2, 4, 1],
-  "modos_operaria": [
-    [1, 2, 7, 7, 7, 7, 7, 7],
-    [4, 1, 1, 1, 4, 2, 2, 2],
-    [13, 13, 13, 4, 4, 4, 2, 2],
-    [13, 13, 4, 4, 4, 4, 4, 2],
-    [1, 1, 1, 2, 2, 2, 2, 2],
-    [1, 2, 2, 2, 2, 2, 2, 2]
-  ],
-  "modos_soldado": [
-    [7, 7, 7, 7, 7, 7, 7, 7],
-    [1, 2, 2, 2, 2, 2, 2, 2],
-    [2, 2, 2, 4, 4, 2, 2, 2],
-    [2, 4, 4, 4, 4, 4, 4, 2],
-    [2, 2, 2, 2, 2, 2, 2, 2],
-    [2, 2, 2, 2, 2, 2, 2, 2]
-  ],
-  "modo_por_grupo": [8, 1, 0, 3, 14, 5, 0, 3, 14, 5, 0, 0, 9, 9, 10, 0],
-  "classe_luta": [0, 0, 0, 0, 2, 0, 1, 1, 2, 1, 0, 0, 3, 3, 0, 0],
-  "matriz_luta": [
-    [5, 2, 7, 3],
-    [8, 5, 9, 4],
-    [3, 1, 5, 2],
-    [7, 6, 8, 5]
-  ],
   "regras": {
     "s_ao_pegar_comida": 200,
     "alarme_de_luta": 40,
