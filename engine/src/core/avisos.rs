@@ -534,7 +534,7 @@ pub fn desenhar_quadro(
 }
 
 /// Retângulo do objeto `nome` da janela já posicionada na tela (coordenadas da área cliente).
-fn objeto_na_tela(interface: &Interface, id: u16, janela: &Janela, nome: &str, ajuste: [i16; 2]) -> Result<(Retangulo, u8), String> {
+pub(crate) fn objeto_na_tela(interface: &Interface, id: u16, janela: &Janela, nome: &str, ajuste: [i16; 2]) -> Result<(Retangulo, u8), String> {
     let g = interface.posicionar(id, janela).ok_or(format!("janela {id} sem posição"))?;
     let base = janela.retangulo();
     let (dx, dy) = (g.origem.0 - base.esq + ajuste[0], g.origem.1 - base.topo + ajuste[1]);

@@ -81,7 +81,7 @@ Outros valores observados no byte de flags: 0, 1, 5 e 8. O bit 2 (valor 4) e o b
 | 1 | tabela de nomes dos objetos de uma janela: registros de 32 bytes com nome ASCIIZ (`editWin`, `editWinTitle`, …) | dump do `SHARED` 1/0 |
 | 2 | bitmap, ver [bitmap.md](bitmap.md) | `_db_LoadObject(id, 2, 1)` em `GR_MODULE`; imagens renderizadas corretamente |
 | 4 | lista de strings (u16 big-endian com a contagem, seguido de strings Pascal; `\n` literal marca quebra de linha) | dump do `SHARED` 4/1000 ("BackYard View", …); `_LoadStringAnt` (`1020:03f4`) lê só o byte baixo da contagem e faz de cada string uma linha (parser: `engine/src/formats/textos.rs`) |
-| 6 | menu | `_db_LoadObject(param_1, 6, …)` seguido da mensagem "Couldn't load menu %d" |
+| 6 | menu da janela principal (títulos e itens, ver [menu.md](menu.md)) | `_db_LoadObject(param_1, 6, …)` seguido da mensagem "Couldn't load menu %d"; objeto 6/0 decodificado |
 | 9 | tilesets 16×16 a 4 bpp: chão (ids 9 e 10) e vida (ids 15–20), ver [tiles.md](tiles.md) | `_OverlayTileSet`, `_LoadTiles` |
 | 10 | texto corrido do sistema de informação (ASCII) | dump do `SHARED` 10/150 |
 | 17 | layout de cartão do sistema de informação (big-endian, itens `PICT`/`TEXT`) | dump do `SHARED` 17/127 |

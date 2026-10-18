@@ -1064,7 +1064,7 @@ impl Gerenciador {
 /// Texto com a borda esquerda em `x` (o `Quadro::texto` com alinhamento 0 centraliza no retângulo;
 /// um retângulo da largura exata do texto deixa-o em `x`). `&` sublinha a letra seguinte, na linha
 /// de base + 2 e na largura da célula da letra [medido em w04: o "C" de Close e o "t" de Next].
-fn texto_a_esquerda(q: &mut Quadro, f: &Fonte, texto: &str, x: i16, topo: i16, frente: u8, fundo: u8) {
+pub(crate) fn texto_a_esquerda(q: &mut Quadro, f: &Fonte, texto: &str, x: i16, topo: i16, frente: u8, fundo: u8) {
     let bytes: Vec<u8> = texto.bytes().filter(|&b| b != b'&').collect();
     let w = f.largura_texto(&bytes) as i16;
     let alt = f.altura() as i16;
@@ -1086,7 +1086,7 @@ fn arrasto_id(a: &Arrasto) -> u16 {
 }
 
 /// Letra depois do `&` (minúscula).
-fn mnemonico(texto: &str) -> Option<char> {
+pub(crate) fn mnemonico(texto: &str) -> Option<char> {
     let i = texto.find('&')?;
     texto[i + 1..].chars().next().map(|c| c.to_ascii_lowercase())
 }

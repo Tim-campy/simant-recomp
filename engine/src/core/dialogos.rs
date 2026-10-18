@@ -84,6 +84,9 @@ pub struct ConfigCaixaMensagem {
     pub grupos_botoes: Vec<(usize, i16, Vec<i16>)>,
     pub titulo_load: String,
     pub pergunta_load: String,
+    /// Título da pergunta de `_MenuQuit` ("SimAnt Quit"); o texto e os botões são os do Load.
+    #[serde(default = "titulo_quit_padrao")]
+    pub titulo_quit: String,
     pub titulo_mensagem: String,
     pub salvo: String,
     pub sim: String,
@@ -91,6 +94,14 @@ pub struct ConfigCaixaMensagem {
     pub cancelar: String,
     pub ok: String,
     pub padrao_load: usize,
+}
+
+fn topo_na_tela_padrao() -> i16 {
+    38
+}
+
+fn titulo_quit_padrao() -> String {
+    "SimAnt Quit".into()
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -128,6 +139,10 @@ pub struct ConfigDialogoArquivo {
 /// Conteúdo de data/dialogos.json.
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigDialogos {
+    /// Linha da tela onde começa a área cliente (título e barra de menus em cima: 38 na bancada); usada
+    /// para pôr os diálogos sobre as telas da abertura, que são da tela inteira.
+    #[serde(default = "topo_na_tela_padrao")]
+    pub topo_na_tela: i16,
     pub fontes_titulo: Vec<usize>,
     pub cores: Cores,
     pub caixa_mensagem: ConfigCaixaMensagem,
@@ -343,6 +358,12 @@ impl CaixaMensagem {
             padrao: m.padrao_load,
             estilo: 0,
         }
+    }
+
+    /// `_MenuQuit` (`1000:d628`): "SimAnt Quit / Do you want to save the current ant hill?" com Yes, No
+    /// e Cancel, No como padrão (`MB_DEFBUTTON2`), como a do Load [bancada: m19].
+    pub fn pergunta_sair(cfg: &ConfigDialogos) -> CaixaMensagem {
+        CaixaMensagem { titulo: cfg.caixa_mensagem.titulo_quit.clone(), ..CaixaMensagem::pergunta_load(cfg) }
     }
 
     /// `_PopMsg("%s\nSaved correctly")`: título "Message", ícone de informação e OK; `arquivo` é o
