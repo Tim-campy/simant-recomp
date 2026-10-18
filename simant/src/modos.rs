@@ -7,6 +7,7 @@
 
 use engine::core::menu_ferramentas::{ItemMenu, MenuFerramentas};
 use engine::core::navegacao::Evento as EventoNav;
+use engine::core::popup_castas::{CliqueBarras, PopupCastas};
 use engine::core::quadro::Quadro;
 use engine::core::janelas::Controle;
 use engine::core::quintal_mapa::{self, AcaoQuintal, ConfigQuintalMapa, DesenhoQuintal, JanelaQuintal};
@@ -31,6 +32,10 @@ pub struct Modos {
     pub tabelas_exp: TabelasExperimental,
     /// `_ExpSubStates` e o arrasto de `_processExp`.
     pub controle_exp: ControleExperimental,
+    /// Área das barras da faixa: limiares de aviso e o quadro das castas (`_DrawCastePopUp`), aberto
+    /// enquanto o botão fica apertado.
+    pub popup_castas: PopupCastas,
+    pub castas_aberto: bool,
 }
 
 impl Modos {
@@ -41,7 +46,19 @@ impl Modos {
         let tabelas_exp = TabelasExperimental::carregar(recursos)?;
         let controle_exp = ControleExperimental::novo(&tabelas_exp);
         let menu = MenuFerramentas::carregar(recursos)?;
-        Ok(Modos { quintal, janela: JanelaQuintal::default(), selecao, escolhendo: false, menu, menu_aberto: false, tabelas_exp, controle_exp })
+        let popup_castas = PopupCastas::carregar(recursos)?;
+        Ok(Modos {
+            quintal,
+            janela: JanelaQuintal::default(),
+            selecao,
+            escolhendo: false,
+            menu,
+            menu_aberto: false,
+            tabelas_exp,
+            controle_exp,
+            popup_castas,
+            castas_aberto: false,
+        })
     }
 }
 
@@ -81,6 +98,9 @@ pub fn desenhar(s: &Sessao, q: &mut Quadro) -> Result<Vec<String>, String> {
     }
     if m.escolhendo {
         pendentes.extend(desenhar_janela_na_tela(q, s.recursos, &s.interface, m.selecao.cfg.janela)?);
+    }
+    if m.castas_aberto {
+        pendentes.extend(m.popup_castas.desenhar(q, s.recursos, &s.interface, &s.partida.estado, s.tela.cfg.largura as i32));
     }
     Ok(pendentes)
 }
@@ -271,6 +291,9 @@ pub fn aplicar_acao_quintal(s: &mut Sessao, a: AcaoQuintal, trazer: bool) {
 /// Clique fora das janelas (na faixa): botão de ferramentas e botão Yard na faixa 34; os botões da
 /// faixa 35 quando ela está na tela.
 pub fn clique_na_faixa(s: &mut Sessao, x: i32, y: i32) -> Resposta {
+    if barras_da_faixa(s, x, y) {
+        return Resposta::Tratada;
+    }
     if s.modos.janela.na_frente {
         // Faixa 35 no lugar da 34.
         if y < i32::from(s.interface.moldura.faixa.altura) {
@@ -291,6 +314,44 @@ pub fn clique_na_faixa(s: &mut Sessao, x: i32, y: i32) -> Resposta {
         return Resposta::Tratada;
     }
     Resposta::Seguir
+}
+
+/// Área das barras da faixa (`mapRibCaste` / `yardRibCaste`): o clique na barra de saúde da amarela
+/// ou da colônia preta muda o limiar de aviso; no resto da área, abre o quadro das castas até soltar
+/// o botão (`_DrawCastePopUp`: `_LessonTemp` = 1, jogo pausado enquanto aberto).
+fn barras_da_faixa(s: &mut Sessao, x: i32, y: i32) -> bool {
+    let quintal = s.modos.janela.na_frente;
+    let clique = {
+        let (tela, desenho) = (&s.tela, &s.modos.quintal);
+        let objeto = |n: &str| if quintal { desenho.retangulo_da_faixa(n) } else { tela.retangulo_da_faixa(n) };
+        s.modos.popup_castas.clique(x, y, quintal, &objeto)
+    };
+    let Some(c) = clique else { return false };
+    match c {
+        CliqueBarras::AvisoAmarela(v) => {
+            s.partida.estado.amarela.aviso_saude = v;
+            println!("_MeWarnHealth = {v}");
+        }
+        CliqueBarras::AvisoColonia(v) => {
+            s.partida.estado.partida.aviso_saude_colonia = v;
+            println!("_BlkWarnHealth = {v}");
+        }
+        CliqueBarras::Castas => {
+            s.partida.estado.tutorial.temporario = 1;
+            s.modos.castas_aberto = true;
+        }
+    }
+    true
+}
+
+/// Há um quadro aberto só enquanto o botão fica apertado (quadro das castas)?
+pub fn segurando(s: &Sessao) -> bool {
+    s.modos.castas_aberto
+}
+
+/// Botão solto: fecha o quadro das castas.
+pub fn soltar_segurado(s: &mut Sessao) {
+    s.modos.castas_aberto = false;
 }
 
 /// Clique na área cliente da janela de edição: no Experimental, vai para a ferramenta
@@ -435,5 +496,41 @@ mod testes {
         if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
             crate::salvar_png(&PathBuf::from(saida).join("info_exame.png"), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
         }
+    }
+
+    /// Bancada (qemu_ui_barras_direito.txt, 2026-10-18): segurar o botão no número da população preta
+    /// abre o quadro das castas (b01); o clique na barra de saúde da colônia em x = 580 dá
+    /// `_BlkWarnHealth` 20 e na da amarela em x = 620 dá `_MeWarnHealth` 82 (tela − 37 linhas = área
+    /// cliente do port).
+    #[test]
+    fn barras_da_faixa_como_no_original() {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
+        let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
+        clicar(&mut s, 580, 77 - 37);
+        assert_eq!(s.partida.estado.partida.aviso_saude_colonia, 20);
+        clicar(&mut s, 620, 48 - 37);
+        assert_eq!(s.partida.estado.amarela.aviso_saude, 82);
+        assert!(!segurando(&s));
+        // Números do snapshot quick no momento da captura b01.
+        s.partida.estado.preta.castas = [2, 1, 0, 0, 1, 1];
+        s.partida.estado.vermelha.castas = [2, 1, 0, 0, 0, 1];
+        clicar(&mut s, 536, 69 - 37);
+        assert!(segurando(&s), "o quadro das castas abre");
+        assert_eq!(s.partida.estado.tutorial.temporario, 1);
+        let rgb = s.quadro_rgb().unwrap();
+        if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+            crate::salvar_png(&PathBuf::from(saida).join("popup_castas.png"), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
+        }
+        soltar_segurado(&mut s);
+        assert!(!segurando(&s));
     }
 }

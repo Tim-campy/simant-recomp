@@ -764,6 +764,14 @@ impl DesenhoQuintal {
             .collect()
     }
 
+    /// Retângulo (na área cliente) do objeto `nome` da faixa 35.
+    pub fn retangulo_da_faixa(&self, nome: &str) -> Option<Retangulo> {
+        let base = self.faixa.retangulo();
+        let (dx, dy) = (self.origem_faixa.0 - base.esq, self.origem_faixa.1 - base.topo);
+        let r = self.faixa.objetos.iter().find(|o| o.nome == nome)?.retangulo;
+        Some(Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy })
+    }
+
     /// Ação do botão da faixa 35 sob o ponto, se houver.
     pub fn acao_da_faixa_em(&self, x: i32, y: i32) -> Option<AcaoQuintal> {
         self.objetos_da_faixa_em(x, y).iter().find_map(|n| self.cfg.botoes_faixa.get(*n).copied())

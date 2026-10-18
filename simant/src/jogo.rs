@@ -153,12 +153,13 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
     loop {
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
-            if s.exame.is_some() {
-                // _MagnifyMenu: a janela fica enquanto o botão (ou Espaço/Insert/Delete) estiver
-                // apertado; o laço do original não trata mensagens (a simulação não anda).
+            if s.exame.is_some() || modos::segurando(s) {
+                // _MagnifyMenu e _DrawCastePopUp: a janela fica enquanto o botão (ou Espaço/Insert)
+                // estiver apertado; a simulação não anda.
                 let solta = matches!(ev, Event::MouseButtonUp { .. } | Event::KeyUp { .. });
                 if solta || matches!(ev, Event::Quit { .. }) {
                     s.exame = None;
+                    modos::soltar_segurado(s);
                     redesenhar = true;
                 }
                 if matches!(ev, Event::Quit { .. }) {
@@ -423,7 +424,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         }
         // Com o "Select a Game" aberto (Ctrl+N), a simulação fica parada (_SetPause(1) em _NewGame).
         s.atualizar_janelas_desenho(minimizada);
-        if !s.modos.escolhendo && s.dialogo.is_none() && s.exame.is_none() && s.menu_mod.is_none() {
+        if !s.modos.escolhendo && s.dialogo.is_none() && s.exame.is_none() && !modos::segurando(s) && s.menu_mod.is_none() {
             s.partida.avancar(ms);
         }
         let pedidos = s.registrar_eventos();
