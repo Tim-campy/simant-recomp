@@ -1,0 +1,38 @@
+# Barras e números da faixa (_DrawMapData): captura com a VM pausada e, logo depois, os valores que o
+# desenho usa. Três amostras (início em normal, depois de 15 s e de 30 s em fast).
+#   python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_barras_faixa.txt --overlay re_trabalho/ritmo/ov3.qcow2
+snapshot_carregar quick
+esperar 3
+pausar
+capturar re_trabalho/ritmo/barras_1.png
+ler_variavel MeHealth re_trabalho/ritmo/v.bin
+ler_variavel MeWarnHealth re_trabalho/ritmo/v.bin
+ler_variavel HealthB re_trabalho/ritmo/v.bin
+ler_variavel BlkWarnHealth re_trabalho/ritmo/v.bin
+ler_variavel HealthR re_trabalho/ritmo/v.bin
+ler_variavel BpopT re_trabalho/ritmo/v.bin
+ler_variavel RpopT re_trabalho/ritmo/v.bin
+continuar
+teclas shift+3
+esperar 15
+pausar
+capturar re_trabalho/ritmo/barras_2.png
+ler_variavel MeHealth re_trabalho/ritmo/v.bin
+ler_variavel MeWarnHealth re_trabalho/ritmo/v.bin
+ler_variavel HealthB re_trabalho/ritmo/v.bin
+ler_variavel BlkWarnHealth re_trabalho/ritmo/v.bin
+ler_variavel HealthR re_trabalho/ritmo/v.bin
+ler_variavel BpopT re_trabalho/ritmo/v.bin
+ler_variavel RpopT re_trabalho/ritmo/v.bin
+continuar
+esperar 15
+pausar
+capturar re_trabalho/ritmo/barras_3.png
+ler_variavel MeHealth re_trabalho/ritmo/v.bin
+ler_variavel MeWarnHealth re_trabalho/ritmo/v.bin
+ler_variavel HealthB re_trabalho/ritmo/v.bin
+ler_variavel BlkWarnHealth re_trabalho/ritmo/v.bin
+ler_variavel HealthR re_trabalho/ritmo/v.bin
+ler_variavel BpopT re_trabalho/ritmo/v.bin
+ler_variavel RpopT re_trabalho/ritmo/v.bin
+fim

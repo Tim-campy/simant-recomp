@@ -269,3 +269,25 @@ fn clique_do_place_tambem_grava_o_patch_escolhido() {
     assert_eq!(p.estado.vistas.ponto_quintal, (5, 8));
     assert_eq!(p.nav.pontos[0], (5, 8));
 }
+
+/// "You have entered the red nest" (1010[4]) só pela passagem entre os ninhos (tile 0x14): a amarela
+/// do QUICK2 (ninho preto) recebe a ordem de ir para a célula de baixo, que vira passagem; ao chegar,
+/// passa para o ninho vermelho e a faixa mostra a mensagem (mensagens.md §2.3).
+#[test]
+fn mensagem_do_ninho_vermelho_so_pela_passagem() {
+    use engine::core::avisos::TextoFaixa;
+    let mut p = partida();
+    assert_eq!(p.estado.amarela.plano, 2);
+    p.estado.partida.opcoes[4] = 1;
+    let (x, y) = (p.estado.amarela.x as i32, p.estado.amarela.y as i32);
+    p.estado.ninho_b.mapa.definir(x, y + 1, 0x14);
+    p.clicar(x, y + 1, true);
+    let mut n = 0;
+    while p.estado.amarela.plano == 2 && n < 200 {
+        p.rodar_tick();
+        n += 1;
+    }
+    assert_eq!(p.estado.amarela.plano, 3, "atravessou");
+    let agora = p.agora();
+    assert_eq!(p.avisos.texto_da_faixa(agora), Some(&TextoFaixa::Lista { lista: 1010, indice: 4 }));
+}

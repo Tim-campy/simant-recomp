@@ -108,7 +108,7 @@ A célula é o tile de chão e, por cima, o tile de vida com o índice 13 transp
 
 A faixa é a janela 34 desenhada como na abertura ([janela.md](../formatos/janela.md)), com uma diferença de estado: `_SetMapPlaneLocation` (`1000:a386`), quando há faixa, seleciona o botão do plano mostrado com `_win_MakeObjSelected`: `0x2205` (`ribToSurface`) no plano 1, `0x2203` (`ribToBNest`) no 2 e `0x2204` (`ribToRNest`) no 3; no plano 0 não seleciona nada [código; o pseudocódigo mostra esses números como ponteiros para texto, `s_Client_ERROR…_21ef + 0x14…0x16`]. O botão selecionado usa o bitmap alternativo (bit 2 das flags). Fica em `data/tela_jogo.json` (`botao_do_plano`). No `QUICK2.ANT` (plano 2), o `ribToBNest` selecionado bate pixel a pixel com a captura [medido].
 
-Ainda não reproduzidos na faixa: as barras de população e saúde (`ribBlacks`, `ribReds`, `ribYellowHealth`, `ribBlackHealth`, `ribRedHealth`, `ribBlackP`, `ribRedP`, `mapRibCaste`, áreas desenhadas pelo código) e os botões configuráveis `ribUserDef1A`–`1H`, que o jogo troca conforme o `WIN.INI` (`_SetUserButton`).
+Barras e números da faixa (`ribBlacks`, `ribReds`, `ribYellowHealth`, `ribBlackHealth`, `ribRedHealth`, `ribBlackP`, `ribRedP`; `_DrawMapData`): reproduzidos desde 2026-10-18, conferidos com a bancada ([mensagens.md](mensagens.md) §9). Ainda não reproduzidos: `mapRibCaste` (área desenhada pelo código) e os botões configuráveis `ribUserDef1A`–`1H` conforme o `WIN.INI` (`_SetUserButton`).
 
 ### Objetos da janela 0
 

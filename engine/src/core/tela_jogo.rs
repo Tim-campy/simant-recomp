@@ -84,6 +84,9 @@ pub struct ConfigTelaJogo {
     /// Objeto da faixa selecionado para cada `_MapPlane` (chave em texto: "1", "2", "3").
     pub botao_do_plano: HashMap<String, String>,
     pub edicao: ConfigEdicao,
+    /// Barras e números da faixa (`_DrawMapData`). Sem a chave (mod antigo), a faixa fica sem elas.
+    #[serde(default)]
+    pub barras_faixa: super::barras_faixa::ConfigBarrasFaixa,
 }
 
 /// Bit "selecionado" das flags de objeto (janela.md).
@@ -272,6 +275,8 @@ pub struct TelaDeJogo {
     amarela: FormigaAmarela,
     /// O que não foi reproduzido ao carregar (vida fora do mapa, `_MePlane` desconhecido...).
     pendencias: Vec<String>,
+    /// Saúde, população e limiares mostrados nas barras da faixa.
+    pub valores_faixa: super::barras_faixa::ValoresFaixa,
 }
 
 fn indice_do_plano(p: Plano) -> usize {
@@ -323,6 +328,18 @@ impl TelaDeJogo {
             vida: rec.camadas,
             amarela,
             pendencias,
+            valores_faixa: {
+                let v = |nome: &str| jogo.i16(nome).map(i32::from).unwrap_or(0);
+                super::barras_faixa::ValoresFaixa {
+                    saude_amarela: v("MeHealth"),
+                    aviso_amarela: v("MeWarnHealth"),
+                    saude_preta: v("HealthB"),
+                    aviso_colonia: v("BlkWarnHealth"),
+                    saude_vermelha: v("HealthR"),
+                    populacao_preta: v("BpopT"),
+                    populacao_vermelha: v("RpopT"),
+                }
+            },
             bitmaps_da_faixa: Vec::new(),
             titulo: String::new(),
             selecao_da_faixa: Vec::new(),
@@ -340,6 +357,7 @@ impl TelaDeJogo {
             b: e.ninho_b.vida.dados.clone(),
             r: e.ninho_r.vida.dados.clone(),
         };
+        self.valores_faixa = super::barras_faixa::ValoresFaixa::do_estado(e);
         let a = &e.amarela;
         self.amarela =
             FormigaAmarela { modo: a.modo, plano: a.plano, x: a.x, y: a.y, tipo: a.tipo, dir: a.dir, ovo: a.ovo, base: a.base };
@@ -416,6 +434,8 @@ impl TelaDeJogo {
             ob.flags |= FLAG_SELECIONADO;
         }
         let mut pendentes = desenhar_janela_carregada_na_tela(&mut q, recursos, interface, id_faixa, &faixa)?;
+        let objeto = |nome: &str| self.objeto_da_faixa(nome);
+        pendentes.extend(super::barras_faixa::desenhar(&mut q, interface, &cfg.barras_faixa, &self.valores_faixa, &objeto));
         pendentes.extend(atras(&mut q)?);
 
         let e = &cfg.edicao;
