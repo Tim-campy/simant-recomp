@@ -4,8 +4,11 @@
 //! Especificação: docs/spec/telas/janelas.md. Dados: data/janelas.json. Sem SDL: a interface só
 //! repassa cliques, arrastos e o desenho.
 
+use std::collections::HashMap;
+
 use serde::Deserialize;
 
+use super::gerenciador::{Clique, ConfigGerenciador, Estilo, Gerenciador, Metricas};
 use super::historico::{ConfigHistorico, JanelaHistorico};
 use super::quadro::Quadro;
 use super::telas::{carregar_janela, desenhar_objetos, Interface};
@@ -35,6 +38,41 @@ pub enum Controle {
     /// Info (`_OpenInfoWindow`, janela 5): desenhada por core/info.rs; aqui a pilha, a geometria e
     /// o clique na área (`clique_info`).
     Info,
+    /// Quintal (`_MapToYard`, janela 25): desenhado e clicado por core/quintal_mapa.rs; aqui só a
+    /// pilha e a geometria. Divide com o mapa a mesma janela do Windows (`_win_Swap`).
+    Quintal,
+}
+
+/// Janela de edição (`_win_hwnd[0]`) no gerenciador.
+pub const ID_EDICAO: u16 = 0;
+
+/// Ação de um acelerador de janela (`MAINWNDPROC`, comandos 0xFDA0–0xFDA5).
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AcaoJanela {
+    /// 0xFDA0 (Ctrl+F4, Ctrl+NumPad−): `WM_CLOSE` na janela de cima.
+    FecharDeCima,
+    /// 0xFDA1 (Ctrl+Espaço): `SC_KEYMENU`, o menu de sistema da janela de cima.
+    MenuSistema,
+    /// 0xFDA2 (Ctrl+F6, Ctrl+NumPad+): a janela de baixo vem para cima.
+    Proxima,
+    /// 0xFDA3 (Ctrl+P): `SC_MOVE` na janela de cima.
+    Mover,
+    /// 0xFDA5 (Ctrl+Z): maximiza ou restaura a janela de edição, se ela é a de cima.
+    MaximizarEdicao,
+}
+
+/// Tecla → ação de janela (mesmo formato dos atalhos de data/partida.json).
+#[derive(Clone, Debug, Deserialize)]
+pub struct AtalhoJanela {
+    pub tecla: String,
+    #[serde(default)]
+    pub ctrl: bool,
+    #[serde(default)]
+    pub shift: bool,
+    #[serde(default)]
+    pub alt: bool,
+    pub acao: AcaoJanela,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -88,6 +126,12 @@ pub struct ConfigJanelas {
     pub mapa: ConfigJanelaMapa,
     /// Janela Info (layout 5) e o objeto da área (`infoArea`).
     pub info: ConfigJanelaMapa,
+    /// Janela do quintal (layout 25; a geometria vem de data/quintal_mapa.json).
+    pub quintal: u16,
+    /// Moldura, menu de sistema e limites (core/gerenciador.rs).
+    pub gerenciador: ConfigGerenciador,
+    /// Aceleradores de janela (0xFDA0–0xFDA5 da `ACCELERATORTABLE`).
+    pub teclas: Vec<AtalhoJanela>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -105,8 +149,8 @@ impl ConfigJanelas {
     /// Configuração da janela de controle (a History não tem: devolve a de castas, nunca usada).
     pub fn de(&self, c: Controle) -> &ConfigControle {
         match c {
-            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => &self.castas,
             Controle::Tarefas => &self.tarefas,
+            _ => &self.castas,
         }
     }
 
@@ -116,23 +160,36 @@ impl ConfigJanelas {
             Controle::Historico => self.historico.janela,
             Controle::Mapa => self.mapa.janela,
             Controle::Info => self.info.janela,
+            Controle::Quintal => self.quintal,
             _ => self.de(c).janela,
         }
     }
+
+    /// Ação do acelerador de janela, se houver.
+    pub fn acao_da_tecla(&self, nome: &str, ctrl: bool, shift: bool, alt: bool) -> Option<AcaoJanela> {
+        self.teclas
+            .iter()
+            .find(|a| a.tecla.eq_ignore_ascii_case(nome) && a.ctrl == ctrl && a.shift == shift && a.alt == alt)
+            .map(|a| a.acao)
+    }
 }
 
-/// Estado de interface das janelas de controle (fora do save, como no original).
+/// Estado de interface das janelas de controle (fora do save, como no original) e o gerenciador
+/// de todas as janelas filhas (ordem, moldura, cliques).
 #[derive(Clone, Debug)]
 pub struct JanelasControle {
     pub cfg: ConfigJanelas,
-    /// Ordem de empilhamento das janelas abertas, a última por cima. A janela de edição entra na
-    /// mesma pilha como `None`.
-    pub pilha: Vec<Option<Controle>>,
+    /// Ordem, moldura e roteamento das janelas filhas (edição, controles, mapa, quintal).
+    pub gerente: Gerenciador,
+    /// Geometria de cada janela no lugar de origem (tabela de posições + faixa), por id.
+    bases: HashMap<u16, GeometriaControle>,
+    /// Estilo (de `_win_Open`) de cada janela, por id.
+    estilos: HashMap<u16, Estilo>,
     /// `_casteSet` / `_modeSet` (DGROUP `1048:159e`/`15a0`): conjunto escolhido (0..2).
     pub conjunto: [usize; 2],
     /// `1048:15b4`/`15b2`: mostrar porcentagem (1) ou número de formigas.
     pub porcentagem: [bool; 2],
-    /// Arrasto em andamento no triângulo.
+    /// Arrasto em andamento no triângulo (ou na área do mapa).
     pub arrastando: Option<Controle>,
     /// Tabela de posições das janelas (tipo 9) e altura da faixa, da `Interface`.
     posicoes: Vec<[i16; 4]>,
@@ -148,8 +205,8 @@ pub struct JanelasControle {
 
 fn indice(c: Controle) -> usize {
     match c {
-        Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => 0,
         Controle::Tarefas => 1,
+        _ => 0,
     }
 }
 
@@ -164,6 +221,18 @@ pub struct GeometriaControle {
     pub dy: i16,
 }
 
+impl GeometriaControle {
+    fn deslocada(self, dx: i16, dy: i16) -> GeometriaControle {
+        GeometriaControle {
+            externo: mover(self.externo, dx, dy),
+            titulo: mover(self.titulo, dx, dy),
+            cliente: mover(self.cliente, dx, dy),
+            dx: self.dx + dx,
+            dy: self.dy + dy,
+        }
+    }
+}
+
 fn mover(r: Retangulo, dx: i16, dy: i16) -> Retangulo {
     Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy }
 }
@@ -172,15 +241,27 @@ fn contem(r: Retangulo, x: i32, y: i32) -> bool {
     x >= i32::from(r.esq) && x < i32::from(r.dir) && y >= i32::from(r.topo) && y < i32::from(r.base)
 }
 
+/// Os controles que têm layout próprio (o quintal entra pela geometria de quintal_mapa.json).
+const COM_LAYOUT: [Controle; 5] = [Controle::Castas, Controle::Tarefas, Controle::Historico, Controle::Mapa, Controle::Info];
+
 impl JanelasControle {
-    /// Como num Quick Game ou depois do Load (`_SetDefaultWindows`): as duas janelas abertas atrás
-    /// da janela de edição, Behavior antes de Caste.
-    pub fn new(cfg: ConfigJanelas, interface: &Interface) -> JanelasControle {
+    /// Gerenciador com a janela de edição (`edicao`: contorno, estilo e medidas da moldura dela) e a
+    /// geometria de origem de cada janela de controle. `area`: área cliente da janela-mãe (embaixo
+    /// da faixa). Nenhuma janela de controle aberta: a interface chama [`Self::janelas_padrao`].
+    pub fn new(
+        cfg: ConfigJanelas,
+        interface: &Interface,
+        recursos: &Recursos,
+        edicao: (Retangulo, Metricas),
+        area: Retangulo,
+    ) -> Result<JanelasControle, String> {
         let historico = JanelaHistorico::new(cfg.historico.clone());
-        JanelasControle {
+        let mut j = JanelasControle {
             historico,
+            gerente: Gerenciador::new(cfg.gerenciador.clone(), area),
+            bases: HashMap::new(),
+            estilos: HashMap::new(),
             cfg,
-            pilha: vec![Some(Controle::Tarefas), Some(Controle::Castas), None],
             conjunto: [0, 0],
             porcentagem: [true, true],
             arrastando: None,
@@ -188,28 +269,131 @@ impl JanelasControle {
             clique_info: None,
             posicoes: interface.posicoes.clone(),
             faixa: interface.moldura.faixa.altura,
+        };
+
+        for c in COM_LAYOUT {
+            let id = j.cfg.id(c);
+            let janela = carregar_janela(recursos, id)?;
+            j.bases.insert(id, j.geometria_de_origem(&janela, id));
+            j.estilos.insert(id, Estilo::da_janela(&janela));
+        }
+        let janela_edicao = carregar_janela(recursos, ID_EDICAO)?;
+        let (externo, metricas) = edicao;
+        j.gerente.abrir(ID_EDICAO, externo, Estilo::da_janela(&janela_edicao), metricas);
+
+        Ok(j)
+    }
+
+    /// Medidas da moldura das janelas de controle (1 pixel, título de `altura_titulo`).
+    pub fn metricas(&self) -> Metricas {
+        Metricas { espessura: 1, altura_titulo: self.cfg.altura_titulo, barra_rolagem: 16 }
+    }
+
+    /// Registra a geometria de origem do quintal (contorno externo de data/quintal_mapa.json).
+    pub fn registrar_quintal(&mut self, externo: Retangulo) {
+        let h = self.cfg.altura_titulo;
+        let cliente = Retangulo { esq: externo.esq + 1, topo: externo.topo + 1 + h + 1, dir: externo.dir - 1, base: externo.base - 1 };
+        let titulo = Retangulo { esq: cliente.esq, topo: externo.topo + 1, dir: cliente.dir, base: externo.topo + 1 + h };
+        self.bases.insert(self.cfg.quintal, GeometriaControle { externo, titulo, cliente, dx: 0, dy: 0 });
+        self.estilos.insert(self.cfg.quintal, Estilo::do_layout([0x06, 0x04], true));
+    }
+
+    /// Controle da janela `id`, se for um.
+    pub fn controle(&self, id: u16) -> Option<Controle> {
+        [Controle::Castas, Controle::Tarefas, Controle::Historico, Controle::Mapa, Controle::Info, Controle::Quintal]
+            .into_iter()
+            .find(|&c| self.cfg.id(c) == id)
+    }
+
+    /// A janela está aberta (visível).
+    pub fn aberta(&self, c: Controle) -> bool {
+        self.gerente.aberta(self.cfg.id(c))
+    }
+
+    /// `_win_Open`: abre a janela (onde estava, se já foi aberta antes) ou a traz para a frente.
+    pub fn abrir(&mut self, c: Controle) {
+        let id = self.cfg.id(c);
+        let Some(base) = self.bases.get(&id).copied() else { return };
+        let estilo = self.estilos.get(&id).copied().unwrap_or_default();
+        let m = self.metricas();
+        self.gerente.abrir(id, base.externo, estilo, m);
+    }
+
+    /// Traz para a frente (`BringWindowToTop`): `None` = janela de edição; uma de controle é aberta
+    /// se estiver fechada (`_OpenCasteWindow`…).
+    pub fn trazer_para_frente(&mut self, c: Option<Controle>) {
+        match c {
+            None => {
+                if !self.gerente.trazer_para_frente(ID_EDICAO) {
+                    // _OpenEditWindow com a janela fechada: reabre onde estava.
+                    let zero = Retangulo { esq: 0, topo: 0, dir: 0, base: 0 };
+                    self.gerente.abrir(ID_EDICAO, zero, Estilo::default(), self.metricas());
+                }
+            }
+            Some(c) => self.abrir(c),
         }
     }
 
-    /// Abre (ou traz para a frente) a janela (`_OpenCasteWindow`/`_OpenModeWindow` pelos botões da faixa).
-    pub fn trazer_para_frente(&mut self, c: Option<Controle>) {
-        self.pilha.retain(|j| *j != c);
-        self.pilha.push(c);
+    /// `_win_Close`.
+    pub fn fechar(&mut self, c: Controle) -> bool {
+        self.gerente.fechar(self.cfg.id(c))
     }
 
-    /// A janela de cima (a ativa).
+    /// `_win_Swap(de, para)` (mapa ↔ quintal): a nova assume o lugar e a posição da velha. Se a
+    /// velha está fechada, a nova é aberta no lugar dela [hipótese: `ShowWindow` da janela
+    /// escondida], ou no lugar de origem.
+    pub fn trocar(&mut self, de: Controle, para: Controle) {
+        let (a, b) = (self.cfg.id(de), self.cfg.id(para));
+        let estilo = self.estilos.get(&b).copied().unwrap_or_default();
+        let m = self.metricas();
+        if !self.gerente.trocar(a, b, estilo, m) {
+            self.abrir(para);
+        }
+    }
+
+    /// `_SetDefaultWindows` (`1000:d66a`, Quick Game e Load): Caste e Behavior para a frente (abrindo),
+    /// o mapa (ou o quintal no plano 0) aberto se nenhum dos dois estiver, e a janela de edição por
+    /// cima. Devolve se abriu o mapa (`_YardToMap`) ou o quintal (`_MapToYard`).
+    pub fn janelas_padrao(&mut self, plano_mapa: i16) -> Option<Controle> {
+        self.abrir(Controle::Castas);
+        self.abrir(Controle::Tarefas);
+        let alvo = if plano_mapa == 0 { Controle::Quintal } else { Controle::Mapa };
+        let aberta = (!self.aberta(alvo)).then(|| {
+            self.abrir(alvo);
+            alvo
+        });
+        self.gerente.trazer_para_frente(ID_EDICAO);
+        aberta
+    }
+
+    /// A janela de cima (a ativa), se for de controle; `None` para a de edição.
     pub fn ativa(&self) -> Option<Controle> {
-        self.pilha.last().copied().flatten()
+        self.gerente.topo().and_then(|id| self.controle(id))
     }
 
-    /// Geometria da janela `c` (layout + deslocamento medido; título do Windows de 18 + 1 linhas).
-    pub fn geometria(&self, recursos: &Recursos, c: Controle) -> Result<GeometriaControle, String> {
+    /// Geometria da janela `c` (layout + deslocamento medido + onde o jogador a pôs).
+    pub fn geometria(&self, _recursos: &Recursos, c: Controle) -> Result<GeometriaControle, String> {
         let id = self.cfg.id(c);
-        let j = carregar_janela(recursos, id)?;
-        Ok(self.geometria_de(&j, id))
+        self.geometria_atual(id).ok_or(format!("janela {id} sem geometria"))
     }
 
-    fn geometria_de(&self, j: &Janela, id: u16) -> GeometriaControle {
+    fn geometria_atual(&self, id: u16) -> Option<GeometriaControle> {
+        let base = *self.bases.get(&id)?;
+        let Some(j) = self.gerente.janela(id) else { return Some(base) };
+        Some(base.deslocada(j.externo.esq - base.externo.esq, j.externo.topo - base.externo.topo))
+    }
+
+    fn geometria_de(&self, _j: &Janela, id: u16) -> GeometriaControle {
+        self.geometria_atual(id).unwrap_or(GeometriaControle {
+            externo: Retangulo { esq: 0, topo: 0, dir: 0, base: 0 },
+            titulo: Retangulo { esq: 0, topo: 0, dir: 0, base: 0 },
+            cliente: Retangulo { esq: 0, topo: 0, dir: 0, base: 0 },
+            dx: 0,
+            dy: 0,
+        })
+    }
+
+    fn geometria_de_origem(&self, j: &Janela, id: u16) -> GeometriaControle {
         let pos = self.posicoes.get(id as usize).copied().unwrap_or([0; 4]);
         let [ax, ay] = self.cfg.ajuste_posicao;
         let [bx, by] = [&self.cfg.mapa, &self.cfg.info].iter().find(|c| c.janela == id).map_or([0, 0], |c| c.ajuste);
@@ -230,65 +414,48 @@ impl JanelasControle {
         Some(Triangulo { esq: r.esq.into(), topo: r.topo.into(), dir: r.dir.into(), base: r.base.into() })
     }
 
-    /// Clique do botão esquerdo em (x, y). Devolve `true` se caiu numa janela de controle visível
-    /// (por cima da janela de edição e das outras) e foi tratado aqui.
-    /// `edicao`: contorno externo da janela de edição (o clique nela a traz para a frente e segue
-    /// para a interface).
-    pub fn clicar(&mut self, recursos: &Recursos, e: &mut Estado, edicao: Retangulo, x: i32, y: i32) -> Result<bool, String> {
-        // De cima para baixo: a primeira janela que contém o ponto recebe o clique.
-        let pilha: Vec<Option<Controle>> = self.pilha.iter().rev().copied().collect();
-        for j in pilha {
-            let Some(c) = j else {
-                if contem(edicao, x, y) {
-                    self.trazer_para_frente(None);
-                    return Ok(false);
-                }
-                continue;
-            };
-            let id = self.cfg.id(c);
-            let janela = carregar_janela(recursos, id)?;
-            let g = self.geometria_de(&janela, id);
-            if !contem(g.externo, x, y) {
-                continue;
+    /// Clique do botão esquerdo em (x, y): o gerenciador decide quem recebe (só a janela da frente
+    /// sob o cursor; a de trás só vem para a frente) e o conteúdo das janelas de controle é tratado
+    /// aqui. `Clique::Cliente` da edição e do quintal fica para a interface.
+    pub fn clicar(&mut self, recursos: &Recursos, e: &mut Estado, x: i32, y: i32, duplo: bool) -> Result<Clique, String> {
+        let c = self.gerente.pressionar(x, y, duplo);
+        if let Clique::Cliente(id) = c {
+            if let Some(ctl) = self.controle(id) {
+                self.clique_no_conteudo(recursos, e, ctl, x, y)?;
             }
-            self.trazer_para_frente(Some(c));
-            if c == Controle::Info {
+        }
+        Ok(c)
+    }
+
+    fn clique_no_conteudo(&mut self, recursos: &Recursos, e: &mut Estado, c: Controle, x: i32, y: i32) -> Result<(), String> {
+        if c == Controle::Quintal {
+            return Ok(());
+        }
+        let id = self.cfg.id(c);
+        let janela = carregar_janela(recursos, id)?;
+        let g = self.geometria_de(&janela, id);
+        match c {
+            Controle::Info => {
                 if Self::objeto(&janela, &g, &self.cfg.info.objeto_area, false).is_some_and(|(r, _)| contem(r, x, y)) {
                     self.clique_info = Some((x, y));
                 }
-            } else if c == Controle::Mapa {
+            }
+            Controle::Mapa => {
                 if Self::objeto(&janela, &g, &self.cfg.mapa.objeto_area, true).is_some_and(|(r, _)| contem(r, x, y)) {
                     self.clique_mapa = Some((x, y));
                     self.arrastando = Some(c);
                 }
-            } else if c == Controle::Historico {
-                self.historico.clicar(&janela, &g, x, y);
-            } else {
-                self.clique_na_janela(&janela, &g, c, e, x, y);
             }
-            return Ok(true);
+            Controle::Historico => self.historico.clicar(&janela, &g, x, y),
+            _ => self.clique_na_janela(&janela, &g, c, e, x, y),
         }
-        Ok(false)
+        Ok(())
     }
 
-    /// Ponto (x, y) dentro de alguma janela de controle que esteja por cima da de edição.
-    pub fn cobre(&self, recursos: &Recursos, edicao: Retangulo, x: i32, y: i32) -> bool {
-        for j in self.pilha.iter().rev() {
-            let Some(c) = j else {
-                if contem(edicao, x, y) {
-                    return false;
-                }
-                continue;
-            };
-            if let Ok(g) = self.geometria(recursos, *c) {
-                if contem(g.externo, x, y) {
-                    return true;
-                }
-            }
-        }
-        false
+    /// Ponto (x, y) dentro de alguma janela que esteja por cima da de edição.
+    pub fn cobre(&self, x: i32, y: i32) -> bool {
+        self.gerente.janela_em(x, y).is_some_and(|id| id != ID_EDICAO)
     }
-
     fn clique_na_janela(&mut self, j: &Janela, g: &GeometriaControle, c: Controle, e: &mut Estado, x: i32, y: i32) {
         let cfg = self.cfg.de(c).clone();
         let k = indice(c);
@@ -321,7 +488,7 @@ impl JanelasControle {
 
     fn auto_mut<'e>(&self, e: &'e mut Estado, c: Controle) -> &'e mut i16 {
         match c {
-            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => &mut e.controles.casta_automatica,
+            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info | Controle::Quintal => &mut e.controles.casta_automatica,
             Controle::Tarefas => &mut e.controles.modo_automatico,
         }
     }
@@ -380,7 +547,7 @@ impl JanelasControle {
     }
 
     pub fn desenhar(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, e: &Estado, c: Controle) -> Result<Vec<String>, String> {
-        if c == Controle::Mapa || c == Controle::Info {
+        if c == Controle::Mapa || c == Controle::Info || c == Controle::Quintal {
             // Desenhada pela interface com core/janela_mapa.rs (precisa da navegação e do buffer).
             return Ok(Vec::new());
         }
@@ -394,7 +561,7 @@ impl JanelasControle {
         let ativa = self.ativa() == Some(c);
         // Estado dos botões Auto/Manual e do conjunto (grupos 3 e 4 do layout).
         let auto = match c {
-            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => e.controles.casta_automatica != 0,
+            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info | Controle::Quintal => e.controles.casta_automatica != 0,
             Controle::Tarefas => e.controles.modo_automatico != 0,
         };
         for o in janela.objetos.iter_mut() {
@@ -422,7 +589,7 @@ impl JanelasControle {
         pendentes.retain(|p| !p.ends_with("Title"));
         // Botão do triângulo.
         let niveis = match c {
-            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => e.controles.castas,
+            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info | Controle::Quintal => e.controles.castas,
             Controle::Tarefas => e.controles.tarefas,
         };
         // O botão bate com as capturas (j01, j02) usando o retângulo do triângulo com 1 pixel a menos
@@ -444,7 +611,7 @@ impl JanelasControle {
         }
         // Níveis e barras (_DrawControlLevels).
         let total = match c {
-            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => i32::from(e.preta.castas[0]),
+            Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info | Controle::Quintal => i32::from(e.preta.castas[0]),
             Controle::Tarefas => e.preta.modos[..3].iter().map(|&v| i32::from(v)).sum(),
         };
         let cor = |i: u8| interface.cores.get(i as usize).copied().unwrap_or(Cor { frente: 0, fundo: 15, fundo2: 15 });
@@ -530,6 +697,11 @@ pub fn geometria_janela(j: &Janela, pos: [i16; 4], faixa: i16, altura_titulo: i1
 pub fn desenhar_moldura_com_titulo(q: &mut Quadro, interface: &Interface, jc: &ConfigJanelas, g: &GeometriaControle, titulo: &str, ativa: bool) {
     q.preencher(g.externo, jc.cor_fundo, jc.cor_fundo);
     q.contorno(Retangulo { dir: g.externo.dir - 1, base: g.externo.base - 1, ..g.externo }, jc.cor_linha);
+    desenhar_titulo(q, interface, jc, g, titulo, ativa);
+}
+
+/// Só a faixa do título (caixa do menu de sistema, faixa ativa ou inativa com o nome, linhas).
+pub fn desenhar_titulo(q: &mut Quadro, interface: &Interface, jc: &ConfigJanelas, g: &GeometriaControle, titulo: &str, ativa: bool) {
     let [fundo, texto] = if ativa { jc.titulo_ativo } else { jc.titulo_inativo };
     let h = jc.altura_titulo;
     let caixa = Retangulo { dir: g.titulo.esq + h, ..g.titulo };
@@ -558,7 +730,7 @@ fn ret(x0: i32, y0: i32, x1: i32, y1: i32) -> Retangulo {
 fn niveis_e_conjuntos(e: &mut Estado, c: Controle) -> (&mut [u16; 3], &mut [u16; 12]) {
     let k = &mut e.controles;
     match c {
-        Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info => (&mut k.castas, &mut k.castas_memorizadas),
+        Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info | Controle::Quintal => (&mut k.castas, &mut k.castas_memorizadas),
         Controle::Tarefas => (&mut k.tarefas, &mut k.tarefas_memorizadas),
     }
 }

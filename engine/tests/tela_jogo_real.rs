@@ -173,7 +173,9 @@ fn camada_de_cheiro_na_janela_de_edicao() {
 
 // 2026-10-18: com as barras e os números da faixa (core/barras_faixa.rs), conferidos contra a bancada
 // (mensagens.md §9); o resto da tela não mudou.
-const HASH_TELA_JOGO: &str = "e64b597926c6d37602354594778fdb915b6534efc64c199a5fcc57ead95a2cd9";
+// 2026-10-18: setas e polegares das barras de rolagem (gerenciador de janelas, janelas.md §8);
+// a região da janela de edição dá 99,59% contra j00 (resta o texto do título).
+const HASH_TELA_JOGO: &str = "1274ad6e2390bd2b28b41185e66c8d0d39f8d1fb4fdfe150516a6d6fbd3a1f8e";
 
 /// Janelas de controle (janelas.md): o clique no triângulo do Caste Control (na frente) muda
 /// `_casteLevels`, passa para Manual e recalcula `_IdealCaste`; Auto e os conjuntos.
@@ -185,24 +187,32 @@ fn janela_de_castas_muda_os_niveis() {
     let mut e = Estado::de_save(&quick2()).unwrap();
     let cfg: ConfigTelaJogo = r.dados("tela_jogo.json").unwrap();
     let interface = Interface::carregar(&r, cfg.tabela_posicoes).unwrap();
-    let mut j = JanelasControle::new(r.dados("janelas.json").unwrap(), &interface);
+    use engine::core::gerenciador::Clique;
+    let area = engine::formats::janela::Retangulo { esq: 0, topo: 73, dir: 640, base: 442 };
+    let m = &cfg.edicao.moldura;
+    let mut j = JanelasControle::new(r.dados("janelas.json").unwrap(), &interface, &r, (m.retangulo(), m.metricas()), area).unwrap();
+    // _SetDefaultWindows: Caste, Behavior, mapa e a de edição por cima.
+    assert_eq!(j.janelas_padrao(2), Some(Controle::Mapa));
+    assert_eq!(j.gerente.ordem(), vec![19, 18, 1, 0]);
     j.trazer_para_frente(Some(Controle::Castas));
-    let edicao = engine::formats::janela::Retangulo { esq: 20, topo: 97, dir: 444, base: 444 };
     // Ápice do triângulo (casteTriangle (392, 342) no layout, deslocamento (0, −52)): reprodutores 100%.
-    assert!(j.clicar(&r, &mut e, edicao, 447, 290).unwrap());
+    assert_eq!(j.clicar(&r, &mut e, 447, 290, false).unwrap(), Clique::Cliente(19));
     assert!(j.soltar());
     assert_eq!(e.controles.castas[0], 0xFFFF);
     assert_eq!(e.controles.casta_automatica, 0);
     assert_eq!(e.controles.castas_ideais, [0, 0, 50, 50]);
     assert_eq!(e.controles.castas_memorizadas[..3], [0xFFFF, 0, 0]);
     // Set 2 (348, 359)–(391, 373): guarda o atual no conjunto 0 e carrega o 1.
-    assert!(j.clicar(&r, &mut e, edicao, 360, 359 - 52 + 5).unwrap());
+    assert_eq!(j.clicar(&r, &mut e, 360, 359 - 52 + 5, false).unwrap(), Clique::Cliente(19));
     assert_eq!(j.conjunto[0], 1);
     assert_eq!(e.controles.castas[..], e.controles.castas_memorizadas[3..6]);
     // Auto (348, 309)–(390, 323).
-    assert!(j.clicar(&r, &mut e, edicao, 360, 309 - 52 + 5).unwrap());
+    assert_eq!(j.clicar(&r, &mut e, 360, 309 - 52 + 5, false).unwrap(), Clique::Cliente(19));
     assert_eq!(e.controles.casta_automatica, 1);
-    // Fora das janelas e dentro da de edição: é da janela de edição, que vem para a frente.
-    assert!(!j.clicar(&r, &mut e, edicao, 100, 200).unwrap());
+    // Na janela de edição (atrás): ela vem para a frente e o clique é comido.
+    assert_eq!(j.clicar(&r, &mut e, 100, 200, false).unwrap(), Clique::Ativou(0));
     assert_eq!(j.ativa(), None);
+    // Agora o mesmo ponto do Auto é da edição, que cobre a Caste: o Manual não é apertado.
+    assert_eq!(j.clicar(&r, &mut e, 360, 323 - 52 + 5, false).unwrap(), Clique::Cliente(0));
+    assert_eq!(e.controles.casta_automatica, 1);
 }

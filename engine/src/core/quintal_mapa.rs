@@ -150,8 +150,11 @@ pub struct Sprites {
 pub enum AcaoQuintal {
     /// Abre a janela no modo atual e a traz para a frente (botão Yard, Ctrl+M).
     Abrir,
-    /// Fecha (botão Patch: `_YardToMap`).
+    /// Só fecha a janela (para mods; o original não tem botão assim).
     Fechar,
+    /// Botão Patch (`_YardToMap`): o quintal vira a janela do mapa da superfície, no mesmo lugar,
+    /// e a faixa volta à 34. Quem faz é a interface (o gerenciador de janelas).
+    ParaMapa,
     /// Botão House: modo 0 ↔ 1; de 2 ou 3 vai para 0.
     AlternarCasa,
     /// Ctrl+Y / Ctrl+5 / Ctrl+6 / Ctrl+7 (e os botões Strat/Graphic): modo 0–3, abrindo a janela.
@@ -314,8 +317,10 @@ fn contem(r: Retangulo, x: i32, y: i32) -> bool {
 /// Estado da janela na interface (não vai para o save).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct JanelaQuintal {
+    /// Aberta (na interface, espelho do gerenciador de janelas).
     pub aberta: bool,
-    /// Na frente da janela de edição.
+    /// A faixa 35 está no lugar da 34: o quintal foi a última ativada entre ele e a janela de edição
+    /// (`WM_NCACTIVATE`, janelas.md §8). A ordem das janelas é do gerenciador.
     pub na_frente: bool,
     /// Esperando o clique do PLACE.
     pub colocando_rainha: bool,
@@ -337,7 +342,7 @@ impl JanelaQuintal {
         let modo = &mut e.vistas.modo_quintal;
         let novo = match a {
             AcaoQuintal::Abrir => None,
-            AcaoQuintal::Fechar => {
+            AcaoQuintal::Fechar | AcaoQuintal::ParaMapa => {
                 *self = JanelaQuintal::default();
                 return;
             }

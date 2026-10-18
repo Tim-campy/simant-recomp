@@ -8,10 +8,10 @@
 use engine::core::menu_ferramentas::{ItemMenu, MenuFerramentas};
 use engine::core::navegacao::Evento as EventoNav;
 use engine::core::quadro::Quadro;
-use engine::core::quintal_mapa::{self, ConfigQuintalMapa, DesenhoQuintal, JanelaQuintal};
+use engine::core::janelas::Controle;
+use engine::core::quintal_mapa::{self, AcaoQuintal, ConfigQuintalMapa, DesenhoQuintal, JanelaQuintal};
 use engine::core::selecao::{ConfigModos, Escolha, SelecaoDeJogo};
 use engine::core::telas::{desenhar_janela_na_tela, Interface};
-use engine::formats::janela::Retangulo;
 use engine::recursos::Recursos;
 use engine::rules::estado::Evento;
 use engine::rules::experimental::{self, Contexto, ControleExperimental, Efeito, Ferramenta, TabelasExperimental};
@@ -50,34 +50,15 @@ pub fn selecao_da_abertura(recursos: &Recursos, interface: &Interface) -> Result
     SelecaoDeJogo::carregar(recursos.dados::<ConfigModos>(engine::core::selecao::ARQUIVO_CONFIG)?, recursos, interface)
 }
 
-/// Desenha, por cima da tela de jogo já composta, a faixa 35 e a janela do quintal (na frente da
-/// janela de edição ou atrás dela) e o "Select a Game" do Ctrl+N. Devolve o que não foi desenhado.
-pub fn desenhar(s: &Sessao, q: &mut Quadro) -> Result<Vec<String>, String> {
+/// A faixa do momento: com o quintal ativado por último, a 35 no lugar da 34; senão, na 34, o botão
+/// de ferramentas do Experimental. Devolve o que não foi desenhado.
+pub fn desenhar_faixa(s: &Sessao, q: &mut Quadro) -> Vec<String> {
     let m = &s.modos;
-    let mut pendentes = Vec::new();
-    if m.janela.aberta {
-        pendentes.extend(m.quintal.desenhar_faixa(q, s.recursos, &s.interface, &s.partida.estado));
-        let fonte_balao = s.interface.fontes.get(m.quintal.cfg.balao_menino.fonte).and_then(|f| f.as_ref());
-        if m.janela.na_frente {
-            m.quintal.desenhar_janela(q, &s.partida.estado);
-            m.quintal.desenhar_balao_do_menino(q, &s.partida.estado, fonte_balao);
-        } else {
-            // Atrás da janela de edição: só a parte fora dela aparece.
-            let [x, y, w, h] = s.tela.cfg.edicao.moldura.externo;
-            let edicao = Retangulo { esq: x, topo: y, dir: x + w, base: y + h };
-            let guardado = q.pixels.clone();
-            m.quintal.desenhar_janela(q, &s.partida.estado);
-            m.quintal.desenhar_balao_do_menino(q, &s.partida.estado, fonte_balao);
-            for yy in edicao.topo.max(0) as usize..(edicao.base.max(0) as usize).min(q.altura) {
-                for xx in edicao.esq.max(0) as usize..(edicao.dir.max(0) as usize).min(q.largura) {
-                    let i = yy * q.largura + xx;
-                    q.pixels[i] = guardado[i];
-                }
-            }
-        }
+    if m.janela.na_frente {
+        return m.quintal.desenhar_faixa(q, s.recursos, &s.interface, &s.partida.estado);
     }
     // _NewGame: no Experimental o botão de ferramentas da faixa usa outros bitmaps.
-    if s.partida.estado.partida.tipo_jogo == 3 && !m.janela.aberta {
+    if s.partida.estado.partida.tipo_jogo == 3 {
         if let Some(r) = s.tela.retangulo_da_faixa(&m.menu.cfg.botao) {
             let id = m.menu.cfg.bitmaps_botao_experimental[1];
             if let Ok(b) = s.recursos.objeto(engine::formats::banco::Chave { tipo: engine::formats::bitmap::TIPO_BITMAP, id }).and_then(|d| engine::formats::bitmap::Bitmap::decodificar(&d)) {
@@ -85,6 +66,15 @@ pub fn desenhar(s: &Sessao, q: &mut Quadro) -> Result<Vec<String>, String> {
             }
         }
     }
+    Vec::new()
+}
+
+/// Desenha, por cima de tudo, o menu de ferramentas do Experimental e o "Select a Game" do Ctrl+N.
+/// (O quintal é uma janela do gerenciador: `Sessao::desenhar_janelas`.) Devolve o que não foi
+/// desenhado.
+pub fn desenhar(s: &Sessao, q: &mut Quadro) -> Result<Vec<String>, String> {
+    let m = &s.modos;
+    let mut pendentes = Vec::new();
     if m.menu_aberto {
         let atual = Ferramenta::de_i16(s.partida.estado.partida.ferramenta_experimental);
         pendentes.extend(m.menu.desenhar(q, s.recursos, &s.interface, atual));
@@ -121,14 +111,13 @@ pub fn tecla(s: &mut Sessao, ev: &EventoNav) -> Resposta {
         return Resposta::Tratada;
     }
     if let Some(a) = m.quintal.cfg.acao_da_tecla(ev) {
-        if a == quintal_mapa::AcaoQuintal::Abrir && !m.janela.aberta {
+        if a == AcaoQuintal::Abrir && !s.janelas.aberta(Controle::Quintal) {
             // _OpenMapYard: sem o quintal aberto, Ctrl+M abre a janela do mapa (_YardToMap).
             s.abrir_mapa();
             println!("mapa aberto (modo {})", s.partida.estado.vistas.modo_mapa);
             return Resposta::Tratada;
         }
-        m.janela.aplicar(a, &mut s.partida.estado);
-        println!("quintal: {a:?} (modo {})", s.partida.estado.vistas.modo_quintal);
+        aplicar_acao_quintal(s, a, true);
         return Resposta::Tratada;
     }
     Resposta::Seguir
@@ -234,9 +223,9 @@ pub fn soltar(s: &mut Sessao) {
     experimental::soltar(&mut s.modos.controle_exp);
 }
 
-/// Clique (esquerdo ou direito) em (x, y) da área cliente. `duplo`: duplo clique do SDL; `ctrl`: Ctrl
-/// apertado (inverte muro, cavar, comida e cheiro no Experimental).
-pub fn clique(s: &mut Sessao, x: i32, y: i32, duplo: bool, ctrl: bool) -> Resposta {
+/// Clique com um "popup" dos modos aberto ("Select a Game" do Ctrl+N, menu de ferramentas do
+/// Experimental): eles ficam por cima das janelas e recebem o clique antes delas.
+pub fn clique_popup(s: &mut Sessao, x: i32, y: i32) -> Resposta {
     if s.modos.escolhendo {
         return match s.modos.selecao.escolha_em(x, y) {
             Some(e) => escolher(s, e),
@@ -247,49 +236,69 @@ pub fn clique(s: &mut Sessao, x: i32, y: i32, duplo: bool, ctrl: bool) -> Respos
         clique_no_menu(s, x, y);
         return Resposta::Tratada;
     }
-    if !s.modos.janela.aberta && s.tela.objetos_da_faixa_em(x, y).contains(&s.modos.menu.cfg.botao.as_str()) {
+    Resposta::Seguir
+}
+
+/// Uma ação do quintal (tecla ou botão da faixa) com o gerenciador de janelas: o Patch é
+/// `_YardToMap`; abrir ou trocar de modo por tecla traz o quintal para a frente (`_MapToYard`).
+pub fn aplicar_acao_quintal(s: &mut Sessao, a: AcaoQuintal, trazer: bool) {
+    match a {
+        AcaoQuintal::ParaMapa => s.quintal_para_mapa(),
+        AcaoQuintal::Fechar => {
+            let id = s.janelas.cfg.quintal;
+            s.fechar_janela(id, false);
+        }
+        _ => {
+            let aberta = s.janelas.aberta(Controle::Quintal);
+            s.modos.janela.aplicar(a, &mut s.partida.estado);
+            let abre = matches!(
+                a,
+                AcaoQuintal::Abrir | AcaoQuintal::ModoQuintal | AcaoQuintal::ModoCasa | AcaoQuintal::ModoEstrategico | AcaoQuintal::ModoGrafico | AcaoQuintal::AlternarCasa
+            );
+            if abre && (trazer || !aberta) {
+                s.abrir_quintal();
+            }
+        }
+    }
+    println!("quintal: {a:?} (modo {})", s.partida.estado.vistas.modo_quintal);
+}
+
+/// Clique fora das janelas (na faixa): botão de ferramentas e botão Yard na faixa 34; os botões da
+/// faixa 35 quando ela está na tela.
+pub fn clique_na_faixa(s: &mut Sessao, x: i32, y: i32) -> Resposta {
+    if s.modos.janela.na_frente {
+        // Faixa 35 no lugar da 34.
+        if y < i32::from(s.interface.moldura.faixa.altura) {
+            if let Some(a) = s.modos.quintal.acao_da_faixa_em(x, y) {
+                aplicar_acao_quintal(s, a, false);
+            }
+            return Resposta::Tratada;
+        }
+        return Resposta::Seguir;
+    }
+    let objetos = s.tela.objetos_da_faixa_em(x, y);
+    if objetos.contains(&s.modos.menu.cfg.botao.as_str()) {
         botao_ferramentas(s);
         return Resposta::Tratada;
     }
-    let m = &mut s.modos;
-    if !m.janela.aberta {
-        let abre = s.tela.objetos_da_faixa_em(x, y).contains(&m.quintal.cfg.botao_abrir.as_str());
-        if abre {
-            m.janela.aplicar(quintal_mapa::AcaoQuintal::Abrir, &mut s.partida.estado);
-            println!("quintal aberto (modo {})", s.partida.estado.vistas.modo_quintal);
-            return Resposta::Tratada;
-        }
-        if s.partida.estado.partida.tipo_jogo == 3 && ferramenta_no_mapa(s, x, y, ctrl, false) {
-            return Resposta::Tratada;
-        }
-        return Resposta::Seguir;
-    }
-    // Faixa 35 no lugar da 34.
-    if y < i32::from(s.interface.moldura.faixa.altura) {
-        if let Some(a) = m.quintal.acao_da_faixa_em(x, y) {
-            m.janela.aplicar(a, &mut s.partida.estado);
-            println!("quintal: {a:?} (modo {})", s.partida.estado.vistas.modo_quintal);
-        }
+    if objetos.contains(&s.modos.quintal.cfg.botao_abrir.as_str()) {
+        aplicar_acao_quintal(s, AcaoQuintal::Abrir, true);
         return Resposta::Tratada;
     }
-    let cfg = &m.quintal.cfg;
-    let [ex, ey, ew, eh] = s.tela.cfg.edicao.moldura.externo;
-    let na_edicao = x >= i32::from(ex) && x < i32::from(ex + ew) && y >= i32::from(ey) && y < i32::from(ey + eh);
-    let no_quintal = cfg.contem(x, y) && (m.janela.na_frente || !na_edicao);
-    if !no_quintal {
-        // Clique fora: a janela de edição (se for ela) vem para a frente e recebe o clique.
-        if na_edicao {
-            m.janela.na_frente = false;
-        }
-        // _processExp: no Experimental, todo clique no mapa vai para a ferramenta.
-        if s.partida.estado.partida.tipo_jogo == 3 && ferramenta_no_mapa(s, x, y, ctrl, false) {
-            return Resposta::Tratada;
-        }
-        return Resposta::Seguir;
-    }
-    match quintal_mapa::clicar(&mut m.janela, cfg, &mut s.partida, x, y, duplo) {
+    Resposta::Seguir
+}
+
+/// Clique na área cliente da janela de edição: no Experimental, vai para a ferramenta
+/// (`_processExp`). Devolve se tratou.
+pub fn clique_na_edicao(s: &mut Sessao, x: i32, y: i32, ctrl: bool) -> bool {
+    s.partida.estado.partida.tipo_jogo == 3 && ferramenta_no_mapa(s, x, y, ctrl, false)
+}
+
+/// Clique na área cliente do quintal (que é a janela da frente): patch, troca de patch, PLACE.
+pub fn clique_no_quintal(s: &mut Sessao, x: i32, y: i32, duplo: bool) {
+    let m = &mut s.modos;
+    match quintal_mapa::clicar(&mut m.janela, &m.quintal.cfg, &mut s.partida, x, y, duplo) {
         Ok(r) => println!("quintal: clique {} em ({x}, {y}): {r:?}", if duplo { "duplo" } else { "simples" }),
         Err(e) => eprintln!("quintal: {e}"),
     }
-    Resposta::Tratada
 }
