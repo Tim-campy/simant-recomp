@@ -6,7 +6,7 @@
 use serde::Deserialize;
 
 use super::edicao::VistaEdicao;
-use super::mapa::ALTURA;
+use super::mapa::{Plano, ALTURA};
 use super::tela_jogo::{vista_do_save, PosicaoVista};
 use super::vida::{plano_de, FormigaAmarela};
 use crate::formats::save::JogoSalvo;
@@ -221,6 +221,20 @@ impl Navegacao {
         antes != (self.plano_mapa, self.vista)
     }
 
+    /// `_SetMapPlane(0)` (`1000:a5ca`, com `_SetMapPlaneLocation(0, …)`): o plano mostrado passa a 0,
+    /// o do quintal. A janela de edição mostra então o mapa da superfície (os planos 0 e 1 desenham
+    /// o mesmo mapa), **sem** centralizar: a vista fica com o canto que tinha (no ninho, as mesmas
+    /// coordenadas, agora na superfície). `_YMapPnt` recebe o patch atual (`_CurYardPnt`).
+    /// [código; bancada p01: do ninho preto, a edição passa a mostrar a superfície no mesmo canto.]
+    pub fn ir_para_quintal(&mut self, patch: (i32, i32)) -> bool {
+        let antes = (self.plano_mapa, self.vista);
+        self.plano_mapa = 0;
+        self.vista.plano = Plano::Superficie;
+        self.pontos[0] = patch;
+        self.vista.limitar();
+        antes != (self.plano_mapa, self.vista)
+    }
+
     /// Parte de vista de `_GotoMyAnt` (`1000:a764`): se a amarela está no plano mostrado (> 0),
     /// `_CenterEdit` na posição dela; senão, `_SetMapPlaneLocation` para o plano dela.
     pub fn ir_para_amarela(&mut self, plano: i16, x: i32, y: i32) -> bool {
@@ -270,7 +284,6 @@ impl Repeticao {
 #[cfg(test)]
 mod testes {
     use super::*;
-    use crate::core::mapa::Plano;
 
     fn nav(plano_mapa: i16, x: i32, y: i32) -> Navegacao {
         let plano = plano_de(plano_mapa).unwrap();

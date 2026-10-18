@@ -255,6 +255,11 @@ pub fn aplicar_acao_quintal(s: &mut Sessao, a: AcaoQuintal, trazer: bool) {
                 a,
                 AcaoQuintal::Abrir | AcaoQuintal::ModoQuintal | AcaoQuintal::ModoCasa | AcaoQuintal::ModoEstrategico | AcaoQuintal::ModoGrafico | AcaoQuintal::AlternarCasa
             );
+            // _ProcMenu 0x21–0x24 (Ctrl+Y/5/6/7): _SetMapPlane(0) se _MapPlane ≠ 0, antes de abrir.
+            let tecla_de_modo = matches!(a, AcaoQuintal::ModoQuintal | AcaoQuintal::ModoCasa | AcaoQuintal::ModoEstrategico | AcaoQuintal::ModoGrafico);
+            if trazer && tecla_de_modo && s.partida.nav.plano_mapa != 0 {
+                s.partida.ir_para_quintal();
+            }
             if abre && (trazer || !aberta) {
                 s.abrir_quintal();
             }
@@ -342,8 +347,21 @@ mod testes {
         // Bancada (qemu_patch_rolagem.txt, p01–p06): o mesmo lugar da faixa é o Yard da 34 e o Patch
         // da 35; seis cliques alternam quintal (faixa 35) e mapa da superfície (faixa 34), sempre
         // com o modo do quintal mantido. Nunca fecha as duas.
+        assert_eq!(s.partida.nav.plano_mapa, 2, "QUICK2.ANT abre no ninho preto");
         for i in 0..6 {
+            let canto = (s.partida.nav.vista.x, s.partida.nav.vista.y);
             clicar(&mut s, x, y);
+            if i % 2 == 0 {
+                // _MapToYard → _SetMapPlane(0): a edição mostra a superfície no mesmo canto (p01, p03).
+                assert_eq!(s.partida.nav.plano_mapa, 0, "clique {i}: _MapPlane 0");
+                assert_eq!(s.partida.nav.vista.plano, engine::core::mapa::Plano::Superficie);
+                assert_eq!((s.partida.nav.vista.x, s.partida.nav.vista.y), canto, "clique {i}: sem centralizar");
+                assert_eq!(s.partida.estado.vistas.plano, 0);
+                assert_eq!(s.partida.estado.vistas.plano_anterior, 0);
+                let p = s.partida.estado.ambiente.patch;
+                assert_eq!(s.partida.nav.pontos[0], (i32::from(p.0), i32::from(p.1)), "_YMapPnt = _CurYardPnt");
+                s.quadro_rgb().unwrap();
+            }
             let estado = (s.janelas.gerente.topo(), s.janelas.aberta(Controle::Quintal), s.janelas.aberta(Controle::Mapa), s.modos.janela.na_frente);
             if i % 2 == 0 {
                 assert_eq!(estado, (Some(quintal), true, false, true), "clique {i}: quintal na frente, faixa 35");
