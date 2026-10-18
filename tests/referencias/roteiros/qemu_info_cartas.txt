@@ -1,0 +1,71 @@
+# Cartões do Info e popups de definição (docs/spec/telas/info.md). Pré-requisitos:
+# re_trabalho/info_cartas/ov.qcow2 = cópia do overlay com o snapshot "quick";
+# re_trabalho/info_cartas/a.img = disquete com PORT50.ANT (o mesmo de qemu_janelas.txt).
+# Área do cartão (infoArea) na tela: canto em (281, 259); cliques = canto + centro da área do PICT.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_info_cartas.txt --overlay re_trabalho/info_cartas/ov.qcow2
+snapshot_carregar quick
+esperar 2
+disquete re_trabalho/info_cartas/a.img
+esperar 1
+teclas ctrl+l
+esperar 3
+teclas n
+esperar 3
+digitar A
+teclas shift+semicolon
+digitar PORT50
+esperar 1
+teclas ret
+esperar 5
+clicar_em 105 97
+esperar 3
+capturar re_trabalho/info_cartas/c128.png
+# Social Insects (134) -> Ants (135)
+clicar_em 337 296
+esperar 3
+capturar re_trabalho/info_cartas/c134.png
+clicar_em 313 286
+esperar 3
+capturar re_trabalho/info_cartas/c135.png
+# BACK -> Social Insects -> Termites (136); TOP -> Ant Anatomy (130)
+clicar_em 330 449
+esperar 3
+clicar_em 388 325
+esperar 3
+capturar re_trabalho/info_cartas/c136.png
+# (barra 21004: BACK (17..81), PREVIOUS (128..192), TOP (239..303))
+clicar_em 552 449
+esperar 3
+# Ant Anatomy (130) -> Head (131) e os popups -912 (em cima) e -911 (embaixo)
+clicar_em 337 310
+esperar 3
+capturar re_trabalho/info_cartas/c130.png
+clicar_em 399 357
+esperar 3
+capturar re_trabalho/info_cartas/c131.png
+ir_para 404 284
+apertar
+esperar 3
+capturar re_trabalho/info_cartas/p912.png
+soltar
+esperar 2
+ir_para 322 382
+apertar
+esperar 3
+capturar re_trabalho/info_cartas/p911.png
+soltar
+esperar 2
+# Mouth (160)
+clicar_em 388 405
+esperar 3
+capturar re_trabalho/info_cartas/c160.png
+# TOP -> Castes (139) -> Soldier (141)
+clicar_em 552 449
+esperar 3
+clicar_em 336 338
+esperar 3
+capturar re_trabalho/info_cartas/c139.png
+clicar_em 346 303
+esperar 3
+capturar re_trabalho/info_cartas/c141.png
+fim

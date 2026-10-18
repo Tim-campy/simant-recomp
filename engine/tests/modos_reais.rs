@@ -158,3 +158,31 @@ fn info_cartao_128_tem_as_figuras() {
         assert!(b.is_ok(), "bitmap {id}: {:?}", b.err());
     }
 }
+
+/// Os 53 cartões (127–179): todos com figura, textos não vazios e popups com texto; os textos com
+/// um 0 no meio (Ants, Soldier, Mouth) saem inteiros depois da limpeza de `_DisplayCard`.
+#[test]
+fn info_todos_os_cartoes_tem_figura_e_texto_inteiro() {
+    use engine::core::info::{Carta, ConfigInfo, Registro, TextoCartao};
+    let Some(r) = recursos() else { return };
+    let cfg: ConfigInfo = r.dados("info.json").unwrap();
+    for id in 127..=179u16 {
+        let c = Carta::ler(&r, &cfg, id).unwrap();
+        assert!(c.registros.iter().any(|x| matches!(x, Registro::Figura { .. })), "cartão {id} sem figura");
+        for reg in &c.registros {
+            let ids: Vec<u16> = match reg {
+                Registro::Texto { textos, .. } => textos.clone(),
+                Registro::Figura { areas, .. } => areas.iter().filter(|a| a.valor <= 0).map(|a| (-a.valor) as u16).collect(),
+            };
+            for t in ids {
+                let x = TextoCartao::ler(&r, &cfg, t).unwrap_or_else(|| panic!("cartão {id}: texto {t}"));
+                assert!(!x.bytes.is_empty() && x.bytes.iter().all(|&b| b != 0), "cartão {id}: texto {t}");
+            }
+        }
+    }
+    let texto = |id| String::from_utf8_lossy(&TextoCartao::ler(&r, &cfg, id).unwrap().bytes).into_owned();
+    assert!(texto(310).starts_with("Ants can be considered the premier social insects."));
+    assert!(texto(310).ends_with("two teeth)."));
+    assert!(texto(420).contains("larger than the workers, and have big heads"));
+    assert!(texto(212).contains("for fighting, digging") && texto(212).contains("putting it in a pouch"));
+}
