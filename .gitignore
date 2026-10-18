@@ -20,3 +20,8 @@ __pycache__/
 referencia/qemu/
 research_notes/
 .claude/
+
+# Saves de teste e SoundFonts do usuário (não versionar)
+/*.ANT
+/*.ant
+*.sf2
