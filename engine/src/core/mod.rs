@@ -1,6 +1,7 @@
 //! Estados e temporização, sem janela nem áudio.
 
 pub mod avisos;
+pub mod barras_faixa;
 pub mod carregar;
 pub mod dialogos;
 pub mod edicao;

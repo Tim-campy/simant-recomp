@@ -28,5 +28,21 @@
       "fontes_titulo": [6, 0],
       "cor_texto_titulo": 15
     }
+  },
+  "barras_faixa": {
+    "_comentario": "_DrawMapData (1010:cb60), a cada _UpdateWindows: números (_win_PrintfAtObj \"%d\", fonte 3, cor do objeto) e barras (_win_DrawHBar: cor de frente até a fração, de fundo no resto) da faixa 34, com a coluna invertida (_GInvBox) no limiar de aviso. Valores: saude_amarela (_MeHealth/100), saude_preta (_HealthB/100), saude_vermelha (_HealthR/100, 0 sem vermelhas), populacao_preta e populacao_vermelha (_BpopT ou _RpopT sobre max(1, _BpopT, _RpopT)). Marcas: aviso_saude_amarela (_MeWarnHealth), aviso_saude_colonia (_BlkWarnHealth). 'encolher': a barra pinta de esq a dir − 1 e divide pela largura dir − 1 − esq (63) [medido na bancada, qemu_barras_faixa.txt: as 15 barras das 3 capturas batem]. Ver docs/spec/telas/mensagens.md §9.",
+    "barras": [
+      {"objeto": "ribYellowHealth", "valor": "saude_amarela", "marca": "aviso_saude_amarela"},
+      {"objeto": "ribBlackHealth", "valor": "saude_preta", "marca": "aviso_saude_colonia"},
+      {"objeto": "ribBlackP", "valor": "populacao_preta"},
+      {"objeto": "ribRedHealth", "valor": "saude_vermelha"},
+      {"objeto": "ribRedP", "valor": "populacao_vermelha"}
+    ],
+    "numeros": [
+      {"objeto": "ribBlacks", "valor": "populacao_preta"},
+      {"objeto": "ribReds", "valor": "populacao_vermelha"}
+    ],
+    "fonte_numeros": 3,
+    "encolher": 1
   }
 }

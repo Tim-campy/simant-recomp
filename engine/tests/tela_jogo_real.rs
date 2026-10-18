@@ -139,7 +139,41 @@ fn botoes_da_faixa_e_outros_planos_do_quick2() {
 }
 
 // Atualizado em 2026-10-18: traço do menu de sistema e seta de maximizar na moldura (medidos em j00).
-const HASH_TELA_JOGO: &str = "aaf5079f898bdb9859f3f144f9a8f6728ce5383b3c24c0cc17a7c423604d8798";
+/// `_ELayerMode` (alarme da amarela, botões de cheiro): na superfície, a camada de feromônio entra no
+/// lugar do chão (`_DoCalcTile`). No QUICK2 o `_PherMapBN` só tem a célula (1, 16) = 254, o buraco
+/// preto: com a camada 1 mudam exatamente os tiles (2..3, 32..33) da vista.
+#[test]
+fn camada_de_cheiro_na_janela_de_edicao() {
+    use engine::core::navegacao::Acao;
+    use engine::core::tela_jogo::TelaDeJogo;
+    use engine::rules::estado::Estado;
+    let Some(r) = recursos() else { return };
+    let cfg: ConfigTelaJogo = r.dados("tela_jogo.json").unwrap();
+    let interface = Interface::carregar(&r, cfg.tabela_posicoes).unwrap();
+    let j = quick2();
+    let mut tela = TelaDeJogo::carregar(&cfg, &r, &interface, &j).unwrap();
+    let mut nav = tela.navegacao(&j, PosicaoVista::AoCarregar).unwrap();
+    nav.aplicar(Acao::Superficie);
+    (nav.vista.x, nav.vista.y) = (0, 23);
+    let mut e = Estado::de_save(&j).unwrap();
+    tela.atualizar(&e);
+    let (sem, _) = tela.compor(&r, &interface, &nav).unwrap();
+    e.camada_edicao = 1;
+    tela.atualizar(&e);
+    let (com, _) = tela.compor(&r, &interface, &nav).unwrap();
+    let diferentes: Vec<(usize, usize)> = (0..sem.pixels.len())
+        .filter(|&i| sem.pixels[i] != com.pixels[i])
+        .map(|i| (i % sem.largura, i / sem.largura))
+        .collect();
+    assert!(!diferentes.is_empty());
+    // Canto da área de tiles (24, 120); célula (2, 32) = coluna 2, linha 9 da vista.
+    let (x0, y0) = (24 + 2 * 16, 120 + 9 * 16);
+    assert!(diferentes.iter().all(|&(x, y)| (x0..x0 + 32).contains(&x) && (y0..y0 + 32).contains(&y)), "{:?}", &diferentes[..5]);
+}
+
+// 2026-10-18: com as barras e os números da faixa (core/barras_faixa.rs), conferidos contra a bancada
+// (mensagens.md §9); o resto da tela não mudou.
+const HASH_TELA_JOGO: &str = "e64b597926c6d37602354594778fdb915b6534efc64c199a5fcc57ead95a2cd9";
 
 /// Janelas de controle (janelas.md): o clique no triângulo do Caste Control (na frente) muda
 /// `_casteLevels`, passa para Manual e recalcula `_IdealCaste`; Auto e os conjuntos.

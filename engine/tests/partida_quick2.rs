@@ -51,18 +51,19 @@ fn cinquenta_ticks_do_quick2() {
 
 #[test]
 fn relogio_em_tempo_real_no_quick2() {
-    // QUICK2: _GameSpeed = 1 (normal), não pausado: 1 tick a cada 2 mensagens de 17 ms.
+    // QUICK2: _GameSpeed = 1 (normal), não pausado: o timer de 17 ms dá uma WM_TIMER a cada 55 ms e
+    // o laço de MYTIMERFUNC roda 1 tick a cada 3 delas: 6 ticks/s, como na bancada.
     let mut p = partida();
     assert_eq!(p.estado.partida.velocidade, 1);
     assert_eq!(p.estado.partida.pausado, 0);
     let antes = p.estado.partida.tempo;
     let mut ticks = 0;
     for _ in 0..100 {
-        ticks += p.avancar(17).ticks;
+        ticks += p.avancar(33).ticks;
     }
-    assert_eq!(ticks, 50);
-    assert_eq!(p.estado.partida.tempo, antes + 50);
-    assert_eq!(p.estado.ciclos_jogo, 100, "_gameCycles conta toda mensagem");
+    assert_eq!(ticks, 20, "3,3 s de tempo real");
+    assert_eq!(p.estado.partida.tempo, antes + 20);
+    assert!(p.estado.ciclos_jogo > 20 * 20, "_gameCycles conta as voltas do laço ocupado");
 }
 
 /// Salvar (`Estado::para_save`, o que Ctrl+S grava) e recarregar dá o mesmo estado, depois de 50
@@ -156,9 +157,9 @@ fn botao_de_velocidade_e_espera_do_clique() {
     let (x, y) = (p.estado.amarela.x as i32, p.estado.amarela.y as i32);
     p.clicar(x, y + 1, false);
     assert_eq!(p.avancar(329).mensagens, 0);
-    assert_eq!(p.avancar(1 + 17).mensagens, 1);
+    assert_eq!(p.avancar(1 + 55).mensagens, 1);
     p.clicar(x, y + 1, true);
-    assert_eq!(p.avancar(17).mensagens, 1);
+    assert_eq!(p.avancar(55).mensagens, 1);
 }
 
 /// File → Load (`_DoLoadInitializations`): `_FullCount` já detecta a rainha que sumiu (C-10 na
@@ -267,4 +268,26 @@ fn clique_do_place_tambem_grava_o_patch_escolhido() {
     assert!(!j.colocando_rainha);
     assert_eq!(p.estado.vistas.ponto_quintal, (5, 8));
     assert_eq!(p.nav.pontos[0], (5, 8));
+}
+
+/// "You have entered the red nest" (1010[4]) só pela passagem entre os ninhos (tile 0x14): a amarela
+/// do QUICK2 (ninho preto) recebe a ordem de ir para a célula de baixo, que vira passagem; ao chegar,
+/// passa para o ninho vermelho e a faixa mostra a mensagem (mensagens.md §2.3).
+#[test]
+fn mensagem_do_ninho_vermelho_so_pela_passagem() {
+    use engine::core::avisos::TextoFaixa;
+    let mut p = partida();
+    assert_eq!(p.estado.amarela.plano, 2);
+    p.estado.partida.opcoes[4] = 1;
+    let (x, y) = (p.estado.amarela.x as i32, p.estado.amarela.y as i32);
+    p.estado.ninho_b.mapa.definir(x, y + 1, 0x14);
+    p.clicar(x, y + 1, true);
+    let mut n = 0;
+    while p.estado.amarela.plano == 2 && n < 200 {
+        p.rodar_tick();
+        n += 1;
+    }
+    assert_eq!(p.estado.amarela.plano, 3, "atravessou");
+    let agora = p.agora();
+    assert_eq!(p.avisos.texto_da_faixa(agora), Some(&TextoFaixa::Lista { lista: 1010, indice: 4 }));
 }

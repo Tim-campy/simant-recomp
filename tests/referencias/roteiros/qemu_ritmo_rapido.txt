@@ -1,0 +1,30 @@
+# Ritmo em ultra e fast a partir do snapshot "quick" (no qemu_ritmo.txt a rainha preta morreu durante o
+# ultra e o quadro modal parou a simulação). Leituras com a VM rodando; o log dá o instante de cada uma.
+#   python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ritmo_rapido.txt --overlay re_trabalho/ritmo/ov2.qcow2
+snapshot_carregar quick
+esperar 2
+teclas shift+4
+esperar 0.5
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+esperar 20
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+capturar re_trabalho/ritmo/ultra2.png
+teclas shift+3
+esperar 0.5
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+esperar 20
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+capturar re_trabalho/ritmo/fast2.png
+teclas shift+2
+esperar 0.5
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+esperar 20
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+capturar re_trabalho/ritmo/normal2.png
+fim

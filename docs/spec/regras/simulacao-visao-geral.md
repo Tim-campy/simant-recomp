@@ -23,7 +23,7 @@ Endereços de variáveis seguem o formato do `symbols.tsv`: `segmento lógico:of
 
 `_StopSimulation` (`1000:0000`) e `_RestartSimulation` (`1000:0034`) usam um contador de aninhamento (DGROUP `0x0044`, sem nome no `.SYM`). O primeiro `Stop` mata o temporizador e descarta as mensagens `WM_TIMER` (0x113) pendentes. O temporizador só é refeito quando o contador volta a zero.
 
-[hipótese] 17 ms imita o *tick* de 1/60 s do Macintosh (o jogo é port do Mac). No Windows 3.1, porém, o temporizador tem resolução de cerca de 55 ms, e as mensagens `WM_TIMER` não se acumulam. A cadência real precisa ser medida (ver "Como testar").
+[hipótese] 17 ms imita o *tick* de 1/60 s do Macintosh (o jogo é port do Mac). No Windows 3.1, porém, o `SetTimer` tem a resolução do relógio do sistema (18,2 Hz, cerca de 55 ms): o intervalo pedido é arredondado para cima, e o temporizador de 17 ms rende **uma `WM_TIMER` a cada 55 ms**. As `WM_TIMER` não se acumulam. **Verificado na bancada** (2026-10-18, seção 3.1): as taxas medidas em slow e normal são exatamente as que o laço da seção 2 dá com mensagens a cada 55 ms, e o relógio do Mac (`⌊GetTickCount / 55⌋ × 3`) anda 9 por tick em normal (3 períodos de 55 ms). O de 170 ms sem foco viraria 220 ms (4 períodos) [hipótese: não medido].
 
 ## 2. O que `MYTIMERFUNC` faz a cada chamada
 
@@ -65,6 +65,10 @@ Consequências:
 1. **Um tick por iteração, no máximo.** Cada `_DoAntSim` é um passo; não há passo fracionário.
 2. **Laço ocupado.** Em velocidade alta, o callback roda vários ticks seguidos e só devolve o controle ao Windows depois de ver chegar pelo menos 2 novas `WM_TIMER` (ou 3), ou um clique. [hipótese] Isso faz a taxa de ticks em "fast"/"ultra" depender da CPU.
 3. **O atraso conta mensagens de timer**, não milissegundos: +1 na entrada do callback e +1 por `WM_TIMER` drenada dentro do laço.
+4. **Cada chamada consome 3 mensagens.** O laço só sai depois de drenar 2 `WM_TIMER` (com mais de 2 voltas), então uma chamada dura 3 períodos do temporizador: a mensagem que a abriu e as 2 drenadas. O atraso é testado no começo de cada volta: depois do +1 da entrada e depois do +1 da primeira drenada. O +1 da segunda drenada só é testado na chamada seguinte, que soma mais 1 na entrada. Contas, com o temporizador a 55 ms [fato visto no código; conferido na bancada, §3.1]:
+   - normal (limite 2): em regime, a entrada leva o atraso de 2 a 3 e roda o tick (atraso = 0); as duas drenadas o levam a 2, sem novo teste. **1 tick por chamada = 1 a cada 3 mensagens = 165 ms (6,06 ticks/s).**
+   - slow (limite 6): o atraso sobe 3 por chamada; o tick sai a cada 2 chamadas. **1 tick a cada 6 mensagens = 330 ms (3,03 ticks/s).** A razão slow:normal é 1:2, não 1:3.
+   - fast e ultra (limite ≤ 0): toda volta roda um tick, enquanto o laço espera as 2 drenadas: cerca de 2/3 do tempo é laço ocupado, o resto fica para o Windows (desenho, entrada). A taxa depende da CPU.
 
 Contadores usados aqui (DGROUP, sem nome no `.SYM`): `0x02EE` atraso desde o último tick; `0x02F0/0x02F2` quadros (32 bits); `0x02F4` trava de reentrada.
 
@@ -80,8 +84,27 @@ Contadores usados aqui (DGROUP, sem nome no `.SYM`): `0x02EE` atraso desde o úl
 | 3 | "Game speed now ultra." | -1 | roda em toda iteração do laço | 1 a cada 4 (`0x9B00 & 3`) |
 
 - Valor inicial: `_InitSimVars` (`1030:5a70`) põe `_GameSpeed = 1` (normal). **Verificado:** `QUICK2.ANT` traz `_GameSpeed = 1`.
-- [hipótese] Com o timer real de cerca de 55 ms, "slow" dá cerca de 3 ticks/s e "normal" cerca de 9 ticks/s. "fast" e "ultra" rodam à velocidade da CPU; "ultra" só desenha menos.
-- Impacto no port: a velocidade deve virar um **intervalo entre ticks** configurável (dado, não código), com o padrão medido no original. A lógica do tick não depende da velocidade.
+- Com o temporizador real de 55 ms, slow dá 3,03 ticks/s e normal 6,06 ticks/s (§2, consequência 4; **verificado**, §3.1). Fast e ultra rodam à velocidade da CPU; ultra desenha menos e por isso roda mais ticks por segundo.
+- A lógica do tick não depende da velocidade. O port reproduz o laço (mensagens a cada 55 ms, 3 por chamada, teste do atraso por volta) e fixa em dado o número de voltas por período (`data/partida.json`, `voltas_por_periodo`), que no original depende da CPU.
+
+### 3.1 Medição na bancada (2026-10-18)
+
+Roteiros `tests/referencias/roteiros/qemu_ritmo.txt` e `qemu_ritmo_rapido.txt` (QEMU TCG, WfW 3.11, a partir do snapshot `quick`): `GameTime` e `_gameCycles` lidos com a VM rodando, em intervalos de 20 ou 30 s do relógio do host.
+
+| Velocidade | `GameTime` | Ticks/s | `_gameCycles` por tick | Modelo (§2) |
+|---|---|---|---|---|
+| normal | 97 → 277 em 30 s; 3309 → 3426 em 20 s | 6,0; 5,85 | 208; 111 | 6,06 |
+| slow | 280 → 370 em 30 s | 3,0 | 453 | 3,03 |
+| fast | 370 → 2353 em 30 s; 2187 → 3287 em 20 s | 66 (início); 55 | 1,0 | depende da CPU |
+| ultra | 293 → 2109 em 20 s | 91 | 1,0 | depende da CPU |
+
+- Em fast e ultra, `_gameCycles` anda exatamente 1 por tick: toda volta do laço roda um tick (confirma a hipótese de [testes-tick.md](testes-tick.md)). Em slow/normal, as voltas sem tick somam 100 a 450 por tick, conforme a carga da CPU emulada.
+- Numa primeira tentativa de ultra (`qemu_ritmo.txt`), a rainha preta morreu e o quadro 10010 parou a simulação; o valor foi descartado.
+- Depois de cada Shift+1..4, a faixa **não** mostra "Game speed now …" (capturas `re_trabalho/ritmo/slow.png`, `fast.png`, `ultra.png`): ver §3.2.
+
+### 3.2 Aceleradores e botão de velocidade
+
+**Fato visto no código** (`_ProcMenu`, `1000:4fc2`, casos 0x43–0x46): o menu Speed → Slow/Normal/Fast/Ultra (e os aceleradores Shift+1..4) só gravam `_GameSpeed` e atualizam as marcas do menu e o texto do item Pause; **não** chamam `_EditMessage`. Só o botão configurável de velocidade (`_DoUserButton` caso 6) escreve "Game speed now …" na faixa. **Verificado na bancada:** depois de Shift+1, Shift+3 e Shift+4 a faixa ficou vazia ou com o conselho que já estava lá. O Pause do menu (0x41), ao contrário, escreve "Game Paused" (ou a instrução da ferramenta 10/11) e limpa ao despausar.
 
 ## 4. Pausa
 
@@ -255,7 +278,7 @@ Total = `_MeHealth` + Σ peso[i] × nota[i] × 51, com pesos `13, 17, 19, 23, 29
 
 Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md).
 
-1. **Taxa de ticks por velocidade.** Comece um Quick Game, salve (`Ctrl+A`), espere N segundos sem mexer, salve de novo com outro nome e compare `_GameTime` (offset 45740 do `.ANT`, 4 bytes). Repita nas 4 velocidades (o menu Speed alterna em ciclo). Resultado esperado: razão de cerca de 3:1 entre slow e normal [hipótese]; fast e ultra variam com a CPU do QEMU (TCG).
+1. **Taxa de ticks por velocidade.** Feito em 2026-10-18 (§3.1): roteiros `qemu_ritmo.txt` e `qemu_ritmo_rapido.txt`, que leem `GameTime` e `_gameCycles` com a VM rodando depois de cada Shift+N. Slow 3,0 e normal 6,0 ticks/s (razão 1:2); fast e ultra variam com a CPU do QEMU (TCG).
 2. **Sequência de fases.** Em saves sucessivos, confira os efeitos periódicos:
    - `_HistCnt` sobe 1 a cada 64 ticks; `_ClearHistory` (`1000:8cfc`) inicia `_HistStart = 63` e `_HistCnt = 0`. **Verificado:** em `QUICK2.ANT`, com `_GameTime` = 78, `_HistStart = 0` e `_HistCnt = 1` (uma chamada, no tick 64).
    - `_HealthB` cai 1 a cada 64 ticks sem comida.
@@ -296,7 +319,7 @@ Onde está (crate `engine`, módulo `rules`):
 
   **Para plugar uma parte:** em `rules/<assunto>.rs` (por exemplo, `ninho.rs`), escreva `impl RegrasNinho for RegrasOriginais { fn simular_ninho(...) {...} }`. Depois apague a linha vazia correspondente em `tick.rs` e acrescente `pub mod <assunto>;` em `rules/mod.rs`. Tabelas de dados de que as regras precisarem entram como campos de `RegrasOriginais` (`geracao`, `quintal`, `inimigos`, `superficie`, `feromonios`, `ninho`, `amarela`, mais a memória e a interface do tutorial), carregados por `RegrasOriginais::carregar(&Recursos)` com mods; `RegrasOriginais::default()` usa as cópias embutidas de `data/*.json`.
   - Os pontos de feromônio do tick (`_FillHoles*`, `_ColonySmell*`, `_SmoothAlarm`) chamam `RegrasSuperficie::fase_de_cheiro`, cujo padrão roda a fase de `rules/feromonios.rs` com as tabelas embutidas; `RegrasOriginais` usa as que carregou.
-  - `simulacao_liberada` (pausa, §4) e `Relogio` (atraso contado em mensagens de temporizador e `_SpeedDelayVals`, §2–3) decidem **quando** rodar um tick. A lógica do tick não depende da velocidade. Quem os usa é o laço de jogo `core/partida.rs` (`Partida::avancar`): mensagens de 17 ms (170 ms sem foco), `_gameCycles` (`Estado::ciclos_jogo`) + 1 por mensagem, voltas do laço por velocidade e redesenho de `_UpdateWindows`, com os valores de `data/partida.json`; descrição em [jogo.md](../telas/jogo.md), "Simulação ao vivo".
+  - `simulacao_liberada` (pausa, §4) e `Relogio` (atraso contado em mensagens de temporizador e `_SpeedDelayVals`, §2–3) decidem **quando** rodar um tick. A lógica do tick não depende da velocidade. Quem os usa é o laço de jogo `core/partida.rs` (`Partida::avancar`): o temporizador de 17 ms (170 ms sem foco) arredondado para a resolução de 55 ms do Windows 3.1, o laço de `MYTIMERFUNC` com 3 mensagens por chamada (§2), `_gameCycles` (`Estado::ciclos_jogo`) + 1 por volta, voltas por período por velocidade e redesenho de `_UpdateWindows`, com os valores de `data/partida.json`; descrição em [jogo.md](../telas/jogo.md), "Simulação ao vivo".
 - **Dados:** `data/simulacao.json` (`ConfigSimulacao`). Contém `atrasos_velocidade` (`_SpeedDelayVals` = 6, 2, 0, −1) e os valores iniciais de jogo novo que não saem da geração:
   - triângulos e conjuntos memorizados, `_ModeAuto`/`_CasteAuto`, botões e porcentagens de `_initControls` (`1000:cc84`);
   - `_GameSpeed` e os avisos de saúde de `_InitSimVars`;
@@ -318,7 +341,7 @@ Não verificado: nenhuma parte do tick foi comparada passo a passo com o origina
 
 ## Lacunas
 
-- Taxa real de ticks por segundo em cada velocidade (seção 3) [em aberto].
+- Taxa de fast/ultra numa máquina real (só medida no QEMU TCG, §3.1) e cadência sem foco (170 ms → 220 ms [hipótese]).
 - Detalhes de `_SimColonies`, `_DoSimYard` (menino, cachorro, gato, pássaro, cortador), `_DoAntLions`, `_MoveSpider`, `_DoPillar`/`_DoSow`, `_DoWater`: só a cadência está descrita aqui.
 - `_Feedback`: regras do tutorial e das mensagens de conselho.
 - Retorno exato de `_CalcScore` e o sentido da nota 3.

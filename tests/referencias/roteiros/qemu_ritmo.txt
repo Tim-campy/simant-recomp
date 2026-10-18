@@ -1,0 +1,43 @@
+# Ritmo da simulação por velocidade: GameTime e _gameCycles lidos com a VM rodando, em intervalos de 30 s
+# do relógio do host (o log do script dá o instante exato de cada leitura). Depois de cada Shift+N, uma
+# captura mostra a faixa de mensagens ("Game speed now ...").
+# Pré-requisito: snapshot "quick". Uso (com cópia do overlay):
+#   python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ritmo.txt --overlay re_trabalho/ritmo/ov.qcow2
+snapshot_carregar quick
+esperar 3
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+esperar 30
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+teclas shift+1
+esperar 0.3
+capturar re_trabalho/ritmo/slow.png
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+esperar 30
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+teclas shift+3
+esperar 0.3
+capturar re_trabalho/ritmo/fast.png
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+esperar 30
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+teclas shift+4
+esperar 0.3
+capturar re_trabalho/ritmo/ultra.png
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+esperar 30
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+ler_variavel _gameCycles re_trabalho/ritmo/gc.bin 4
+teclas shift+2
+esperar 0.3
+capturar re_trabalho/ritmo/normal.png
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+esperar 30
+ler_variavel GameTime re_trabalho/ritmo/gt.bin
+fim

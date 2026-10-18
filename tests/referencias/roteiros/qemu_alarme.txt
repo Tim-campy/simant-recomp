@@ -1,0 +1,24 @@
+# Alarme da amarela (tecla 0): a amarela sobe à superfície por uma ordem, liga o alarme e anda; as
+# capturas mostram a janela de edição com a camada de alarme (_ELayerMode = 0).
+#   python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_alarme.txt --overlay re_trabalho/ritmo/ov4.qcow2
+snapshot_carregar quick
+esperar 2
+clicar_em 152 56
+esperar 2
+capturar re_trabalho/ritmo/alarme_1_superficie.png
+clicar_em 230 300
+esperar 25
+capturar re_trabalho/ritmo/alarme_2_chegou.png
+ler_variavel MePlane re_trabalho/ritmo/v.bin
+ler_variavel MeLocX re_trabalho/ritmo/v.bin
+ler_variavel MeLocY re_trabalho/ritmo/v.bin
+teclas 0
+esperar 1
+capturar re_trabalho/ritmo/alarme_3_ligado.png
+ler_variavel _ELayerMode re_trabalho/ritmo/v.bin 2
+clicar_em 330 250
+esperar 15
+capturar re_trabalho/ritmo/alarme_4_andou.png
+ler_variavel MeLocX re_trabalho/ritmo/v.bin
+ler_variavel MeLocY re_trabalho/ritmo/v.bin
+fim
