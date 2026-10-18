@@ -15,6 +15,9 @@ pub struct Manifesto {
     pub versao: String,
     #[serde(default)]
     pub dependencias: Vec<String>,
+    /// Arquivos `.lua` do mod, em ordem de carga (API 0.12; ver `scripts.rs` e docs/api-mods.md).
+    #[serde(default)]
+    pub scripts: Vec<String>,
 }
 
 #[derive(Debug)]
