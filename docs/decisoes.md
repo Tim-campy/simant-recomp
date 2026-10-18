@@ -2,6 +2,12 @@
 
 Formato: data, decisão, motivo, alternativas descartadas.
 
+## 2026-10-18: Janela nítida: ciente de DPI, escala inteira por vizinho mais próximo
+
+- **Decisão:** antes do `SDL_Init`, `SDL_WINDOWS_DPI_AWARENESS = permonitorv2` e `SDL_RENDER_SCALE_QUALITY = 0`; a janela continua com resolução lógica (`set_logical_size`) e escala inteira (`set_integer_scale`), com tarjas quando o tamanho não é múltiplo.
+- **Motivo:** o usuário achou o jogo "meio borrado". Na máquina dele a tela tem escala de 125% (1920×1080 físicos, 1536×864 lógicos): sem ciência de DPI a janela de 640×442 saía em escala 1 e o Windows a ampliava 125% com filtro bilinear. Ciente de DPI, os limites da tela vêm em pixels físicos e a escala passa a 2 (1280×884), toda feita pelo renderizador. **Conferido:** a captura da janela (`--capturar-janela`) tem 0 blocos 2×2 não uniformes, só as 16 cores da paleta, e a faixa é idêntica, pixel a pixel, ao quadro exportado (`--exportar-tela-jogo`) ampliado 2×.
+- **Descartado:** escala fracionária para preencher a tela (borra ou distorce os pixels); `SDL_WINDOW_ALLOW_HIGHDPI` (no Windows o SDL 2.30 continua dando coordenadas lógicas da janela, e a conta da escala ficaria em dois sistemas).
+
 ## 2026-10-18: Fontes do Windows para títulos e diálogos: as da instalação do usuário
 
 - **Decisão:** os títulos das janelas e os diálogos do Windows (caixa de mensagem, diálogo de arquivo) usam as fontes do próprio Windows 3.1 que acompanha o jogo do usuário: `WINDOWS/SYSTEM/VGASYS.FON` (System) e `WINDOWS/SYSTEM/SSERIFE.FON` (MS Sans Serif 8, em negrito simulado como o GDI faz), lidas em tempo de execução pela lista de fontes de `data/interface.json` (índices 6 e 7). Nada delas é versionado. Sem os arquivos, cai na fonte 0 do jogo (`Gaia8x14`).
