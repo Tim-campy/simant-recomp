@@ -32,6 +32,9 @@ pub(crate) struct Opcoes {
     pub(crate) semente: Option<u32>,
     /// Roda N ticks sem janela (antes de exportar).
     pub(crate) ticks: Option<u64>,
+    /// Sem janela, depois dos `--ticks`: passa tanto tempo real (ms) na partida, para exportar um
+    /// quadro de uma animação da amarela em andamento.
+    pub(crate) avancar_ms: Option<u64>,
     /// Tipo do jogo novo (`--tipo`; padrão: Quick Game).
     pub(crate) tipo: TipoJogo,
     /// Abre a janela do quintal nesse modo (0–3) antes de mostrar ou exportar.
@@ -85,6 +88,7 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         novo_jogo: false,
         semente: None,
         ticks: None,
+        avancar_ms: None,
         tipo: TipoJogo::Rapido,
         quintal: None,
         salvar: None,
@@ -118,6 +122,7 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
             "--novo-jogo" => o.novo_jogo = true,
             "--semente" => o.semente = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
             "--ticks" => o.ticks = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
+            "--avancar-ms" => o.avancar_ms = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
             "--quintal" => o.quintal = Some(valor()?.parse().map_err(|_| format!("{a}: modo 0 a 3"))?),
             "--tipo" => {
                 let v = valor()?;

@@ -449,6 +449,24 @@ impl TelaDeJogo {
             FormigaAmarela { modo: a.modo, plano: a.plano, x: a.x, y: a.y, tipo: a.tipo, dir: a.dir, ovo: a.ovo, base: a.base };
     }
 
+    /// Mostra um quadro de animação da amarela (`_AnimYellowFight` redesenha a janela de edição a cada
+    /// quadro): troca o chão e a vida do plano animado e a marca da amarela pelos do quadro.
+    pub fn mostrar_quadro_animado(&mut self, plano: i16, q: &crate::rules::estado::QuadroAnimacao) {
+        let i = match plano {
+            2 => 1,
+            3 => 2,
+            _ => 0,
+        };
+        self.mapas[i] = q.mapa.clone();
+        let vida = match i {
+            0 => &mut self.vida.a,
+            1 => &mut self.vida.b,
+            _ => &mut self.vida.r,
+        };
+        *vida = q.vida.clone();
+        self.amarela = FormigaAmarela { plano, x: q.x, y: q.y, tipo: q.tipo, dir: q.dir, ovo: q.ovo, base: q.base, ..self.amarela };
+    }
+
     /// Célula do mapa sob o ponto (x, y) da área cliente, se ele cai na parte visível da janela de
     /// edição (jogo.md, "Clique no mapa": `(px − esquerda) / 16 + _MapPnt.x`, idem para y).
     pub fn celula_em(&self, x: i32, y: i32, nav: &Navegacao) -> Option<(i32, i32)> {

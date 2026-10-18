@@ -184,6 +184,14 @@ impl Avisos {
     }
 
     /// Texto da faixa no instante `agora` (`_DrawRibbonMessage`): vencido o prazo, a mensagem é apagada.
+    /// O texto da faixa agora, sem mexer no estado (o prazo vencido conta como sem texto).
+    pub fn texto_vigente(&self, agora: u64) -> Option<&TextoFaixa> {
+        if self.expira.is_some_and(|e| agora > e) {
+            return None;
+        }
+        self.texto.as_ref()
+    }
+
     pub fn texto_da_faixa(&mut self, agora: u64) -> Option<&TextoFaixa> {
         if self.expira.is_some_and(|e| agora > e) {
             self.texto = None;

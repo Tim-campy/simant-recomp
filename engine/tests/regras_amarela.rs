@@ -309,6 +309,40 @@ fn y11_luta_por_ordem() {
     assert_eq!(linha.iter().filter(|ev| matches!(ev, Evento::Espera(165))).count(), 5);
     assert!(linha.iter().any(|ev| matches!(ev, Evento::Som(37))), "S2 ≠ 0 em algum quadro com essa semente");
     assert!(!matches!(linha.last(), Some(Evento::Espera(_))), "sem espera depois do último quadro");
+    // Os quadros desenhados (_DoEditUpdateDraw depois de cada _MoveMyLife): a nuvem de luta (tipo
+    // 0x70) na célula da amarela, sem a vermelha (apagada antes da animação), pedidos antes da
+    // primeira espera para a interface parar a simulação desde o primeiro quadro.
+    let i = e.eventos.iter().position(|ev| matches!(ev, Evento::Animacao(_))).expect("animação da luta");
+    let primeira_espera = e.eventos.iter().position(|ev| matches!(ev, Evento::Espera(_))).unwrap();
+    assert!(i < primeira_espera);
+    let Evento::Animacao(a) = &e.eventos[i] else { unreachable!() };
+    assert_eq!((a.codigo, a.plano, a.espera_ms, a.quadros.len()), (0, 1, 165, 6));
+    assert_eq!(a.duracao_ms(), 825);
+    for q in &a.quadros {
+        assert_eq!(q.tipo, 0x70);
+        assert!((0..8).contains(&q.dir));
+        assert_eq!(q.vida[q.x as usize * 64 + q.y as usize], 0xFF);
+        assert_eq!(q.vida[14 * 64 + 10], 0, "a vermelha sai do mapa de vida durante a luta");
+    }
+}
+
+#[test]
+fn morte_com_musica_sai_no_primeiro_quadro_no_caminho_mci() {
+    // _AnimYellowFight com código 1–9 e música ligada sai quando _mySongIsDone, sempre verdadeiro no
+    // MCI: nenhum quadro desenhado, nenhum S8. Com a música desligada, 32 quadros de 165 ms.
+    for (musica, quadros) in [(1, 0usize), (0, 32)] {
+        let mut e = estado(1, 10, 10);
+        e.partida.opcoes[1] = musica;
+        e.s.definir_semente(0x4321);
+        matar_amarela(&mut e, t(), CausaMorte::Aranha);
+        let a = e.eventos.iter().find_map(|ev| if let Evento::Animacao(a) = ev { Some(a) } else { None });
+        assert_eq!(a.map_or(0, |a| a.quadros.len()), quadros, "música {musica}");
+        if musica != 0 {
+            assert_eq!(e.eventos.iter().filter(|ev| matches!(ev, Evento::Espera(_))).count(), 0);
+        } else {
+            assert_eq!(e.eventos.iter().filter(|ev| matches!(ev, Evento::Espera(165))).count(), 31);
+        }
+    }
 }
 
 #[test]

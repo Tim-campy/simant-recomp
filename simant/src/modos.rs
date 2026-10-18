@@ -268,6 +268,10 @@ pub fn aplicar_acao_quintal(s: &mut Sessao, a: AcaoQuintal, trazer: bool) {
             let id = s.janelas.cfg.quintal;
             s.fechar_janela(id, false);
         }
+        AcaoQuintal::Revoada => {
+            let armou = s.partida.botao_revoada();
+            println!("quintal: MATE {}", if armou { "armou a revoada" } else { "recusado" });
+        }
         _ => {
             let aberta = s.janelas.aberta(Controle::Quintal);
             s.modos.janela.aplicar(a, &mut s.partida.estado);

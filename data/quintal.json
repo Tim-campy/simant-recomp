@@ -1585,11 +1585,23 @@
   "enxame_teto": "_SimColonies: _SwarmCnt ≤ 50",
   "inseticida_por_formiga": "_SimKidInside: (_RpopT + _BpopT) × 8 sorteios"
  },
+  "botao_revoada": {
+    "_origem": "_ProcYardEvent 1010:a51e, comando 0x2306 (ribMate): só com _CurGameType = 2; _CastePopB[3] + [4] menos 1 se _MeType é 0x40 ou 0x20; >= 1: _FlyAwayB = 200 e 1010[6], senão som 1 e 1010[5]; fora do Jogo Completo som 1 e 1010[15]. _EditMessage(texto, 0xb4, 0, 1): importante",
+    "contagem": 200,
+    "castas": [3, 4],
+    "tipos_amarela": [64, 32],
+    "som_erro": 1,
+    "faixa_armou": {"lista": 1010, "indice": 6, "duracao": 180, "importante": true},
+    "faixa_sem_reprodutores": {"lista": 1010, "indice": 5, "duracao": 180, "importante": true},
+    "faixa_so_jogo_completo": {"lista": 1010, "indice": 15, "duracao": 180, "importante": true}
+  },
   "sons": {
-    "_origem": "docs/spec/regras/som.md: _MakeBark/_SimDog (1030:2dbc, 32ea), _SimCat, _SimBird, _FootFall, _SimKidInside (1030:20b6), _DoWater",
+    "_origem": "docs/spec/regras/som.md: _MakeBark/_SimDog (1030:2dbc, 32ea), _SimCat, _SimBird, _FootFall, _SimKidInside (1030:20b6), _DoWater; gato fugindo (_SimCat, 0xE) e _DrawMower (1010:b2c4, 0x24)",
     "latidos": [23, 21, 23, 22], "latido_cortador": 21, "gato": 13, "passaro": 7,
     "pisada": 35, "inseticida": 9,
     "menino_casa": 24, "menino_casa_quando": [[3, 20, 900], [1, 21, 903], [6, 20, 6], [3, 21, 1]],
-    "chuva": 41
+    "chuva": 41,
+    "gato_fugindo": 14,
+    "cortador": 36
   }
 }

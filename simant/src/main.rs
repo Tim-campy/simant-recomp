@@ -4,7 +4,7 @@
 //! Uso:
 //!   simant [--jogo DIR] [--dados DIR] [--mods DIR] [--exportar-telas DIR]
 //!   simant (--save ARQ.ANT | --novo-jogo [--semente N]) [--acoes a,b,...]
-//!          [--ticks N] [--botoes F,F,...] [--fechar-avisos N] [--exportar-tela-jogo ARQ.png]
+//!          [--ticks N] [--avancar-ms MS] [--botoes F,F,...] [--fechar-avisos N] [--exportar-tela-jogo ARQ.png]
 //!          [--salvar ARQ.ANT]
 //!   opções da janela: [--escala N] [--janela LxA] [--sair-apos-ms N [--capturar-janela ARQ.png]]
 //!   (padrões em data/video.json: escala 1 = 640×480 como o original; simant/src/video.rs)
@@ -320,6 +320,12 @@ fn principal() -> Result<(), String> {
             }
             s.registrar_eventos();
             println!("{n} ticks: GameTime {antes} -> {}", s.partida.estado.partida.tempo);
+        }
+        if let Some(ms) = o.avancar_ms {
+            let av = s.partida.avancar(ms);
+            s.registrar_eventos();
+            let quadro = s.partida.quadro_animado().map(|(p, q)| format!(", animação no plano {p}: tipo {:#x} dir {}", q.tipo, q.dir));
+            println!("{ms} ms: {} ticks{}", av.ticks, quadro.unwrap_or_default());
         }
         for &b in &o.botoes {
             println!("botão {b}: {:?}", s.botao_usuario(b));

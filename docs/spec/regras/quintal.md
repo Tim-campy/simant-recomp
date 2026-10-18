@@ -158,6 +158,8 @@ Observações (fato visto no código):
 - Em Tutorial e Experimental o menino passeando volta para casa em todo tick (`_CurGameType` 0 e 3 forçam o ramo "volta"); ele só vai e vem perto da porta.
 - `_BoyWait` só é iniciado (20) e nunca lido nas rotinas da simulação.
 
+**O que o jogador vê com o menino cortando a grama (bancada, 2026-10-18, `cenarios_tick.py gravar tela_menino`):** nenhuma mensagem na faixa nem quadro. Na **janela de edição** nada do menino é desenhado (nem pé, nem cortador: o código de desenho da edição não lê `_FootHere`): só as formigas somem (3/4 por passada, sem cadáver) e as pisadas deixam cadáveres; na bancada as pretas da superfície caíram de 35 para 12 e as vermelhas de 28 para 6 em ~2 s. O som é o da pisada (0x23) a cada passo no patch atual. Na **janela do mapa** (superfície, sem trilhas) aparecem o pé (1200–1203) e o cortador (1210/1211) (`_DrawMapFoot`, telas/mapa.md). Na **Yard View**: o menino empurrando o cortador, o som 0x24 do cortador a cada redesenho e os balões nº 1 ("This yard needs mowing."), 3–5 e 6 ("I've had enough of this!"). O port faz o mesmo (o som 0x24 desde 2026-10-18).
+
 ### 3.1 Pisada: `_FootFall(x, y)` (`1030:3386`)
 
 ```
@@ -328,6 +330,8 @@ se _MapA(x, y) < 0x0E:
 
 `_InitWater` chama `_PlaceDrop(i)` para i = 0..99, na ordem.
 
+**O que o jogador vê (bancada, 2026-10-18, `cenarios_tick.py gravar tela_chuva`):** a chuva **não tem mensagem própria** (nem na faixa, nem quadro): a faixa segue com os conselhos de sempre. Os sinais são: as poças azuis na superfície (janela de edição e mapa); a chuva desenhada na Yard View; o balão do menino nº 0 ("Looks like a bit of rain!", lista 4/1200) quando ele está à vista na Yard/House View; o efeito 0x29 (3,2 s) com chance 1/50 por tick; e, nos ninhos, a água subindo de baixo (ninho.md §8.4). O port faz o mesmo.
+
 **Verificado no original (caso Q-01, `tests/referencias/casos/Q-01.json`, 2026-10-17):** a partir do `QUICK2.ANT` com `_RainOn = 1`, `_RainCnt = 600`, `_ClearRainFlag = 0`, o jogo parado no tick 140 tem `_RainCnt = 538` (exatamente 1 por tick), `_RainOn = 1`, `_ClearRainFlag = 1` e `_WaterTable = 61` (três linhas inundadas em 62 ticks). Estado final: `tests/referencias/saves/Q01_T140.ANT`.
 
 ## 10. Colônias do quintal: `_SimColonies` (`1030:35f8`)
@@ -403,6 +407,8 @@ se (x, y) ≠ (px, py):
 ```
 
 ### 10.3 Revoada
+
+**O que o jogador vê (bancada, 2026-10-18, `tela_revoada` e `tela_mate`):** nenhuma mensagem quando a revoada acontece. As formigas aladas em pré-voo (M = 14/15) ficam perto do buraco e, ao decolar (M = 16), somem da superfície. Na **Yard View** o enxame aparece como pontinhos pretos e vermelhos em volta do patch atual (`_DrawSwarm`, telas/quintal.md §2.3), e o pássaro vem comê-lo (som 7). Só o botão **MATE** (Jogo Completo) escreve na faixa e no rodapé do quintal: "You have started the mating cycle", ou as recusas "Produce males and new queens first" / "Fertilize queens in Full Game only" (telas/quintal.md §3). No port o enxame e o botão MATE existem desde 2026-10-18.
 
 `_SwarmCnt*` sobe quando formigas M = 16 decolam ([superficie.md](superficie.md)) e `_QueenStorage*` com chance 1/16 em cada decolagem no Jogo Completo. O pássaro come 1/8 (arredondado para cima) do enxame e das rainhas guardadas (seção 7).
 

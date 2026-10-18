@@ -17,6 +17,7 @@ Cenários (função cenario_<nome>; cada uma prepara e devolve a lista de passos
     amarela_sup   a amarela sai do ninho e vai comer (duplo clique numa comida), volta a um buraco e luta com
               uma vermelha (duplo clique), com cliques calculados a partir de _MapPnt
     luta      duplo clique numa vermelha (ordem 3) logo depois de uma compactação da lista A
+    luta_quadros  como luta_vizinha, com a tela capturada em cada quadro de _AnimYellowFight
 Protocolo e formato: docs/spec/regras/testes-tick.md. Snapshot "rico": tests/referencias/roteiros/qemu_snapshot_rico.txt.
 """
 import argparse
@@ -446,6 +447,77 @@ def cenario_luta_vizinha(c: Sessao, saida, n):
     """A amarela (soldado, vida 100) é posta na superfície numa célula livre vizinha de uma operária
     vermelha, e o duplo clique nela dá a ordem 3: a luta vem em poucos ticks (vitória provável:
     classe 1 contra 0)."""
+    preparar_luta_vizinha(c)
+    return c.gravar(saida, n, parar=lambda d: d.ler("MeCmd") == 3 and d.ler("MeMoveMe") == 0)
+
+
+def cenario_luta_quadros(c: Sessao, saida, n):
+    """Como `luta_vizinha`, mas captura a tela em cada quadro de _AnimYellowFight (a nuvem de luta) e
+    grava a entrada do tick da luta, para comparar com o port (formiga-amarela.md §10.2)."""
+    preparar_luta_vizinha(c)
+    return quadros_da_animacao(c, saida, n)
+
+
+# _AnimYellowFight (1028:7e56): o primeiro _DoEditUpdateDraw retorna em 1028:7e86, o de cada quadro em
+# 1028:8019, e o laço dos quadros volta a 1028:7f1c (leitura do relógio no começo do quadro).
+ANIM_PRIMEIRO_DESENHO, ANIM_QUADRO, ANIM_LACO = 0x7e86, 0x8019, 0x7f1c
+
+
+def quadros_da_animacao(c: Sessao, saida, n, timeout=60):
+    """Roda até n ticks; em cada um grava a entrada (estado, vida, extras) e, se _AnimYellowFight
+    desenhar, captura a tela parada logo depois de cada _DoEditUpdateDraw (quadro_00 = o desenho antes
+    do laço; quadro_01.. = um por quadro). Para no fim do tick que animou. Alterna dois breakpoints no
+    laço para nunca continuar de um ativo."""
+    dep, mj = c.dep, c.mj
+    saida = Path(saida).resolve()
+    for _ in range(n):
+        dep.ir_entrada()
+        ex = dep.extras()
+        gt = ex["GameTime"]
+        pasta = saida / f"tick_{gt:06d}"
+        qb.gravar(pasta / "estado_antes.bin", mj.estado())
+        qb.gravar(pasta / "vida_antes.bin", dep.vida())
+        g = mj.sessao_gdb()
+        primeiro, quadro, laco = (mj.linear_codigo(6, o) for o in (ANIM_PRIMEIRO_DESENHO, ANIM_QUADRO, ANIM_LACO))
+        armados = {dep.retorno, primeiro, quadro}
+        for a in armados:
+            g.breakpoint(a)
+        quadros = []
+        try:
+            while True:
+                g.continuar_ate_parar(timeout)
+                pc, _ = dep.pc()
+                if pc == dep.retorno:
+                    break
+                if pc not in armados:
+                    raise RuntimeError(f"parada inesperada: pc linear {pc:#x}")
+                g.breakpoint(pc, False)
+                armados.discard(pc)
+                if pc == laco:
+                    g.breakpoint(quadro)
+                    armados.add(quadro)
+                    continue
+                if pc == quadro:
+                    g.breakpoint(laco)
+                    armados.add(laco)
+                nome = f"quadro_{len(quadros):02d}"
+                rel = (pasta / f"{nome}.png").relative_to(qb.RAIZ.resolve()).as_posix()
+                c.b.executar(f"capturar {rel}")
+                quadros.append({"quadro": nome, **{v: c.ler(v, sinal=True) for v in ("MeType", "MeDir", "MeLocX", "MeLocY")}})
+        finally:
+            for a in armados:
+                g.breakpoint(a, False)
+        qb.gravar(pasta / "estado_depois.bin", mj.estado())
+        qb.gravar(pasta / "vida_depois.bin", dep.vida())
+        reg = {"antes": ex, "depois": dep.extras(), "quadros": quadros}
+        (pasta / "extras.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+        c.log(f"tick {gt}: {len(quadros)} desenhos da animação")
+        if quadros:
+            return [pasta.name]
+    return []
+
+
+def preparar_luta_vizinha(c: Sessao):
     c.teclas("ctrl+8")
     time.sleep(1)
     c.entrada()
@@ -475,7 +547,6 @@ def cenario_luta_vizinha(c: Sessao, saida, n):
         c.escrever(nome, v)
     c.log(f"amarela de ({plano}, {ox}, {oy}) para a superfície em ({mx}, {my}), vizinha da vermelha em {alvo}")
     c.clicar_celula(*alvo, duplo=True, pausado=True)
-    return c.gravar(saida, n, parar=lambda d: d.ler("MeCmd") == 3 and d.ler("MeMoveMe") == 0)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -881,6 +952,96 @@ def cenario_misterio(c: Sessao, saida, n):
     tela(c, saida, "depois")
     depois = fotografar(c, saida, "depois")
     gravar_acao(saida, antes, depois, {"misterio": n})
+    return []
+
+
+def capturar_vistas(c: Sessao, saida, prefixo, vistas):
+    """Para cada (nome, teclas, segundos): teclas com a VM rodando, espera, captura a tela e grava o
+    estado (.ANT, abre no port com --save) e os extras."""
+    reg = []
+    for nome, teclas, seg in vistas:
+        c.dep.retomar()
+        if teclas:
+            c.teclas(*teclas)
+        time.sleep(seg)
+        c.mj.sessao_gdb()
+        pasta = Path(saida).resolve()
+        pasta.mkdir(parents=True, exist_ok=True)
+        (pasta / f"{prefixo}_{nome}.ANT").write_bytes(c.mj.estado())
+        ex = c.dep.extras()
+        tela(c, saida, f"{prefixo}_{nome}")
+        reg.append({"captura": f"{prefixo}_{nome}", "teclas": teclas, **ex})
+    (Path(saida).resolve() / f"{prefixo}.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"{prefixo}: {[r['captura'] for r in reg]}")
+    return []
+
+
+def cenario_tela_chuva(c: Sessao, saida, n):
+    """O que o original mostra na chuva: _GlobalKey = 0xA8 na entrada de um tick; a superfície (gotas,
+    faixa), a Yard View (Ctrl+Y, depois fechada com Ctrl+F4) e, com _RainCnt alto (a água sobe uma linha a
+    cada ~10 ticks), o ninho preto depois de n/2 e n segundos, o vermelho e a superfície de novo."""
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    c.escrever("GlobalKey", 0xA8, 2)
+    c.avancar(2)
+    c.escrever("RainCnt", 2000)
+    return capturar_vistas(c, saida, "chuva", [
+        ("superficie", [], 2), ("quintal", ["ctrl+y"], 3), ("superficie2", ["ctrl+f4", "ctrl+8"], 2),
+        ("ninho_preto_meio", ["ctrl+9"], max(n // 2, 1)), ("ninho_preto", [], max(n // 2, 1)),
+        ("ninho_vermelho", ["ctrl+0"], 2), ("superficie3", ["ctrl+8"], 2)])
+
+
+def cenario_tela_menino(c: Sessao, saida, n):
+    """O menino cortando a grama no patch atual (como `menino`): superfície, Yard View e mapa."""
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    p = c.ler("CurYardPnt")
+    px, py = p & 0xFFFF, p >> 16
+    boy_y = 38 + py * 10 + 5
+    boy_x = px * 28 + 14 + 200 - boy_y
+    for nome, v in (("NodeNum", 0x26), ("BoyHere", 3), ("BoyIsMowing", 1), ("BoyX", boy_x), ("BoyY", boy_y),
+                    ("BoyPx", px), ("BoyPy", py), ("LastMowX", px), ("LastMowY", py), ("FootHere", 1)):
+        c.escrever(nome, v)
+    return capturar_vistas(c, saida, "menino", [
+        ("superficie", [], 1), ("superficie_b", [], 1), ("quintal", ["ctrl+y"], 2), ("quintal_b", [], 1),
+        ("mapa", ["ctrl+8", "ctrl+m"], 2)])
+
+
+def cenario_tela_revoada(c: Sessao, saida, n):
+    """Revoada (como `revoada`: formigas da superfície em M = 15 e _FlyAway = 3) com enxame e rainhas
+    guardadas para o desenho do enxame: superfície e Yard View."""
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    s = c.save()
+    pretas = [i for i, f in formigas(s, "A") if not f["T"] & 0x80][:6]
+    verms = [i for i, f in formigas(s, "A") if f["T"] & 0x80][:12]
+    for i in pretas + verms:
+        c.escrever_elemento("AlistM", i, 15)
+    for nome, v in (("FlyAwayB", 3), ("FlyAwayR", 3), ("SwarmCntB", 8), ("QueenStorageB", 8), ("SwarmCntR", 6),
+                    ("QueenStorageR", 6)):
+        c.escrever(nome, v)
+    return capturar_vistas(c, saida, "revoada", [
+        ("superficie", [], 1), ("superficie_b", [], 2), ("quintal", ["ctrl+y"], 2), ("quintal_b", [], 1)])
+
+
+def cenario_tela_mate(c: Sessao, saida, n):
+    """Botão MATE da faixa do quintal (Ctrl+Y; ribMate em (214, 50) na tela da bancada): captura a faixa
+    e grava _FlyAwayB antes e depois."""
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    c.mj.sessao_gdb()
+    antes = c.ler("FlyAwayB", sinal=True)
+    clicar_tela(c, 214, 50)
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    depois = c.ler("FlyAwayB", sinal=True)
+    tela(c, saida, "mate")
+    reg = {"FlyAwayB": [antes, depois], "CurGameType": c.ler("CurGameType", sinal=True)}
+    (Path(saida).resolve() / "mate.json").write_text(json.dumps(reg) + "\n", encoding="utf-8")
+    c.log(f"MATE: {reg}")
     return []
 
 

@@ -50,6 +50,16 @@ pub fn desenhar_menino(e: &mut Estado, modo_quintal: i16) {
     }
 }
 
+/// `_DrawMower` (`1010:b2c4`), chamado por `_Draw_SimYard` nos modos 0 e 1: com o menino cortando ou
+/// guardando o cortador (`_BoyHere` 3 ou 4) e o jogo não pausado (`_GamePaused`), o efeito do
+/// cortador a cada redesenho do quintal. Sem sorteio.
+pub fn desenhar_cortador(e: &mut Estado, som: Option<u16>) {
+    let m = &e.menino;
+    if e.vistas.modo_quintal <= 1 && (m.presente == 3 || m.presente == 4) && e.partida.pausado == 0 {
+        e.pedir_som(som);
+    }
+}
+
 /// `_DrawSwarm` (`1010:bb0e`): com `_MapMode` = 0, grava o centro do enxame na tela do quintal
 /// (`_SwarmCentX = 28·px − 10·py + 178`, `_SwarmCentY = 10·py + 46`, do patch atual) e mexe cada formiga
 /// dos enxames (até `min(_SwarmCnt, 16, _QueenStorage)`): a preta fora de ±15 volta para
@@ -134,6 +144,8 @@ pub struct JanelasDesenho {
     pub edicao_na_frente: bool,
     /// A aranha aparece na janela de edição (`_PreDrawSpider`).
     pub aranha_visivel: bool,
+    /// Efeito do cortador de grama (`_DrawMower`, 0x24; `quintal.json`, `sons.cortador`).
+    pub som_cortador: Option<u16>,
 }
 
 /// Contadores do `MYTIMERFUNC`/`_UpdateWindows` que não vão no save (a interface os guarda).
@@ -176,6 +188,7 @@ pub fn redesenho_do_timer(e: &mut Estado, j: &JanelasDesenho, k: &mut Contadores
         };
         if desenha {
             passos += desenhar_quintal(e, e.vistas.modo_quintal);
+            desenhar_cortador(e, j.som_cortador);
         }
     }
     if j.edicao_aberta {

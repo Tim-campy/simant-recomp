@@ -14,7 +14,7 @@ use serde::Deserialize;
 
 use super::amarela::{self, CausaMorte, TabelasAmarela};
 use super::comum::{self, achar_na_lista_a, Direcoes};
-use super::estado::{Estado, Evento};
+use super::estado::{Estado, Evento, MensagemFaixa};
 use super::geracao::Cor;
 use super::inimigos::TabelasInimigos;
 use super::tick::{RegrasOriginais, RegrasQuintal};
@@ -178,6 +178,25 @@ pub struct SonsQuintal {
     pub menino_casa_quando: Vec<[i16; 3]>,
     /// Chuva (`_DoWater`, `S(50)` = 0; 0x29).
     pub chuva: Option<u16>,
+    /// Gato fugindo do cachorro (`_SimCat`, 0xE, com a vista do quintal; sem sorteio).
+    pub gato_fugindo: Option<u16>,
+    /// Cortador de grama (`_DrawMower`, 0x24): pedido pelo desenho do quintal (`rules::desenho`).
+    pub cortador: Option<u16>,
+}
+
+/// Botão MATE (`ribMate`, comando 0x2306 de `_ProcYardEvent`, `1010:a51e`): arma a revoada preta.
+#[derive(Clone, Debug, Deserialize)]
+pub struct BotaoRevoada {
+    /// `_FlyAwayB` armado (200).
+    pub contagem: i16,
+    /// Castas (`_CastePopB`) que contam como reprodutores (3 e 4: machos e rainhas novas).
+    pub castas: Vec<usize>,
+    /// `_MeType` que não conta (a amarela macho 0x20 ou rainha alada 0x40 é um dos reprodutores).
+    pub tipos_amarela: Vec<i16>,
+    pub som_erro: Option<u16>,
+    pub faixa_armou: MensagemFaixa,
+    pub faixa_sem_reprodutores: MensagemFaixa,
+    pub faixa_so_jogo_completo: MensagemFaixa,
 }
 
 /// Conteúdo de `data/quintal.json`.
@@ -195,6 +214,9 @@ pub struct TabelasQuintal {
     pub mensagens: Mensagens,
     #[serde(default)]
     pub sons: SonsQuintal,
+    /// Botão MATE da faixa do quintal (API 0.18; ausente: o botão não faz nada).
+    #[serde(default)]
+    pub botao_revoada: Option<BotaoRevoada>,
     /// Tabelas do tutorial e dos conselhos (docs/spec/regras/conselhos.md).
     pub conselhos: super::conselhos::TabelasConselhos,
 }
@@ -436,6 +458,32 @@ fn chuva(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
 
 /// O começo da chuva dentro de `_DoSimYard` (depois do sorteio): `_RainOn = 1`, duração
 /// `SRand1(150) + 150`, `_InitWater` (100 gotas, R) e o balão 0 do menino. Também para a API de mods.
+/// Botão MATE (`_ProcYardEvent` 0x2306; telas/quintal.md §3): no Jogo Completo, com pelo menos um
+/// reprodutor preto além da amarela, arma a revoada (`_FlyAwayB` = 200); senão som de erro. Em
+/// todos os casos uma mensagem importante na faixa. Devolve se armou. Sem sorteio.
+pub fn botao_revoada(e: &mut Estado, t: &TabelasQuintal) -> bool {
+    let Some(b) = &t.botao_revoada else { return false };
+    let (armou, msg) = if e.partida.tipo_jogo != 2 {
+        (false, b.faixa_so_jogo_completo)
+    } else {
+        let mut n: i32 = b.castas.iter().map(|&c| i32::from(e.preta.castas.get(c).copied().unwrap_or(0))).sum();
+        if b.tipos_amarela.contains(&e.amarela.tipo) {
+            n -= 1;
+        }
+        if n < 1 {
+            (false, b.faixa_sem_reprodutores)
+        } else {
+            e.preta.revoada = b.contagem;
+            (true, b.faixa_armou)
+        }
+    };
+    if !armou {
+        e.pedir_som(b.som_erro);
+    }
+    e.eventos.push(Evento::MensagemFaixa(msg));
+    armou
+}
+
 pub fn comecar_chuva(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
     let r = &t.regras;
     e.ambiente.chovendo = 1;
@@ -1071,6 +1119,9 @@ fn gato(e: &mut Estado, t: &TabelasQuintal, rel: Relogios) {
             let b = &mut e.bichos;
             b.gato_ligado = 3;
             b.gato_quadro = 20;
+            if vista_do_quintal(e) {
+                e.pedir_som(t.sons.gato_fugindo);
+            }
         }
     }
 }
