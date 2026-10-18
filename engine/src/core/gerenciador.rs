@@ -1070,7 +1070,7 @@ fn texto_a_esquerda(q: &mut Quadro, f: &Fonte, texto: &str, x: i16, topo: i16, f
     let alt = f.altura() as i16;
     q.texto(Retangulo { esq: x, topo, dir: x + w, base: topo + alt }, f, &bytes, 0, frente, fundo);
     if let Some(p) = texto.find('&') {
-        let antes = f.largura_texto(texto[..p].as_bytes()) as i32;
+        let antes = f.largura_texto(&texto.as_bytes()[..p]) as i32;
         let letra = texto.as_bytes().get(p + 1).copied().unwrap_or(b' ');
         let lw = f.largura_texto(&[letra]) as i32;
         let yb = i32::from(topo) + f.ascendente() as i32 + 1;
