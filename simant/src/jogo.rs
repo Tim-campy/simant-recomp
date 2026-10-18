@@ -249,6 +249,11 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                         redesenhar |= s.mover_nas_janelas(x, y);
                         continue;
                     }
+                    if mousestate.left() && modos::mover_no_menu(s, x, y) {
+                        // Menu de ferramentas do Experimental: realce segue o mouse.
+                        redesenhar = true;
+                        continue;
+                    }
                     let nas_janelas = mousestate.left() && s.janelas.mover(s.recursos, &mut s.partida.estado, x, y).unwrap_or(false);
                     if nas_janelas || (mousestate.left() && modos::mover(s, x, y, ctrl_apertado(&eventos))) {
                         redesenhar = true;
@@ -398,6 +403,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     redesenhar = true;
                 }
                 Event::MouseButtonUp { mouse_btn: MouseButton::Left, x, y, .. } => {
+                    redesenhar |= modos::soltar_no_menu(s, x, y);
                     if s.menu.is_some() {
                         s.soltar_menu(x, y, shift_apertado(&eventos));
                         redesenhar = true;
@@ -443,7 +449,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         }
         // Com o "Select a Game" aberto (Ctrl+N), a simulação fica parada (_SetPause(1) em _NewGame).
         s.atualizar_janelas_desenho(minimizada);
-        if !s.modos.escolhendo && s.dialogo.is_none() && s.exame.is_none() && !modos::segurando(s) && s.menu_mod.is_none() {
+        if !s.modos.escolhendo && !s.modos.menu_aberto && s.dialogo.is_none() && s.exame.is_none() && !modos::segurando(s) && s.menu_mod.is_none() {
             s.partida.avancar(ms);
         }
         let pedidos = s.registrar_eventos();

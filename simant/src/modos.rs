@@ -93,8 +93,7 @@ pub fn desenhar(s: &Sessao, q: &mut Quadro) -> Result<Vec<String>, String> {
     let m = &s.modos;
     let mut pendentes = Vec::new();
     if m.menu_aberto {
-        let atual = Ferramenta::de_i16(s.partida.estado.partida.ferramenta_experimental);
-        pendentes.extend(m.menu.desenhar(q, s.recursos, &s.interface, atual));
+        pendentes.extend(m.menu.desenhar(q, s.recursos, &s.interface));
     }
     if m.escolhendo {
         pendentes.extend(desenhar_janela_na_tela(q, s.recursos, &s.interface, m.selecao.cfg.janela)?);
@@ -182,7 +181,8 @@ fn botao_ferramentas(s: &mut Sessao) {
         }
         3 => {
             if let Some(r) = s.tela.retangulo_da_faixa(&s.modos.menu.cfg.botao) {
-                s.modos.menu.abrir(r);
+                let atual = Ferramenta::de_i16(s.partida.estado.partida.ferramenta_experimental);
+                s.modos.menu.abrir(r, atual);
                 s.modos.menu_aberto = true;
             }
         }
@@ -227,6 +227,30 @@ fn ferramenta_no_mapa(s: &mut Sessao, x: i32, y: i32, ctrl: bool, arrasto: bool)
     };
     s.modos.controle_exp = ctl;
     tratar_efeitos(s, efeitos);
+    true
+}
+
+/// Menu de ferramentas aberto (`_DoExpMenu`, menu "de proximidade"): o mouse andando com o botão
+/// apertado realça o item sob ele e abre o submenu dele. Devolve se o menu está aberto.
+pub fn mover_no_menu(s: &mut Sessao, x: i32, y: i32) -> bool {
+    if !s.modos.menu_aberto {
+        return false;
+    }
+    let _ = s.modos.menu.item_em(x, y);
+    true
+}
+
+/// Botão solto com o menu de ferramentas aberto: escolhe o item sob o mouse (do menu ou do submenu)
+/// e fecha; solto fora (inclusive no próprio botão da faixa), fecha sem escolher [bancada: i05/i06].
+/// Devolve se o menu estava aberto.
+pub fn soltar_no_menu(s: &mut Sessao, x: i32, y: i32) -> bool {
+    if !s.modos.menu_aberto {
+        return false;
+    }
+    if s.modos.menu.contem(x, y) {
+        clique_no_menu(s, x, y);
+    }
+    s.modos.menu_aberto = false;
     true
 }
 
@@ -503,6 +527,33 @@ mod testes {
         if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
             crate::salvar_png(&PathBuf::from(saida).join("info_exame.png"), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
         }
+        s.exame = None;
+        // Menu de ferramentas como no original (i05/i06): apertar o botão abre com a Info realçada;
+        // soltar no próprio botão fecha sem escolher; apertar, arrastar até BARRIERS e soltar escolhe.
+        s.partida.estado.partida.ferramenta_experimental = Ferramenta::Info as i16;
+        let (bx, by) = (354, 70 - 37);
+        clique_na_faixa(&mut s, bx, by);
+        assert!(s.modos.menu_aberto);
+        assert_eq!(s.modos.menu.realce, Some(Ferramenta::Info));
+        let rgb = s.quadro_rgb().unwrap();
+        if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+            crate::salvar_png(&PathBuf::from(saida).join("menu_ferramentas.png"), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
+        }
+        assert!(soltar_no_menu(&mut s, bx, by));
+        assert!(!s.modos.menu_aberto);
+        assert_eq!(s.partida.estado.partida.ferramenta_experimental, Ferramenta::Info as i16);
+        clique_na_faixa(&mut s, bx, by);
+        let r = s.tela.retangulo_da_faixa(&s.modos.menu.cfg.botao).unwrap();
+        let o = s.modos.menu.origem;
+        // Item 3 (formiga) do menu: os itens começam 3 pixels abaixo do canto do objeto 0 e têm 17 de
+        // altura; soltar nele escolhe a ferramenta 3 com a subopção atual (o submenu abre ao lado).
+        let (ix, iy) = (i32::from(o.0) + 40, i32::from(o.1) + 3 + 17 * 3 + 8);
+        assert!(r.base <= o.1);
+        assert!(mover_no_menu(&mut s, ix, iy));
+        assert_eq!(s.modos.menu.realce, Some(Ferramenta::Formiga));
+        assert!(soltar_no_menu(&mut s, ix, iy));
+        assert_eq!(s.partida.estado.partida.ferramenta_experimental, Ferramenta::Formiga as i16);
+        assert!(!s.modos.menu_aberto);
     }
 
     /// Bancada (qemu_ui_barras_direito.txt, 2026-10-18): segurar o botão no número da população preta
