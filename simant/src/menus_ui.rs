@@ -368,3 +368,141 @@ pub fn compor(s: &Sessao, cliente: &[u8]) -> Vec<u8> {
     }
     rgb
 }
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+    use crate::{ConfigJogo, Origem};
+    use engine::paleta::Paleta;
+    use engine::rules::geracao::TipoJogo;
+    use engine::rules::rng::GeradorR;
+    use std::path::PathBuf;
+    use engine::core::barra_menus::Estado;
+
+    fn raiz() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
+    }
+
+    fn com_sessao(f: impl FnOnce(&mut Sessao)) {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
+        let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
+        f(&mut s);
+    }
+
+    fn tecla(k: sdl2::keyboard::Keycode, m: sdl2::keyboard::Mod) -> Event {
+        Event::KeyDown { timestamp: 0, window_id: 0, keycode: Some(k), scancode: None, keymod: m, repeat: false }
+    }
+
+    fn clique(x: i32, y: i32) -> Event {
+        Event::MouseButtonDown { timestamp: 0, window_id: 0, which: 0, mouse_btn: sdl2::mouse::MouseButton::Left, clicks: 1, x, y }
+    }
+
+    fn soltar(x: i32, y: i32) -> Event {
+        Event::MouseButtonUp { timestamp: 0, window_id: 0, which: 0, mouse_btn: sdl2::mouse::MouseButton::Left, clicks: 1, x, y }
+    }
+
+    /// Itens pelo mouse e pelo teclado, como na bancada (m01–m11, n05): o mouse apertado no título,
+    /// arrastado até o item e solto escolhe; Alt+O e a letra sublinhada também.
+    #[test]
+    fn itens_pelo_mouse_e_pelo_teclado() {
+        use sdl2::keyboard::{Keycode, Mod};
+        com_sessao(|s| {
+            let silly = s.partida.estado.partida.opcoes[5];
+            // Options (título em x 154–219) → Silly (6.º item: topo 18 + 1 + 5 × 18).
+            assert!(matches!(evento(s, clique(170, 5), false), Filtro::Tratada(true)));
+            assert!(s.menus.prende_simulacao());
+            let y = 18 + 1 + 5 * 18 + 5;
+            assert!(matches!(evento(s, Event::MouseMotion { timestamp: 0, window_id: 0, which: 0, mousestate: sdl2::mouse::MouseState::from_sdl_state(1), x: 170, y, xrel: 0, yrel: 0 }, false), Filtro::Tratada(true)));
+            match evento(s, soltar(170, y), false) {
+                Filtro::Comando(c) => assert_eq!(executar(s, c, None), Depois::Nada),
+                f => panic!("{f:?}"),
+            }
+            assert_eq!(s.partida.estado.partida.opcoes[5], i16::from(silly == 0));
+            assert_eq!(s.menus.barra.estado, Estado::Fechado);
+            // Alt+S e Enter: o Pause (primeiro item) pausa, e o texto vira "Un&pause".
+            let pausado = s.partida.estado.partida.pausado;
+            evento(s, tecla(Keycode::S, Mod::LALTMOD), false);
+            assert_eq!(s.menus.barra.estado, Estado::Aberto { menu: 4, item: Some(0) });
+            match evento(s, tecla(Keycode::Return, Mod::NOMOD), false) {
+                Filtro::Comando(c) => {
+                    executar(s, c, None);
+                }
+                f => panic!("{f:?}"),
+            }
+            assert_ne!(s.partida.estado.partida.pausado, pausado);
+            let e = estado_menus(s);
+            assert_eq!(s.menus.barra.texto_item(4, 0, &e), if e.pausado { "Un&pause\tShift+0" } else { "&Pause\tShift+0" });
+            // Fora da barra, o clique vai para o jogo com o y da área cliente.
+            match evento(s, clique(300, 200), false) {
+                Filtro::Passar(Event::MouseButtonDown { y, .. }) => assert_eq!(y, 200 - s.menus.altura()),
+                f => panic!("{f:?}"),
+            }
+        });
+    }
+
+    /// Ctrl+T abre o Status (a simulação continua); clique fecha. About pausa e devolve a pausa.
+    /// Ctrl+Q pergunta; No sai.
+    #[test]
+    fn status_about_e_quit() {
+        use sdl2::keyboard::{Keycode, Mod};
+        com_sessao(|s| {
+            match evento(s, tecla(Keycode::T, Mod::LCTRLMOD), false) {
+                Filtro::Comando(c) => {
+                    executar(s, c, None);
+                }
+                f => panic!("{f:?}"),
+            }
+            assert!(s.menus.status && !s.menus.prende_simulacao());
+            s.quadro_rgb().unwrap();
+            assert!(matches!(evento(s, clique(10, 300), false), Filtro::Tratada(true)));
+            assert!(!s.menus.status);
+            s.partida.definir_pausa(false);
+            executar(s, ComandoMenu::Sobre, None);
+            assert_eq!(s.partida.estado.partida.pausado, 1);
+            s.quadro_rgb().unwrap();
+            // O primeiro clique só começa a rolagem; depois de alguns passos, fecha e despausa.
+            evento(s, clique(300, 300), false);
+            assert!(s.menus.sobre.is_some());
+            for _ in 0..5 {
+                let cfg = s.menus.barra.cfg.sobre.clone();
+                let sobre = s.menus.sobre.as_mut().unwrap();
+                sobre.passos += 1;
+                sobre.passar_tempo(&cfg, 0);
+            }
+            evento(s, clique(300, 300), false);
+            assert!(s.menus.sobre.is_none());
+            assert_eq!(s.partida.estado.partida.pausado, 0);
+            // Quit: a pergunta; No = sair.
+            match evento(s, tecla(Keycode::Q, Mod::LCTRLMOD), false) {
+                Filtro::Comando(c) => {
+                    executar(s, c, None);
+                }
+                f => panic!("{f:?}"),
+            }
+            assert!(matches!(s.dialogo, Some(crate::arquivos::Dialogo::PerguntaSair(_))));
+            assert_eq!(s.tecla_no_dialogo("N"), crate::arquivos::RespostaDialogo::Sair);
+        });
+    }
+
+    /// "Load Game" do "Select a Game" na partida abre o File → Load (a pergunta, com a partida mudada).
+    #[test]
+    fn load_game_do_select_a_game() {
+        com_sessao(|s| {
+            s.modos.escolhendo = true;
+            match crate::modos::escolher(s, engine::core::selecao::Escolha::Carregar) {
+                crate::modos::Resposta::NovoJogo(e) => assert_eq!(e, engine::core::selecao::Escolha::Carregar),
+                _ => panic!("Load Game deve chegar ao laço da janela"),
+            }
+            assert!(!s.modos.escolhendo);
+        });
+    }
+}

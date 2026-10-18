@@ -125,8 +125,8 @@ pub fn tecla(s: &mut Sessao, ev: &EventoNav) -> Resposta {
         };
     }
     if m.selecao.cfg.novo_jogo.bate(ev) {
-        m.escolhendo = true;
-        println!("File > New Game: Select a Game");
+        // Ctrl+N = File → New (_ProcMenu 3): a música e o "Select a Game".
+        super::menus_ui::executar(s, engine::core::barra_menus::ComandoMenu::Novo, None);
         return Resposta::Tratada;
     }
     if let Some(a) = m.quintal.cfg.acao_da_tecla(ev) {
@@ -142,7 +142,7 @@ pub fn tecla(s: &mut Sessao, ev: &EventoNav) -> Resposta {
     Resposta::Seguir
 }
 
-fn escolher(s: &mut Sessao, e: Escolha) -> Resposta {
+pub(crate) fn escolher(s: &mut Sessao, e: Escolha) -> Resposta {
     s.modos.escolhendo = false;
     match e {
         Escolha::Cancelar => Resposta::Tratada,
