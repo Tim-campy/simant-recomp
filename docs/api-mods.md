@@ -1,6 +1,6 @@
 # API de mods
 
-Versão da API: **0.12**. Mods sobrescrevem dados (objetos do banco, `data/*.json`, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua").
+Versão da API: **0.13**. Mods sobrescrevem dados (objetos do banco, `data/*.json`, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua").
 
 ## Estrutura
 
@@ -150,6 +150,8 @@ As tabelas usadas nas escritas vêm de `data/experimental.json` (com mods). Nenh
 | 0.10 | Novos arquivos sobrescrevíveis `data/janelas.json` (Caste, Behavior e History) e `data/menus.json` (menus de segurar o botão e de ícones). `partida.json` ganhou `marcadores`, `botoes_usuario.bitmap_selecionado`/`bitmap_normal` e as ações `janela_edicao`, `janela_comportamento`, `janela_castas`, `janela_historico`; `mensagens.json` ganhou `faixa.marcador_posto`/`marcador_ausente`; `amarela.json` (`mensagens.faixa_*`) e `superficie.json` (`regras.mensagem_ataque_vermelho`) ganharam as mensagens da faixa. | Arquivos novos: compatível. Um `partida.json`, `mensagens.json`, `amarela.json` ou `superficie.json` de mod anterior precisa das chaves novas (o arquivo é trocado inteiro); sem elas o jogo não inicia. |
 | 0.11 | Novos arquivos sobrescrevíveis `data/dialogos.json`, `data/exame.json` (Examine: janela, fonte, listas), `data/info.json` (cartões do Info), `data/tutorial_arquivo.json` (Load de `Tutorial.Ant`) e `data/mapa.json` (janela do mapa: tabelas de cor, blocos do feromônio, bitmaps, botões de cheiro); `janelas.json` ganhou `mapa` e `info` (janela, objeto da área e ajustes); `partida.json` ganhou as ações `carregar` (Ctrl+L) e `janela_info` (Ctrl+I); `quintal_mapa.json` ganhou `balao_menino` (lista, fonte, peças 8×8 e posição do balão do menino). `interface.json`: na lista de fontes, `ARQUIVO.FON#Nome` aceita `@altura` (escolhe o tamanho) e `+negrito` (negrito simulado); índice 7 = MS Sans Serif 8 em negrito, do `SSERIFE.FON` do Windows do usuário. | Arquivo novo: compatível. Um `partida.json` de mod anterior continua válido (sem Ctrl+L e Ctrl+I); um `quintal_mapa.json` de mod anterior precisa da chave `balao_menino` e um `janelas.json`, das chaves `mapa` e `info`. |
 | 0.12 | Scripts Lua: chave opcional `scripts` no `mod.json`; ganchos `ao_iniciar`, `antes_do_tick`, `depois_do_tick`, `ao_evento`; objeto `estado` (leitura e escritas validadas); `registrar`, `mostrar_mensagem`, `aleatorio`, `semear_aleatorio`; sandbox e limites (seção "Scripts Lua"). | Compatível com 0.11: só acrescenta. Um mod sem `scripts` funciona como antes, e sem scripts o laço do jogo não muda. |
+| 0.13 | Novo arquivo sobrescrevível `data/tutorial_arquivo.json` (Load de `Tutorial.Ant`: nome, título, os 30 patches de `_GenerateTutorial`, valores de `_InitSimVars`). `dialogos.json`, `caixa_mensagem`: `centro`, `texto`, `altura_minima`, `icone` e `y_botoes` deram lugar a `estilos` (moldura, margem do título e centro por estilo), `icone_x`, `icone_abaixo_titulo`, `lado_icone`, `texto_x`, `folga_botoes` e `margem_baixo`; `salvo` passou a `"%s
+Saved correctly"`. `exame.json` ganhou `deslocamento_linhas` e `cor_fundo` (opcionais). | Um `dialogos.json` de mod anterior precisa das chaves novas da `caixa_mensagem`; o resto é compatível. |
 
 ## Planejado
 
