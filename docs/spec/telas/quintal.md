@@ -66,9 +66,9 @@ Sprites com fundo transparente (índice 13, magenta, em todos os bitmaps abaixo)
 
 | Bicho | Quando | Bitmap | Posição |
 |---|---|---|---|
-| gato | `_CatOn ≠ 0` | 1300 + `_CatFrame` | (`_CatX`, `_CatY`) + desl. por quadro (quadros ≥ 10) |
+| gato | `_CatOn ≠ 0` (modos 0 e 1) | 1300 + `_CatFrame` (1300–1305 andando, 1310–1312 sentado, 1320–1329 fugindo) | (`_CatX`, `_CatY`) + desl. por quadro (quadros ≥ 10); na bancada os quadros 0–12 aparecem 1 pixel abaixo da conta [medido, causa em aberto; `ajuste_medido`] |
 | cachorro | `_ForSaleState = 0` | 8500 + `_DogFrame` | (`_DogX`, `_DogY`) + desl. por quadro |
-| menino | `_BoyFrame` ≥ 0 e não (modo 0 e `_BoyHere = 0`) | 8000 + `_BoyFrame` | (`_BoyX`, `_BoyY`) + desl. por quadro (quadros < 200) |
+| menino | `_BoyFrame` ≥ 0 e não (modo 0 e `_BoyHere = 0`) | 8000 + `_BoyFrame`, **qualquer** quadro ≥ 0: inclusive 200 (poltrona, nó 32), 201 (geladeira, nó 34) e 900–903 (porta, nós 20/21) | (`_BoyX`, `_BoyY`) + desl. por quadro; sem deslocamento a partir de 200 (`_DrawSimKid` `1010:af14`) |
 | cortador (`_DrawMower`) | parado: sempre que o menino não está com ele | 8800 | (98, 181) |
 | cortador | `_BoyHere` 3 ou 4 e `_BoyFrame` 103–105 / 109–111 | 8801 / 8802 | (`_BoyX` + 19, `_BoyY` + 15) / (`_BoyX` − 15, `_BoyY` + 15) |
 | pássaro | `_BirdOn ≠ 0` | 1250 + `_BirdFrame` | (`_BirdX` − 10, `_BirdY` − 3) no quadro 0, (`_BirdX` − 9, `_BirdY` − 1) no 1 |
@@ -77,6 +77,10 @@ Sprites com fundo transparente (índice 13, magenta, em todos os bitmaps abaixo)
 | enxame | `_SwarmCntB`/`R` > 0, quando `_YardMode = 0`… | 7006 / 7007 | perto do patch atual (`_DrawSwarm`) |
 
 Com o cortador nas mãos e o menino virado para cima ou para baixo (quadros 106–108 e 100–102), o cortador não é desenhado [código]. Os deslocamentos por quadro vêm de tabelas de bytes com sinal do DGROUP (`1048:18d4`…`1048:1953`, extraídas para `data/quintal_mapa.json`) [dados]. A ordem de desenho do `_hanim` (prioridades `0xffff`, 999, 1000, `0x8000`) não foi estudada [em aberto]; o port desenha gato, cachorro, menino, cortador, pássaro, placa, chuva.
+
+**Bancada dos sprites (2026-10-18, `cenarios_tick.py gravar sprites_quintal`, snapshot `rico`, cópia do overlay em `re_trabalho/sprites/`):** os bichos são escritos na entrada de um tick (ou no retorno de `_DoAntSim`, para quadros que a simulação não mantém) e a tela é capturada parada na entrada seguinte, com o estado desenhado em `NOME.ANT`; o port desenha o mesmo estado com `simant --save NOME.ANT --quintal M --exportar-tela-jogo`. 31 capturas (`cap/` e `cap2/`): Yard View livre, gato andando (quadros 1–5), sentado (10–12) e fugindo (21, 25), cachorro andando e sentado (100–103), pássaro (0, 1), menino cortando com o cortador nas mãos (104, 110), cortador parado, House View com o menino na poltrona (200), na geladeira (201), na porta (900–903) e andando. Janela inteira **98,7–99,5%** (`comparar_captura.py --mapear`, região (119, 99)–(632, 376)); as diferenças são as gotas de chuva, o título, o rodapé e o cursor. Posição de cada sprite (melhor deslocamento da máscara contra a captura): todos em (0, 0), depois do ajuste de 1 pixel dos quadros 0–12 do gato. Antes da correção o menino sumia nos quadros 200, 201 e 900–903 (o port só desenhava quadros < 200).
+
+**Por que o gato "não aparecia":** o desenho e a regra já existiam e batem com o original. O relógio do Mac da partida (`_MacTickCount`) começava em 0 a cada sessão, e o `_CatDelay` do save (2669–5000 nos saves da bancada, valores do relógio da sessão que salvou) segurava o primeiro teste por quase um minuto, além do minuto médio de espera do próprio sorteio (`S16` a cada 200 unidades). O port agora começa o relógio no maior prazo do save (ver regras/quintal.md, "Relógios do port").
 
 **Sorteios no desenho:** a chuva e o enxame usam `_SRand1`/`_SRand16` — o **gerador S da simulação** — cada vez que a janela é redesenhada [código]. Com a janela do quintal aberta e chovendo, o original consome sorteios de S fora do tick. O port reproduz os sorteios e o que o desenho grava no estado (`rules/desenho.rs`, chamado pela partida depois de cada tick; regras/rng.md "Sorteios do desenho"), mas a imagem das gotas usa posições próprias e o enxame não é desenhado (ver [../../divergencias.md](../../divergencias.md)).
 

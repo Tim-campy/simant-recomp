@@ -93,13 +93,27 @@ pub struct EstiloCursor {
 #[derive(Clone, Debug, Deserialize)]
 pub struct SpriteQuadros {
     pub base: u16,
+    /// Maior quadro carregado (`base` … `base + ultimo_quadro`, os que existirem no banco). O
+    /// menino vai até 903 (porta) [código: `_DrawSimKid` desenha qualquer quadro ≥ 0].
+    #[serde(default = "ultimo_quadro_padrao")]
+    pub ultimo_quadro: u16,
     /// Quadro (em texto) → (dx, dy); quadros ausentes não têm deslocamento.
     pub deslocamentos: HashMap<String, [i16; 2]>,
+    /// Somado a `deslocamentos`: diferença medida na bancada que o código não explica.
+    #[serde(default)]
+    pub ajuste_medido: HashMap<String, [i16; 2]>,
+}
+
+fn ultimo_quadro_padrao() -> u16 {
+    199
 }
 
 impl SpriteQuadros {
     fn deslocamento(&self, quadro: i16) -> (i16, i16) {
-        self.deslocamentos.get(&quadro.to_string()).map(|d| (d[0], d[1])).unwrap_or((0, 0))
+        let q = quadro.to_string();
+        let [dx, dy] = self.deslocamentos.get(&q).copied().unwrap_or([0, 0]);
+        let [ax, ay] = self.ajuste_medido.get(&q).copied().unwrap_or([0, 0]);
+        (dx + ax, dy + ay)
     }
 }
 
@@ -430,8 +444,8 @@ impl DesenhoQuintal {
         let mut ids: Vec<u16> = cfg.modos.iter().flat_map(|m| m.bitmaps.iter().map(|b| b.id)).collect();
         ids.push(cfg.rodape.id);
         let s = &cfg.sprites;
-        for (sp, quadros) in [(&s.menino, 0..200), (&s.cachorro, 0..200), (&s.gato, 0..40), (&s.passaro, 0..2)] {
-            ids.extend(quadros.map(|q| sp.base + q as u16));
+        for sp in [&s.menino, &s.cachorro, &s.gato, &s.passaro] {
+            ids.extend((0..=sp.ultimo_quadro).map(|q| sp.base.wrapping_add(q)));
         }
         ids.extend([s.cortador.base, s.cortador.base + 1, s.cortador.base + 2, s.placa.id, s.chuva.id]);
         let mut bitmaps = HashMap::new();
@@ -514,7 +528,7 @@ impl DesenhoQuintal {
         let modo = e.vistas.modo_quintal;
         let m = &e.menino;
         let menino_desenhado = modo <= 1 && !((modo == 0 && m.presente == 0) || m.quadro < 0);
-        if !menino_desenhado || m.mensagem_ligada == 0 || m.quadro >= 200 {
+        if !menino_desenhado || m.mensagem_ligada == 0 {
             return;
         }
         let fala = usize::try_from(m.mensagem_offset).ok().and_then(|i| self.falas_menino.get(i));
@@ -605,7 +619,9 @@ impl DesenhoQuintal {
             self.sprite(q, id, x, y);
         }
         let menino_visivel = m.quadro >= 0 && (menino_dentro || m.presente != 0);
-        if menino_visivel && m.quadro < 200 {
+        // Qualquer quadro ≥ 0, inclusive 200 (poltrona), 201 (geladeira) e 900–903 (porta), sem
+        // deslocamento a partir de 200 (_DrawSimKid).
+        if menino_visivel {
             let (id, x, y) = quadro_de(&s.menino, m.x, m.y, m.quadro);
             self.sprite(q, id, x, y);
         }

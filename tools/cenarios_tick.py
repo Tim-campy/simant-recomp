@@ -987,6 +987,88 @@ def cenario_capturas_mapa(c: Sessao, saida, n):
     return []
 
 
+def cenario_sprites_quintal(c: Sessao, saida, n):
+    """Sprites do quintal e da casa (docs/spec/telas/quintal.md): escreve os bichos na entrada de um
+    tick, anda 1 tick (o desenho acontece entre o retorno de _DoAntSim e a entrada seguinte) e, parado
+    na entrada seguinte, captura a tela e grava o estado (= o que foi desenhado) em NOME.ANT. O port
+    desenha o mesmo estado com `simant --save NOME.ANT --quintal M --exportar-tela-jogo`.
+    Grava `sprites.json` com o nome, o modo do quintal e o estado lido de cada captura."""
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    reg = []
+
+    def foto(nome, modo):
+        c.entrada()
+        (pasta / f"{nome}.ANT").write_bytes(c.mj.estado())
+        tela(c, saida, nome)
+        s = c.save()
+        lido = {k: s.ler(k) for k in ("CatOn", "CatX", "CatY", "CatFrame", "BoyHere", "BoyX", "BoyY", "BoyFrame",
+                                      "DogX", "DogY", "DogFrame", "BirdOn", "BirdX", "BirdY", "BirdFrame", "YardMode")}
+        reg.append({"nome": nome, "modo": modo, "estado": lido})
+        c.log(f"{nome}: {lido}")
+
+    def escrever(**v):
+        c.entrada()
+        for k, x in v.items():
+            c.escrever(k, x)
+
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    for k in range(3):
+        c.avancar(7)
+        foto(f"yard_{k}", 0)
+    escrever(CatOn=1, CatX=0x140, CatY=0x19, CatFrame=1)
+    c.avancar(1)
+    foto("gato_anda", 0)
+    escrever(CatOn=2, CatFrame=10)
+    c.avancar(1)
+    foto("gato_senta_a", 0)
+    c.avancar(3)
+    foto("gato_senta_b", 0)
+    escrever(CatOn=3, CatFrame=20)
+    c.avancar(1)
+    foto("gato_foge_a", 0)
+    c.avancar(4)
+    foto("gato_foge_b", 0)
+    c.teclas("ctrl+5")
+    time.sleep(2)
+    foto("casa_0", 1)
+    escrever(BoyHere=0, NodeNum=32, BoyFrame=200, BoyX=45, BoyY=166)
+    c.avancar(1)
+    foto("casa_poltrona", 1)
+    escrever(BoyHere=0, NodeNum=34, BoyFrame=201, BoyX=207, BoyY=47)
+    c.avancar(1)
+    foto("casa_geladeira", 1)
+    for k in range(3):
+        c.avancar(9)
+        foto(f"casa_{k + 1}", 1)
+    # Quadros que a simulação não mantém por um tick: escritos no retorno de _DoAntSim, antes do
+    # desenho; a entrada seguinte ainda não mexeu neles.
+    def na_saida(nome, modo, **v):
+        c.entrada()
+        c.dep.ir_saida()
+        for k, x in v.items():
+            c.escrever(k, x)
+        foto(nome, modo)
+
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    for q in (10, 11, 12):
+        na_saida(f"gato_senta_{q}", 0, CatOn=2, CatX=0x140, CatY=0x19, CatFrame=q)
+    for q in (100, 101, 102, 103):
+        na_saida(f"cao_senta_{q}", 0, DogFrame=q, DogX=300, DogY=60)
+    for q in (0, 1):
+        na_saida(f"passaro_{q}", 0, BirdOn=1, BirdFrame=q, BirdX=360, BirdY=120)
+    for q in (104, 110):
+        na_saida(f"cortador_{q}", 0, BoyHere=3, BoyFrame=q, BoyX=250, BoyY=110)
+    c.teclas("ctrl+5")
+    time.sleep(2)
+    for q in (900, 901, 902, 903):
+        na_saida(f"porta_{q}", 1, BoyHere=0, BoyFrame=q, BoyX=172, BoyY=73)
+    (pasta / "sprites.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    return []
+
+
 def cenario_salvo(c: Sessao, saida, n):
     """'Saved correctly': jogo pausado, Ctrl+S abre "Save Ant Hill As" (o Quick Game não tem nome),
     digita QUICK1 e Enter, confirma a substituição (Y); a caixa "%s Saved correctly" aparece; captura e fecha."""

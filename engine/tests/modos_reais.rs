@@ -88,6 +88,71 @@ fn janela_do_quintal_desenha_os_quatro_modos() {
     }
 }
 
+/// Pixels que mudam na janela do quintal entre dois estados, e a caixa que os contém.
+fn caixa_da_diferenca(d: &DesenhoQuintal, a: &Estado, b: &Estado) -> Option<(i32, i32, i32, i32)> {
+    let (mut qa, mut qb) = (Quadro::new(640, 442, 17), Quadro::new(640, 442, 17));
+    d.desenhar_janela(&mut qa, a);
+    d.desenhar_janela(&mut qb, b);
+    let mut caixa: Option<(i32, i32, i32, i32)> = None;
+    for (i, (x, y)) in qa.pixels.iter().zip(&qb.pixels).enumerate() {
+        if x != y {
+            let (px, py) = ((i % 640) as i32, (i / 640) as i32);
+            caixa = Some(caixa.map_or((px, py, px, py), |(x0, y0, x1, y1)| (x0.min(px), y0.min(py), x1.max(px), y1.max(py))));
+        }
+    }
+    caixa
+}
+
+/// Gato (`_Draw_SimYard`, bitmap 1300 + `_CatFrame` em (`_CatX`, `_CatY`) + deslocamento dos
+/// quadros 10–29): aparece nos modos 0 e 1 com `_CatOn`; no ponto de entrada (0xFC, 0x19), andando
+/// 1 pixel abaixo (`ajuste_medido`, bancada).
+#[test]
+fn gato_aparece_no_quintal() {
+    let Some(r) = recursos() else { return };
+    let interface = Interface::carregar(&r, 0).unwrap();
+    let d = DesenhoQuintal::carregar(ConfigQuintalMapa::carregar(&r).unwrap(), &r, &interface).unwrap();
+    let (ox, oy) = d.cfg.origem();
+    for modo in 0..2 {
+        let mut sem = Estado::vazio();
+        sem.vistas.modo_quintal = modo;
+        sem.ambiente.casa_a_venda = 1;
+        let mut com = sem.clone();
+        com.bichos.gato_ligado = 1;
+        com.bichos.gato_x = 0xFC;
+        com.bichos.gato_y = 0x19;
+        for quadro in [0, 1, 2, 4, 5, 11, 12, 20, 25, 29] {
+            com.bichos.gato_quadro = quadro;
+            let caixa = caixa_da_diferenca(&d, &sem, &com);
+            let Some((x0, y0, ..)) = caixa else { panic!("modo {modo}: gato no quadro {quadro} não desenhado") };
+            if quadro < 10 {
+                assert_eq!((x0, y0), (ox + 0xFC, oy + 0x19 + 1), "modo {modo} quadro {quadro}: {caixa:?}");
+            }
+        }
+    }
+}
+
+/// Menino na poltrona (quadro 200), na geladeira (201) e na porta (900–903): `_DrawSimKid` usa o
+/// bitmap 8000 + quadro para qualquer quadro ≥ 0, sem deslocamento a partir de 200.
+#[test]
+fn menino_na_poltrona_na_geladeira_e_na_porta() {
+    let Some(r) = recursos() else { return };
+    let interface = Interface::carregar(&r, 0).unwrap();
+    let d = DesenhoQuintal::carregar(ConfigQuintalMapa::carregar(&r).unwrap(), &r, &interface).unwrap();
+    let (ox, oy) = d.cfg.origem();
+    let mut sem = Estado::vazio();
+    sem.vistas.modo_quintal = 1;
+    sem.menino.quadro = -1;
+    for (quadro, x, y) in [(200, 45, 166), (201, 207, 47), (900, 172, 73), (901, 172, 73), (902, 172, 73), (903, 172, 73)] {
+        let mut com = sem.clone();
+        com.menino.quadro = quadro;
+        com.menino.x = x;
+        com.menino.y = y;
+        let caixa = caixa_da_diferenca(&d, &sem, &com);
+        let Some((x0, y0, ..)) = caixa else { panic!("menino no quadro {quadro} não desenhado") };
+        assert!(x0 >= ox + i32::from(x) && y0 >= oy + i32::from(y), "quadro {quadro}: {caixa:?}");
+    }
+}
+
 /// Balão do menino (`_DrawSimKid` + `_MakeBalloon`): com `_BoyMessOn` aparece acima do menino, com o
 /// contorno preto e o fundo branco das peças; sem ele, nada muda.
 #[test]
@@ -157,4 +222,32 @@ fn info_cartao_128_tem_as_figuras() {
         let b = r.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d));
         assert!(b.is_ok(), "bitmap {id}: {:?}", b.err());
     }
+}
+
+/// Os 53 cartões (127–179): todos com figura, textos não vazios e popups com texto; os textos com
+/// um 0 no meio (Ants, Soldier, Mouth) saem inteiros depois da limpeza de `_DisplayCard`.
+#[test]
+fn info_todos_os_cartoes_tem_figura_e_texto_inteiro() {
+    use engine::core::info::{Carta, ConfigInfo, Registro, TextoCartao};
+    let Some(r) = recursos() else { return };
+    let cfg: ConfigInfo = r.dados("info.json").unwrap();
+    for id in 127..=179u16 {
+        let c = Carta::ler(&r, &cfg, id).unwrap();
+        assert!(c.registros.iter().any(|x| matches!(x, Registro::Figura { .. })), "cartão {id} sem figura");
+        for reg in &c.registros {
+            let ids: Vec<u16> = match reg {
+                Registro::Texto { textos, .. } => textos.clone(),
+                Registro::Figura { areas, .. } => areas.iter().filter(|a| a.valor <= 0).map(|a| (-a.valor) as u16).collect(),
+            };
+            for t in ids {
+                let x = TextoCartao::ler(&r, &cfg, t).unwrap_or_else(|| panic!("cartão {id}: texto {t}"));
+                assert!(!x.bytes.is_empty() && x.bytes.iter().all(|&b| b != 0), "cartão {id}: texto {t}");
+            }
+        }
+    }
+    let texto = |id| String::from_utf8_lossy(&TextoCartao::ler(&r, &cfg, id).unwrap().bytes).into_owned();
+    assert!(texto(310).starts_with("Ants can be considered the premier social insects."));
+    assert!(texto(310).ends_with("two teeth)."));
+    assert!(texto(420).contains("larger than the workers, and have big heads"));
+    assert!(texto(212).contains("for fighting, digging") && texto(212).contains("putting it in a pouch"));
 }

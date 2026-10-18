@@ -354,6 +354,8 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
                     redesenhar |= s.soltar_nas_janelas(x, y);
                     repeticao.soltar();
                     s.janelas.soltar();
+                    // Popup de definição do Info: só enquanto o botão fica apertado.
+                    redesenhar |= s.info.soltar();
                     modos::soltar(&mut s);
                 }
                 Event::MouseButtonUp { mouse_btn: MouseButton::Right, .. } => modos::soltar(&mut s),

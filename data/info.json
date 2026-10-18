@@ -1,5 +1,5 @@
 {
-  "_comentario": "Info / Top Card (janela 5; telas/info.md): cartão inicial 128; recursos do cartão: corpo tipo 17 (PICT/TEXT, big-endian), título tipo 19, textos tipo 10 e estilos tipo 21 (styl do Mac). Fontes do texto normal e dos trechos destacados (índices de interface.json) [hipótese: as fontes 2 e 5 de _PopUpInfoWindow]. Histórico de 16 cartões (anel em DGROUP a434).",
+  "_comentario": "Info / Top Card (janela 5; telas/info.md): cartão inicial 128; recursos do cartão: corpo tipo 17 (PICT/TEXT, big-endian), título tipo 19, textos tipo 10 e estilos tipo 21 (styl do Mac). Fontes do texto normal e dos trechos destacados (índices de interface.json): 2 e 5, as de _PopUpInfoWindow [código]. Histórico de 16 cartões (anel em DGROUP a434). Texto em (esq + 1, topo + 4) do retângulo [código: _win_PrintStyleTextInRect].",
   "janela": 5,
   "objeto_area": "infoArea",
   "carta_inicial": 128,
@@ -14,5 +14,14 @@
   "tamanho_historico": 16,
   "inverter_mono": true,
   "deslocamento_texto": [1, 4],
-  "margem_direita": 0
+  "popup": {
+    "_comentario": "_PopUpInfoWindow: janela filha com moldura de diálogo; moldura = GetSystemMetrics 7/8 (SM_CXDLGFRAME/SM_CYDLGFRAME), 4 na bancada; 4 pixels de margem até o texto; altura do texto + 5. A borda desenhada tem 5 pixels: 1 preto + 4 azuis (cores de fora para dentro). A área do cartão nas contas do popup começa 1 pixel à esquerda da do desenho e é 1 pixel menor (lw/2 = 159, lh < 200) [medido em p911/p912].",
+    "moldura": [4, 4],
+    "margem": 4,
+    "altura_extra": 5,
+    "deslocamento_area": [-1, 0],
+    "ajuste_area": [-1, -1],
+    "cores_moldura": [0, 4, 4, 4, 4],
+    "cor_fundo": 15
+  }
 }
