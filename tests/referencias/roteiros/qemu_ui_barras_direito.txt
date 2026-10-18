@@ -1,0 +1,95 @@
+# Clique nas barras da faixa (mapRibCaste 0x2227: _DoHealthSetY, _DoWarnSetB, _DrawCastePopUp) e
+# clique direito na janela de edição e na faixa. Tela = layout da faixa + (0, 20).
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_barras_direito.txt --overlay re_trabalho/qemu/ov_ui_quick.qcow2
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+capturar re_trabalho/agente_ui/b00_pausado.png
+# ribBlacks (população preta, número) segurando
+ir_para 536 69
+apertar
+esperar 2
+capturar re_trabalho/agente_ui/b01_ribBlacks.png
+soltar
+esperar 2
+capturar re_trabalho/agente_ui/b02_solto.png
+# ribBlackP (barra de população preta) segurando
+ir_para 598 67
+apertar
+esperar 2
+capturar re_trabalho/agente_ui/b03_ribBlackP.png
+soltar
+esperar 1
+# ribRedHealth segurando
+ir_para 598 102
+apertar
+esperar 2
+capturar re_trabalho/agente_ui/b04_ribRedHealth.png
+soltar
+esperar 1
+# ribRedP segurando
+ir_para 598 92
+apertar
+esperar 2
+capturar re_trabalho/agente_ui/b05_ribRedP.png
+soltar
+esperar 1
+# ribBlackHealth: clique em x = 580 (limiar de aviso da colônia)
+ler_variavel BlkWarnHealth re_trabalho/agente_ui/v.bin
+clicar_em 580 77
+esperar 1
+ler_variavel BlkWarnHealth re_trabalho/agente_ui/v.bin
+capturar re_trabalho/agente_ui/b06_blackhealth_580.png
+# ribYellowHealth: clique em x = 620
+ler_variavel MeWarnHealth re_trabalho/agente_ui/v.bin
+clicar_em 620 48
+esperar 1
+ler_variavel MeWarnHealth re_trabalho/agente_ui/v.bin
+capturar re_trabalho/agente_ui/b07_yellowhealth_620.png
+# ribBlackHealth arrastando de 590 a 610 com o botão apertado
+ir_para 590 77
+apertar
+esperar 1
+ler_variavel BlkWarnHealth re_trabalho/agente_ui/v.bin
+mover 20 0
+esperar 1
+ler_variavel BlkWarnHealth re_trabalho/agente_ui/v.bin
+capturar re_trabalho/agente_ui/b08_arrasto.png
+soltar
+esperar 1
+ler_variavel BlkWarnHealth re_trabalho/agente_ui/v.bin
+# Faixa vazia (entre os botões configuráveis e os marcadores) com o botão direito
+ler_variavel MeGoalX re_trabalho/agente_ui/v.bin
+ler_variavel MeGoalY re_trabalho/agente_ui/v.bin
+ler_variavel MeCmd re_trabalho/agente_ui/v.bin
+clicar_direito_em 300 96
+esperar 2
+capturar re_trabalho/agente_ui/r01_direito_faixa.png
+ler_variavel bHelp re_trabalho/agente_ui/v.bin 2
+# de novo: alterna de volta?
+clicar_direito_em 300 96
+esperar 2
+capturar re_trabalho/agente_ui/r02_direito_faixa2.png
+ler_variavel bHelp re_trabalho/agente_ui/v.bin 2
+# Clique direito na janela de edição, célula (8, 6) da vista
+clicar_direito_em 160 262
+esperar 2
+ler_variavel MeGoalX re_trabalho/agente_ui/v.bin
+ler_variavel MeGoalY re_trabalho/agente_ui/v.bin
+ler_variavel MeCmd re_trabalho/agente_ui/v.bin
+capturar re_trabalho/agente_ui/r03_direito_edicao.png
+# Clique esquerdo na célula (10, 7)
+clicar_em 192 278
+esperar 2
+ler_variavel MeGoalX re_trabalho/agente_ui/v.bin
+ler_variavel MeGoalY re_trabalho/agente_ui/v.bin
+ler_variavel MeCmd re_trabalho/agente_ui/v.bin
+# Segurando o direito numa formiga? (só captura)
+ir_para 160 262
+apertar_direito
+esperar 2
+capturar re_trabalho/agente_ui/r04_direito_segurando.png
+soltar_direito
+esperar 1
+fim

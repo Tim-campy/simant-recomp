@@ -1,0 +1,46 @@
+# Ajuda: botão "?" da faixa (ribHelp 0x2208 -> WinHelp HELP_CONTEXT 0x2200), modo de ajuda pelo clique
+# direito (_bHelp) e clique esquerdo depois dele, clique direito na edição.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_ajuda.txt --overlay re_trabalho/qemu/ov_ui_quick.qcow2
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+# Clique direito na janela de edição: _bHelp e o destino da amarela
+ler_variavel bHelp re_trabalho/agente_ui/v.bin 2
+ler_variavel MeGoalX re_trabalho/agente_ui/v.bin
+clicar_direito_em 160 262
+esperar 2
+ler_variavel bHelp re_trabalho/agente_ui/v.bin 2
+ler_variavel MeGoalX re_trabalho/agente_ui/v.bin
+capturar re_trabalho/agente_ui/a01_direito_edicao.png
+# Clique esquerdo na área do mapa com o modo de ajuda ligado
+clicar_em 192 278
+esperar 6
+ler_variavel bHelp re_trabalho/agente_ui/v.bin 2
+ler_variavel MeGoalX re_trabalho/agente_ui/v.bin
+capturar re_trabalho/agente_ui/a02_ajuda_edicao.png
+teclas alt+f4
+esperar 3
+capturar re_trabalho/agente_ui/a03_fechou.png
+# Botão "?" da faixa (ribHelp)
+clicar_em 287 70
+esperar 6
+capturar re_trabalho/agente_ui/a04_ribhelp.png
+teclas alt+f4
+esperar 3
+# Modo de ajuda e clique no botão de estatísticas (ribStats 0x2209)
+clicar_direito_em 300 96
+esperar 1
+clicar_em 320 70
+esperar 6
+capturar re_trabalho/agente_ui/a05_ajuda_ribstats.png
+teclas alt+f4
+esperar 3
+# F1: índice da ajuda
+teclas f1
+esperar 6
+capturar re_trabalho/agente_ui/a06_f1.png
+teclas alt+f4
+esperar 3
+capturar re_trabalho/agente_ui/a07_fim.png
+fim

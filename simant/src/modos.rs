@@ -402,4 +402,38 @@ mod testes {
             assert_eq!(s.partida.estado.vistas.modo_quintal, 0);
         }
     }
+
+    #[test]
+    fn info_do_experimental_abre_o_exame() {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let mut s = Sessao::abrir(&recursos, &dados, Origem::Novo(1234, TipoJogo::Experimental), cores).unwrap();
+        assert_eq!(s.partida.estado.partida.tipo_jogo, 3);
+        // Uma célula da área do mapa da edição.
+        let [ax, ay] = s.tela.cfg.edicao.area_na_tela;
+        let (x, y) = (i32::from(ax) + 16 * 5 + 8, i32::from(ay) + 16 * 5 + 8);
+        let (cx, cy) = s.tela.celula_em(x, y, &s.partida.nav).unwrap();
+        // Põe uma formiga (ferramenta 3) e examina com a Info (ferramenta 0).
+        s.partida.estado.partida.ferramenta_experimental = Ferramenta::Formiga as i16;
+        assert!(matches!(s.clicar_nas_janelas(x, y, false), janelas_ui::Roteamento::Edicao));
+        assert!(clique_na_edicao(&mut s, x, y, false));
+        soltar(&mut s);
+        let plano = i32::from(s.partida.nav.plano_mapa);
+        assert!(engine::rules::comum::vida_bruta(&s.partida.estado, plano, cx, cy).unwrap_or(0) != 0, "formiga posta em ({cx}, {cy})");
+        s.partida.estado.partida.ferramenta_experimental = Ferramenta::Info as i16;
+        assert!(matches!(s.clicar_nas_janelas(x, y, false), janelas_ui::Roteamento::Edicao));
+        assert!(clique_na_edicao(&mut s, x, y, false));
+        assert!(s.exame.is_some(), "Info numa formiga abre o Examine");
+        let rgb = s.quadro_rgb().unwrap();
+        if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+            crate::salvar_png(&PathBuf::from(saida).join("info_exame.png"), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
+        }
+    }
 }
