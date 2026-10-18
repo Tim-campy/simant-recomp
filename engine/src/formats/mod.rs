@@ -3,6 +3,7 @@
 pub mod banco;
 pub mod bitmap;
 pub mod fonte;
+pub mod hlp;
 pub mod janela;
 pub mod lzss;
 pub mod midi;
