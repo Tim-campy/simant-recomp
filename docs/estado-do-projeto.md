@@ -1,17 +1,17 @@
 # Estado do projeto (revisão geral, 2026-10-19)
 
-Revisão refeita por inteiro sobre o branch que integra o `main` em `f362d7b` (API de mods 0.28) mais os resíduos desta rodada (lista A cheia, `_KillAntLion(-1)`, botão esquerdo no laço, `WIN.INI`, bitmaps empacotados, `_LastColonyPopR`). Fontes: o código (`engine/src`, `simant/src`, `data/`), as 46 specs de `docs/spec/`, `docs/divergencias.md`, `docs/api-mods.md`, `docs/spec/regras/testes-tick.md`, `tests/referencias/` e a tabela de símbolos `re_trabalho/symbols.tsv` (2.171 nomes do `SIMANTW.SYM`). A revisão anterior (2026-10-18, sobre `1ff4b82`) e os seus adendos "Feito depois desta revisão" foram absorvidos aqui; o que eles listavam como feito está em §2 e saiu de §4.
+Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (perfil de driver, API 0.29) mais os resíduos desta rodada (lista A cheia, `_KillAntLion(-1)`, botão esquerdo no laço, `WIN.INI`, bitmaps empacotados, `_LastColonyPopR`, alinhamento do Examine e do mini mapa pelo perfil de driver; API 0.30). Fontes: o código (`engine/src`, `simant/src`, `data/`), as 46 specs de `docs/spec/`, `docs/divergencias.md`, `docs/api-mods.md`, `docs/spec/regras/testes-tick.md`, `tests/referencias/` e a tabela de símbolos `re_trabalho/symbols.tsv` (2.171 nomes do `SIMANTW.SYM`). A revisão anterior (2026-10-18, sobre `1ff4b82`) e os seus adendos "Feito depois desta revisão" foram absorvidos aqui; o que eles listavam como feito está em §2 e saiu de §4.
 
 **Medições desta revisão** (comandos rodados nesta data):
 
-- `cargo test --workspace` com `SIMANT_DIR` = `SimAnt-T/MAXIS/ANTWIN`: **590 testes passaram, 0 falharam, 0 ignorados**, em 36 binários de teste (unitários de `engine` e `simant` e 33 arquivos de integração em `engine/tests/`). `cargo clippy --workspace --all-targets -- -D warnings`: sem avisos.
+- `cargo test --workspace` com `SIMANT_DIR` = `SimAnt-T/MAXIS/ANTWIN`: **591 testes passaram, 0 falharam, 0 ignorados**, em 36 binários de teste (unitários de `engine` e `simant` e 33 arquivos de integração em `engine/tests/`). `cargo clippy --workspace --all-targets -- -D warnings`: sem avisos.
 - Vetores do original no repositório (`tests/referencias/`, contados nas pastas e na saída dos testes):
   - **173 vetores de tick** (5 na raiz e 168 em 50 subpastas de `ticks/`): **172 exigidos 307/307** blocos, com extras e vida, por `engine/tests/ticks_originais.rs`; o 173.º (`inseticida_morte/21`, fim de jogo) é conferido pela interface (`fim_de_jogo_interface.rs`), 307/307 com S e R. Nenhum vetor pendente.
   - **2 sequências longas** (`ticks_longos/rico_200`, 200 ticks; `full_600`, 600 ticks do Jogo Completo com a Yard View na frente, inclusive os 17.650 passos de S do desenho entre os ticks): iguais ao original.
   - **15 ações da interface** (`acoes/`: troca de patch e da casa, PLACE dentro e fora, `_SpecialXfer`, Quick → Experimental, Start Game, Ctrl e arrasto, ninho e cheiro do Experimental, chuva e enxame desenhados, dois Mystery): todas 307/307.
   - **1 Load do tutorial** (`load_tutorial/`): 307/307.
   - **21 casos de regra** da bancada (`casos/*.json`): 20 confirmados no original e iguais no port; C-10 não conferível (mensagem modal no Load). (C-04 a C-07 viraram vetores de tick.)
-  - 65 roteiros de bancada em `tests/referencias/roteiros/`.
+  - 74 roteiros de bancada em `tests/referencias/roteiros/`.
 - Cobertura por nome das funções do original (heurística, §2.13): das 1.319 funções dos segmentos de código 1–7, **497 (38%) aparecem pelo nome no código ou nos dados do port** e 715 (54%) no código ou nas specs (eram 452 e 663 na revisão anterior). Nos módulos de regras `SIMONE` e `SIMANT1`, 185 de 292 (63%) estão no código e só 24 não aparecem em lugar nenhum.
 
 ## 1. Resumo
@@ -30,16 +30,16 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `f362d7b` (A
 | 2 | Regras da simulação (tick) | 97% (95%) | 80% (75%) | 173 vetores (todos iguais), 2 sequências, 15 ações e 20 casos; desenho dentro do tick, aranha do jogador com AutoTrack; faltam os ramos raros sem vetor (§3) e a troca de patch de `_SpecialXfer` dentro do tick |
 | 3 | Geração de mundo | 96% (95%) | 75% | Quick Game byte a byte; casa pelos patches; Tutorial via Load; `_DROPdir` guardado; ramos de Full/Experimental e vários patches da casa sem caso |
 | 4 | Jogo ao vivo (laço, relógio, ritmo) | 93% (90%) | 65% | laço de `MYTIMERFUNC` com o clique esquerdo (2026-10-19); slow/normal medidos (3,0/6,0 ticks/s); fast/ultra e relógio do Mac com decisões do port |
-| 5 | Telas e janelas | 92% (85%) | 80% (70%) | todas as janelas alcançáveis existem e foram comparadas (93–100%), inclusive balões, aranha, mapa, mini mapa e Info (51 cartões); tela virtual 640/800/1024 com só parte das janelas conferida nas telas maiores |
+| 5 | Telas e janelas | 94% (85%) | 83% (70%) | todas as janelas alcançáveis existem e foram comparadas (93–100%), inclusive balões, aranha, mapa, mini mapa e Info (51 cartões); tela virtual 640/800/1024 e **perfil de driver** (VGA de 16 cores × 256 cores: alinhamento ao byte e cores do sistema), com as caixas, o WinHelp e a janela 26 conferidos na SVGA |
 | 6 | Diálogos e menus | 90% (60%) | 80% (50%) | barra de menus do Windows (100% nas capturas), About, Status, Quit, Load Game, quadros da janela 26; faltam o menu de sistema da janela principal, o menu de um item do botão de ferramentas no Quick Game e os diálogos internos do WinHelp |
 | 7 | Som e música | 80% (75%) | 35% | efeitos e músicas de regras, Experimental, diálogos e File → New ligados; timbre diferente; **nada comparado de ouvido** (outro agente trabalha na captura do DOSBox-X e no timbre FM) |
 | 8 | Modos (Quick, Completo, Experimental, Tutorial) | 93% (90%) | 83% (80%) | os quatro têm vetores; tutorial conferido da lição 1 ao fim; PLACE, `_SpecialXfer` ao vivo e avisos do Experimental feitos |
 | 9 | Salvar/carregar | 98% (95%) | 90% | `.ANT` aceito pelo original; Load com `_RandYard`; Load Game no "Select a Game"; preferências com o `WIN.INI` do usuário como origem (2026-10-19) |
-| 10 | Mods (dados + Lua) | 92% (90%) | n/a | API 0.28; dados mesclados por chave; ganchos dentro do tick; 41 `data/*.json` sobrescrevíveis (mais o `save_layout.json`, que não é) |
-| 11 | Ferramentas e testes | 92% (90%) | n/a | 40 ferramentas em `tools/`, bancada QEMU com gdbstub (VGA e SVGA), 590 testes |
-| 12 | Documentação | 92% (90%) | n/a | 46 specs (~8,8 mil linhas), divergências revistas (32 em aberto, 54 resolvidas) |
+| 10 | Mods (dados + Lua) | 92% (90%) | n/a | API 0.30; dados mesclados por chave; ganchos dentro do tick; 41 `data/*.json` sobrescrevíveis (mais o `save_layout.json`, que não é) |
+| 11 | Ferramentas e testes | 92% (90%) | n/a | 40 ferramentas em `tools/`, bancada QEMU com gdbstub (VGA e SVGA), 591 testes |
+| 12 | Documentação | 92% (90%) | n/a | 46 specs (~8,8 mil linhas), divergências revistas (33 em aberto, 56 resolvidas) |
 
-**Geral (conta em §6): cerca de 93% implementado e 76% verificado contra o original** (este último só nas áreas 1–9). Na revisão anterior: 88% e 70%.
+**Geral (conta em §6): cerca de 94% implementado e 77% verificado contra o original** (este último só nas áreas 1–9). Na revisão anterior: 88% e 70%.
 
 ## 2. Por área
 
@@ -75,7 +75,7 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `f362d7b` (A
 
 | Janela | Implementado | Verificado | Evidência / o que falta |
 |---|---|---|---|
-| Abertura e título | 100% | 95% | 99,98% (VGA de 256 cores) e 99,89–99,99% nas três resoluções da SVGA; duração (~39,6 s) medida; na VGA de 16 cores o título fica 3 pixels à direita [causa em aberto, `divergencias.md`] |
+| Abertura e título | 100% | 95% | 99,96% contra a VGA de 16 cores com o perfil `vga` (o deslocamento de 3 pixels era o `CS_BYTEALIGNCLIENT`) e 99,89–99,99% nas três resoluções da SVGA; duração (~39,6 s) medida |
 | "Select a Game" | 100% | 90% | 99,87% (Load Game desde 2026-10-18, não conferido na bancada) |
 | Tela de jogo: faixa 34 | 95% | 90% | botões, barras, popup das castas, marcadores, mini mapa conferidos; botões configuráveis com bitmaps trocados |
 | Tela de jogo: janela de edição | 95% | 90% | mapa 100%, janela 99,33–99,59%; balões "Silly" (100% nas regiões dos balões), aranha (18 capturas 99,91–100%), formiga-leão, lagarta, bicho-de-conta, navegação, superfície e ninho vermelho conferidos; `_DrawEditGraphs` não desenha nos modos do Windows (`telas/baloes.md` §3); faltam a rainha amarela 0xFE e a 2.ª metade de alguns bichos (tabela não localizada, `jogo.md`) |
@@ -93,7 +93,7 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `f362d7b` (A
 | Menu de ferramentas do Experimental | 100% | 100% | 100% na bancada |
 | Quadros de mensagem, faixa, janela 26 | 100% | 95% | 100% nas capturas; `_YellowDialog`, `_SpiderDialog`, `_LionDialog` 100%; 9100/9101 2 pixels à esquerda por ajuste medido |
 | Fim de jogo e pontuação | 100% | 90% | 97,95%; pontuações 19785 e 27572 iguais; `_DrawSimPayoff` 99,78% |
-| Telas maiores (800×600, 1024×768) | 85% | 60% | tela virtual e tabela de posições 0/8 conferidas na SVGA (abertura, Select a Game, Quick Game); caixas de mensagem, WinHelp, janela 26, Info, fim de jogo e quintal usam as medidas de 640×480 [não verificado]; outro agente trabalha na tela virtual e nas cores |
+| Telas maiores e perfil de driver | 95% | 80% | tela virtual 640/800/1024 com a tabela de posições 0/8; perfil de driver (`data/resolucao.json`: `vga` padrão, `svga256`, `s3_dosbox`) com o alinhamento ao byte das janelas (`CS_BYTEALIGNCLIENT`) e dos diálogos, as cores do sistema do driver e o pixel do S3; caixas de mensagem, diálogo de arquivo, janela 26 e WinHelp posicionados por resolução e conferidos na SVGA (`posicoes_por_resolucao_e_driver`); Select a Game 99,80–99,92% e Quick Game 96–99% contra a SVGA; Examine e mini mapa pelo perfil desde 2026-10-19 (sem captura em 256 cores); a VGA de 16 cores em 800×600/1024×768 não existe na bancada |
 
 ### 2.6 Diálogos e menus
 
@@ -132,13 +132,13 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `f362d7b` (A
 
 ### 2.11 Ferramentas e testes
 
-- 40 ferramentas em `tools/` (39 Python e 1 PowerShell: inspetores de formato, extratores de tabelas e `conferir_extracoes.py`, `cenarios_tick.py`/`cenarios_regras.py`/`bancada_mapa.py` da bancada QEMU com gdbstub em VGA e SVGA, comparadores de captura, medição de ritmo e de abertura, `som_original.py`), 65 roteiros, exemplos de `engine/examples/` (exportadores e comparadores).
-- 590 testes; os de vetores exigem igualdade total; os de arquivos reais avisam e passam sem `SIMANT_DIR`.
+- 40 ferramentas em `tools/` (39 Python e 1 PowerShell: inspetores de formato, extratores de tabelas e `conferir_extracoes.py`, `cenarios_tick.py`/`cenarios_regras.py`/`bancada_mapa.py` da bancada QEMU com gdbstub em VGA e SVGA, comparadores de captura, medição de ritmo e de abertura, `som_original.py`), 74 roteiros, exemplos de `engine/examples/` (exportadores e comparadores).
+- 591 testes; os de vetores exigem igualdade total; os de arquivos reais avisam e passam sem `SIMANT_DIR`.
 - **Fraqueza:** capturas e `re_trabalho/` ficam fora do git (direitos autorais), então as porcentagens de tela só são reprodutíveis na máquina do usuário; o determinismo da bancada depende do snapshot (QEMU sem `icount`).
 
 ### 2.12 Documentação
 
-- 46 specs (~8,8 mil linhas, parágrafos longos), `decisoes.md`, `glossario.md`, `divergencias.md` (32 em aberto, 3 extensões do port, 54 resolvidas, depois da varredura de 2026-10-19), `bancada-qemu.md`, `api-mods.md`. A convenção de evidência (verificado / visto no código / [hipótese]) é seguida; há 174 marcas `[hipótese` nas specs.
+- 46 specs (~8,8 mil linhas, parágrafos longos), `decisoes.md`, `glossario.md`, `divergencias.md` (33 em aberto, 3 extensões do port, 56 resolvidas, depois da varredura de 2026-10-19), `bancada-qemu.md`, `api-mods.md`. A convenção de evidência (verificado / visto no código / [hipótese]) é seguida; há 174 marcas `[hipótese` nas specs.
 - **Desatualizado (achado nesta revisão, corrigido):** o "O que falta" de `spec/README.md`, a "Pendente" da aranha em `regras/inimigos.md`, o botão Yard em `telas/quintal.md`, a contagem de vetores em `tests/referencias/README.md` e o "Planejado" de `api-mods.md`. **Ainda desatualizados, sem correção nesta rodada:** trechos históricos de `testes-tick.md` (rodadas antigas, que contam os vetores daquela data), a lacuna "os de dentro do tick não sorteiam" de `telas/baloes.md` §4 (o desenho dentro do tick foi feito depois, `regras/rng.md`) e a direção dentro dos ninhos em `regras/feromonios.md` (a conferir).
 
 ### 2.13 Funções do original sem equivalente (estimativa pela tabela de símbolos)
@@ -188,7 +188,7 @@ Jogo ao vivo
 
 Telas
 - Rainha amarela 0xFE (`telas/jogo.md`); cartões 127 e 129 do Info e clique em palavra em negrito.
-- Telas maiores (800×600, 1024×768): caixas de mensagem, WinHelp, janela 26, Info, fim de jogo e quintal.
+- Telas maiores e perfil de driver: a VGA de 16 cores em 800×600 e 1024×768 (sem driver na bancada); Examine e mini mapa em 256 cores; as cores do perfil `svga256` além do título e do fundo (`divergencias.md`).
 - Altura mínima da edição e clique comido na janela de trás (`telas/janelas.md` §8, [hipótese]); contorno XOR e realce do menu de sistema.
 - Cores do mapa (`_ConvColor`, [hipótese]).
 - Clique direito no Experimental e nas janelas de controle, F1 com janela de controle, Shift+F1, Delete, `yardHelpBut`, cursor das ferramentas (`telas/ajuda-contexto.md` §6).
@@ -212,9 +212,9 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 | Item | Esforço | Referência |
 |---|---|---|
 | Timbre mais próximo do original (FM/OPL) e comparação de ouvido com a captura do DOSBox-X | M | `regras/som.md`, `formatos/som.md`; **em andamento por outro agente** |
-| Telas maiores (800×600, 1024×768): posições das caixas de mensagem, WinHelp, janela 26, Info, fim de jogo e quintal; cores do sistema na abertura | M | `telas/resolucao.md`, `divergencias.md`; **em andamento por outro agente** |
+| Resíduos da tela virtual e do perfil de driver: cores do sistema na abertura, posição guardada do WinHelp, cores do `svga256` além do título e do fundo | P–M | `telas/resolucao.md` §7, `divergencias.md` (linhas de 2026-10-19) |
 
-Não há outro item de alto impacto: tudo o que o jogador alcança no original existe no port.
+Não há outro item de alto impacto: tudo o que o jogador alcança no original existe no port (a tela virtual e o perfil de driver entraram no `main` em 2026-10-19).
 
 ### Médio impacto
 
@@ -250,7 +250,7 @@ Não há outro item de alto impacto: tudo o que o jogador alcança no original e
 ## 5. Riscos e dívidas técnicas
 
 1. ~~Tabelas duplicadas nos JSON~~ (resolvido em 2026-10-18, `comum.json`, API 0.20).
-2. **Ajustes de pixel medidos sem causa conhecida** ([causa em aberto] em `divergencias.md`): texto da faixa e janela do fim de jogo 1 pixel à esquerda; gato 1 pixel abaixo nos quadros 0–12; título, triângulo e barras das janelas de controle; Info; 9100/9101 2 pixels à esquerda; Status 3 pixels à esquerda. Parte deles depende do driver de vídeo, não da resolução (a SVGA de 256 cores mostrou a janela de edição 4 pixels à esquerda e as de controle 1 à direita, em todas as resoluções). Dois dos antigos (Examine e mini mapa) foram explicados em 2026-10-19 pelo alinhamento da área cliente (`CS_BYTEALIGNCLIENT`) e saíram da lista.
+2. **Ajustes de pixel medidos sem causa conhecida** ([causa em aberto] em `divergencias.md`): texto da faixa 1 pixel à esquerda; gato 1 pixel abaixo nos quadros 0–12; título, triângulo e barras das janelas de controle; 9100/9101; Status. Vários dos antigos foram explicados em 2026-10-19 pelo **perfil de driver** (o `CS_BYTEALIGNCLIENT` arredonda a área cliente a 8 pixels só no VGA planar: título +3, edição, janelas de controle, fim de jogo, Info, About, Examine, mini mapa) e viraram regra do driver em `data/resolucao.json`; o que sobra pode ter a mesma natureza e deve ser revisto com o perfil.
 3. **Hipóteses no relógio.** O relógio do Mac ao vivo começa no maior prazo do save; `mac_por_tick` = 9 só vale na bancada; sem relógio, `_GameTime × 6` [hipótese]. O gato, o cachorro e o balão do menino dependem disso, e com o gato e o cachorro **o consumo de sorteios** também: uma partida ao vivo não reproduz exatamente uma do original.
 4. **Ritmo de fast/ultra dependente da CPU no original.** O port fixa 5 e 7 voltas por período. `_BirdDelay` depende de `_gameCycles` e é a única entrada não determinística do tick.
 5. **Desenho que consome o gerador S fora do tick** (chuva e enxame do quintal): o port faz os sorteios à parte, entre os ticks (`full_600` bate com os 17.650 passos), mas as posições desenhadas da chuva são próprias. Os sorteios dentro do tick foram resolvidos em 2026-10-18/19.
@@ -259,7 +259,7 @@ Não há outro item de alto impacto: tudo o que o jogador alcança no original e
 8. **Evidência fora do git.** Capturas, `re_trabalho/` e pseudocódigo não são versionados (direitos autorais); as porcentagens de tela não podem ser refeitas por terceiros sem o jogo e a bancada.
 9. **Ritmo de mudança da API de mods** (0.20 a 0.28 em dois dias). A mesclagem por chave (0.26) protege mods de dados; scripts dependem de nomes de campos que ainda mudam.
 10. **Comentários com `[hipótese]`, "ainda não" ou "[lacuna]" no código** (`engine/src`, `simant/src`): 55 linhas nesta revisão; nenhum `todo!` ou `unimplemented!`. Não foram reconferidos um a um nesta rodada.
-11. **Trabalho em paralelo.** Áudio (captura e timbre FM) e tela virtual/cores estão em outros branches; as porcentagens das áreas 5 e 7 mudam quando eles entrarem, e as specs `regras/som.md`, `telas/resolucao.md` e `divergencias.md` terão conflitos de merge prováveis.
+11. **Trabalho em paralelo e perfil de driver.** O áudio (captura e timbre FM) está em outro branch; a porcentagem da área 7 muda quando ele entrar, e `regras/som.md` e `divergencias.md` terão conflitos de merge prováveis. O perfil padrão é `vga` (a bancada de referência); quem compara com o original no DOSBox-X de 256 cores deve usar `svga256`/`s3_dosbox`, e as capturas antigas feitas lá têm de ser lidas com esse perfil.
 12. ~~Ordem das janelas fixa nas animações da amarela~~ (resolvido em 2026-10-18: a interface grava a ordem real). ~~Cauda da amarela rainha na reconstrução da vida~~ (feito em 2026-10-18, branch dos balões).
 
 ## 6. Porcentagem geral estimada
@@ -272,7 +272,7 @@ Pesos por área, pensados no que importa para quem joga um port completo (as reg
 | Regras da simulação | 25 | 97 | 2.425 | 80 | 2.000 |
 | Geração de mundo | 7 | 96 | 672 | 75 | 525 |
 | Jogo ao vivo | 8 | 93 | 744 | 65 | 520 |
-| Telas e janelas | 15 | 92 | 1.380 | 80 | 1.200 |
+| Telas e janelas | 15 | 94 | 1.410 | 83 | 1.245 |
 | Diálogos e menus | 8 | 90 | 720 | 80 | 640 |
 | Som e música | 6 | 80 | 480 | 35 | 210 |
 | Modos | 8 | 93 | 744 | 83 | 664 |
@@ -280,9 +280,9 @@ Pesos por área, pensados no que importa para quem joga um port completo (as reg
 | Mods | 5 | 92 | 460 | n/a | — |
 | Ferramentas e testes | 3 | 92 | 276 | n/a | — |
 | Documentação | 3 | 92 | 276 | n/a | — |
-| **Total** | **100** | | **9.329** | | **6.799** (peso 89) |
+| **Total** | **100** | | **9.359** | | **6.844** (peso 89) |
 
-- **Implementado:** 9.329 / 100 = **≈ 93%** (era 8.775, ≈ 88%).
-- **Verificado contra o original** (só as áreas 1–9, peso 89): 6.799 / 89 = **≈ 76%** (era 6.220, ≈ 70%).
+- **Implementado:** 9.359 / 100 = **≈ 94%** (era 8.775, ≈ 88%).
+- **Verificado contra o original** (só as áreas 1–9, peso 89): 6.844 / 89 = **≈ 77%** (era 6.220, ≈ 70%).
 
-Leitura: a simulação está praticamente completa e amarrada ao original por vetores de tick inteiros; a interface alcançável pelo jogador existe inteira e foi comparada com capturas na maior parte. O que separa o port de "completo" é o som (timbre e comparação de ouvido) e as telas maiores que 640×480, os dois em andamento em paralelo, mais a ordem de `_SpecialXfer` dentro do tick. O que separa de "verificado" são os ramos raros das regras (§3), o áudio e as janelas sem captura nas resoluções maiores.
+Leitura: a simulação está praticamente completa e amarrada ao original por vetores de tick inteiros; a interface alcançável pelo jogador existe inteira e foi comparada com capturas na maior parte. O que separa o port de "completo" é o som (timbre e comparação de ouvido, em andamento em paralelo) e a ordem de `_SpecialXfer` dentro do tick; o resto são resíduos pequenos (§4). O que separa de "verificado" são os ramos raros das regras (§3), o áudio e as poucas janelas sem captura nas resoluções maiores e em 256 cores.

@@ -53,7 +53,6 @@ use engine::core::quintal_mapa::AcaoQuintal;
 use engine::core::tela_jogo::{ConfigTelaJogo, PosicaoVista, TelaDeJogo};
 use engine::core::telas::{compor, Evento, Interface, Reprodutor, Sequencia};
 use engine::formats::save::{JogoSalvo, LayoutSave};
-use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 use engine::rules::amarela::{Modificadores, RespostaTecla, TabelasAmarela};
 use engine::rules::estado::{ConfigSimulacao, Estado, Evento as EventoRegras};
@@ -265,7 +264,7 @@ fn principal() -> Result<(), String> {
     for m in recursos.mods() {
         println!("mod carregado: {} {}", m.manifesto.nome, m.manifesto.versao);
     }
-    let cores = recursos.dados::<Paleta>("paleta.json")?.rgb()?;
+    let cores = engine::paleta::carregar_rgb(&recursos)?;
     if let Some(dir) = &o.som.exportar {
         return som::exportar(&recursos, &o.som, dir);
     }
@@ -283,7 +282,8 @@ fn principal() -> Result<(), String> {
         // Abertura até o "Select a Game"; a escolha vira o jogo novo.
         let mut seq: Sequencia = recursos.dados("telas.json")?;
         tela_virtual.aplicar_sequencia(&mut seq);
-        let interface = Interface::carregar(&recursos, tela_virtual.tabela_posicoes)?;
+        let mut interface = Interface::carregar(&recursos, tela_virtual.tabela_posicoes)?;
+        interface.area = [tela_virtual.largura as i16, tela_virtual.altura as i16];
         match executar(seq, &recursos, &interface, &cores, &o)? {
             Some(SaidaAbertura::Carregar(p)) => {
                 // Load Game na abertura: o Load do começo do programa (como --save).
@@ -509,7 +509,8 @@ fn principal() -> Result<(), String> {
 
     let mut seq: Sequencia = recursos.dados("telas.json")?;
     tela_virtual.aplicar_sequencia(&mut seq);
-    let interface = Interface::carregar(&recursos, tela_virtual.tabela_posicoes)?;
+    let mut interface = Interface::carregar(&recursos, tela_virtual.tabela_posicoes)?;
+    interface.area = [tela_virtual.largura as i16, tela_virtual.altura as i16];
     match &o.exportar {
         Some(dir) => exportar(&seq, &recursos, &interface, &cores, dir),
         None => Ok(()),

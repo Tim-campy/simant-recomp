@@ -72,6 +72,13 @@ pub struct CoresAjuda {
     pub trilho: u8,
 }
 
+/// Regra da posição padrão do visor (telas/resolucao.md §3).
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub struct PosicaoAjuda {
+    pub divisor_x: i16,
+    pub margem_direita: i16,
+}
+
 /// Conteúdo de data/ajuda.json.
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigAjuda {
@@ -81,6 +88,11 @@ pub struct ConfigAjuda {
     pub titulo: String,
     /// Contorno externo da janela na área cliente do port [esq, topo, dir, base) .
     pub externo: [i16; 4],
+    /// Posição padrão do WinHelp (sem `H_WindowPosition` no `WIN.INI`) para a tela virtual: x de
+    /// `largura / divisor_x` a `largura − margem_direita`; do topo à base da área cliente. Opcional
+    /// (API 0.29); sem ela, `externo`.
+    #[serde(default)]
+    pub posicao_padrao: Option<PosicaoAjuda>,
     pub espessura_moldura: i16,
     pub altura_titulo: i16,
     pub altura_menu: i16,
@@ -349,6 +361,13 @@ impl VisorAjuda {
     // ------------------------------------------------------------------------------------------
     // Geometria
     // ------------------------------------------------------------------------------------------
+
+    /// O visor na área cliente de `largura` × `altura` (a tela virtual), pela `posicao_padrao`.
+    pub fn na_tela(&mut self, largura: i16, altura: i16) {
+        if let Some(p) = self.cfg.posicao_padrao {
+            self.cfg.externo = [largura / p.divisor_x.max(1), 0, largura - p.margem_direita, altura];
+        }
+    }
 
     pub fn externo(&self) -> Retangulo {
         let [e, t, d, b] = self.cfg.externo;

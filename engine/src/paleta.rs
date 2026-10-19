@@ -24,3 +24,19 @@ impl Paleta {
             .collect()
     }
 }
+
+/// A paleta de `data/paleta.json` com as cores do sistema do perfil de driver ativo
+/// (`data/resolucao.json`, `perfil_driver`; docs/spec/telas/resolucao.md §7).
+pub fn carregar_rgb(recursos: &crate::recursos::Recursos) -> Result<Vec<[u8; 3]>, String> {
+    carregar_rgb_do_perfil(recursos, None)
+}
+
+/// Como [`carregar_rgb`], com o perfil `perfil` no lugar do ativo.
+pub fn carregar_rgb_do_perfil(recursos: &crate::recursos::Recursos, perfil: Option<&str>) -> Result<Vec<[u8; 3]>, String> {
+    use crate::core::resolucao::{ConfigResolucao, ARQUIVO};
+    let mut rgb = recursos.dados::<Paleta>("paleta.json")?.rgb()?;
+    if recursos.existe_dado(ARQUIVO) {
+        recursos.dados::<ConfigResolucao>(ARQUIVO)?.perfil(perfil)?.aplicar_cores(&mut rgb)?;
+    }
+    Ok(rgb)
+}

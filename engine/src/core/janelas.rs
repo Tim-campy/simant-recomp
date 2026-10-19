@@ -194,6 +194,8 @@ pub struct JanelasControle {
     /// Tabela de posições das janelas (tipo 9) e altura da faixa, da `Interface`.
     posicoes: Vec<[i16; 4]>,
     faixa: i16,
+    /// Alinhamento ao byte do driver imitado (data/resolucao.json).
+    driver: super::resolucao::PerfilDriver,
     /// Estado da janela History.
     pub historico: JanelaHistorico,
     /// Último clique (ou arrasto) na área da janela do mapa, em coordenadas da área cliente; a
@@ -282,6 +284,7 @@ impl JanelasControle {
             clique_info: None,
             posicoes: interface.posicoes.clone(),
             faixa: interface.moldura.faixa.altura,
+            driver: interface.driver.clone(),
         };
 
         for c in COM_LAYOUT {
@@ -410,7 +413,7 @@ impl JanelasControle {
         let pos = self.posicoes.get(id as usize).copied().unwrap_or([0; 4]);
         let [ax, ay] = self.cfg.ajuste_posicao;
         let [bx, by] = [&self.cfg.mapa, &self.cfg.info].iter().find(|c| c.janela == id).map_or([0, 0], |c| c.ajuste);
-        geometria_janela(j, pos, self.faixa, self.cfg.altura_titulo, [ax + bx, ay + by])
+        geometria_janela(j, pos, self.faixa, self.cfg.altura_titulo, [ax + bx, ay + by], &self.driver)
     }
 
     /// Retângulo de um objeto da janela na área cliente; com `mais_um`, o pixel a mais à direita e
@@ -706,13 +709,15 @@ impl JanelasControle {
 }
 
 /// Geometria de uma janela de layout com título do Windows: o objeto 0 vai para a posição da
-/// tabela tipo 9 (+ faixa + ajuste) e encolhe pelo contorno (`_win_Recalc`); o encolhido é o
-/// contorno externo, com o título de `altura_titulo` + 1 linha e a área cliente embaixo.
-pub fn geometria_janela(j: &Janela, pos: [i16; 4], faixa: i16, altura_titulo: i16, ajuste: [i16; 2]) -> GeometriaControle {
+/// tabela tipo 9 (+ faixa + ajuste) e encolhe pelo contorno (`_win_Recalc`); o encolhido é a
+/// janela do Windows (`_win_Open`), com 1 pixel de borda (`WS_BORDER`), o título de
+/// `altura_titulo` + 1 linha e a área cliente embaixo. O Windows põe a borda esquerda da área
+/// cliente no byte mais próximo (`CS_BYTEALIGNCLIENT`, `driver`; telas/resolucao.md §7).
+pub fn geometria_janela(j: &Janela, pos: [i16; 4], faixa: i16, altura_titulo: i16, ajuste: [i16; 2], driver: &super::resolucao::PerfilDriver) -> GeometriaControle {
     let ob0 = &j.objetos[0];
     let t = if ob0.tipo == crate::formats::janela::TIPO_CONTORNO { ob0.byte_28 as i16 } else { 0 };
     let r = ob0.retangulo;
-    let dx = pos[0] - r.esq + ajuste[0];
+    let dx = driver.alinhar(pos[0] + t + 1 + ajuste[0]) - (r.esq + t);
     let dy = pos[1] - r.topo + faixa + ajuste[1];
     // _win_Recalc: com contorno de espessura t a janela encolhe (L+t, T+t, R−(t+1), B−(t+1)).
     let enc = Retangulo { esq: r.esq + t, topo: r.topo + t, dir: r.dir - (t + 1), base: r.base - (t + 1) };

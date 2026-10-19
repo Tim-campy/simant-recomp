@@ -13,7 +13,6 @@ use engine::core::quadro::Quadro;
 use engine::core::telas::Interface;
 use engine::formats::banco::Chave;
 use engine::formats::menu::{MenuBanco, TIPO_MENU};
-use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 
 fn main() {
@@ -25,7 +24,7 @@ fn main() {
     let bancos = ["SHARED", "WINGANT", "SOUND"].map(String::from);
     let r = Recursos::abrir(Path::new(&a[1]), &bancos, Path::new("data"), None).unwrap();
     let interface = Interface::carregar(&r, 0).unwrap();
-    let cores = r.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+    let cores = engine::paleta::carregar_rgb(&r).unwrap();
     let cfg: ConfigBarraMenus = r.dados(engine::core::barra_menus::ARQUIVO_CONFIG).unwrap();
     let menu = MenuBanco::decodificar(&r.objeto(Chave { tipo: TIPO_MENU, id: cfg.objeto_menu }).unwrap()).unwrap();
     let fonte = cfg.fontes.iter().find_map(|&i| interface.fontes.get(i).and_then(|f| f.as_ref()));

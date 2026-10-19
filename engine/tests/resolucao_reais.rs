@@ -29,9 +29,12 @@ fn abertura_em_800x600_pela_regra_e_a_validada_no_dosbox() {
     let mut seq: Sequencia = r.dados("telas.json").unwrap();
     let validada = seq.clone();
     tela.aplicar_sequencia(&mut seq);
-    // As telas validadas (telas.json, tabela 8) são as do DOSBox-X a 800×600.
-    let ref_interface = Interface::carregar(&r, 8).unwrap();
-    let interface = Interface::carregar(&r, tela.tabela_posicoes).unwrap();
+    // As telas validadas (telas.json, tabela 8) são as do DOSBox-X a 800×600, com o driver dele.
+    let regra: ConfigResolucao = r.dados(ARQUIVO).unwrap();
+    let mut ref_interface = Interface::carregar(&r, 8).unwrap();
+    ref_interface.driver = regra.perfil(Some("s3_dosbox")).unwrap();
+    let mut interface = Interface::carregar(&r, tela.tabela_posicoes).unwrap();
+    interface.driver = regra.perfil(Some("s3_dosbox")).unwrap();
     for (t, v) in seq.telas.iter().zip(&validada.telas) {
         let (q, _) = compor(t, &r, &interface).unwrap();
         let (q_ref, _) = compor(v, &r, &ref_interface).unwrap();
@@ -41,7 +44,7 @@ fn abertura_em_800x600_pela_regra_e_a_validada_no_dosbox() {
 }
 
 #[test]
-fn abertura_em_640x480_usa_a_tabela_0() {
+fn abertura_em_640x480_usa_a_tabela_0_e_o_alinhamento_do_vga() {
     let Some(r) = recursos() else { return };
     let tela = r.dados::<ConfigResolucao>(ARQUIVO).unwrap().tela([640, 480]).unwrap();
     let mut seq: Sequencia = r.dados("telas.json").unwrap();
@@ -52,9 +55,12 @@ fn abertura_em_640x480_usa_a_tabela_0() {
     assert!(pendentes.is_empty(), "{pendentes:?}");
     assert_eq!((q.largura, q.altura), (640, 442));
     let px = |x: usize, y: usize| q.pixels[y * q.largura + x];
-    // Janela 3 na tabela 9/0: (64, 3) + faixa (73). Na de 800×600 (9/8) ficaria em (64, 145).
-    assert_eq!(px(64, 76), 0, "borda externa");
-    assert_eq!(px(65, 77), 16, "cor da borda");
-    assert_eq!(px(64, 75), 17, "fundo acima da janela");
+    // Janela 3 na tabela 9/0: (64, 3) + faixa (73). Na de 800×600 (9/8) ficaria em (64, 145). Com o
+    // perfil padrão (VGA de 16 cores) a área cliente (64 + 5 = 69) vai para o byte, 72: a janela
+    // inteira 3 pixels à direita, como na bancada VGA (qi_01_titulo.png: contorno em (67, 76)).
+    assert_eq!(px(67, 76), 0, "borda externa");
+    assert_eq!(px(68, 77), 16, "cor da borda");
+    assert_eq!(px(67, 75), 17, "fundo acima da janela");
+    assert_eq!(px(66, 76), 17, "fundo à esquerda da janela");
     assert_eq!(px(639, 30), 8, "faixa até a borda direita");
 }

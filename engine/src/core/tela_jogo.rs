@@ -130,6 +130,22 @@ pub struct ConfigTelaJogo {
     pub barras_faixa: super::barras_faixa::ConfigBarrasFaixa,
 }
 
+impl ConfigTelaJogo {
+    /// A janela de edição no x do driver imitado: `_win_Open` cria a janela no canto da tabela
+    /// (objeto 0 encolhido pelo contorno) e o Windows põe a área cliente (depois da moldura de
+    /// `espessura`) no byte mais próximo (`CS_BYTEALIGNCLIENT`; telas/resolucao.md §7). Os valores de
+    /// `data/tela_jogo.json` são os medidos na bancada VGA (x = 20); em 256 cores ficam em 16.
+    pub fn alinhar_edicao(&mut self, janela: &crate::formats::janela::Janela, interface: &super::telas::Interface) {
+        let Some(&[x, ..]) = interface.posicoes.get(self.edicao.janela as usize) else { return };
+        let ob0 = &janela.objetos[0];
+        let t = if ob0.tipo == crate::formats::janela::TIPO_CONTORNO { ob0.byte_28 as i16 } else { 0 };
+        let m = &mut self.edicao.moldura;
+        let dx = interface.driver.alinhar_janela(x + t, m.espessura) - m.externo[0];
+        m.externo[0] += dx;
+        self.edicao.area_na_tela[0] += dx;
+    }
+}
+
 /// Bit "selecionado" das flags de objeto (janela.md).
 const FLAG_SELECIONADO: u16 = 4;
 

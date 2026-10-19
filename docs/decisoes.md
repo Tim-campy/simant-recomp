@@ -2,6 +2,13 @@
 
 Formato: data, decisão, motivo, alternativas descartadas.
 
+## 2026-10-19: Referência de cores e de posições: Windows 3.1 VGA padrão (perfil de driver)
+
+- **Decisão:** o port imita por padrão o Windows 3.1 com o driver **VGA padrão** (`VGA.DRV`, 16 cores): cores do sistema do driver (título ativo e moldura de diálogo azul-escuros, fundo da aplicação branco) e alinhamento ao byte de 8 pixels das janelas e diálogos. Abertura e partida passam a usar a mesma referência. O que depende do driver fica em `data/resolucao.json` → `perfis_driver` (`"vga"`, `"svga256"` para o vbesvga/S3 em 256 cores, `"s3_dosbox"` para as telas validadas no DOSBox-X), escolhido por `perfil_driver`. Ver `docs/spec/telas/resolucao.md` §7.
+- **Motivo:** a abertura vinha das capturas do DOSBox-X (S3, 256 cores: azul-claro e creme) e a partida da bancada QEMU (VGA, 16 cores: azul-escuro e branco). A diferença não é do jogo: o `WIN.INI` não tem `[colors]`, e cada driver traz as próprias cores padrão (recurso `OEMBIN 1`); as diferenças de 1 a 4 pixels em x vêm do `CS_BYTEALIGNCLIENT` da classe das janelas do jogo, que só age em vídeo planar. O VGA padrão é o que todo Windows 3.1 tem e é o ambiente da bancada automática (onde está a maior parte das referências da partida).
+- **Descartado:** manter as duas referências misturadas (a tela muda de cores entre a abertura e a partida); usar o S3 do DOSBox-X como padrão (exigiria refazer as medidas da partida, e o S3 tem um pixel a mais sem explicação no Windows); emular o DAC de 6 bits da bancada (as cores lógicas do driver são as mesmas; o DAC é do emulador).
+- **Consequências:** os hashes das telas validadas contra o DOSBox-X não mudam (os testes usam o perfil `"s3_dosbox"`); o título em 640×480 bate 99,96% com a bancada VGA (antes 84,88%). Mods: API 0.29 (`docs/api-mods.md`).
+
 ## 2026-10-19: Tela virtual (`resolucao_virtual` em `data/video.json`)
 
 - **Decisão:** o port imita uma tela do Windows 3.1 de 640×480 (padrão), 800×600 ou 1024×768. A resolução escolhe, pela regra do original guardada em `data/resolucao.json` (área cliente = tela − 38 linhas; tabela de posições 9/0 até 480 linhas, 9/8 acima), o tamanho da área cliente e a tabela de posições da abertura e da partida. A ampliação continua a da decisão "Escala 1" (inteira, nítida), aplicada sobre a tela virtual. Linha de comando: `--resolucao LxA`. Especificação: `docs/spec/telas/resolucao.md`.

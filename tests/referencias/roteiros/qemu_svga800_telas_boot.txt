@@ -1,0 +1,17 @@
+# Bancada SVGA 800x600 (vbesvga.drv): boot até o Quick Game pausado e snapshot "quick" (telas/resolucao.md §5).
+# python tools/qemu_bancada.py preparar_svga 800 600 --disco re_trabalho/qemu/svga_ag_800x600.img --ajuda-padrao
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_svga800_telas_boot.txt --disco re_trabalho/qemu/svga_ag_800x600.img --overlay re_trabalho/qemu/svga_ag_800x600.qcow2
+esperar 70
+capturar re_trabalho/svga/ag800_titulo.png
+teclas spc
+esperar 4
+teclas spc
+esperar 6
+capturar re_trabalho/svga/ag800_selecao.png
+clicar_em 345 228
+esperar 20
+teclas shift+0
+esperar 3
+capturar re_trabalho/svga/ag800_quick.png
+snapshot_salvar quick
+fim

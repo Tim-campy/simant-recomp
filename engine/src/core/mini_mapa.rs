@@ -45,8 +45,10 @@ pub struct MolduraMini {
     pub topo: i16,
     pub ajuste_x: i16,
     /// Alinhamento da área cliente na criação da janela (primeira abertura; 8 = um byte em 16
-    /// cores): bancada mini3, 155 na primeira abertura e 156 depois.
-    pub alinhamento_ao_criar: i16,
+    /// cores): bancada mini3, 155 na primeira abertura e 156 depois. Ausente (padrão, API 0.30): o
+    /// `alinhamento_x` do perfil de driver (`MiniMapa::aplicar_driver`); um mod pode fixá-lo.
+    #[serde(default)]
+    pub alinhamento_ao_criar: Option<i16>,
     pub largura_borda: i16,
     pub cor_borda: u8,
     pub cor_contorno: u8,
@@ -93,6 +95,12 @@ impl MiniMapa {
         Ok(MiniMapa::novo(cfg, (r.dir - r.esq, r.base - r.topo)))
     }
 
+    /// O alinhamento da criação vem do perfil de driver, se os dados não o fixam
+    /// (docs/spec/telas/resolucao.md §7).
+    pub fn aplicar_driver(&mut self, driver: &super::resolucao::PerfilDriver) {
+        self.cfg.moldura.alinhamento_ao_criar.get_or_insert(driver.alinhamento_x);
+    }
+
     /// Sem banco (testes): `tamanho` = largura e altura do objeto 0.
     pub fn novo(cfg: ConfigMiniMapa, tamanho: (i16, i16)) -> MiniMapa {
         MiniMapa {
@@ -121,7 +129,7 @@ impl MiniMapa {
         let b = m.largura_borda;
         let mut esq = botao.esq + (botao.dir - botao.esq) / 2 - w / 2 + m.ajuste_x;
         if !self.reaberto {
-            esq = super::gerenciador::alinhar_cliente_ao_criar(i32::from(esq + b), i32::from(m.alinhamento_ao_criar)) as i16 - b;
+            esq = super::gerenciador::alinhar_cliente_ao_criar(i32::from(esq + b), i32::from(m.alinhamento_ao_criar.unwrap_or(1))) as i16 - b;
         }
         self.reaberto = true;
         self.externo = Some(Retangulo { esq, topo: m.topo, dir: esq + w + b, base: m.topo + h + b });
@@ -248,9 +256,16 @@ impl MiniMapa {
 mod testes {
     use super::*;
 
-    fn mini() -> MiniMapa {
+    fn mini_com(alinhamento_x: i16) -> MiniMapa {
         let cfg: ConfigMiniMapa = serde_json::from_str(include_str!("../../../data/mini_mapa.json")).unwrap();
-        MiniMapa::novo(cfg, (132, 68))
+        let mut m = MiniMapa::novo(cfg, (132, 68));
+        m.aplicar_driver(&crate::core::resolucao::PerfilDriver { alinhamento_x, ..Default::default() });
+        m
+    }
+
+    /// Perfil VGA de 16 cores (a bancada): área cliente alinhada a 8 pixels na criação.
+    fn mini() -> MiniMapa {
+        mini_com(8)
     }
 
     fn mapa() -> JanelaMapa {
@@ -281,6 +296,10 @@ mod testes {
         m.fechar();
         m.abrir(Retangulo { esq: 207, topo: 41, dir: 232, base: 59 }, &e, &mapa(), false, true, false);
         assert_eq!(m.externo.map(|r| r.esq), Some(156));
+        // Em 256 cores (perfil svga256, 1 byte por pixel) não há alinhamento: já na primeira, 156.
+        let mut s = mini_com(1);
+        s.abrir(Retangulo { esq: 207, topo: 41, dir: 232, base: 59 }, &e, &mapa(), false, true, false);
+        assert_eq!(s.externo.map(|r| r.esq), Some(156));
     }
 
     #[test]

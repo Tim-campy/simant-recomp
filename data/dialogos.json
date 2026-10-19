@@ -1,5 +1,5 @@
 {
-  "_comentario": "Diálogos do Windows usados na partida (docs/spec/telas/arquivos.md): a caixa de mensagem (MessageBox: 'SimAnt Load' de _LoadGame, 'Message' de _PopMsg) e o diálogo comum de arquivo de _FileSelect ('Load Ant Hill' / 'Save Ant Hill As'). Coordenadas na área cliente da janela principal (640×442: tela da bancada QEMU menos 38 linhas de título e menu), medidas em re_trabalho/load/l1, l2 e l4. Cores: índices da paleta (data/paleta.json). '&' nos textos sublinha a letra seguinte (mnemônico do Windows). Fontes: índices de interface.json, a primeira que existir (6 = System, 7 = MS Sans Serif 8 em negrito, ambas da instalação do usuário; 0 = reserva).",
+  "_comentario": "Diálogos do Windows usados na partida (docs/spec/telas/arquivos.md): a caixa de mensagem (MessageBox: 'SimAnt Load' de _LoadGame, 'Message' de _PopMsg) e o diálogo comum de arquivo de _FileSelect ('Load Ant Hill' / 'Save Ant Hill As'). Coordenadas na área cliente da janela principal (tela menos 38 linhas de título e menu), medidas em re_trabalho/load/l1, l2 e l4 (bancada VGA) e re_trabalho/svga/ag*_load_dialogo.png (SVGA): o diálogo de arquivo fica no mesmo lugar em 640x480, 800x600 e 1024x768; os x de 'arquivo' são os sem alinhamento (256 cores, 58) e o port põe o canto no byte do perfil de driver (56 no VGA; ConfigDialogoArquivo::aplicar_driver). Cores: índices da paleta (data/paleta.json). '&' nos textos sublinha a letra seguinte (mnemônico do Windows). Fontes: índices de interface.json, a primeira que existir (6 = System, 7 = MS Sans Serif 8 em negrito, ambas da instalação do usuário; 0 = reserva).",
   "fontes_titulo": [
     6,
     0
@@ -24,7 +24,7 @@
     "pasta": 11
   },
   "caixa_mensagem": {
-    "_comentario": "MessageBox: a largura do interior é texto_x + largura do texto + margem_direita (no mínimo a dos botões); o ícone fica icone_abaixo_titulo linhas abaixo da linha do título e o texto, centrado na altura dele se for mais baixo; os botões, folga_botoes abaixo do mais baixo dos dois; o interior acaba margem_baixo abaixo deles. estilos: 0 = a pergunta do Load (só o contorno; 348x129 em (144, 138), bancada l1), 1 = a 'Message' do _PopMsg (moldura de diálogo azul [5, 4, 5, 5] e margem branca no título; 296x137 em (176, 134), bancada cen/salvo). centro em coordenadas da área cliente [medido; o critério do Windows para o x não foi achado]. grupos_botoes: por número de botões, a largura do grupo e o x de cada botão (Yes/No/Cancel em 0, 74 e 150). salvo: o formato do DGROUP ('%s\\nSaved correctly'), com o caminho completo.",
+    "_comentario": "MessageBox: a largura do interior é texto_x + largura do texto + margem_direita (no mínimo a dos botões); o ícone fica icone_abaixo_titulo linhas abaixo da linha do título e o texto, centrado na altura dele se for mais baixo; os botões, folga_botoes abaixo do mais baixo dos dois; o interior acaba margem_baixo abaixo deles. estilos: 0 = a pergunta do Load (só o contorno; 348x129 em (144, 138) na bancada VGA, l1), 1 = a 'Message' do _PopMsg (moldura de diálogo azul [5, 4, 5, 5] e margem branca no título; 296x137 em (176, 134), cen/salvo). Posição: regra do Windows (Interface::centrar_dialogo; telas/resolucao.md §3): centrada na tela sem o contorno de 1 pixel, x no byte mais próximo (8 pixels no VGA de 16 cores) [medido em 640x480 VGA e em 640, 800 e 1024 na bancada SVGA]. grupos_botoes: por número de botões, a largura do grupo e o x de cada botão (Yes/No/Cancel em 0, 74 e 150). salvo: o formato do DGROUP ('%s\\nSaved correctly'), com o caminho completo.",
     "fontes": [
       6,
       0
@@ -80,11 +80,7 @@
           1,
           1
         ],
-        "margem_titulo": 0,
-        "centro": [
-          318,
-          202
-        ]
+        "margem_titulo": 0
       },
       {
         "borda": [
@@ -93,11 +89,7 @@
           5,
           5
         ],
-        "margem_titulo": 1,
-        "centro": [
-          324,
-          202
-        ]
+        "margem_titulo": 1
       }
     ],
     "icone_x": 18,
@@ -114,7 +106,7 @@
       0
     ],
     "externo": [
-      56,
+      58,
       15,
       472,
       247
@@ -129,43 +121,43 @@
     "titulo_abrir": "Load Ant Hill",
     "titulo_salvar": "Save Ant Hill As",
     "campo": [
-      71,
+      73,
       65,
       160,
       20
     ],
     "lista": [
-      71,
+      73,
       90,
       160,
       106
     ],
     "pastas": [
-      253,
+      255,
       90,
       163,
       114
     ],
     "tipo": [
-      72,
+      74,
       224,
       158,
       20
     ],
     "unidades": [
-      254,
+      256,
       224,
       161,
       22
     ],
     "ok": [
-      425,
+      427,
       49,
       88,
       23
     ],
     "cancelar": [
-      425,
+      427,
       78,
       88,
       23
@@ -177,28 +169,28 @@
       [
         "File &Name:",
         [
-          72,
+          74,
           49
         ]
       ],
       [
         "&Directories:",
         [
-          253,
+          255,
           49
         ]
       ],
       [
         "List Files of &Type:",
         [
-          72,
+          74,
           208
         ]
       ],
       [
         "Dri&ves:",
         [
-          253,
+          255,
           208
         ]
       ]
@@ -207,28 +199,28 @@
       [
         "File &Name:",
         [
-          72,
+          74,
           49
         ]
       ],
       [
         "&Directories:",
         [
-          253,
+          255,
           49
         ]
       ],
       [
         "Save File as &Type:",
         [
-          72,
+          74,
           208
         ]
       ],
       [
         "Dri&ves:",
         [
-          253,
+          255,
           208
         ]
       ]
@@ -240,13 +232,13 @@
     "somente_leitura": [
       "&Read Only",
       [
-        425,
+        427,
         153
       ]
     ],
     "campo_inicial": "*.ant",
     "caminho": [
-      254,
+      256,
       68
     ],
     "recuo_pasta": 4,

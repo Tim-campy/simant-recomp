@@ -210,7 +210,7 @@ pub(crate) struct LoadNaAbertura {
 
 impl LoadNaAbertura {
     pub(crate) fn abrir(recursos: &Recursos) -> Result<LoadNaAbertura, String> {
-        let cfg: engine::core::dialogos::ConfigDialogos = recursos.dados(engine::core::dialogos::ARQUIVO_CONFIG)?;
+        let cfg = engine::core::dialogos::ConfigDialogos::carregar(recursos)?;
         Ok(LoadNaAbertura { dialogo: DialogoArquivo::new(false, Path::new("."), &cfg), cfg })
     }
 

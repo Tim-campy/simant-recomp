@@ -44,6 +44,22 @@ fn main() {
                 println!("{l}");
             }
         }
-        _ => eprintln!("use janela <id>, strings <id> ou bitmap <id>"),
+        "layout" => {
+            // Campos de layout de cada objeto (docs/spec/formatos/janela.md, "Cálculo do layout"):
+            // deslocamentos (0x08), referências (0x10) e modos (0x18) das quatro coordenadas.
+            let d = r.objeto(Chave { tipo: 0, id }).unwrap();
+            let u = |o: usize| u16::from_le_bytes([d[o], d[o + 1]]);
+            let n = u(0x0c) as usize;
+            println!("flags da janela (0x1c, 0x1d): {:02x} {:02x}", d[0x1c], d[0x1d]);
+            let mut o = 0x2c + 4 * n;
+            for i in 0..n {
+                let desl: Vec<i16> = (0..4).map(|k| u(o + 8 + 2 * k) as i16).collect();
+                let refs: Vec<String> = (0..4).map(|k| format!("{:04x}", u(o + 0x10 + 2 * k))).collect();
+                let modos: Vec<u16> = (0..4).map(|k| u(o + 0x18 + 2 * k)).collect();
+                println!("{i:3} tipo {:2} byte28 {:3} desl {desl:?} ref {refs:?} modos {modos:?}", d[o + 0x21], d[o + 0x28]);
+                o += u(o + 0x22) as usize;
+            }
+        }
+        _ => eprintln!("use janela <id>, layout <id>, strings <id> ou bitmap <id>"),
     }
 }

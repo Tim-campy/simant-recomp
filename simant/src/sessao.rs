@@ -93,7 +93,9 @@ impl Sessao<'_> {
         let nav_cfg: ConfigNavegacao = recursos.dados("navegacao.json")?;
         let cfg_sim = ConfigSimulacao::carregar(recursos)?;
         let cfg_partida: ConfigPartida = recursos.dados(partida::ARQUIVO_CONFIG)?;
-        let interface = Interface::carregar(recursos, cfg.tabela_posicoes)?;
+        let mut interface = Interface::carregar(recursos, cfg.tabela_posicoes)?;
+        interface.area = [cfg.largura as i16, cfg.altura as i16];
+        cfg.alinhar_edicao(&engine::core::telas::carregar_janela(recursos, cfg.edicao.janela)?, &interface);
         let layout = LayoutSave::carregar(&dados.join("save_layout.json"))?;
         let geracao = TabelasGeracao::carregar(recursos)?;
         let (jogo, estado) = match origem {
@@ -154,6 +156,7 @@ impl Sessao<'_> {
         let mut partida =
             Partida::nova(estado, nav, regras, TabelasAmarela::carregar(recursos)?, cfg_sim, cfg_partida, cfg_avisos);
         partida.tabelas_trapaca = engine::rules::trapacas::TabelasTrapaca::carregar(recursos)?;
+        partida.avisos.driver = interface.driver.clone();
         if matches!(origem, Origem::Save(..) | Origem::Tutorial(..)) {
             // File → Load: _FullCount e o jogo pausado (mensagens.md §6).
             partida.ao_carregar();
@@ -170,12 +173,15 @@ impl Sessao<'_> {
             Origem::Save(p, ..) => Some(p.to_path_buf()),
             Origem::Novo(..) | Origem::NovoNaPartida(..) | Origem::Tutorial(..) => None,
         };
-        let modos = modos::Modos::carregar(recursos, &interface)?;
+        let mut modos = modos::Modos::carregar(recursos, &interface)?;
         // Gerenciador de janelas: a de edição e a área cliente embaixo da faixa (janelas.md §8).
         let area = Retangulo { esq: 0, topo: interface.moldura.faixa.altura, dir: tela.cfg.largura as i16, base: tela.cfg.altura as i16 };
         let moldura = &tela.cfg.edicao.moldura;
         let mut janelas =
             JanelasControle::new(recursos.dados(janelas::ARQUIVO_CONFIG)?, &interface, recursos, (moldura.retangulo(), moldura.metricas()), area)?;
+        // O quintal abre no lugar do mapa (_MapToYard): o x medido (bancada VGA) é o do mapa com a área
+        // cliente no byte; com outro driver, o do mapa (telas/resolucao.md §7).
+        modos.quintal.cfg.externo[0] = janelas.geometria(recursos, Controle::Mapa)?.externo.esq;
         let [qx, qy, qw, qh] = modos.quintal.cfg.externo;
         janelas.registrar_quintal(Retangulo { esq: qx, topo: qy, dir: qx + qw, base: qy + qh });
         // _SetDefaultWindows no começo do jogo e, num Load, de novo (o Load roda depois de um jogo).
@@ -185,9 +191,12 @@ impl Sessao<'_> {
             abertas.push(janelas.janelas_padrao(plano));
         }
         let menus_cfg: ConfigMenus = recursos.dados(menus::ARQUIVO_CONFIG)?;
-        let dialogos_cfg = recursos.dados(engine::core::dialogos::ARQUIVO_CONFIG)?;
+        let dialogos_cfg = engine::core::dialogos::ConfigDialogos::carregar(recursos)?;
         let mapa = engine::core::janela_mapa::JanelaMapa::carregar(recursos)?;
-        let janela_exame = engine::core::exame::JanelaExame::carregar(recursos)?;
+        let mut janela_exame = engine::core::exame::JanelaExame::carregar(recursos)?;
+        janela_exame.aplicar_driver(&interface.driver);
+        let mut mini = engine::core::mini_mapa::MiniMapa::carregar(recursos)?;
+        mini.aplicar_driver(&interface.driver);
         let info = engine::core::info::JanelaInfo::new(recursos.dados(engine::core::info::ARQUIVO_CONFIG)?);
         let mut s = Sessao {
             recursos,
@@ -207,7 +216,7 @@ impl Sessao<'_> {
             dialogos_cfg,
             dialogo: None,
             mapa,
-            mini: engine::core::mini_mapa::MiniMapa::carregar(recursos)?,
+            mini,
             janela_exame,
             exame: None,
             info,
@@ -669,7 +678,7 @@ mod testes_tela_virtual {
         let dados = raiz().join("data");
         let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
         let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
-        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
         let tela = recursos.dados::<ConfigResolucao>(ARQUIVO).unwrap().tela(resolucao).unwrap();
         let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
         let origem = match novo {
@@ -734,7 +743,74 @@ mod testes_tela_virtual {
                 assert_eq!(rgb.len(), (l * a) as usize * 3);
                 let px = |x: u32, y: u32| rgb[((y * l + x) * 3) as usize..((y * l + x) * 3 + 3) as usize].to_vec();
                 assert_eq!(px(l - 1, 30), vec![0xc0, 0xc0, 0xc0], "fundo cinza da faixa até a borda direita");
-                assert_eq!(px(l - 1, a - 1), vec![0xff, 0xfb, 0xf0], "fundo da área cliente");
+                assert_eq!(px(l - 1, a - 1), vec![0xff, 0xff, 0xff], "fundo da área cliente (branco no VGA)");
+            });
+        }
+    }
+
+    /// Como `abrir` (QUICK2), com o perfil de driver `perfil` de data/resolucao.json (um mod de teste
+    /// troca `perfil_driver`).
+    fn quick2_com_perfil(resolucao: [u32; 2], perfil: &str, f: impl FnOnce(&mut Sessao, &Recursos)) {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let mods = std::env::temp_dir().join(format!("simant_teste_perfil_{perfil}_{}", std::process::id()));
+        let m = mods.join("perfil");
+        std::fs::create_dir_all(m.join("data")).unwrap();
+        std::fs::write(m.join("mod.json"), r#"{"nome": "perfil", "versao": "1", "dependencias": []}"#).unwrap();
+        std::fs::write(m.join("data").join(ARQUIVO), format!(r#"{{"perfil_driver": "{perfil}"}}"#)).unwrap();
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, Some(&mods)).unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
+        let tela = recursos.dados::<ConfigResolucao>(ARQUIVO).unwrap().tela(resolucao).unwrap();
+        let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
+        let mut s = Sessao::abrir_na_tela(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores, Some(tela)).unwrap();
+        f(&mut s, &recursos);
+        let _ = std::fs::remove_dir_all(&mods);
+    }
+
+    /// Posições que dependem da tela virtual e do driver (telas/resolucao.md §3 e §7), medidas na
+    /// bancada VGA (640×480) e na SVGA (`re_trabalho/svga/ag*`, 640/800/1024): caixa "SimAnt Quit",
+    /// diálogo de arquivo, janela de edição, Info, fim de jogo, About (178 e 170 na SVGA), visor de
+    /// ajuda e janela 26.
+    #[test]
+    fn posicoes_por_resolucao_e_driver() {
+        use engine::core::dialogos::CaixaMensagem;
+        // (perfil, resolução, quit (x, y), arquivo x, edição x, Info x, fim de jogo x, ajuda [esq, dir), bitmap da janela 26 x)
+        type Caso = (&'static str, [u32; 2], (i16, i16), i16, i16, i16, i16, (i16, i16), i16);
+        let casos: [Caso; 6] = [
+            ("vga", [640, 480], (144, 138), 56, 20, 279, 131, (213, 638), 160),
+            ("vga", [800, 600], (224, 198), 56, 20, 311, 155, (266, 798), 160),
+            ("vga", [1024, 768], (336, 282), 56, 20, 311, 155, (341, 1022), 160),
+            ("svga256", [640, 480], (147, 138), 58, 16, 279, 132, (213, 638), 158),
+            ("svga256", [800, 600], (227, 198), 58, 16, 313, 155, (266, 798), 158),
+            ("svga256", [1024, 768], (339, 282), 58, 16, 313, 155, (341, 1022), 158),
+        ];
+        for (perfil, r, quit, arquivo, edicao, info, fim, ajuda, amarela) in casos {
+            quick2_com_perfil(r, perfil, |s, recursos| {
+                let e = CaixaMensagem::pergunta_sair(&s.dialogos_cfg).externo(&s.interface, &s.dialogos_cfg);
+                assert_eq!((e.esq, e.topo), quit, "{perfil} {r:?}: SimAnt Quit");
+                assert_eq!((e.dir - e.esq, e.base - e.topo), (348, 129), "{perfil} {r:?}: tamanho da caixa");
+                assert_eq!(s.dialogos_cfg.arquivo.externo[0], arquivo, "{perfil} {r:?}: diálogo de arquivo");
+                assert_eq!(s.tela.cfg.edicao.moldura.externo[0], edicao, "{perfil} {r:?}: edição");
+                assert_eq!(s.janelas.geometria(recursos, Controle::Info).unwrap().externo.esq, info, "{perfil} {r:?}: Info");
+                let j4 = engine::core::telas::carregar_janela(recursos, 4).unwrap();
+                assert_eq!(s.interface.posicionar(4, &j4).unwrap().externo.unwrap().esq, fim, "{perfil} {r:?}: fim de jogo");
+                // Quintal: no lugar do mapa (119 na bancada VGA, 120 na SVGA, nas três resoluções).
+                assert_eq!(s.modos.quintal.cfg.externo[0], if perfil == "vga" { 119 } else { 120 }, "{perfil} {r:?}: quintal");
+                // About (janela 31): tabela + contorno; área cliente no byte só no VGA.
+                let j31 = engine::core::telas::carregar_janela(recursos, 31).unwrap();
+                let tabela = s.interface.posicoes[31][0] + 2;
+                let about = if perfil == "vga" { (tabela + 5 + 4) / 8 * 8 - 5 } else { tabela };
+                assert_eq!(s.interface.posicionar(31, &j31).unwrap().externo.unwrap().esq, about, "{perfil} {r:?}: About");
+                let mut v = engine::core::ajuda::VisorAjuda::carregar(recursos, &s.cores).unwrap();
+                v.na_tela(s.tela.cfg.largura as i16, s.tela.cfg.altura as i16);
+                assert_eq!((v.externo().esq, v.externo().dir), ajuda, "{perfil} {r:?}: ajuda");
+                let c = s.partida.avisos.cfg.quadro_amarela.clone().unwrap();
+                assert_eq!(c.imagem_em[0] + s.partida.avisos.ajuste_janela_imagem(&c, [0, 0])[0], amarela, "{perfil} {r:?}: janela 26");
             });
         }
     }
