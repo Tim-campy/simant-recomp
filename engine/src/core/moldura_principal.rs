@@ -118,7 +118,7 @@ pub struct ConfigMolduraPrincipal {
     pub glifo_apertado: [i16; 2],
     /// Itens do menu de sistema.
     pub itens: Vec<ItemPrincipal>,
-    /// Moldura grossa da janela restaurada (sem a borda do sistema). Opcional (API 0.37).
+    /// Moldura grossa da janela restaurada (sem a borda do sistema). Opcional (API 0.38).
     #[serde(default)]
     pub borda: BordaJanela,
 }
