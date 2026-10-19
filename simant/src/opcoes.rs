@@ -7,6 +7,10 @@ pub(crate) struct Opcoes {
     pub(crate) jogo: PathBuf,
     pub(crate) dados: PathBuf,
     pub(crate) mods: PathBuf,
+    /// Mods que não carregam (`--desligar-mods a,b`; nomes do `mod.json`).
+    pub(crate) mods_desligados: Vec<String>,
+    /// Perfil de driver imitado (`--perfil-driver`; vence `data/resolucao.json` → `perfil_driver`).
+    pub(crate) perfil_driver: Option<String>,
     pub(crate) exportar: Option<PathBuf>,
     pub(crate) save: Option<PathBuf>,
     pub(crate) exportar_tela_jogo: Option<PathBuf>,
@@ -86,12 +90,24 @@ pub(crate) fn ler_acoes(texto: &str) -> Result<Vec<Acao>, String> {
         .collect()
 }
 
-pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
-    let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(PathBuf::from("SimAnt-T/MAXIS/ANTWIN"));
+/// Pasta do jogo sem `--jogo` nem configuração: `SIMANT_DIR` ou `SimAnt-T/MAXIS/ANTWIN` na pasta
+/// base do port (a do executável, se tiver `data/`; `pastas.rs`).
+pub(crate) fn pasta_jogo_padrao(base: &Path) -> PathBuf {
+    std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or_else(|| base.join("SimAnt-T").join("MAXIS").join("ANTWIN"))
+}
+
+/// Lê as opções `args` (sem o nome do programa; a configuração do launcher já combinada na frente,
+/// `config_launcher::combinar`). Padrões das pastas: `data/`, `mods/` e o jogo relativos à pasta base
+/// do port, não à pasta atual; caminhos relativos dados nas opções valem a partir da pasta atual ou,
+/// se não existirem lá, da base (`pastas::resolver`).
+pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
+    let base = crate::pastas::base();
     let mut o = Opcoes {
-        jogo,
-        dados: PathBuf::from("data"),
-        mods: PathBuf::from("mods"),
+        jogo: pasta_jogo_padrao(&base),
+        dados: base.join("data"),
+        mods: base.join("mods"),
+        mods_desligados: Vec::new(),
+        perfil_driver: None,
         exportar: None,
         save: None,
         exportar_tela_jogo: None,
@@ -128,13 +144,16 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         exame_ja_aberto: false,
         som: som::OpcoesSom::default(),
     };
-    let mut args = std::env::args().skip(1);
+    let mut args = args.into_iter();
     while let Some(a) = args.next() {
         let mut valor = || args.next().ok_or(format!("falta o valor de {a}"));
         match a.as_str() {
             "--jogo" => o.jogo = valor()?.into(),
             "--dados" => o.dados = valor()?.into(),
             "--mods" => o.mods = valor()?.into(),
+            "--desligar-mods" => o.mods_desligados = crate::config_launcher::lista(&valor()?),
+            "--perfil-driver" => o.perfil_driver = Some(valor()?),
+            "--com-som" => o.som.desligado = false,
             "--exportar-telas" => o.exportar = Some(valor()?.into()),
             "--save" => o.save = Some(valor()?.into()),
             "--exportar-tela-jogo" => o.exportar_tela_jogo = Some(valor()?.into()),
@@ -194,6 +213,9 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
             _ => return Err(format!("opção desconhecida: {a}")),
         }
     }
+    o.jogo = crate::pastas::resolver(&o.jogo, &base);
+    o.dados = crate::pastas::resolver(&o.dados, &base);
+    o.mods = crate::pastas::resolver(&o.mods, &base);
     let partida = o.save.is_some() || o.novo_jogo;
     if !partida && (o.exportar_tela_jogo.is_some() || !o.acoes.is_empty() || o.ticks.is_some() || o.salvar.is_some()) {
         return Err("--exportar-tela-jogo, --acoes, --ticks e --salvar precisam de --save ou --novo-jogo".into());

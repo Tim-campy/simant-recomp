@@ -92,7 +92,7 @@ Um script é código Lua 5.4 que roda numa sandbox e só fala com o jogo pelas f
 - Cada mod com `"scripts"` ganha **uma máquina Lua só sua**: os arquivos dele rodam em ordem na mesma máquina (compartilham as globais); mods diferentes não se enxergam.
 - A ordem entre mods é a mesma dos dados (dependências primeiro, depois alfabética): para o mesmo gancho, o mod que vem antes é chamado antes.
 - Os scripts recomeçam do zero a cada partida (jogo novo, Load). Desde a 0.26, um mod pode guardar uma tabela própria ao lado do save (`ao_salvar`/`ao_carregar`, seção "Estado no save"); as globais Lua não vão para o save.
-- Mods são escolhidos como para os dados: todos os de `--mods DIR` (padrão `mods/`) estão ativos.
+- Mods são escolhidos como para os dados: todos os de `--mods DIR` (padrão `mods/` na pasta do port) estão ativos, menos os desligados pelo jogador (`--desligar-mods NOME,NOME` ou as caixas do launcher; nomes do `mod.json`). Um mod ligado que depende de um desligado é erro, como uma dependência ausente. Isso não muda a API: é a escolha de quais pastas carregar.
 
 ### Ganchos
 

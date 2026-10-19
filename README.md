@@ -12,10 +12,17 @@ Reimplementação moderna do **SimAnt** (Maxis, 1991, versão Windows 3.x) em Ru
 ## Rodar
 
 ```
-cargo run --release -p simant                              # abertura e "Select a Game"
+cargo run --release -p simant                              # launcher (opções de inicialização); Jogar = abertura e "Select a Game"
+cargo run --release -p simant -- --sem-config              # direto na abertura, sem o launcher nem a configuração dele
 cargo run --release -p simant -- --novo-jogo --tipo completo   # direto num jogo novo (tutorial, rapido, completo, experimental)
 cargo run --release -p simant -- --save tests/referencias/saves/QUICK2.ANT   # abre um save
 ```
+
+### Launcher
+
+![Launcher do SimAnt recomp](docs/imagens/launcher.png)
+
+O `simant` sem opções abre a tela de opções de inicialização (`simant/src/launcher/`, desenhada em SDL2 sem nada do jogo original; a captura acima foi gravada por `simant --capturar-launcher`): pasta da instalação do SimAnt (seletor de pastas do sistema, conferida: `SHARED.NDX`, `WINGANT.NDX`...), início (abertura, jogo novo de cada tipo ou save), vídeo, perfil de driver, som e sintetizador, pasta de mods e cada mod ligado ou não, preferências e a **linha de comando equivalente**, editável. As escolhas ficam em `launcher.json` na pasta de dados do usuário e valem também para o `simant` rodado com opções, que vencem (`simant/src/config_launcher.rs`; decisão em `docs/decisoes.md`). No Windows, o executável de lançamento não abre console: a saída vai para `simant.log` na mesma pasta e os erros fatais aparecem numa caixa de mensagem (`--console` liga um console). `data/` e `mods/` são procurados ao lado do executável (e depois na pasta atual).
 
 ## Jogar
 
@@ -36,13 +43,17 @@ Todas as teclas vêm de `data/partida.json`, `data/navegacao.json`, `data/janela
 
 | Opção | Efeito |
 |---|---|
-| `--jogo DIR`, `--dados DIR`, `--mods DIR` | pastas do jogo (padrão `SIMANT_DIR` ou `SimAnt-T/MAXIS/ANTWIN`), dos dados (`data`) e dos mods (`mods`) |
+| `--jogo DIR`, `--dados DIR`, `--mods DIR` | pastas do jogo (padrão: a do launcher, `SIMANT_DIR` ou `SimAnt-T/MAXIS/ANTWIN`), dos dados (`data`) e dos mods (`mods`), relativas à pasta do executável (ou à atual, se lá não houver `data/`) |
+| `--desligar-mods A,B` | não carrega esses mods (nomes do `mod.json`) |
+| `--launcher`, `--config ARQ`, `--sem-config` | abre o launcher; outro `launcher.json`; ignora a configuração do launcher |
+| `--console`, `--capturar-launcher ARQ.png` | (Windows, executável de lançamento) mensagens num console em vez do `simant.log`; grava a tela do launcher sem abrir janela |
 | `--novo-jogo`, `--tipo T`, `--semente N` | jogo novo do tipo `tutorial`, `rapido` (padrão), `completo` ou `experimental`, com semente fixa (reproduzível) |
 | `--save ARQ.ANT`, `--salvar ARQ.ANT` | abre um save; `--salvar` grava o estado no fim de uma execução sem janela e, na janela, é o nome do "salvar como" (Ctrl+A; sem ele, `SALVO01.ANT`, `SALVO02.ANT`...) |
 | `--resolucao LxA` | tela virtual do Windows 3.1: `640x480` (padrão), `800x600` ou `1024x768`; muda o layout como o original (janelas na tabela de posições da resolução, mais área livre em volta), sem escalar nada ([`telas/resolucao.md`](docs/spec/telas/resolucao.md)) |
 | `--escala N`, `--janela LxA` | ampliação da tela virtual (inteira, nítida) e tamanho inicial da janela; `0` = a maior que cabe |
 | `--moldura`, `--sem-moldura` | liga ou desliga a barra de título e o menu de sistema do Windows 3.1 em cima da barra de menus (`moldura_windows31`) |
-| `--sem-som`, `--sintetizador NOME`, `--soundfont ARQ.sf2` | sem áudio; sintetizador das músicas: `fm` (padrão de `data/som.json`: FM próprio no estilo do OPL da Sound Blaster, banco `data/opl_banco.json`), `soundfont` (SoundFont General MIDI, ou `SIMANT_SOUNDFONT`) ou `simples` |
+| `--perfil-driver NOME` | perfil de driver de vídeo imitado (`vga`, `svga256`, `s3_dosbox`; `data/resolucao.json` → `perfis_driver`) |
+| `--sem-som` (`--com-som`), `--sintetizador NOME`, `--soundfont ARQ.sf2` | sem áudio (ou com, vencendo o launcher); sintetizador das músicas: `fm` (padrão de `data/som.json`: FM próprio no estilo do OPL da Sound Blaster, banco `data/opl_banco.json`), `soundfont` (SoundFont General MIDI, ou `SIMANT_SOUNDFONT`) ou `simples` |
 | `--preferencias ARQ`, `--sem-preferencias` | arquivo das opções guardadas entre partidas (no lugar do `[SimAnt]` do `WIN.INI`; padrão em `%APPDATA%\SimAnt recomp\SimAnt\`) |
 | `--win-ini ARQ` | `WIN.INI` lido (só leitura) como origem das opções enquanto o arquivo acima não existe; padrão: `WINDOWS/WIN.INI` na pasta do jogo ou nas duas de cima |
 | `--ticks N`, `--avancar-ms MS`, `--acoes A,B`, `--quintal M`, `--janela-mapa M`, `--mini-mapa N` | testes sem interação: roda ticks, passa tempo real, aplica ações de navegação, abre o quintal, o mapa num modo ou o mini mapa (N aberturas) |
