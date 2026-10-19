@@ -343,6 +343,10 @@ fn principal() -> Result<(), String> {
             Origem::NovoNaPartida(_, tipo) => format!("{tipo:?}"),
         };
         let mut s = Sessao::abrir_na_tela(&recursos, &o.dados, origem, cores, o.tela_virtual)?;
+        if o.ticks.is_some() || o.exportar_tela_jogo.is_some() || o.salvar.is_some() {
+            // Sem janela, as preferências só valem se pedidas (--preferencias/--win-ini).
+            jogo::aplicar_preferencias(&mut s, &o, de_save);
+        }
         for &a in &o.acoes {
             s.partida.navegar(a);
         }

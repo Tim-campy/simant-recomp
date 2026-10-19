@@ -663,6 +663,72 @@ def cenario_queda_casa_aranha(c: Sessao, saida, n):
     return c.gravar(saida, n, parar=lambda d: d.ler("SpidOn") == 0)
 
 
+# ------------------------------------------------------------------------------------------------
+# _LastColonyPopR depois do Load (quintal.md, "Implementação": 1 depois de _InitSimYard e do Load)
+# ------------------------------------------------------------------------------------------------
+
+def gravar_ate_caixa(c: Sessao, saida, limite):
+    """Grava tick a tick até um tick que abriu caixa (extras "dialogos"); devolve os nomes."""
+    nomes = []
+    for _ in range(limite):
+        nomes += c.gravar(saida, 1)
+        ex = json.loads((Path(saida).resolve() / nomes[-1] / "extras.json").read_text(encoding="utf-8"))
+        if ex.get("dialogos"):
+            c.log(f"{nomes[-1]}: {ex['dialogos']} caixa(s) (capturas re_trabalho/cen/dialogo_*)")
+            break
+    return nomes
+
+
+def cenario_ultima_vermelha(c: Sessao, saida, n):
+    """Jogo Completo (snapshot full) sem nenhuma vermelha (listas, vida, _YMapPopR, _RpopT, _CastePopR
+    zerados na entrada de um tick): na primeira passada de _SimColonies (_YardCycle & 0x1F = 0) com
+    _LastColonyPopR = 1 (do _InitSimYard) o original mostra 10052 (e 10055). Depois salva (Ctrl+A,
+    ULTVERM), carrega o mesmo arquivo (Ctrl+L) e grava até a passada seguinte: se o Load repõe
+    _LastColonyPopR = 1, as caixas voltam."""
+    c.entrada()
+    for nome, tam in (("RlistT", 500), ("YMapPopR", 192), ("LifeR", 4096)):
+        seg, off, _ = c.mj.resolver(nome, tam)
+        for k in range(0, tam, 256):
+            c.mj.escrever_variavel(f"{seg}:{off + k:x}", bytes(min(256, tam - k)), min(256, tam - k))
+        c.log(f"{nome} zerado")
+    s = c.save()
+    for i, f in formigas(s, "A"):
+        if f["T"] & 0x80:
+            vida_escrever(c, "A", f["X"], f["Y"], 0)
+            c.escrever_elemento("AlistT", i, 0)
+    seg, off, _ = c.mj.resolver("CastePopR")
+    c.mj.escrever_variavel(f"{seg}:{off:x}", bytes(12), 12)
+    c.escrever("RpopT", 0)
+    c.escrever("RedQueens", 0)
+    c.log(f"YardCycle {c.ler('YardCycle')}, ForSaleState {c.ler('ForSaleState')}")
+    nomes = gravar_ate_caixa(c, saida, 40)
+    # salvar e carregar
+    c.teclas("ctrl+a")
+    time.sleep(3)
+    ct.tela(c, saida, "salvar_como")
+    c.b.executar("digitar ULTVERM")
+    c.teclas("ret")
+    time.sleep(4)
+    ct.tela(c, saida, "salvo")
+    c.teclas("ret")
+    time.sleep(2)
+    c.teclas("ctrl+l")
+    time.sleep(3)
+    ct.tela(c, saida, "load_pergunta")
+    c.teclas("n")
+    time.sleep(3)
+    c.b.executar("digitar ULTVERM")
+    c.teclas("ret")
+    time.sleep(6)
+    ct.tela(c, saida, "carregado")
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.entrada()
+    c.log(f"depois do Load: GameTime {c.ler('GameTime')}, YardCycle {c.ler('YardCycle')}")
+    nomes += gravar_ate_caixa(c, saida, 40)
+    return nomes
+
+
 def mortes(bruto):
     """Por tick: vagas que sumiram (T ≠ 0 → 0) em cada lista, com o T e o M de antes, e os contadores
     _BAntsExpired/_RAntsExpired, _BlkQueens/_RedQueens."""

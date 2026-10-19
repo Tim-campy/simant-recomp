@@ -464,7 +464,7 @@ Quintal: tile 0x48 (última unidade) → `Mapa = S16()` (chão); senão `Mapa �
 
 Usada pela amarela e pela aranha morta. Quintal: tile > 0x4A → falha (devolve 0); tile < 0x48 → 0x48; senão +1. Casa: tile ≤ 3 → `(tile + 6)·4`; 8–0x17 (cadáver) → `((tile − 8) >> 2 + 6)·4`; 0x18–0x26 → +1; outro tile < 0x40 (4–7 e 0x27–0x3F) → a comida **cai**; ≥ 0x40 → falha. Sucesso: `_FoodA += 1`. Fato visto no código.
 
-**A queda** [código + desmontagem de `1020:0dfe`–`0ea4`]: com d = `_DROPdir` (`9:9c66`), dx = byte `10:22be + d` e dy = byte `10:22c2 + d` (tabelas `[0, 1, 0, 0xFF]` e `[0xFF, 0, 1, 0]`), **somados sem sinal** (`mov al, …; sub ah, ah`). A partir da própria célula: se o tile é < 4, recebe `(tile + 6)·4`, `_FoodA += 1` e para; senão anda (dx, dy); para se x sai de 0..127 ou y de 0..63. Devolve 1 mesmo quando a comida some. Como 0xFF soma 255, nas direções 0 (ladrilhos, "para cima") e 3 (carpete direito, "para a esquerda") a comida sai do mapa no primeiro passo e **some**; só cai de fato nas direções 1 (carpete esquerdo, para a direita) e 2 (cozinha, patches 9/36/37, para baixo) [hipótese: defeito do original (o código quer −1); comportamento seguido pelo port]. `_DROPdir` não está no save: depois de um Load vale o do último patch da casa gerado na sessão (0 se nenhum). **Port** (2026-10-18): `comum::largar_comida_superficie` + `comida_cai`, com `Estado::passo_queda` gravado ao gerar um patch da casa (tabela em `data/casa.json`, `direcoes_queda`); teste `comida_cai_na_casa_pelo_dropdir`. **Não conferido na bancada.**
+**A queda** [código + desmontagem de `1020:0dfe`–`0ea4`]: com d = `_DROPdir` (`9:9c66`), dx = byte `10:22be + d` e dy = byte `10:22c2 + d` (tabelas `[0, 1, 0, 0xFF]` e `[0xFF, 0, 1, 0]`), **somados sem sinal** (`mov al, …; sub ah, ah`). A partir da própria célula: se o tile é < 4, recebe `(tile + 6)·4`, `_FoodA += 1` e para; senão anda (dx, dy); para se x sai de 0..127 ou y de 0..63. Devolve 1 mesmo quando a comida some. Como 0xFF soma 255, nas direções 0 (ladrilhos, "para cima") e 3 (carpete direito, "para a esquerda") a comida sai do mapa no primeiro passo e **some**; só cai de fato nas direções 1 (carpete esquerdo, para a direita) e 2 (cozinha, patches 9/36/37, para baixo) [hipótese: defeito do original (o código quer −1); comportamento seguido pelo port]. `_DROPdir` não está no save: depois de um Load vale o do último patch da casa gerado na sessão (0 se nenhum). **Port** (2026-10-18): `comum::largar_comida_superficie` + `comida_cai`, com `Estado::passo_queda` gravado ao gerar um patch da casa (tabela em `data/casa.json`, `direcoes_queda`); teste `comida_cai_na_casa_pelo_dropdir`. **Conferido na bancada (2026-10-19, vetores `queda_casa_carpete_esq` e `queda_casa_carpete_dir`, testes-tick.md "Sétima rodada"):** a aranha em agonia sobre um fiapo (0x3F/0x3E) larga 3 comidas; no carpete esquerdo (`_DROPdir` = 1, lido na memória) cada uma cai para a direita até o primeiro carpete livre (106, 107 e 108, 44 = 0x24, `_FoodA` + 3); no direito (`_DROPdir` = 3) as três somem e `_FoodA` não muda — o passo 0xFF sem sinal se confirma. Cozinha (2) e ladrilhos (0) não foram gravados.
 
 ### 8.3 `_AddFood(n, som)` (`1030:6a58`) e alimentação periódica
 
@@ -630,10 +630,10 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md). Ferramenta de leitura do
 ## Lacunas
 
 - Quem arma `_FlyAwayB` (revoada preta) e as regras de `_QueenStorage*`: documento de ciclo de vida (em paralelo).
-- Queda de comida na casa (`_DropFoodA`): especificada em 8.2 pelo código; falta um caso na bancada.
+- Queda de comida na casa (`_DropFoodA`): conferida nos dois carpetes (8.2); faltam a cozinha e os ladrilhos.
 - Significado prático dos modos 17/18 na superfície (se alguma formiga sai do ninho com eles).
 - `_ForceModeA/B`, `_StartAttack`, `_GetNewRedTask` e demais funções sem chamador: confirmar se há chamadas indiretas (tabela de ponteiros) com o Ghidra.
-- Ainda não conferidos no original: morte natural (T1), luta e proporção de vitórias (T5, T6), revoada (T8), estratégia vermelha (T9), recrutamento pelo jogador (T11). As regras foram conferidas só pelos casos da seção "Observado no original".
+- Ainda não conferidos no original: estratégia vermelha (T9) e recrutamento pelo jogador (T11). Morte natural (T1), luta e proporção de vitórias (T5, T6) e revoada natural (T8) foram conferidos em 2026-10-19 por vetores de tick (seção "Observado no original").
 - `_YellowFight` e `_DoTroph` são os completos de `amarela.rs` (com `_YellowDeath(0)` e `_ResetYellowVars`); os balões (`_RestBalloons`, `_FightBalloons`) anotam pelo `rules::baloes` (telas/baloes.md).
 
 ## Observado no original
@@ -650,6 +650,14 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md). Ferramenta de leitura do
 | SUP-04 | feromônios no tick e P7 | trilha vermelha 210 → 105 no tick 96; trilha preta 210 intacta até o tick 130; alarme 200 → 100 no centro e 25 nas vizinhas no tick 128; buraco vermelho (59, 16) = 254; formiga com M = 17 parada |
 
 Nenhuma divergência entre esta especificação e o original apareceu nesses casos.
+
+**Vetores de tick da sétima rodada** (2026-10-19, `tools/cenarios_raros.py`, [testes-tick.md](testes-tick.md#sétima-rodada-2026-10-19-ramos-raros); todos 307/307 com S, R e vida):
+
+| Caso | Vetor | Observado no original |
+|---|---|---|
+| T1 | `morte_natural` (1763, 1772, 1796, 1842) | com `_HealthB` = `_HealthR` = 1, morrem na superfície um soldado preto, uma operária vermelha, um macho preto e um macho vermelho: cadáver e `_BAntsExpired` + 1 **também para as vermelhas** (6.5) |
+| T5, T6 | `lutas_soldado`, `lutas_castas` (1793) | tabuleiros de pretas e vermelhas em Bored: dezenas de lutas por tick; nas 250 lutas das gravações, as proporções por classe ficam perto da matriz (testes-tick.md, achado 3; a matriz é complementar, M[i][j] + M[j][i] = 10, então a chance de cada classe independe de quem ataca) |
+| T8 | `revoada_natural` (3722, 3842, 3843) | sem castas forçadas: a colônia vermelha do `rico`, rodando em ultra, fez os próprios machos e rainhas novas e `_GstrR` armou `_FlyAwayR`; voo (16) saindo do mapa, decolagem 15 → 16 por `S1(F)` com F = 5 |
 
 ## Implementação no port
 

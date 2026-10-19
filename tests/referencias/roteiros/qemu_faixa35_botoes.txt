@@ -1,0 +1,30 @@
+# Faixa 35 (quintal) com um botão configurável trocado: Quick Game (snapshot quick), Shift+0, Ctrl+Y
+# (Yard View: faixa 35), Ctrl+clique no 1º botão configurável (ribUserDef2A) abre o menu de ícones
+# (janela 36); soltar sobre MUSIC (60, 269) escolhe a função. Capturas em re_trabalho/raros/faixa35/.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_faixa35_botoes.txt --overlay re_trabalho/raros/ov_r3.qcow2
+snapshot_carregar quick
+esperar 2
+teclas shift+0
+esperar 1
+teclas ctrl+y
+esperar 3
+capturar re_trabalho/raros/faixa35/f1_antes.png
+ir_para 25 96
+esperar 1
+apertar_tecla ctrl
+apertar
+esperar 2
+capturar re_trabalho/raros/faixa35/f2_menu.png
+soltar_tecla ctrl
+mover 35 173
+esperar 1
+capturar re_trabalho/raros/faixa35/f3_item.png
+soltar
+esperar 2
+ir_para 600 470
+esperar 1
+capturar re_trabalho/raros/faixa35/f4_depois.png
+teclas ctrl+e
+esperar 2
+capturar re_trabalho/raros/faixa35/f5_faixa34.png
+fim
