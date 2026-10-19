@@ -49,6 +49,16 @@ arquivo do jogo é distribuído.
 - Preferências guardadas entre partidas na pasta do usuário (no lugar do `[SimAnt]` do `WIN.INI`).
 - Teclas e opções em arquivos de dados (`data/*.json`).
 - Linha de comando para rodar sem janela (`--ticks`, `--salvar`, exportação de telas e sons).
+- **Launcher:** o `simant` aberto sem opções mostra uma tela de opções de inicialização: pasta da
+  instalação do SimAnt (seletor do sistema, conferida e lembrada), início (abertura, jogo novo de cada
+  tipo ou save), vídeo, perfil de driver, som e sintetizador, mods (pasta e cada mod ligado ou não),
+  preferências e a linha de comando equivalente, editável. As escolhas ficam em `launcher.json` e valem
+  também para o `simant` rodado com opções (que vencem).
+- No Windows, o `simant.exe` não abre console: mensagens em `simant.log` na pasta do usuário, erros
+  fatais numa caixa de mensagem, `simant-console.bat`/`--console` para ver tudo na hora.
+- O pacote funciona de qualquer pasta: `data/` e `mods/` são procurados ao lado do executável.
+- Opções novas: `--launcher`, `--config`, `--sem-config`, `--console`, `--perfil-driver`,
+  `--desligar-mods`, `--com-som`, `--capturar-launcher`.
 
 ### Mods
 

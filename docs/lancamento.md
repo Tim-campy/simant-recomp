@@ -14,6 +14,7 @@ Arquivos preparados neste branch:
 | `LEIAME-usuario.md` | LEIAME de quem joga, em pt-BR (vai no pacote como `LEIAME.txt`) |
 | `README-user.md` | versão em inglês, opcional (vai como `README.txt` se existir) |
 | `docs/lancamento.md` | este documento |
+| `simant/src/launcher/`, `config_launcher.rs`, `registro.rs`, `pastas.rs` | launcher, configuração, saída sem console e pastas ao lado do executável (seção 4, "Melhorias feitas") |
 
 ## 1. Licença do projeto **[DECIDIR]**
 
@@ -73,6 +74,7 @@ Fora das crates, também dentro do pacote:
 |---|---|---|
 | **Lua 5.4.8**, compilado dentro do executável (`mlua`, feature `vendored`, via `lua-src`) | MIT (© Lua.org, PUC-Rio) | **Sim** |
 | Biblioteca padrão do Rust (ligada estaticamente) | MIT OR Apache-2.0 | Sim (MIT) |
+| **font8x8** (fonte 8 × 8 do launcher, `simant/src/launcher/fonte8x8.rs`; Daniel Hepper, derivada das fontes VGA da IBM) | **domínio público** | Não exige; o pacote cita a origem |
 | **SDL2 2.30.9** (`SDL2.dll`, só no pacote de Windows; binário oficial de libsdl.org, sem alteração) | **zlib** (`vendor/SDL2-2.30.9/COPYING.txt`, conferido) | A zlib **não exige** aviso em binários (só pede para não deturpar a origem e manter o aviso nas distribuições de *código*), mas o pacote inclui o texto e o `README-SDL.txt`, como o próprio SDL recomenda |
 
 Nenhuma dependência é copyleft (GPL/LGPL/MPL). O `tools/gerar_avisos_terceiros.py` monta o
@@ -86,8 +88,9 @@ Linux o SDL2 é o do sistema e não vai no pacote.
 
 ```
 simant-recomp-1.0.0-windows-x64/          simant-recomp-1.0.0-linux-x64/
-  simant.exe                                simant
-  SDL2.dll, README-SDL.txt                  simant.sh   (entra na pasta e roda)
+  simant.exe   (com o launcher dentro)      simant      (com o launcher dentro)
+  simant-console.bat (mensagens no console) simant.sh   (atalho; não é mais preciso)
+  SDL2.dll, README-SDL.txt
   data/          (44 JSON, 353 KB)          data/
   exemplos/mods/ (exemplo-lua, trapacas)    exemplos/mods/
   mods/LEIAME.txt (pasta vazia para mods)   mods/LEIAME.txt
@@ -131,10 +134,30 @@ O pacote de Linux não foi montado localmente (só no runner): sem o `SDL2.dll`,
   .../SHARED.ndx`, código 1, sem pânico (é o que o smoke test do workflow no Linux espera).
 - `.github/workflows/release.yml` é YAML válido (lido com PyYAML; gatilho só `push: tags: ["v*"]`).
 
-**Não verificado:** o workflow em si (não foi disparado); o build e a execução no Linux; o jogo no Linux
+Verificado em 2026-10-19 depois do launcher (Windows 11, build release, executável de janela):
+
+- `cargo build --release -p simant`: `simant.exe` com 6.053.376 bytes (era 5.784.576).
+- Com a saída redirecionada (pipes, como no CI): `--config <cfg> --novo-jogo --ticks 600 --mods
+  exemplos/mods` imprime os `[script]` dos mods e `600 ticks: GameTime 0 -> 600`; `--sem-config
+  --novo-jogo --ticks 5 --jogo /nao/existe` → `erro: não encontrei .../SHARED.ndx`, código 1.
+- Sem console nem redirecionamento (`Start-Process`): a mesma saída foi para `%APPDATA%\SimAnt
+  recomp\SimAnt\simant.log`; com a pasta do jogo errada apareceu a caixa de erro (fechada pela fila de
+  mensagens dela) e o código foi 1; com `--console`, código 0 e o log não foi tocado.
+- Pacote de demonstração em outra pasta (exe, `SDL2.dll`, `data/`, `exemplos/mods`), rodado com a pasta
+  atual em `%TEMP%`: `--mods exemplos/mods --ticks 600` achou `data/` e os mods ao lado do executável.
+- Launcher: `--launcher-jogar-apos-ms 800 --config <cfg>` abriu a janela do launcher, apertou Jogar,
+  gravou o `launcher.json` e abriu o jogo no mesmo processo (`--sair-apos-ms 1500 --capturar-janela`
+  fechou e gravou a tela); o diálogo de pasta e de arquivo do Windows foi conferido pelo teste
+  `dialogo_do_windows_escolhe_pasta_e_arquivo_e_cancela` (ignorado por padrão: abre o diálogo ~1 s).
+- `cargo clippy --workspace --all-targets --target x86_64-unknown-linux-gnu -- -D warnings` passa (com
+  um compilador C de mentira para o Lua: só o Rust do alvo Linux foi conferido, nada foi ligado nem
+  rodado no Linux).
+
+**Não verificado:** o workflow em si (não foi disparado); o launcher no Linux (janela, `zenity`/`kdialog`,
+`simant.log` aberto pelo gerenciador de arquivos); o build e a execução no Linux; o jogo no Linux
 com os arquivos do jogo em nomes minúsculos (o banco aceita `.NDX`/`.ndx`, os arquivos soltos são
 procurados sem diferença de caixa, mas não há teste num sistema de arquivos que diferencie caixa);
-`cargo test` neste branch (só foram adicionados documentos, um script Python e o workflow).
+`simant-console.bat` no duplo clique (o `--console` foi conferido só pelo `AllocConsole`).
 
 ## 4. Checklist da 1.0
 
@@ -177,21 +200,25 @@ procurados sem diferença de caixa, mas não há teste num sistema de arquivos q
 - [ ] Opcional: `cargo install cargo-deny` e um `deny.toml` com a lista de licenças aceitas
       (MIT, Apache-2.0, Zlib, 0BSD, Unlicense, Unicode-3.0), rodando no CI.
 
-### Melhorias sugeridas (não feitas; cada uma é decisão de escopo)
+### Melhorias feitas para a 1.0 (2026-10-19)
 
-- **Pastas relativas ao executável.** Hoje `data/`, `mods/` e `SimAnt-T/MAXIS/ANTWIN` são relativos à
-  **pasta atual** (`simant/src/opcoes.rs`). No Windows, o duplo clique usa a pasta do `.exe` e funciona;
-  no Linux, rodar `~/jogos/simant-recomp/simant` de outra pasta não acha `data/` (por isso o
-  `simant.sh`). Proposta: se `data/` não existir na pasta atual, procurar ao lado do executável
-  (`std::env::current_exe`).
-- **Mensagem de erro visível no Windows.** O `simant.exe` é um programa de console: no duplo clique abre
-  um console junto com a janela, e um erro (pasta do jogo errada) fecha o console antes de dar para ler.
-  Proposta: `SDL_ShowSimpleMessageBox` com o erro e, talvez, `#![windows_subsystem = "windows"]` no
-  build de lançamento (perdendo a saída de texto das opções de teste, que pode ir para um arquivo de
-  registro).
-- **Escolher a pasta do jogo na primeira execução** (diálogo ou tela que pede o caminho e o guarda nas
-  preferências), em vez de exigir `SIMANT_DIR`/`--jogo`.
+- **Pastas relativas ao executável:** `data/`, `mods/` e `SimAnt-T/MAXIS/ANTWIN` são procurados ao lado
+  do executável e só depois na pasta atual (`simant/src/pastas.rs`); o `simant.sh` do Linux fica só como
+  atalho.
+- **Sem console no Windows, com log e caixa de erro:** `windows_subsystem = "windows"` no perfil release,
+  `simant.log` na pasta de dados do usuário, `SDL_ShowSimpleMessageBox` nos erros fatais, `--console` e
+  `simant-console.bat` (`simant/src/registro.rs`).
+- **Launcher:** o `simant` sem opções abre a tela de opções de inicialização, com a pasta do jogo
+  (seletor nativo e conferência dos arquivos), início, vídeo, som, mods, preferências e a linha de comando
+  equivalente editável; a escolha fica em `launcher.json` e vale também para o `simant` rodado com
+  opções (`simant/src/launcher/`, `simant/src/config_launcher.rs`). Captura em `docs/imagens/launcher.png`.
+  Decisões em `docs/decisoes.md` (2026-10-19: launcher, executável sem console, pastas).
+
+### Melhorias sugeridas (não feitas)
+
 - Ícone e metadados do `.exe` (recurso de versão).
+- Launcher: campos de texto sem seleção com o mouse (só cursor, Ctrl+V cola e Ctrl+C copia o campo
+  inteiro); sem leitor de tela; no Linux sem `zenity`/`kdialog` não há seletor (digita-se o caminho).
 
 ### Lançar (feito pelo usuário)
 
@@ -216,7 +243,8 @@ Se algo falhar depois da tag: apagar o rascunho e a tag (`git push --delete orig
 - **Linux** (`ubuntu-22.04`, glibc 2.35, para rodar em distribuições não tão novas): `libsdl2-dev` do
   sistema; o executável liga dinamicamente com `libSDL2-2.0.so.0`, que o usuário instala (LEIAME §1).
 - **Passos:** versão da tag = `Cargo.toml` e `LICENSE` presente → `cargo test --workspace --release` →
-  `cargo build --release --locked` → pacote → conferência de conteúdo → smoke test (Linux, drivers
-  `dummy` do SDL) → `.zip`/`.tar.gz` com `.sha256` → artefatos → job `rascunho` cria o release com
+  `cargo build --release --locked` → pacote → conferência de conteúdo → smoke test nos dois sistemas,
+  de fora da pasta do pacote (erro sem os arquivos do jogo, código 1; captura do launcher sem janela,
+  enviada como artefato `launcher-<so>`, fora do pacote) → `.zip`/`.tar.gz` com `.sha256` → artefatos → job `rascunho` cria o release com
   `gh release create --draft --verify-tag`.
 - **Permissões:** `contents: read` por padrão; só o job `rascunho` tem `contents: write`.

@@ -6,8 +6,8 @@ Uso: python tools/gerar_avisos_terceiros.py --alvo x86_64-pc-windows-msvc --said
 Só biblioteca padrão. Lista as crates ligadas ao executável `simant` no alvo pedido (`cargo tree -e
 normal,no-proc-macro`: sem dependências de build, de teste e macros, que não entram no binário), com o
 texto de licença que cada uma traz. Nas crates com licença dupla ("MIT OR Apache-2.0") o pacote usa a MIT.
-Acrescenta o que não é crate mas entra no binário: o Lua 5.4 compilado pelo `mlua` (feature `vendored`),
-a biblioteca padrão do Rust e, com --sdl2, o SDL2.dll.
+Acrescenta o que não é crate mas entra no binário: o Lua 5.4 compilado pelo `mlua` (feature `vendored`), a
+fonte font8x8 do launcher (domínio público), a biblioteca padrão do Rust e, com --sdl2, o SDL2.dll.
 """
 import argparse
 import json
@@ -124,6 +124,12 @@ def main():
     if lua:
         extras.append(lua)
         resumo.append("  Lua 5.4 (via mlua/lua-src) — MIT")
+    extras.append("font8x8 (fonte 8 x 8 do launcher: font8x8_basic e font8x8_ext_latin, em simant/src/launcher/fonte8x8.rs)\n"
+                  "Licença: domínio público\nhttps://github.com/dhepper/font8x8\n\n"
+                  "Author: Daniel Hepper <daniel@hepper.net>. License: Public Domain.\n"
+                  "Based on font8_8.asm by Marcel Sondaar, from the International Business Machines public\n"
+                  "domain VGA fonts. License: Public Domain.")
+    resumo.append("  font8x8 (fonte do launcher) — domínio público")
     extras.append("Biblioteca padrão do Rust (std, core, alloc), ligada estaticamente\n"
                   "Licença: MIT OR Apache-2.0 (usa-se a MIT)\n\nCopyright (c) The Rust Project Developers\n\n" + MIT)
     resumo.append("  Biblioteca padrão do Rust — MIT OR Apache-2.0")
