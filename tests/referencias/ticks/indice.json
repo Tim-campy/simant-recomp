@@ -49,7 +49,10 @@
   "ovos_c04_c05",
   "ovos_c06",
   "ovos_c07",
-  "tutorial_completo"
+  "tutorial_completo",
+  "aranha_jogador_autotrack",
+  "desenho_aranha_movey",
+  "amarela_morte_aranha_silly"
  ],
  "snapshot": "quick",
  "semente_s_forcada": null,

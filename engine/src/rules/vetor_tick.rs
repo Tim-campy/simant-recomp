@@ -285,10 +285,14 @@ pub fn montar_entrada(v: &VetorTick, layout: &LayoutSave) -> Result<Entrada, Str
 }
 
 /// `_TickCount` do começo do tick para o desenho dentro do tick (`desenho::EdicaoNoTick::tick_count`):
-/// a primeira leitura gravada (do desenho ou de `_MacTickCount`, que lê o mesmo relógio). `None` sem
-/// leituras.
+/// a primeira leitura do desenho (os retornos no segmento 3); sem ela, a primeira de `_MacTickCount`
+/// (que devolve o mesmo relógio × 3). `None` sem leituras.
 pub fn relogio_do_tick(v: &VetorTick) -> Option<u32> {
-    v.tick_count_lidos.first().map(|l| l.v as u32)
+    let l = &v.tick_count_lidos;
+    l.iter()
+        .find(|x| x.de.starts_with("3:"))
+        .map(|x| x.v as u32)
+        .or_else(|| l.iter().find(|x| x.de == "_MacTickCount").map(|x| (x.v / 3) as u32))
 }
 
 /// Variáveis dos balões por fala (`rules::baloes::Fala`, nessa ordem): prazo, fala ligada e índice.

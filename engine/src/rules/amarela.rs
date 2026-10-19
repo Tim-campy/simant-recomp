@@ -88,7 +88,8 @@ pub struct AnimacaoAmarela {
     /// `Evento::Espera` entre os quadros da luta e do choque, os que pedem som.
     #[serde(default = "espera_quadro_padrao")]
     pub espera_quadro_ms: u16,
-    /// `_AnimYellowInsane` espera "início + 3" no relógio do Mac: 1 degrau = 55 ms por quadro.
+    /// `_AnimYellowInsane` espera o relógio do Mac passar de "início + 3": como ele anda de 3 em 3, são
+    /// 2 degraus = 110 ms por quadro (a mesma conta que dá os 165 ms da luta, medidos na bancada).
     #[serde(default = "espera_loucura_padrao")]
     pub espera_loucura_ms: u16,
     /// Com música ligada, as mortes 1–9 saem no primeiro quadro (antes do sorteio), porque no
@@ -102,8 +103,13 @@ fn espera_quadro_padrao() -> u16 {
     165
 }
 
+/// Degraus de `_TickCount` (55 ms) de uma espera em ms.
+fn degraus(ms: u16) -> u32 {
+    u32::from(ms).div_ceil(55)
+}
+
 fn espera_loucura_padrao() -> u16 {
-    55
+    110
 }
 
 fn verdadeiro() -> bool {
@@ -1658,9 +1664,11 @@ fn animar_luta(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, d
     for q in 0..quadros {
         if q > 0 {
             // Cada quadro começa esperando o relógio (o som do quadro sai depois da espera); o
-            // primeiro espera só o próximo degrau (até 55 ms), que o port não conta.
+            // primeiro espera só o próximo degrau (até 55 ms), que o port não conta no som.
             e.eventos.push(Evento::Espera(t.animacao.espera_quadro_ms));
         }
+        // O relógio que o desenho do quadro lê (balões "Silly"): +1 degrau no primeiro, depois a espera.
+        super::desenho::avancar_relogio_no_tick(e, if q == 0 { 1 } else { degraus(t.animacao.espera_quadro_ms) });
         if codigo == 0 && e.s.mascara(2) != 0 {
             e.pedir_som(t.sons.luta);
         }
@@ -1724,6 +1732,7 @@ fn animar_loucura(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32
         if k > 0 {
             e.eventos.push(Evento::Espera(t.animacao.espera_loucura_ms));
         }
+        super::desenho::avancar_relogio_no_tick(e, if k == 0 { 1 } else { degraus(t.animacao.espera_loucura_ms) });
         let (mut ax, mut ay) = (x, y);
         if get_dis(cx, cy, x, y) == 0 && quadros - k != 1 {
             ay = e.r.rrand(7) + cy - 3;

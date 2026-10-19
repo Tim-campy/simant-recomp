@@ -1,0 +1,90 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-18",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "rico",
+ "descricao": "aranha do jogador com AutoTrack: _MoveSpider chama _GotoMyAnt (vista anda com a aranha; perseguindo, os palpos sorteiam no desenho de dentro do tick)",
+ "passos": [
+  "teclas ctrl+8",
+  "esperou até GameTime 1793",
+  "SpidOn <- 1",
+  "SpidX <- 1032",
+  "SpidY <- 520",
+  "SMode <- 0",
+  "Starg <- -2",
+  "EatCnt <- 0",
+  "SpidDir <- 0",
+  "teclas x",
+  "clique na célula (64, 32) com _MapPnt = (52, 23)",
+  "_MeMode = 1, _MeLoc = (64, 32), aranha em (64, 32)",
+  "clique na célula (72, 32) com _MapPnt = (60, 23)",
+  "teclas 1",
+  "clique na célula (82, 32) com _MapPnt = (70, 23)",
+  "alvo (82, 32): _SMode = 2, _MeSMode = 6"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ]
+ },
+ "ticks": [
+  "tick_001810",
+  "tick_001812",
+  "tick_001844",
+  "tick_001845",
+  "tick_001846",
+  "tick_001847",
+  "tick_001848",
+  "tick_001849",
+  "tick_001850",
+  "tick_001851",
+  "tick_001852"
+ ],
+ "selecao": [
+  "1810",
+  "1812",
+  "1844-1852"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}

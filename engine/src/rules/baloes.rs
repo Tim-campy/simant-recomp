@@ -141,11 +141,16 @@ impl TabelasBaloes {
 }
 
 /// `_BalloonIsVisible` (`1010:48a8`): a célula (x, y) do plano está na vista da janela de edição, com
-/// ao menos `linhas` linhas acima dela.
+/// ao menos `linhas` linhas acima dela. A vista é `_MapPnt`/`_MapPlane` do momento: dentro do tick, a
+/// que os `_GotoMyAnt` já moveram (`desenho::EdicaoNoTick`).
 fn na_vista(e: &Estado, linhas: i16, plano: i16, x: i32, y: i32) -> bool {
-    let (px, py) = (i32::from(e.vistas.ponto.0), i32::from(e.vistas.ponto.1));
+    let (vplano, ponto) = match e.edicao_no_tick.as_deref().filter(|j| j.no_tick) {
+        Some(j) => (j.plano, j.ponto),
+        None => (e.vistas.plano, e.vistas.ponto),
+    };
+    let (px, py) = (i32::from(ponto.0), i32::from(ponto.1));
     let (l, a) = (i32::from(e.baloes.vista.0), i32::from(e.baloes.vista.1));
-    plano == e.vistas.plano && px <= x && x < px + l && py <= y - i32::from(linhas) && y < py + a
+    plano == vplano && px <= x && x < px + l && py <= y - i32::from(linhas) && y < py + a
 }
 
 /// `_FightBalloons`, `_RestBalloons`, `_QueenBalloons`, `_EggBalloons` (`1010:48f0`…`4aee`), chamados

@@ -1,0 +1,264 @@
+{
+ "antes": {
+  "SementeS": 65343,
+  "SementeR": 1474907982,
+  "gameCycles": 206717,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1793,
+  "Cycle": 1793,
+  "posicao": "entrada",
+  "Baloes": {
+   "FightBalloonCnt": 0,
+   "RestBalloonCnt": 0,
+   "QueenBalloonCnt": 0,
+   "EggBalloonCnt": 0,
+   "CurFightPnt": 0,
+   "CurFightPlane": 0,
+   "CurRestPnt": 0,
+   "CurRestPlane": 0,
+   "CurQueenPnt": 0,
+   "CurQueenPlane": 0,
+   "CurEggPnt": 0,
+   "CurEggPlane": 0,
+   "LastFightPnt": 0,
+   "LastRestPnt": 0,
+   "LastQueenPnt": 0,
+   "LastEggPnt": 0,
+   "BFightBalloonTicks": 0,
+   "RFightBalloonTicks": 0,
+   "EggBalloonTicks": 0,
+   "QueenBalloonTicks": 0,
+   "RestBalloonTicks": 0,
+   "SpidBalloonTicks": 0,
+   "WantBFightBalloon": 0,
+   "WantRFightBalloon": 0,
+   "WantEggBalloon": 0,
+   "WantQueenBalloon": 0,
+   "WantRestBalloon": 0,
+   "WantSpiderBalloon": 0,
+   "BFightBalloonIndex": 0,
+   "RFightBalloonIndex": 0,
+   "EggBalloonIndex": 0,
+   "QueenBalloonIndex": 0,
+   "RestBalloonIndex": 0,
+   "8:87da": -1,
+   "LastSMode": 3,
+   "CurBalloonCnt": 0,
+   "MapPnt": 24,
+   "MapPlane": 2,
+   "editWidth": 25,
+   "editHeight": 19,
+   "ELayerMode": -1
+  },
+  "MacTickCount": 18066
+ },
+ "depois": {
+  "SementeS": 58463,
+  "SementeR": 3747965145,
+  "gameCycles": 206717,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1794,
+  "Cycle": 1794,
+  "posicao": "saida",
+  "Baloes": {
+   "FightBalloonCnt": 0,
+   "RestBalloonCnt": 0,
+   "QueenBalloonCnt": 0,
+   "EggBalloonCnt": 0,
+   "CurFightPnt": 0,
+   "CurFightPlane": 0,
+   "CurRestPnt": 0,
+   "CurRestPlane": 0,
+   "CurQueenPnt": 0,
+   "CurQueenPlane": 0,
+   "CurEggPnt": 0,
+   "CurEggPlane": 0,
+   "LastFightPnt": 4294967295,
+   "LastRestPnt": 4294967295,
+   "LastQueenPnt": 393250,
+   "LastEggPnt": 524322,
+   "BFightBalloonTicks": 0,
+   "RFightBalloonTicks": 0,
+   "EggBalloonTicks": 0,
+   "QueenBalloonTicks": 0,
+   "RestBalloonTicks": 0,
+   "SpidBalloonTicks": 6244,
+   "WantBFightBalloon": 0,
+   "WantRFightBalloon": 0,
+   "WantEggBalloon": 0,
+   "WantQueenBalloon": 0,
+   "WantRestBalloon": 0,
+   "WantSpiderBalloon": 1,
+   "BFightBalloonIndex": 0,
+   "RFightBalloonIndex": 0,
+   "EggBalloonIndex": 0,
+   "QueenBalloonIndex": 0,
+   "RestBalloonIndex": 0,
+   "8:87da": 0,
+   "LastSMode": 3,
+   "CurBalloonCnt": 0,
+   "MapPnt": 22,
+   "MapPlane": 2,
+   "editWidth": 25,
+   "editHeight": 19,
+   "ELayerMode": -1
+  }
+ },
+ "MacTickCount_lidos": [
+  18066
+ ],
+ "TickCount_lidos": [
+  {
+   "de": "_MacTickCount",
+   "v": 18066
+  },
+  {
+   "de": "3:20e2",
+   "v": 6023
+  },
+  {
+   "de": "3:2105",
+   "v": 6023
+  },
+  {
+   "de": "3:20e2",
+   "v": 6028
+  },
+  {
+   "de": "3:20e2",
+   "v": 6029
+  },
+  {
+   "de": "3:20e2",
+   "v": 6030
+  },
+  {
+   "de": "3:20e2",
+   "v": 6033
+  },
+  {
+   "de": "3:20e2",
+   "v": 6036
+  },
+  {
+   "de": "3:20e2",
+   "v": 6039
+  },
+  {
+   "de": "3:20e2",
+   "v": 6042
+  },
+  {
+   "de": "3:20e2",
+   "v": 6045
+  },
+  {
+   "de": "3:20e2",
+   "v": 6048
+  },
+  {
+   "de": "3:20e2",
+   "v": 6051
+  },
+  {
+   "de": "3:20e2",
+   "v": 6054
+  },
+  {
+   "de": "3:20e2",
+   "v": 6057
+  },
+  {
+   "de": "3:20e2",
+   "v": 6060
+  },
+  {
+   "de": "3:20e2",
+   "v": 6063
+  },
+  {
+   "de": "3:20e2",
+   "v": 6066
+  },
+  {
+   "de": "3:20e2",
+   "v": 6069
+  },
+  {
+   "de": "3:20e2",
+   "v": 6072
+  },
+  {
+   "de": "3:20e2",
+   "v": 6075
+  },
+  {
+   "de": "3:20e2",
+   "v": 6078
+  },
+  {
+   "de": "3:20e2",
+   "v": 6081
+  },
+  {
+   "de": "3:20e2",
+   "v": 6084
+  },
+  {
+   "de": "3:20e2",
+   "v": 6087
+  },
+  {
+   "de": "3:20e2",
+   "v": 6090
+  },
+  {
+   "de": "3:20e2",
+   "v": 6093
+  },
+  {
+   "de": "3:20e2",
+   "v": 6096
+  },
+  {
+   "de": "3:20e2",
+   "v": 6099
+  },
+  {
+   "de": "3:20e2",
+   "v": 6102
+  },
+  {
+   "de": "3:20e2",
+   "v": 6105
+  },
+  {
+   "de": "3:20e2",
+   "v": 6108
+  },
+  {
+   "de": "3:20e2",
+   "v": 6111
+  },
+  {
+   "de": "3:20e2",
+   "v": 6114
+  },
+  {
+   "de": "3:20e2",
+   "v": 6117
+  },
+  {
+   "de": "3:20e2",
+   "v": 6120
+  },
+  {
+   "de": "3:20e2",
+   "v": 6123
+  }
+ ]
+}
