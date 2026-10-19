@@ -522,11 +522,11 @@ fn clicar_sem_parada(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Par
     let geracao = p.regras.geracao.as_ref().ok_or("tabelas de geração não carregadas (troca de patch)")?;
     let r = troca_patch::trocar_patch(&mut p.estado, geracao, &p.cfg_simulacao)?;
     if let ResultadoTroca::Trocou { .. } = r {
-        // _RandWorld passo 18: pontos lembrados; o port leva a vista até a amarela [decisão do port].
+        // _RandWorld passo 18: os pontos lembrados; a vista da superfície fica em `_MapPnt` = (0x40,
+        // 0x20), não vai até a amarela (bancada, 2026-10-19: cenarios_raros.py vista_xfer).
         let e = &p.estado;
         let par = |(x, y): (i16, i16)| (i32::from(x), i32::from(y));
         p.nav.pontos = [par(e.vistas.ponto_quintal), par(e.vistas.ponto_superficie), par(e.preta.vista_ninho), par(e.vermelha.vista_ninho)];
-        p.estado.pedir_centralizar_na_amarela();
     }
     p.processar_eventos_do_estado();
     Ok(RespostaQuintal::Troca(r))

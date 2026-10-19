@@ -110,6 +110,11 @@ def melodico(p):
             return t(n, op(1, 34, 7, 0, 0, 6, vib=True), op(1, 0, 7, 0, 0, 6, vib=True), fb=2)
         return t(n, op(1, 10, 15, 4, 15, 7), op(1, 0, 15, 4, 15, 7), fb=7)
     if f == 7:  # metais
+        if k == 3:
+            # Muted Trumpet (happy2, happy1, sad4): ~12 dB acima do original em relação à abertura
+            # (happy2 sozinha: RMS -38,6 contra -32,0 dBFS da abertura no original; -22,2 contra
+            # -25,8 no port). Portadora 16 passos de TL (12 dB) mais baixa.
+            return t(n, op(2, 26, 10, 2, 2, 7, vib=True), op(1, 16, 12, 1, 1, 7, vib=True), fb=4)
         tl = [20, 22, 18, 26, 30, 18, 16, 20][k]
         mm = [1, 1, 0, 2, 1, 1, 1, 1][k]
         return t(n, op(mm, tl, 10, 2, 2, 7, vib=True), op(1, 0, 12, 1, 1, 7, vib=True), fb=[6, 6, 5, 4, 3, 6, 7, 6][k])

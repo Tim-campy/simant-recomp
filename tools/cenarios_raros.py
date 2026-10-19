@@ -948,6 +948,36 @@ def cenario_volta_cycle(c: Sessao, saida, n):
     return c.gravar(saida, max(n, 3))
 
 
+def cenario_vista_xfer(c: Sessao, saida, n):
+    """O que a janela de edição mostra depois de _XferPatch (estado-do-projeto §3): Jogo Completo,
+    troca de patch pela Yard View (como cenario_xfer), caixa fechada; depois Ctrl+E (janela de edição na
+    frente) e capturas; anota _MapPnt, _MapPlane e a posição da amarela."""
+    saida = Path(saida).resolve()
+    ct.cenario_xfer(c, str(saida / "xfer"), 1)
+    for nome in ("MapPnt", "MapPlane", "MePlane", "MeLocX", "MeLocY", "CurYardPnt"):
+        tam = 4 if nome == "MapPnt" else None
+        c.log(f"depois do xfer: {nome} = {c.mj.ler_variavel(nome, tam).hex()}")
+    c.dep.retomar()
+    c.teclas("ctrl+e")
+    time.sleep(2)
+    ct.tela(c, saida, "edicao_na_frente")
+    c.mj.sessao_gdb()
+    for nome in ("MapPnt", "MapPlane"):
+        tam = 4 if nome == "MapPnt" else None
+        c.log(f"com a edição na frente: {nome} = {c.mj.ler_variavel(nome, tam).hex()}")
+    qb.gravar(saida / "estado_depois.ANT", c.mj.estado())
+    c.dep.retomar()
+    c.teclas("shift+0")
+    time.sleep(3)
+    ct.tela(c, saida, "despausado")
+    c.mj.sessao_gdb()
+    for nome in ("MapPnt", "MapPlane", "GameTime"):
+        tam = 4 if nome == "MapPnt" else None
+        c.log(f"despausado: {nome} = {c.mj.ler_variavel(nome, tam).hex()}")
+    qb.gravar(saida / "estado_despausado.ANT", c.mj.estado())
+    return []
+
+
 def mortes(bruto):
     """Por tick: vagas que sumiram (T ≠ 0 → 0) em cada lista, com o T e o M de antes, e os contadores
     _BAntsExpired/_RAntsExpired, _BlkQueens/_RedQueens."""

@@ -75,8 +75,7 @@ mpu401 = intelligent
 mididevice = none
 [dos]
 ver = 6.22
-# com o layout automático (BR nesta máquina) o AUTOTYPE não entrega nada; com o US entrega, mesmo
-# com a janela minimizada e sem foco (2026-10-19)
+# layout US: com o automatico (BR nesta maquina) o AUTOTYPE nao entrega nada (som.md)
 keyboardlayout = us
 [autoexec]
 mount c "{trab}\C"
@@ -176,7 +175,10 @@ def capturar_musicas(pasta, nomes, oplemu, folga=20):
         for nome in nomes:
             arq = arqs[nome.upper() + ".MID"]
             fim = max(t + d for t, _, _, _, d, _ in ler_midi(arq))
-            shutil.copyfile(arq, tema)
+            if os.path.normcase(arq) != os.path.normcase(tema):
+                shutil.copyfile(arq, tema)
+            else:
+                shutil.copyfile(guarda, tema)
             saida = os.path.join(pasta, nome.lower() + ".wav")
             print(f"{nome}: notas até {fim:.1f} s")
             capturar(saida, int(fim + folga), "", oplemu)
