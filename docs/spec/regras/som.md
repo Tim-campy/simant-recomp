@@ -161,7 +161,7 @@ Ferramenta: `tools/som_dosbox.py` (`capturar`, `niveis`, `comparar`, `harmonicos
 1. **Abertura (10001, `gamethme`)**, 130 s: o som começa 6,26 s depois do início do Windows e dura **102,90 s** (o resto é silêncio, ruído de fundo −74 dBFS). Saída **mono** (canais E e D idênticos, correlação 1,000). Os quadros do vídeo mostram o título até ~40 s (o tempo limite de 720 ticks) e depois o "Select a Game", parado; a música toca até o fim depois que o título fecha.
 2. **Nível de um efeito no mesmo caminho:** o efeito 41 (água, 3,15 s) decodificado pelo port, reamostrado para 11 025 Hz e posto como som "Windows Start" no `WIN.INI` da cópia (`capturar --som-inicio`), sai pelo mesmo `sb16snd.drv` (`waveOut`) dos efeitos do jogo, 1,7 s antes da música. Na gravação ele aparece com **correlação 0,99989** com o PCM e **ganho 0,2504 (−12,0 dB)** em relação à escala cheia de 8 bits. A música, na mesma escala, tem **RMS −32,0 dBFS** (pico 0,15). Logo, no original, **a música fica 20,0 dB abaixo de um efeito tocado a ganho 1** (RMS da música contra o ganho do efeito, com os volumes do mixer da SB16 da instalação). Com o efeito a 4096 Hz (a taxa do jogo), o Windows 3.1 travou ao tocar o som de início ("Corrupt UMB chain" e laço de interrupção inválida no log) [observado, não investigado: o `waveOutOpen` do jogo pode seguir outro caminho]; a taxa de 11 025 Hz não muda o nível.
 
-**Não capturado:** as outras músicas e os efeitos dentro do jogo. O `AUTOTYPE` do DOSBox-X não entregou teclas com a janela minimizada e sem foco (testado no DOS, digitando um `mkdir`, e no Windows, com espaço no título e Enter no "Select a Game": nada mudou na tela nem no som), e operar a janela exigiria o foco do PC do usuário. O `-time-limit` também não encerra o DOSBox-X quando o convidado trava (foi preciso encerrar o processo).
+**Não capturado (nesta seção):** as outras músicas (capturadas depois, seção seguinte) e os efeitos dentro do jogo. O `AUTOTYPE` do DOSBox-X não entregou teclas com a janela minimizada e sem foco (testado no DOS, digitando um `mkdir`, e no Windows, com espaço no título e Enter no "Select a Game": nada mudou na tela nem no som), e operar a janela exigiria o foco do PC do usuário. No DOS a causa era o layout de teclado (seção seguinte); no Windows continua não chegando. O `-time-limit` também não encerra o DOSBox-X quando o convidado trava (foi preciso encerrar o processo).
 
 **Comparação com o port** (`som_dosbox.py comparar`, música inteira, port exportado a volume 1; 10001 é também a música do jogo novo):
 
@@ -177,8 +177,53 @@ Ferramenta: `tools/som_dosbox.py` (`capturar`, `niveis`, `comparar`, `harmonicos
 
 - **Duração e andamento:** batem. O som do original dura 102,90 s para 102,99 s de notas no MIDI (razão 0,999); a escala que melhor alinha o port (0,9975) melhora a croma em menos de 0,01, dentro da resolução do teste [verificado].
 - **Notas e ordem:** a croma do port alinhada ao original dá 0,82–0,85, contra 0,39–0,43 com o port deslocado: as notas estão na mesma ordem e no mesmo tempo, com o original 6,20 s depois do início da gravação [verificado na abertura]. A percussão do canal 10 usa notas fora do mapa GM (85, 86, 89, 91, 95 nos `.MID`): nas janelas em que só a 89 soa, o original não mostra som próprio dela [observado em duas janelas; o banco do port as deixa em silêncio, hipótese para as demais].
-- **Timbre:** no original o baixo (programa 34) tem o 2.º harmônico como o mais forte, o 1.º 10 dB e o 3.º 6 dB abaixo e os 4.º–12.º planos entre −17 e −24 dB (27 notas isoladas, `som_dosbox.py harmonicos`); o piano (programa 3) começa com os 5 primeiros harmônicos quase iguais e os agudos caem mais rápido que a fundamental; o tom 43 soa como um tom grave de ~69 Hz com a altura caindo; não há ruído na percussão (espectrograma). O sintetizador simples é claro demais (ondas serra/quadrada e percussão de ruído branco: 18 % da energia acima de 4 kHz, contra 6 %); o FM chega mais perto no espectro médio e na distribuição por faixa, mas ainda fica escuro entre 2 e 4 kHz (5 % contra 12 %). O banco FM foi ajustado nos programas de `gamethme` (baixo 34: perfil −2/0/−6/−11/−12/−13… no port, contra −10/0/−6/−22/−17/−17… no original). Os demais programas usados pelas músicas (19, 21, 25, 31, 33, 35, 49, 57, 59, 69, 95) não puderam ser comparados, por falta de captura [em aberto].
+- **Timbre:** no original o baixo (programa 34) tem o 2.º harmônico como o mais forte, o 1.º 10 dB e o 3.º 6 dB abaixo e os 4.º–12.º planos entre −17 e −24 dB (27 notas isoladas, `som_dosbox.py harmonicos`); o piano (programa 3) começa com os 5 primeiros harmônicos quase iguais e os agudos caem mais rápido que a fundamental; o tom 43 soa como um tom grave de ~69 Hz com a altura caindo; não há ruído na percussão (espectrograma). O sintetizador simples é claro demais (ondas serra/quadrada e percussão de ruído branco: 18 % da energia acima de 4 kHz, contra 6 %); o FM chega mais perto no espectro médio e na distribuição por faixa, mas ainda fica escuro entre 2 e 4 kHz (5 % contra 12 %). O banco FM foi ajustado nos programas de `gamethme` e, desde a captura das outras músicas, no 59 (seção seguinte) (baixo 34: perfil −2/0/−6/−11/−12/−13… no port, contra −10/0/−6/−22/−17/−17… no original). Os demais programas usados pelas músicas foram comparados em 2026-10-19 (seção seguinte).
 - **Volume relativo:** com o simples, a música ficava 3,7 dB mais baixa em relação aos efeitos do que no original; o banco FM tem `ganho` 2,25, calibrado para a abertura dar −19,8 dB (contra −20,0 dB medidos). As outras músicas ficam no nível relativo que o banco der [não medido].
+
+## As outras músicas do original, sem input (2026-10-19)
+
+**Rota:** `tools/som_dosbox.py musicas PASTA [NOME ...]`. Na **cópia** do jogo (`re_trabalho/som/C`), o `GAMETHME.MID` é trocado pela música pedida e o próprio SimAnt a toca ao abrir, pelo mesmo caminho de todas as músicas no Windows (MCI → MIDI Mapper "SB16 Ext Synth" → `sb16fm.drv`, OPL3 do DOSBox-X); o original é reposto no fim. Nenhuma tecla, nenhum clique, nada tocado no PC (mesmas condições da captura da abertura, acima). As 28 músicas com `.MID` foram gravadas (as 27 além da abertura, mais a abertura de novo como referência de nível); `jolly5` também, mas o original não a toca (20006 não tem cabeçalho, formatos/som.md) e o port também não. Comparação: `som_dosbox.py comparar_todas ORIGINAIS PORT/musicas saida.json` (port exportado com `--exportar-som`, FM).
+
+| Id, música | Som (s): original / port | Croma alinhada (controle deslocado) | Envelope em dB (controle) | Centróide (Hz): original / port | Nível em relação à abertura (dB): original / port (diferença) |
+|---|---|---|---|---|---|
+| 10001 gamethme | 102.90 / 103.15 | 0.86 (0.43) | 0.64 (0.29) | 1038 / 854 | +0.0 / +0.0 (+0.0) |
+| 10003 antthme1 | 55.37 / 55.70 | 0.51 (0.48) | 0.37 (-0.05) | 1053 / 2085 | -9.1 / -7.7 (+1.4) |
+| 10004 antthme2 | 47.48 / 47.93 | 0.54 (0.48) | 0.75 (0.02) | 1094 / 4081 | -8.1 / -5.5 (+2.5) |
+| 10005 antthme3 | 41.12 / 41.38 | 0.64 (0.56) | 0.58 (0.16) | 345 / 496 | -8.1 / -8.1 (+0.1) |
+| 10006 hmanawar | 19.99 / 20.12 | 0.82 (0.32) | 0.81 (0.09) | 953 / 1100 | -0.3 / +3.4 (+3.7) |
+| 10007 hmanthme | 20.07 / 20.19 | 0.82 (0.32) | 0.93 (0.18) | 913 / 1130 | -0.4 / +3.0 (+3.4) |
+| 10008 victory | 30.04 / 30.13 | 0.87 (0.43) | 0.96 (0.01) | 458 / 769 | -3.0 / +0.2 (+3.3) |
+| 10010 defeat | 34.40 / 34.58 | 0.90 (0.42) | 0.97 (0.10) | 622 / 564 | -0.8 / +2.7 (+3.5) |
+| 11004 newcoln2 | 4.47 / 4.11 | 0.69 (0.21) | 0.96 (-0.14) | 767 / 1526 | -5.1 / -1.9 (+3.2) |
+| 11005 newbody | 6.98 / 6.99 | 0.75 (0.22) | 0.90 (-0.08) | 731 / 911 | -2.8 / +3.1 (+5.9) |
+| 11006 qn4day | 19.96 / 17.65 | 0.90 (0.56) | 0.42 (-0.00) | 742 / 1104 | +1.5 / +5.8 (+4.4) |
+| 11007 badnews | 8.31 / 6.12 | 0.83 (0.53) | -0.02 (0.04) | 110 / 253 | +3.2 / +8.3 (+5.1) |
+| 11014 call2arm | 6.80 / 6.11 | 0.85 (0.46) | 0.81 (0.01) | 364 / 585 | +3.1 / +7.7 (+4.6) |
+| 11017 victqndd | 8.07 / 5.63 | 0.82 (0.60) | 0.07 (0.04) | 467 / 761 | +3.1 / +8.3 (+5.1) |
+| 11018 attack | 7.46 / 5.86 | 0.76 (0.25) | 0.85 (0.03) | 622 / 339 | -7.7 / -6.3 (+1.4) |
+| 11020 blackq | 4.84 / 4.91 | 0.67 (0.24) | 0.96 (-0.13) | 458 / 701 | -12.4 / -13.8 (-1.3) |
+| 11021 redq | 7.47 / 8.10 | 0.94 (0.25) | 0.84 (-0.13) | 601 / 641 | +1.5 / +3.8 (+2.3) |
+| 20000 happy1 | 5.47 / 4.63 | 0.69 (0.23) | 0.75 (-0.17) | 1591 / 1418 | -9.4 / +2.1 (+11.6) |
+| 20001 happy2 | 5.28 / 4.49 | 0.65 (0.18) | 0.88 (-0.14) | 1093 / 784 | -6.5 / -6.4 (+0.1) |
+| 20002 jolly1 | 7.79 / 7.83 | 0.71 (0.34) | 0.92 (-0.12) | 934 / 282 | -9.9 / -4.9 (+5.0) |
+| 20003 jolly2 | 6.45 / 6.62 | 0.56 (0.21) | 0.92 (-0.12) | 1000 / 316 | -3.7 / +4.9 (+8.6) |
+| 20004 jolly3 | 4.06 / 4.17 | 0.50 (0.31) | 0.90 (-0.19) | 1039 / 340 | -8.8 / -3.0 (+5.8) |
+| 20005 jolly4 | 7.98 / 8.09 | 0.70 (0.35) | 0.81 (-0.08) | 946 / 346 | -11.8 / -5.3 (+6.4) |
+| 20007 omnious1 | 7.87 / 7.21 | 0.74 (0.37) | 0.62 (-0.04) | 341 / 351 | -5.5 / -0.2 (+5.3) |
+| 20008 sad1 | 14.85 / 13.58 | 0.84 (0.43) | 0.63 (0.13) | 861 / 1176 | -7.6 / -1.3 (+6.2) |
+| 20009 sad2 | 1.21 / 7.49 | 0.96 (0.32) | 0.79 (-0.12) | 342 / 452 | -9.4 / -2.9 (+6.5) |
+| 20010 sad3 | 8.64 / 8.70 | 0.96 (0.18) | 0.91 (-0.07) | 670 / 359 | -5.0 / -4.8 (+0.3) |
+| 20011 sad4 | 10.18 / 9.04 | 0.89 (0.90) | -0.14 (0.23) | 795 / 552 | -6.2 / +1.4 (+7.6) |
+
+Leitura (fato medido nas gravações; "controle" = o port deslocado 0,9–4 s):
+
+- **Notas, ordem e andamento batem em todas.** A croma alinhada fica acima do controle em todas as músicas melódicas (0,50–0,96 contra 0,18–0,60), e o envelope de energia quadro a quadro dá 0,6–0,97 na maioria; a duração do som bate (diferenças até ~1 s vêm das caudas de liberação das notas). As exceções são de timbre, não de notas: `antthme1–3` são só percussão (canal 10; a croma não se aplica, o envelope dá 0,37–0,75 contra controle ≤ 0,16); `badnews` e `victqndd` (programa 95, Pad 8) e `sad4`/`qn4day` têm envelope baixo porque no original o pad e as cordas soam com outro envelope.
+- **Programa 49 (String Ensemble 2):** no original um ataque forte e, meio segundo depois, a sustentação ~17 dB abaixo, com as notas seguintes (curtas, 0,23 s, mesma velocidade, sem controladores no `.MID`) baixas (`sad2`: som "útil" de 1,2 s contra 7,5 s no port). Um decaimento na portadora do banco do port não mudou a medida (as notas são curtas demais) e foi desfeito [em aberto: provavelmente o timbre e a alocação de vozes do driver da Creative].
+- **Programa 59 (Muted Trumpet):** ~10–12 dB alto demais no port em relação à abertura (`happy2`, só com ele: +10,2 dB). **Corrigido no banco** (`tools/gerar_banco_opl.py`, portadora 16 passos de TL mais baixa): `happy2` +0,1 dB.
+- **Nível:** com o 59 corrigido, as outras músicas ficam em média ~4 dB acima do original em relação à abertura (mediana 4,1; de −1,3 a +8,6, fora `happy1`, +11,6, e `sad4`, +7,6, que misturam o 49). A abertura está calibrada (−19,8 dB contra um efeito de ganho 1); não foi mexido no ganho geral, porque a diferença é por programa [em aberto: um ganho por programa, medido música a música].
+- **Timbre:** o centróide do original fica entre 340 e 1600 Hz; no port, perto nas músicas de baixo e cordas e mais escuro nas `jolly*` (programas 19 e 69: 282–346 Hz contra ~1000 Hz) e mais claro nas `antthme*` (percussão). Os programas 19, 21, 25, 31, 33, 35, 49, 57, 69 e 95 continuam com o timbre do banco próprio, sem ajuste fino.
+
+**Efeitos dentro do jogo: continuam sem captura.** Tentado (2026-10-19): o `AUTOTYPE` do DOSBox-X **funciona com a janela minimizada e sem foco** quando o layout de teclado do DOS é US (`[dos] keyboardlayout = us`, agora no `som_dosbox.py`): com o layout automático desta máquina (BR) não entregava nada, que era a falha registrada antes. No DOS (`mkdir` digitado) passa; **no Windows 3.1 em modo 386 avançado nenhuma tecla chega**: Espaço no título aos 25–27 s não o fecha (continua aos 38 s, quadros do vídeo), Enter e Alt no "Select a Game" não fazem nada [hipótese: o `AUTOTYPE` põe as teclas no buffer do BIOS, que o Windows não lê]. A bancada QEMU (alternativa a) segue sem servir para isso: o `sb16` do QEMU toca os efeitos com a taxa e o buffer errados e não há OPL3 (seção abaixo); a instalação do usuário não tem driver para AC97/ES1370. Rotas que sobram: entrada pela porta serial (mouse serial emulado via `nullmodem`) no DOSBox-X, ou um driver de teclado no Windows da cópia [não tentadas].
 
 ## Áudio do original na bancada QEMU (2026-10-18)
 

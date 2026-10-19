@@ -226,8 +226,8 @@ fn trocar_patch(p: &mut Partida, x: i16, y: i16) -> Result<(), String> {
         ResultadoTroca::Trocou { .. } => {
             let e = &p.estado;
             let par = |(x, y): (i16, i16)| (i32::from(x), i32::from(y));
+            // Como o duplo clique: a vista fica nos pontos de _RandWorld (core::quintal_mapa::clicar).
             p.nav.pontos = [par(e.vistas.ponto_quintal), par(e.vistas.ponto_superficie), par(e.preta.vista_ninho), par(e.vermelha.vista_ninho)];
-            p.estado.pedir_centralizar_na_amarela();
             Ok(())
         }
         ResultadoTroca::MesmoPatch => Err("já está neste patch".into()),

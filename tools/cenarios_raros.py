@@ -729,6 +729,255 @@ def cenario_ultima_vermelha(c: Sessao, saida, n):
     return nomes
 
 
+# ------------------------------------------------------------------------------------------------
+# Oitava rodada: estratégia vermelha (T9), recrutamento (T11), _FlyAwayR no limiar, queda na casa
+# ------------------------------------------------------------------------------------------------
+
+def ate_compactar_e_parar(c: Sessao, alvo_mod=None):
+    """Entrada de um tick; com `alvo_mod` = (m, r), avança até _Cycle % m == r (estado antes)."""
+    c.entrada()
+    if alvo_mod:
+        m, r = alvo_mod
+        while (c.ler("Cycle") + 1) % m != r:
+            c.avancar(1)
+
+
+def cenario_estrategia_malvada(c: Sessao, saida, n):
+    """_GstrR, ramo MALVADO pelo desespero (superficie.md 9.1): _HealthR = 5 < 10, 0 < _BpopT < _RpopT/2
+    e _BlkQueens > 0 na entrada de um tick: _JustToBeMean = S1(100) + 30, _StrategicModeR = 0, música
+    0x2B0A e "The red ants are attacking!". Grava os primeiros ticks (o contador desce e o modo fica 0),
+    avança até faltar 2 e grava a volta à estratégia normal (_HealthR = 60 posto antes)."""
+    c.entrada()
+    rp, bp = c.ler("RpopT"), c.ler("BpopT")
+    c.log(f"RpopT {rp}, BpopT {bp}, BlkQueens {c.ler('BlkQueens')}, HealthR {c.ler('HealthR')}")
+    c.escrever("HealthR", 5)
+    if not 0 < bp < rp // 2:
+        c.escrever("BpopT", max(1, rp // 2 - 1))
+    nomes = c.gravar(saida, 3)
+    c.log(f"JustToBeMean {c.ler('JustToBeMean')}, StrategicModeR {c.ler('StrategicModeR')}")
+    while c.ler("JustToBeMean") > 2:
+        c.avancar(1)
+    c.escrever("HealthR", 60)
+    nomes += c.gravar(saida, 4)
+    return nomes
+
+
+def cenario_estrategia_vermelha_p(c: Sessao, saida, n):
+    """_GstrR, ramo MALVADO sem sorteio ("não normal"): _HealthR = 80, _TilesDugR = 400 (≥ 2P),
+    _RpopT = 150 (≥ 101), _BpopT = 20 (≥ 1, < P/3), _BlkQueens > 0."""
+    c.entrada()
+    for nome, v in (("HealthR", 80), ("TilesDugR", 400), ("RpopT", 150), ("BpopT", 20)):
+        c.escrever(nome, v)
+    return c.gravar(saida, n)
+
+
+def cenario_estrategia_vermelha_s(c: Sessao, saida, n):
+    """_GstrR com a estratégia normal até os sorteios: _HealthR = 80, _TilesDugR = 400, _RpopT = 50,
+    _BpopT = 20. Com SEMENTE_S (ambiente; escolhida no port sobre o vetor gravado sem ela) os dois
+    sorteios S32() e S128() dão 0 e o ramo MALVADO sai pelo acaso."""
+    import os
+    c.entrada()
+    for nome, v in (("HealthR", 80), ("TilesDugR", 400), ("RpopT", 50), ("BpopT", 20)):
+        c.escrever(nome, v)
+    if os.environ.get("SEMENTE_S"):
+        c.escrever("SementeS", int(os.environ["SEMENTE_S"], 0))
+    return c.gravar(saida, n)
+
+
+def cenario_estrategia_preta_0(c: Sessao, saida, n):
+    """Escada preta de _GetStrategy, modo 0 pelo desespero (simulacao-visao-geral.md §7): _HealthB = 5,
+    _AlwaysHealthy = 0, 0 < _RpopT < _BpopT/2, _RedQueens > 0."""
+    c.entrada()
+    rp, bp = c.ler("RpopT"), c.ler("BpopT")
+    c.escrever("AlwaysHealthy", 0)
+    c.escrever("HealthB", 5)
+    if not 0 < rp < bp // 2:
+        c.escrever("RpopT", max(1, bp // 2 - 1))
+    return c.gravar(saida, n)
+
+
+def acao_teclas(c: Sessao, pasta, tecla, comandos):
+    """Com o jogo pausado: estado antes, a tecla (VM rodando), estado depois; a ação do port é a lista
+    de comandos de _YellowCommand, com _TemBModePop[6] do último tick (para _UnRecruit)."""
+    antes = ct.fotografar(c, pasta, "antes")
+    tem = c.mj.ler_variavel("TemBModePop", 40)
+    defesa = int.from_bytes(tem[12:14], "little", signed=True)
+    c.teclas(tecla)
+    time.sleep(2)
+    ct.tela(c, pasta, "depois")
+    depois = ct.fotografar(c, pasta, "depois")
+    ct.gravar_acao(pasta, antes, depois, {"comandos": comandos, "defesa_ultimo_tick": defesa})
+    c.log(f"{tecla}: comandos {comandos}, _TemBModePop[6] = {defesa}")
+
+
+def cenario_recrutar(c: Sessao, saida, n):
+    """T11 (superficie.md 9.4, formiga-amarela.md 10.3/11.4): a amarela na superfície ao lado de pretas;
+    jogo pausado (Shift+0); teclas 1 (recruta 5) e 2 (recruta 10) gravadas como ações; despausa e grava
+    n ticks com as recrutadas (modo 6, _DoRecruitAnt); pausa de novo e grava 3 (libera metade),
+    Ctrl+2 (recruta todas) e 4 (libera todas)."""
+    saida = Path(saida).resolve()
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    s = c.save()
+    vida_a = vida_ler(c, "A")
+    pretas = adultas(s, "A", 0, grupos=(2, 6))
+    c.log(f"{len(pretas)} pretas de grupo 2/6 na lista A; BpopT {s.ler('BpopT')}")
+    x0, y0 = (pretas[0][1]["X"], pretas[0][1]["Y"]) if pretas else (64, 32)
+    x, y = next((x0 + dx, y0 + dy) for r in range(1, 6) for dx in range(-r, r + 1) for dy in range(-r, r + 1)
+                if cr.livre_a(s, vida_a, x0 + dx, y0 + dy))
+    cr.por_amarela(c, 1, x, y, vida=100)
+    c.teclas("shift+0")
+    time.sleep(2)
+    acao_teclas(c, saida / "recrutar_5", "1", [1])
+    acao_teclas(c, saida / "recrutar_10", "2", [2])
+    c.teclas("shift+0")
+    time.sleep(1)
+    nomes = c.gravar(saida / "ticks", n)
+    # uma operária preta no ninho preto (lista B, M 0) e uma invasora preta recrutada no vermelho
+    # (lista R, M 6): _Recruit passa à lista B depois da A; _UnRecruit põe M = 7 na lista R
+    s = c.save()
+    xb, yb = topo_do_tunel(s, "MapB", vida_ler(c, "B"))
+    acrescentar_formiga(c, "B", xb, yb, 0x12, 0, 0)
+    xr, yr = topo_do_tunel(s, "MapR", vida_ler(c, "R"))
+    acrescentar_formiga(c, "R", xr, yr, 0x12, 6, 0)
+    c.dep.retomar()
+    c.teclas("shift+0")
+    time.sleep(2)
+    acao_teclas(c, saida / "liberar_metade", "3", [4])
+    acao_teclas(c, saida / "recrutar_todas", "ctrl+2", [3])
+    acao_teclas(c, saida / "liberar_todas", "4", [5])
+    return [f"ticks/{t}" for t in nomes]
+
+
+def cenario_revoada_limiar(c: Sessao, saida, n):
+    """_FlyAwayR no limiar (superficie.md 9.1, ciclo-de-vida.md): na entrada de um tick, logo depois de
+    uma contagem (_FullCount, _Cycle % 64 == 0), machos e rainhas novas vermelhas (grupos 4 e 8) do
+    ninho vermelho e da superfície são acertados para somar exatamente 20 (o _CastePopR guardado fica
+    como está). Velocidade normal, modo tick: na contagem seguinte _CastePopR[3] + [4] = 20 e _GstrR
+    não arma (o teste é > 20); uma vermelha a mais vira macho e, na contagem depois, _FlyAwayR = 200
+    no mesmo tick (o passo 13 o deixa em 199). Grava os ticks das duas contagens e os vizinhos."""
+    c.entrada()
+    while (c.ler("Cycle") + 1) % 64 != 1:
+        c.avancar(1)
+    s = c.save()
+    c.log(f"GameTime {s.ler('GameTime')}, FlyAwayR {s.ler('FlyAwayR')}, CastePopR {c.mj.ler_variavel('CastePopR').hex()}")
+    if s.ler("FlyAwayR"):
+        c.escrever("FlyAwayR", 0)
+    repro = [(l, i) for l in ("R", "A") for i, f in formigas(s, l) if f["T"] & 0x80 and GRUPO(f["T"]) in (4, 8)]
+    operarias = [(l, i) for l in ("R", "A") for i, f in formigas(s, l) if f["T"] & 0x80 and GRUPO(f["T"]) == 2]
+    c.log(f"reprodutores vermelhos {len(repro)}, operárias {len(operarias)}")
+    # exatamente 20: tira o excesso (vira operária) ou converte operárias em machos
+    while len(repro) > 20:
+        l, i = repro.pop()
+        trocar_casta(c, s, l, i, 2)
+        operarias.append((l, i))
+    while len(repro) < 20:
+        l, i = operarias.pop(0)
+        trocar_casta(c, s, l, i, 4, m=14 if l == "A" else None)
+        repro.append((l, i))
+    nomes = []
+    # até a contagem seguinte: grava o tick dela e o seguinte
+    while (c.ler("Cycle") + 1) % 64 != 0:
+        c.avancar(1)
+    nomes += c.gravar(saida, 2)
+    c.log(f"depois da contagem com 20: FlyAwayR {c.ler('FlyAwayR')}, CastePopR {c.mj.ler_variavel('CastePopR').hex()}")
+    s = c.save()
+    l, i = next((l, i) for l in ("R", "A") for i, f in formigas(s, l) if f["T"] & 0x80 and GRUPO(f["T"]) == 2)
+    trocar_casta(c, s, l, i, 4, m=14 if l == "A" else None)
+    while (c.ler("Cycle") + 1) % 64 != 63:
+        c.avancar(1)
+    nomes += c.gravar(saida, 3)
+    c.log(f"depois da contagem com 21: FlyAwayR {c.ler('FlyAwayR')}, CastePopR {c.mj.ler_variavel('CastePopR').hex()}")
+    return nomes
+
+
+def cenario_queda_casa_celula(c: Sessao, saida, n):
+    """Como queda_casa_aranha, com o patch (CASA_PATCH, "px,py") e a célula da aranha (CASA_CEL, "x,y")
+    escolhidos: cozinha (0, 1), _DROPdir = 2, aranha no azulejo da parede (a comida desce até a bancada);
+    ladrilhos (0, 2), _DROPdir = 0, aranha numa junta (a comida sobe 0xFF sem sinal e some)."""
+    import os
+    alvo = tuple(int(v) for v in os.environ.get("CASA_PATCH", "0,1").split(","))
+    x, y = (int(v) for v in os.environ.get("CASA_CEL", "20,20").split(","))
+    xfer_para(c, str(Path(saida).resolve() / "xfer"), alvo)
+    c.dep.retomar()
+    c.teclas("ctrl+e")
+    time.sleep(1)
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.teclas("shift+0")
+    time.sleep(2)
+    c.entrada()
+    s = c.save()
+    c.log(f"_CurYardPnt = {c.ler('CurYardPnt'):#x}; DROPdir {c.ler('DROPdir', 2)}; aranha em agonia em ({x}, {y}) "
+          f"tile {s.celula('MapA', x, y):#x}; abaixo {[hex(s.celula('MapA', x, k)) for k in range(y, min(64, y + 8))]}")
+    if os.environ.get("CASA_TILE"):
+        # nenhum tile da cozinha nem dos ladrilhos faz a comida cair (todos < 4 ou ≥ 0x40): um 0x3F
+        # (fiapo do carpete) é escrito na célula
+        mapa_escrever(c, "MapA", x, y, int(os.environ["CASA_TILE"], 0))
+    cr.aranha_em(c, x, y, modo=5)
+    c.escrever("DeathCnt", 3)
+    return c.gravar(saida, n, parar=lambda d: d.ler("SpidOn") == 0)
+
+
+def cenario_leao_pedrinha(c: Sessao, saida, n):
+    """Pedrinha cuspida pela formiga-leão (inimigos.md 1.3, I7): pedrinha 0x51 no centro de uma
+    formiga-leão esperando (M = 0) e comida 0x48 no de outra, se houver; com SEMENTE_S (escolhida no
+    port) o S1(512) dá 0 e a armadilha cospe o objeto a 2 células (M 0 → 1, S = 25, centro 0x39)."""
+    import os
+    c.entrada()
+    s = c.save()
+    li = c.ler("LionIndex")
+    esperando = [k for k in range(li) if s.ler("LionListM", k, 1) == 0]
+    c.log(f"LionIndex {li}; esperando {esperando}")
+    for k, v in zip(esperando, (0x51, 0x48)):
+        x, y = s.ler("LionListX", k, 1), s.ler("LionListY", k, 1)
+        mapa_escrever(c, "MapA", x, y, v)
+        c.log(f"formiga-leão {k} em ({x}, {y}): centro <- {v:#x}")
+    if os.environ.get("SEMENTE_S"):
+        c.escrever("SementeS", int(os.environ["SEMENTE_S"], 0))
+    return c.gravar(saida, n)
+
+
+def cenario_volta_cycle(c: Sessao, saida, n):
+    """A volta de _Cycle (simulacao-visao-geral.md §5, feromonios.md): _Cycle = 4095 na entrada; o
+    tick o leva a 0x1000 e o seguinte a 0. Os dois são ≡ 0 (mod 128): compactação da lista A,
+    _FullCount, _HistUpdate e _SmoothAlarm (e a alimentação, mod 64) rodam em dois ticks seguidos."""
+    c.entrada()
+    c.escrever("Cycle", 4095)
+    return c.gravar(saida, max(n, 3))
+
+
+def cenario_vista_xfer(c: Sessao, saida, n):
+    """O que a janela de edição mostra depois de _XferPatch (estado-do-projeto §3): Jogo Completo,
+    troca de patch pela Yard View (como cenario_xfer), caixa fechada; depois Ctrl+E (janela de edição na
+    frente) e capturas; anota _MapPnt, _MapPlane e a posição da amarela."""
+    saida = Path(saida).resolve()
+    ct.cenario_xfer(c, str(saida / "xfer"), 1)
+    for nome in ("MapPnt", "MapPlane", "MePlane", "MeLocX", "MeLocY", "CurYardPnt"):
+        tam = 4 if nome == "MapPnt" else None
+        c.log(f"depois do xfer: {nome} = {c.mj.ler_variavel(nome, tam).hex()}")
+    c.dep.retomar()
+    c.teclas("ctrl+e")
+    time.sleep(2)
+    ct.tela(c, saida, "edicao_na_frente")
+    c.mj.sessao_gdb()
+    for nome in ("MapPnt", "MapPlane"):
+        tam = 4 if nome == "MapPnt" else None
+        c.log(f"com a edição na frente: {nome} = {c.mj.ler_variavel(nome, tam).hex()}")
+    qb.gravar(saida / "estado_depois.ANT", c.mj.estado())
+    c.dep.retomar()
+    c.teclas("shift+0")
+    time.sleep(3)
+    ct.tela(c, saida, "despausado")
+    c.mj.sessao_gdb()
+    for nome in ("MapPnt", "MapPlane", "GameTime"):
+        tam = 4 if nome == "MapPnt" else None
+        c.log(f"despausado: {nome} = {c.mj.ler_variavel(nome, tam).hex()}")
+    qb.gravar(saida / "estado_despausado.ANT", c.mj.estado())
+    return []
+
+
 def mortes(bruto):
     """Por tick: vagas que sumiram (T ≠ 0 → 0) em cada lista, com o T e o M de antes, e os contadores
     _BAntsExpired/_RAntsExpired, _BlkQueens/_RedQueens."""

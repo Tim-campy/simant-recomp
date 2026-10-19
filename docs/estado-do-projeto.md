@@ -4,11 +4,11 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 
 **Medições desta revisão** (comandos rodados nesta data):
 
-- `cargo test --workspace` com `SIMANT_DIR` = `SimAnt-T/MAXIS/ANTWIN`: **591 testes passaram, 0 falharam, 0 ignorados**, em 36 binários de teste (603 depois da sétima rodada de vetores e do merge do áudio FM, mesma data) (unitários de `engine` e `simant` e 33 arquivos de integração em `engine/tests/`). `cargo clippy --workspace --all-targets -- -D warnings`: sem avisos.
+- `cargo test --workspace` com `SIMANT_DIR` = `SimAnt-T/MAXIS/ANTWIN`: **591 testes passaram, 0 falharam, 0 ignorados**, em 36 binários de teste (603 depois da sétima rodada de vetores e do merge do áudio FM; **614** depois da oitava rodada e do merge da API 0.33, mesma data) (unitários de `engine` e `simant` e 33 arquivos de integração em `engine/tests/`). `cargo clippy --workspace --all-targets -- -D warnings`: sem avisos.
 - Vetores do original no repositório (`tests/referencias/`, contados nas pastas e na saída dos testes):
-  - **204 vetores de tick** (5 na raiz e 199 em 66 subpastas de `ticks/`; eram 173 antes da sétima rodada, `regras/testes-tick.md`): **203 exigidos 307/307** blocos, com extras e vida, por `engine/tests/ticks_originais.rs`; o restante (`inseticida_morte/21`, fim de jogo) é conferido pela interface (`fim_de_jogo_interface.rs`), 307/307 com S e R. Nenhum vetor pendente.
+  - **221 vetores de tick** (5 na raiz e 216 em 77 subpastas de `ticks/`; eram 173 antes da sétima rodada e 204 antes da oitava, `regras/testes-tick.md`): **220 exigidos 307/307** blocos, com extras e vida, por `engine/tests/ticks_originais.rs`; o restante (`inseticida_morte/21`, fim de jogo) é conferido pela interface (`fim_de_jogo_interface.rs`), 307/307 com S e R. Nenhum vetor pendente.
   - **2 sequências longas** (`ticks_longos/rico_200`, 200 ticks; `full_600`, 600 ticks do Jogo Completo com a Yard View na frente, inclusive os 17.650 passos de S do desenho entre os ticks): iguais ao original.
-  - **16 ações da interface** (`acoes/`: inseticida num tile de formiga-leão sem entrada, desde a sétima rodada; troca de patch e da casa, PLACE dentro e fora, `_SpecialXfer`, Quick → Experimental, Start Game, Ctrl e arrasto, ninho e cheiro do Experimental, chuva e enxame desenhados, dois Mystery): todas 307/307.
+  - **21 ações da interface** (`acoes/`: as cinco teclas de recrutar e liberar da amarela, desde a oitava rodada; inseticida num tile de formiga-leão sem entrada, desde a sétima; troca de patch e da casa, PLACE dentro e fora, `_SpecialXfer`, Quick → Experimental, Start Game, Ctrl e arrasto, ninho e cheiro do Experimental, chuva e enxame desenhados, dois Mystery): todas 307/307.
   - **1 Load do tutorial** (`load_tutorial/`): 307/307.
   - **21 casos de regra** da bancada (`casos/*.json`): 20 confirmados no original e iguais no port; C-10 não conferível (mensagem modal no Load). (C-04 a C-07 viraram vetores de tick.)
   - 76 roteiros de bancada em `tests/referencias/roteiros/`.
@@ -27,19 +27,19 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 | # | Área | Implementado | Verificado no original | Comentário curto |
 |---|---|---|---|---|
 | 1 | Formatos de arquivo | 95% (era 90%) | 85% | banco NDX/DAT + LZSS, bitmaps (os três bancos decodificam inteiros desde 2026-10-19, com o `kind` 0xFFFF empacotado e o planar sem alinhamento), fontes, janelas, `SIMANT.CFG`, `.ANT` (byte a byte), sons, tiles, `.HLP`; restam o byte 3 dos bitmaps, os bits 4/8 das flags e o layout binário tipo 0 |
-| 2 | Regras da simulação (tick) | 98% (97%) | 81% (80%) | 173 vetores (todos iguais), 2 sequências, 15 ações e 20 casos; desenho dentro do tick, aranha do jogador com AutoTrack; `_SpecialXfer` dentro do tick (2026-10-19, ação `special_xfer` 307/307 assim); faltam os ramos raros sem vetor (§3) |
-| 3 | Geração de mundo | 96% (95%) | 75% | Quick Game byte a byte; casa pelos patches; Tutorial via Load; `_DROPdir` guardado; ramos de Full/Experimental e vários patches da casa sem caso |
+| 2 | Regras da simulação (tick) | 98% (97%) | 84% (80%) | 221 vetores (todos iguais), 2 sequências, 21 ações e 20 casos; estratégia vermelha, recrutamento, limiar da revoada, pedrinha e volta de `_Cycle` na oitava rodada; desenho dentro do tick, aranha do jogador com AutoTrack; `_SpecialXfer` dentro do tick (2026-10-19, ação `special_xfer` 307/307 assim); restam hipóteses de defeitos do original (§3) |
+| 3 | Geração de mundo | 96% (95%) | 77% (75%) | Quick Game byte a byte; casa pelos patches; Tutorial via Load; `_DROPdir` lido no original nas quatro direções (cozinha e ladrilhos gerados pelo original); ramos de Full/Experimental e vários patches da casa sem caso |
 | 4 | Jogo ao vivo (laço, relógio, ritmo) | 95% (93%) | 67% (65%) | laço de `MYTIMERFUNC` com o clique esquerdo (2026-10-19); slow/normal medidos (3,0/6,0 ticks/s); fast/ultra e relógio do Mac com decisões do port; rolagem repetida a ~23 passos/s com a simulação parada (medido, 2026-10-19) |
 | 5 | Telas e janelas | 95% (94%) | 85% (83%) | todas as janelas alcançáveis existem e foram comparadas (93–100%), inclusive balões, aranha, mapa, mini mapa e Info (51 cartões); tela virtual 640/800/1024 e **perfil de driver** (VGA de 16 cores × 256 cores: alinhamento ao byte e cores do sistema), com as caixas, o WinHelp e a janela 26 conferidos na SVGA; desde 2026-10-19, cores do sistema 18–20 por driver, History do WinHelp no `WIN.INI`, contorno do arrasto em XOR, 9100/9101 e Status sem ajuste (100%/99,90%), faixa 35 e mapa depois do Load como no original |
-| 6 | Diálogos e menus | 95% (93%) | 85% (83%) | barra de menus do Windows (100% nas capturas), About, Status, Quit, Load Game, quadros da janela 26, menus de um item do botão de ferramentas no Quick/Completo (100%, 2026-10-19); barra de título e menu de sistema da janela principal opcionais (`moldura_windows31`, 100% contra a bancada, 2026-10-19); faltam os diálogos internos do WinHelp |
-| 7 | Som e música | 86% (85%) | 55% | efeitos e músicas de regras, Experimental, diálogos e File → New ligados; sintetizador FM (OPL) próprio como padrão; abertura comparada com a captura do DOSBox-X (andamento, notas, volume relativo, timbre aproximado); demais músicas e efeitos dentro do jogo sem captura |
+| 6 | Diálogos e menus | 95% (93%) | 88% (83%) | barra de menus do Windows (100% nas capturas), About, Status, Quit, Load Game, quadros da janela 26, menus de um item do botão de ferramentas no Quick/Completo (100%, 2026-10-19); barra de título e menu de sistema da janela principal opcionais (`moldura_windows31`, 100% contra a bancada, 2026-10-19); Status no Full/Experimental e os dois Cancel da abertura conferidos (oitava rodada); faltam os diálogos internos do WinHelp |
+| 7 | Som e música | 86% (85%) | 65% (55%) | efeitos e músicas de regras, Experimental, diálogos e File → New ligados; sintetizador FM (OPL) próprio como padrão; as 28 músicas comparadas com capturas do DOSBox-X feitas sem input (notas e andamento iguais; nível e timbre aproximados); efeitos dentro do jogo sem captura |
 | 8 | Modos (Quick, Completo, Experimental, Tutorial) | 94% (93%) | 84% (83%) | os quatro têm vetores; tutorial conferido da lição 1 ao fim; PLACE, `_SpecialXfer` ao vivo e avisos do Experimental feitos |
 | 9 | Salvar/carregar | 98% (95%) | 90% | `.ANT` aceito pelo original; Load com `_RandYard`; Load Game no "Select a Game"; preferências com o `WIN.INI` do usuário como origem (2026-10-19) |
 | 10 | Mods (dados + Lua) | 92% (90%) | n/a | API 0.33; dados mesclados por chave; ganchos dentro do tick; 42 `data/*.json` sobrescrevíveis (mais o `save_layout.json`, que não é) |
 | 11 | Ferramentas e testes | 92% (90%) | n/a | 40 ferramentas em `tools/`, bancada QEMU com gdbstub (VGA e SVGA), 591 testes |
 | 12 | Documentação | 92% (90%) | n/a | 46 specs (~8,8 mil linhas), divergências revistas (33 em aberto, 56 resolvidas) |
 
-**Geral (conta em §6): cerca de 95% implementado e 80% verificado contra o original** (este último só nas áreas 1–9). Na revisão anterior: 88% e 70%.
+**Geral (conta em §6): cerca de 95% implementado e 82% verificado contra o original** (este último só nas áreas 1–9). Na revisão anterior: 88% e 70%.
 
 ## 2. Por área
 
@@ -54,14 +54,14 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 
 - **Completo e verificado:** ordem do tick (`_DoAntSim`), geradores S e R, superfície (lista A, feromônios, luta, comida, entrada no ninho, líder vermelha), ninhos preto e vermelho (escavação, comida, saída, invasoras, água), ciclo de vida (ovos, rainha, castas, casos C-04 a C-07), inimigos (formiga-leão com cerco, aranha com cerco, fuga, vingança, faro, laser e aranha do jogador com e sem AutoTrack, lagarta, bicho-de-conta), formiga amarela (andar, contorno, comer, ninho, luta, as mortes 1–10, choque, loucura), quintal (menino, cortador, inseticida, gato, cachorro, pássaro, chuva, enxames, `_SimColonies`), conselhos e tutorial no tick, trapaças, e o **desenho dentro do tick** (sorteios do redesenho da janela de edição em `_GotoMyAnt`, nas animações, na trofalaxia e em `_DoAntMoveY`, inclusive com "Silly" e com o `_TickCount` do momento). Evidência: 173 vetores, 2 sequências, 15 ações, 20 casos.
 - **Feito nesta rodada (2026-10-19):** `_ExitHole` com a lista A cheia igual ao original (a formiga vai para a folga da vaga 1000 e se perde; a compactação deixa uma vaga com resto; `regras/ninho.md` §4.6); `_KillAntLion(-1)` do Inseticida reproduzido no que cai no estado (a formiga-leão 0 sai da lista; bytes altos de `_BoyMsgCnt` e `_LastThemeSong`), sem as gravações em ponteiros do Windows (`regras/inimigos.md` §1.4); `_LastColonyPopR` fora do save (1 depois de `_InitSimYard` e do Load; `regras/quintal.md`). Nenhum dos três tem caso na bancada.
-- **Implementado, não verificado:** a lista consolidada está em §3 (estratégia vermelha, recrutamento, defeitos do original marcados [hipótese]). **Conferidos em 2026-10-19 (sétima rodada de vetores, `regras/testes-tick.md`):** morte natural por casta e das rainhas, proporção de vitórias, revoada natural, N-02/04/05/08/11, afogamento de adultas, lista A cheia em `_ExitHole`, `_KillAntLion(-1)` (com uma correção: o `_SetMap` da vaga −1), `_LastColonyPopR` depois do Load, o clique esquerdo no laço do `MYTIMERFUNC` e a queda de comida na casa nos dois carpetes.
+- **Implementado, não verificado:** a lista consolidada está em §3 (defeitos do original marcados [hipótese] e poucos outros). **Conferidos na oitava rodada (2026-10-19, `regras/testes-tick.md`):** estratégia vermelha (T9) pelos três caminhos do MALVADO e a escada preta no modo 0, recrutamento pelo jogador (T11, as cinco teclas, listas A, B e R), o tick exato em que `_FlyAwayR` arma (o da contagem com mais de 20 reprodutores), a queda de comida na cozinha e nos ladrilhos, a pedrinha cuspida pela formiga-leão e a volta de `_Cycle` (duas fases 0 seguidas); o giro duplo de `_GetNestDir` ficou confirmado de forma indireta (91 giros de 90° de carregadoras nos vetores que batem). **Conferidos em 2026-10-19 (sétima rodada de vetores, `regras/testes-tick.md`):** morte natural por casta e das rainhas, proporção de vitórias, revoada natural, N-02/04/05/08/11, afogamento de adultas, lista A cheia em `_ExitHole`, `_KillAntLion(-1)` (com uma correção: o `_SetMap` da vaga −1), `_LastColonyPopR` depois do Load, o clique esquerdo no laço do `MYTIMERFUNC` e a queda de comida na casa nos dois carpetes.
 - **Feito em 2026-10-19 (antes parcial):** `_SpecialXfer` troca de patch dentro do tick, com a escolha conhecida (`Estado::transferencia_no_tick`; ao vivo o tick é refeito a partir da foto do começo; telas/quintal.md §8). O registro antigo: trocava **depois** do tick (o original troca dentro do passo 17; S e R batem assim mesmo nos vetores e na ação `special_xfer`); desde 2026-10-18 a partida ao vivo reage à mensagem 10058.
 - **Falta:** modos 17/18 e grupos 10/11/15 sem significado conhecido (`formigas.md`); `_RevSpider` sem chamador visto (`inimigos.md`); chamadas indiretas de `_ForceModeA/B`, `_StartAttack`, `_GetNewRedTask` não procuradas (`superficie.md`); a direção dentro dos ninhos de `_GetRandDir`/`_GetDefendDir` (`feromonios.md`, "ainda não foi portada"; os vetores do ninho batem, então ou o caminho não é exercitado ou a spec está desatualizada — a conferir).
 
 ### 2.3 Geração de mundo
 
 - **Completo e verificado:** `_RandYard`/`_RandWorld` do Quick Game (`engine/tests/geracao_quick2.rs`); casa em quatro patches pelo `_XferPatch` (`xfer_casa`); `_InitPillar`; `_GenerateTutorial` no Load de `Tutorial.Ant` (`load_tutorial/`); jogo novo depois do fim de jogo (`inseticida_morte/21`).
-- **Implementado, não verificado** (`geracao-mundo.md`): `_CanBeHouseHole`; patches 5–7, 9, 15, 36/37 e cozinha sem pia; `_DigOutBNest/RNest`; ramos de Tutorial, Full e Experimental de `_InitYelloAnt`/`_RandWorld`; `_AddFood` com parâmetro ≥ 0; a queda de comida na cozinha e nos ladrilhos (`_DROPdir` 2 e 0; os carpetes, 1 e 3, foram conferidos em 2026-10-19, `superficie.md` 8.2).
+- **Implementado, não verificado** (`geracao-mundo.md`): `_CanBeHouseHole`; patches 5–7, 9, 15, 36/37 e cozinha sem pia; `_DigOutBNest/RNest`; ramos de Tutorial, Full e Experimental de `_InitYelloAnt`/`_RandWorld`; `_AddFood` com parâmetro ≥ 0. A queda de comida na casa foi conferida nas quatro direções de `_DROPdir` (carpetes na sétima rodada, cozinha e ladrilhos na oitava; `superficie.md` 8.2).
 - **Falta:** só verificação (saves gerados na bancada logo depois de cada tipo de jogo; `geracao-mundo.md` §"Como verificar").
 
 ### 2.4 Jogo ao vivo (laço, relógio, ritmo)
@@ -98,7 +98,8 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 ### 2.6 Diálogos e menus
 
 - **Completo e verificado:** barra de menus da janela principal (File, Window, View, Options, Speed; itens, marcas, aceleradores, navegação por teclado; 100% nas capturas m00–m08), About (98,81%), Status (`_ScoreDialog`, 100%), Quit (99,51%), quadros de mensagem, fim de jogo, "Saved correctly", pergunta do Load, Save As/Load (imitação), menus de segurar e de ícones, menu de ferramentas do Experimental, quadros animados da janela 26 (trofalaxia, 9100/9101, aranha, formiga-leão, vitória).
-- **Implementado, não verificado:** Cancel do "Load Ant Hill" aberto pela abertura (volta ao "Select a Game"; o Load Game em si foi conferido em 2026-10-19: o original fecha o "Select a Game" antes do diálogo, e o port passou a fazer o mesmo); Status no Full Game e no Experimental; a ajuda dos itens de menu com o modo de ajuda (`_ProcMenuHelp`); diálogos de arquivo modais em relação ao `WM_TIMER` [hipótese].
+- **Conferidos na bancada em 2026-10-19 (oitava rodada):** Cancel do "Load Ant Hill" aberto pela abertura (o "Select a Game" volta idêntico), CANCEL do "Select a Game" da abertura (o SimAnt encerra, como o port), Status no Full Game e no Experimental (99,56% e 99,62%; `telas/menus.md` §6).
+- **Implementado, não verificado:** a ajuda dos itens de menu com o modo de ajuda (`_ProcMenuHelp`); diálogos de arquivo modais em relação ao `WM_TIMER` [hipótese].
 - **Feito em 2026-10-19:** o título e o menu de sistema da janela principal (opção de vídeo `moldura_windows31`, padrão desligado, decisoes.md; com ela as setas passam pela caixa; telas/menus.md §8), conferidos 100% contra m00, m05b e s00–s16; e a coluna e a linha cinza-claro por fora dos menus (m01, m05b).
 - **Falta:** o menu de um item (`editToExp`, janela 10; **feito em 2026-10-19**) do botão de ferramentas no Quick Game (o port vira Experimental direto); os diálogos internos do WinHelp (Open, Print, Annotate, Define…).
 
@@ -108,7 +109,8 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 - **Verificado:** formato e catálogo (pelo código). **Desde 2026-10-19, contra a captura do original no DOSBox-X** (SB16 + OPL3, MIDI Mapper "SB16 Ext Synth" da instalação, sem som no PC; `tools/som_dosbox.py`, `regras/som.md` "Áudio do original no DOSBox-X"): na abertura (10001), duração (102,90 s contra 102,99 s de MIDI), andamento, notas e ordem (croma alinhada 0,85 contra 0,43 deslocada), saída mono e o volume relativo música/efeito (a música 20 dB abaixo de um efeito de ganho 1, medido com o efeito 41 pelo mesmo `waveOut`). Os canais 1–10 sem mapas conferem com o `MIDIMAP.CFG`.
 - **Parcial / decisão do port:** timbre por um **sintetizador FM próprio no estilo do OPL** com banco GM próprio (`data/opl_banco.json`), padrão desde 2026-10-19 (`decisoes.md`), mais perto do original que o simples, mas não igual (agudos de 2–4 kHz mais fracos; só os programas da abertura ajustados); SoundFont e o simples continuam selecionáveis. Efeito novo sempre corta o anterior (o original descarta um pedido no mesmo milissegundo).
 - **Feito em 2026-10-19:** o descarte de um efeito pedido no mesmo milissegundo em que outro começou (`_myBeginSound`; `simant/src/som/controle.rs`): de dois efeitos seguidos no mesmo tick, fica o primeiro [não medido no original].
-- **Não capturado:** as outras 28 músicas e os efeitos dentro do jogo (taxa real dos efeitos de 4096 Hz na SB16, luta, preempção): o `AUTOTYPE` do DOSBox-X não entrega teclas com a janela sem foco, e operar a janela exigiria o PC do usuário.
+- **Capturado sem input (2026-10-19, `som_dosbox.py musicas`):** as outras 27 músicas, tocadas pelo próprio jogo na cópia com o `GAMETHME.MID` trocado (mesmo caminho MCI → SB16 FM): notas, ordem e andamento batem em todas; o nível das outras fica ~4 dB acima do original em relação à abertura e o programa 59 foi corrigido no banco FM (era ~10 dB alto); 49 e 95 têm envelope diferente [em aberto] (`regras/som.md`, "As outras músicas").
+- **Não capturado:** os efeitos dentro do jogo (taxa real dos efeitos de 4096 Hz na SB16, luta, preempção): o `AUTOTYPE` do DOSBox-X entrega teclas no DOS com a janela minimizada (o problema anterior era o layout BR), mas não no Windows 3.1 em modo 386 avançado; a bancada QEMU não tem OPL3 e toca os efeitos errado.
 - **Não ligados porque o caminho não existe no port:** `_StartAttack` pelo menu e os menus de ferramentas da janela de edição e da janela do mapa (os botões não existem no Windows).
 
 ### 2.8 Modos
@@ -170,22 +172,20 @@ Formatos
 - Classes do campo T e bits 0–2 nas crias (`formatos/save-ant.md`, [hipótese]).
 
 Regras
-- Estratégia vermelha (T9), recrutamento pelo jogador (T11) (`regras/superficie.md`).
 - A lista 4/1100 por estágio (`regras/ciclo-de-vida.md`); amarela vermelha pondo ovo preto e recriação da cauda em lutas ([hipótese]).
-- Pedrinha cuspida pela formiga-leão (a regra; o desenho foi conferido).
 - Defeitos do original marcados [hipótese] no ninho e coluna 106 de `_CarpetFloorR`.
-- Suavização dupla na volta de `_Cycle` e giro duplo de `_GetNestDir` (`regras/feromonios.md`).
+- Giro duplo de `_GetNestDir` sem caso isolado (confirmado só de forma indireta, `regras/feromonios.md`).
 - Textos do balão do menino (lista 4/1200) (`regras/quintal.md`).
 - Seção 13 de `regras/formiga-amarela.md` além de Y-01..Y-04 e Y13; quadros do choque e da loucura com a janela de edição atrás.
 - Retorno exato de `_CalcScore` e o sentido da nota 3 (`regras/simulacao-visao-geral.md`).
 - `_KillAntLion(-1)`: o x do primeiro `_SetMap` é o byte alto do seletor de `_EggStr` (memória do Windows; o port só o tem quando o vetor o traz).
 
 Geração de mundo
-- `_CanBeHouseHole`; patches da casa 5–7, 9, 15, 36/37 e cozinha sem pia; `_DigOutBNest/RNest`; ramos de Tutorial/Full/Experimental de `_InitYelloAnt`/`_RandWorld`; `_AddFood` com parâmetro ≥ 0; a queda de comida na cozinha e nos ladrilhos (`_DROPdir` 2 e 0).
+- `_CanBeHouseHole`; patches da casa 5–7, 9, 15, 36/37 e cozinha sem pia; `_DigOutBNest/RNest`; ramos de Tutorial/Full/Experimental de `_InitYelloAnt`/`_RandWorld`; `_AddFood` com parâmetro ≥ 0.
 
 Jogo ao vivo
 - Taxa de fast/ultra em máquina real; `mac_por_tick` fora da bancada. (A cadência sem foco foi medida em 2026-10-19: igual à com foco.)
-- O que o original mostra depois de `_XferPatch` (`_RandWorld` põe `_MapPnt` = (0x40, 0x20) e o original só redesenha; o port leva a vista até a amarela).
+- O que o original mostra depois de `_XferPatch` foi conferido em 2026-10-19 (a vista fica em `_MapPnt` = (64, 32); o port deixou de centralizar na amarela). Resta: com o jogo pausado o original mantém o patch antigo na janela até o próximo redesenho, e o port redesenha na hora (`divergencias.md`).
 
 Telas
 - Cartões 127 e 129 do Info e clique em palavra em negrito.
@@ -194,10 +194,10 @@ Telas
 - Cores do mapa (`_ConvColor`, [hipótese]).
 - Clique direito no Experimental e nas janelas de controle, F1 com janela de controle, Shift+F1, Delete, `yardHelpBut`, cursor das ferramentas (`telas/ajuda-contexto.md` §6).
 - Posição do menu de ferramentas no Quick Game; avisos do Experimental na faixa. Faixa 35 aberta com o jogo pausado: o original deixa vazios os números do quintal e as barras de saúde até o próximo redesenho, o port os desenha (`divergencias.md`, 2026-10-19).
-- A janela do mapa atrás logo depois de um Load (o original a desenha; o port a deixa preta na exportação, `divergencias.md`); Status no Full Game e no Experimental; ajuda dos itens de menu.
+- A janela do mapa atrás logo depois de um Load (o original a desenha; o port a deixa preta na exportação, `divergencias.md`); ajuda dos itens de menu.
 
 Som
-- Comparado só na abertura (andamento, notas, volume relativo, timbre aproximado; `regras/som.md`). Sem captura: as outras músicas, os efeitos dentro do jogo (taxa real na SB16), os sons da luta no tempo, a preempção no mesmo milissegundo e os sons da janela 26.
+- Músicas comparadas todas (notas e andamento iguais; nível ~4 dB acima e timbre dos programas 49, 95, 19 e 69 diferentes, `regras/som.md`). Sem captura: os efeitos dentro do jogo (taxa real na SB16), os sons da luta no tempo, a preempção no mesmo milissegundo e os sons da janela 26.
 
 Diálogos
 - Modalidade dos diálogos de arquivo em relação ao `WM_TIMER` ([hipótese]); rolagem com muitos arquivos e mudança de pasta.
@@ -212,7 +212,7 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 
 | Item | Esforço | Referência |
 |---|---|---|
-| Timbre FM: ajustar os 11 programas restantes e os agudos (2–4 kHz) quando houver captura das outras músicas (exige input no DOSBox-X: o `AUTOTYPE` não funciona com a janela sem foco) | M | `regras/som.md` "Áudio do original no DOSBox-X", `formatos/som.md` "Sintetizador FM" |
+| Timbre FM: ajustar os programas que ainda diferem (49 e 95 no envelope, 19 e 69 escuros demais) e o nível por programa (~4 dB acima do original em relação à abertura), com as capturas das músicas já feitas (`re_trabalho/som/musicas/`, `som_dosbox.py comparar_todas`) | M | `regras/som.md` "Áudio do original no DOSBox-X", `formatos/som.md` "Sintetizador FM" |
 
 Não há outro item de alto impacto: tudo o que o jogador alcança no original existe no port (a tela virtual e o perfil de driver entraram no `main` em 2026-10-19).
 
@@ -236,9 +236,8 @@ Não há outro item de alto impacto: tudo o que o jogador alcança no original e
 
 | Item | Esforço |
 |---|---|
-| Captura das outras músicas e dos efeitos dentro do jogo no DOSBox-X (a abertura e o nível de um efeito já estão: `tools/som_dosbox.py`) | M |
-| Vetores ou casos para os ramos raros que restam em §3 (estratégia vermelha, recrutamento, queda de comida na cozinha e nos ladrilhos); os demais foram feitos em 2026-10-19 (sétima rodada) | P–M |
-| Capturas: Status no Full/Experimental, telas maiores, avisos do Experimental, o que se vê depois de `_XferPatch` | P |
+| Captura dos efeitos dentro do jogo (as músicas já estão: `som_dosbox.py musicas`); falta uma entrada que chegue ao Windows sem o foco (mouse serial pelo `nullmodem` do DOSBox-X, não tentado) | M |
+| Capturas: telas maiores, avisos do Experimental | P |
 | Saves gerados na bancada logo depois de Tutorial/Full/Experimental para os ramos da geração | P |
 | Ritmo fast/ultra numa máquina real | P |
 
@@ -264,20 +263,20 @@ Pesos por área, pensados no que importa para quem joga um port completo (as reg
 | Área | Peso | Implementado | Peso × impl. | Verificado | Peso × verif. |
 |---|---|---|---|---|---|
 | Formatos de arquivo | 8 | 95 | 760 | 85 | 680 |
-| Regras da simulação | 25 | 98 | 2.450 | 81 | 2.025 |
-| Geração de mundo | 7 | 96 | 672 | 75 | 525 |
-| Jogo ao vivo | 8 | 95 | 760 | 67 | 536 |
+| Regras da simulação | 25 | 98 | 2.450 | 84 | 2.100 |
+| Geração de mundo | 7 | 96 | 672 | 77 | 539 |
+| Jogo ao vivo | 8 | 95 | 760 | 68 | 544 |
 | Telas e janelas | 15 | 95 | 1.425 | 85 | 1.275 |
-| Diálogos e menus | 8 | 95 | 760 | 85 | 680 |
-| Som e música | 6 | 86 | 516 | 55 | 330 |
+| Diálogos e menus | 8 | 95 | 760 | 88 | 704 |
+| Som e música | 6 | 86 | 516 | 65 | 390 |
 | Modos | 8 | 94 | 752 | 84 | 672 |
 | Salvar/carregar | 4 | 98 | 392 | 90 | 360 |
 | Mods | 5 | 92 | 460 | n/a | — |
 | Ferramentas e testes | 3 | 92 | 276 | n/a | — |
 | Documentação | 3 | 92 | 276 | n/a | — |
-| **Total** | **100** | | **9.499** | | **7.083** (peso 89) |
+| **Total** | **100** | | **9.499** | | **7.264** (peso 89) |
 
 - **Implementado:** 9.499 / 100 = **≈ 95%** (9.483 antes da barra de título, 2026-10-19; era 8.775, ≈ 88%; 9.359 antes do caminho FM; 9.389 antes dos itens de alto e médio impacto de 2026-10-19).
-- **Verificado contra o original** (só as áreas 1–9, peso 89): 7.083 / 89 = **≈ 80%** (7.067 antes da barra de título; era 6.220, ≈ 70%; 6.844 antes da captura de áudio; 6.964 antes dos itens de 2026-10-19).
+- **Verificado contra o original** (só as áreas 1–9, peso 89): 7.264 / 89 = **≈ 82%** (7.083 antes da oitava rodada de verificação; 7.067 antes da barra de título; era 6.220, ≈ 70%; 6.844 antes da captura de áudio; 6.964 antes dos itens de 2026-10-19).
 
-Leitura: a simulação está praticamente completa e amarrada ao original por vetores de tick inteiros; a interface alcançável pelo jogador existe inteira e foi comparada com capturas na maior parte. O que separa o port de "completo" é o som (timbre FM aproximado; só a abertura comparada com a captura); o resto são resíduos pequenos (§4). O que separa de "verificado" são os ramos raros das regras (§3), o áudio e as poucas janelas sem captura nas resoluções maiores e em 256 cores.
+Leitura: a simulação está praticamente completa e amarrada ao original por vetores de tick inteiros; a interface alcançável pelo jogador existe inteira e foi comparada com capturas na maior parte. O que separa o port de "completo" é o som (timbre FM aproximado; as músicas comparadas, os efeitos dentro do jogo não); o resto são resíduos pequenos (§4). O que separa de "verificado" são as hipóteses que restam nas regras (§3), os efeitos sonoros dentro do jogo e as poucas janelas sem captura nas resoluções maiores e em 256 cores.

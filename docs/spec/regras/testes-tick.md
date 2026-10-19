@@ -361,6 +361,28 @@ Achados:
 
 Achados: (1) o port não chamava `_GotoMyAnt` na aranha do jogador com AutoTrack (corrigido); (2) o relógio dos balões dentro do tick é o do momento do desenho: igual ao do começo fora das animações, +1 e depois +3 por quadro na luta (o port modela as esperas; o tempo de desenho e o das caixas modais, não); (3) `_AnimYellowInsane` espera 2 degraus por quadro (110 ms, não 55: `amarela.json`).
 
+### Oitava rodada (2026-10-19): estratégia, recrutamento e o que restava
+
+`tools/cenarios_raros.py` (cenários novos `estrategia_malvada`, `estrategia_vermelha_p`, `estrategia_vermelha_s`, `estrategia_preta_0`, `recrutar`, `revoada_limiar`, `queda_casa_celula`, `leao_pedrinha`, `volta_cycle`, `vista_xfer`), sobre **cópias** dos overlays (`re_trabalho/ag8/`). Onde a regra depende de sorteio, a semente S da entrada foi escolhida no port com o exemplo novo `engine/examples/buscar_semente.rs` (`buscar_semente DIR_TICK SIMBOLO[ou NOME[i]] [VALOR|nz]`: roda o tick do port sobre o vetor gravado sem a semente, para cada semente, até o bloco ter o valor pedido) e escrita na bancada antes do estado de antes. Os 17 vetores e as 5 ações batem 307/307 com S, R e vida e são exigidos por `ticks_originais.rs` e `acoes_originais.rs`. Ação nova no port: `{"comandos": [c...], "defesa_ultimo_tick": n}` (`vetor_tick::aplicar_acao`: `_YellowCommand(c)` com o jogo pausado; `n` = `_TemBModePop[6]` lido na bancada, que `_UnRecruit` usa e não está no save).
+
+| Subpasta | Ticks | O que exercita |
+|---|---|---|
+| `estrategia_malvada` | 1711, 1712, 1767, 1768 | `_GstrR` pelo desespero: `_JustToBeMean` 0 → 56, modo 0, descendo; 1 → 0 e a volta à estratégia normal (modo 3) |
+| `estrategia_vermelha_populosa` | 1711 | MALVADO "não normal", sem sorteio (`_RpopT` 150, `_BpopT` 20) |
+| `estrategia_vermelha_sorteio` | 1711 | MALVADO pelos sorteios `S32()` = `S128()` = 0 (semente 0x009c) |
+| `estrategia_preta_desespero` | 1711 | escada preta no modo 0 |
+| `recrutadas` | 1726, 1727 | pretas recrutadas pelas teclas 1 e 2 em Defense (`_DoRecruitAnt`) com a amarela na superfície |
+| `revoada_limiar` | 1791, 1855 | contagem com 20 reprodutores vermelhos (não arma) e com 21 (arma 200 no tick da contagem, 199 no fim) |
+| `queda_casa_cozinha`, `queda_casa_ladrilhos`, `queda_casa_azulejo` | 34 | `_DROPdir` 2 e 0 (sobre um 0x3F escrito) e o azulejo 0x62 da cozinha, onde nada cai |
+| `leao_pedrinha` | 1711 | a formiga-leão cospe a pedrinha a 2 células (semente 0x02cd) |
+| `volta_cycle` | 1711, 1712 | `_Cycle` 4095 → 0x1000 → 0: duas fases 0 seguidas |
+
+Ações (`tests/referencias/acoes/`): `amarela_recrutar_5`, `amarela_recrutar_10`, `amarela_liberar_metade`, `amarela_recrutar_todas`, `amarela_liberar_todas` (teclas 1, 2, 3, Ctrl+2, 4 com o jogo pausado; superficie.md 9.4, T11).
+
+Gravações brutas inteiras comparadas antes da seleção (fora do git): `estrategia_malvada` 7, as outras estratégias 2 cada (e o sorteio sem semente, 2), recrutamento 5 ticks + 5 ações (duas vezes), limiar 5, queda 3 × 4, pedrinha 1 + 2, volta de `_Cycle` 3: **todas 307/307**.
+
+Achados: nenhuma divergência de regra. A mensagem de `_GstrR` ("The red ants are attacking!") vai para a faixa, sem caixa modal (o tick não parou). Na cozinha e nos ladrilhos nenhum tile do patch faz a comida cair (superficie.md 8.2). Fora do tick (bancada, sem vetor): Cancel do "Load Ant Hill" e do "Select a Game" na abertura (menus.md §7, abertura.md), Status no Full Game e no Experimental (menus.md §6) e a vista depois de `_XferPatch` (divergencias.md; o port deixou de centralizar na amarela).
+
 ### Sétima rodada (2026-10-19): ramos raros
 
 `tools/cenarios_raros.py` (mesma interface de `cenarios_regras.py`; snapshots `rico`, `full` e `exp`). A preparação escreve a memória na entrada de um tick; onde a regra é rara demais para esperar, a semente S da entrada foi **escolhida no port** (busca sobre o vetor do mesmo tick sem a semente) e escrita na bancada antes do estado de antes. Os 31 vetores novos (16 cenários, 3,9 MB) batem 307/307 com S, R e vida e são exigidos por `ticks_originais.rs`; a ação nova (`acoes/exp_leao_m1`) por `acoes_originais.rs`.

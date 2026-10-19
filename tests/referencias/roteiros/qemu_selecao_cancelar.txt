@@ -1,0 +1,14 @@
+# Cancel do "Select a Game" da abertura (snapshot sel2 do overlay ov_modos): clique no CANCEL da janela 2
+# e o que acontece depois. Capturas em re_trabalho/ag8/sel_cancel/ (fora do git). Uma cópia do overlay:
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_selecao_cancelar.txt --overlay re_trabalho/ag8/ov_modos.qcow2
+snapshot_carregar sel2
+esperar 3
+capturar re_trabalho/ag8/sel_cancel/s1_selecao.png
+clicar_em 412 174
+esperar 1
+capturar re_trabalho/ag8/sel_cancel/s2_1s.png
+esperar 5
+capturar re_trabalho/ag8/sel_cancel/s3_6s.png
+esperar 10
+capturar re_trabalho/ag8/sel_cancel/s4_16s.png
+fim

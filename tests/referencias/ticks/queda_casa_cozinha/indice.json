@@ -1,0 +1,85 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-19",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "full",
+ "descricao": "_DROPdir = 2 (cozinha): aranha morta sobre um 0x3F escrito no azulejo; as 3 comidas descem até a bancada",
+ "passos": [
+  "teclas shift+0",
+  "ColonyTotalBlack <- 2",
+  "teclas ctrl+y",
+  "antes: {'SementeS': 34791, 'SementeR': 4186687430, 'gameCycles': 3020, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 19, 'Cycle': 19, 'posicao': 'livre'}",
+  "duplo clique em (287, 237)",
+  "depois: {'SementeS': 11490, 'SementeR': 4186687430, 'gameCycles': 4351, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 2, 'GameTime': 19, 'Cycle': 0, 'posicao': 'livre'}",
+  "teclas ctrl+e",
+  "teclas ctrl+8",
+  "teclas shift+0",
+  "_CurYardPnt = 0x10000; DROPdir 2; aranha em agonia em (20, 20) tile 0x62; abaixo ['0x62', '0x62', '0x62', '0x68', '0x0', '0x0', '0x0', '0x0']",
+  "MapA(20, 20) <- 0x3f",
+  "SpidOn <- 1",
+  "SpidX <- 328",
+  "SpidY <- 328",
+  "SMode <- 5",
+  "Starg <- -2",
+  "EatCnt <- 0",
+  "DeathCnt <- 3"
+ ],
+ "primeira_entrada": {
+  "SementeS": 60730,
+  "SementeR": 2578188780,
+  "gameCycles": 271,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "DROPdir": 0,
+  "GameTime": 17,
+  "Cycle": 17,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ],
+  "DROPdir": [
+   "DROPdir",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_000034"
+ ],
+ "selecao": [
+  "34"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}

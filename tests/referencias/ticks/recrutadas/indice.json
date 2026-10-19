@@ -1,0 +1,110 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-19",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "rico",
+ "descricao": "T11: pretas recrutadas pelas teclas 1 e 2 (modo 6, _DoRecruitAnt) com a amarela na superfície",
+ "passos": [
+  "teclas ctrl+8",
+  "30 pretas de grupo 2/6 na lista A; BpopT 31",
+  "MePlane <- 1",
+  "MeLocX <- 38",
+  "MeLocY <- 30",
+  "MeGoalPlane <- 1",
+  "MeGoalX <- 38",
+  "MeGoalY <- 30",
+  "MeLastX <- 38",
+  "MeLastY <- 30",
+  "MeMoveMe <- 0",
+  "MeCmd <- 0",
+  "MeHealth <- 100",
+  "amarela de (2, 36, 9) para (1, 38, 30)",
+  "teclas shift+0",
+  "antes: {'SementeS': 15986, 'SementeR': 4144515450, 'gameCycles': 207544, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 1720, 'Cycle': 1720, 'posicao': 'livre'}",
+  "teclas 1",
+  "depois: {'SementeS': 15986, 'SementeR': 4144515450, 'gameCycles': 208247, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 1720, 'Cycle': 1720, 'posicao': 'livre'}",
+  "1: comandos [1], _TemBModePop[6] = 0",
+  "antes: {'SementeS': 15986, 'SementeR': 4144515450, 'gameCycles': 208247, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 1720, 'Cycle': 1720, 'posicao': 'livre'}",
+  "teclas 2",
+  "depois: {'SementeS': 15986, 'SementeR': 4144515450, 'gameCycles': 208951, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 1720, 'Cycle': 1720, 'posicao': 'livre'}",
+  "2: comandos [2], _TemBModePop[6] = 0",
+  "teclas shift+0",
+  "ListIndexB <- 42",
+  "lista B[41] = (34, 5) T 0x12 M 0 S 0",
+  "ListIndexR <- 56",
+  "lista R[55] = (31, 4) T 0x12 M 6 S 0",
+  "teclas shift+0",
+  "antes: {'SementeS': 27866, 'SementeR': 2033329836, 'gameCycles': 209780, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 1731, 'Cycle': 1731, 'posicao': 'livre'}",
+  "teclas 3",
+  "depois: {'SementeS': 27866, 'SementeR': 2033329836, 'gameCycles': 210435, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 1731, 'Cycle': 1731, 'posicao': 'livre'}",
+  "3: comandos [4], _TemBModePop[6] = 15",
+  "antes: {'SementeS': 27866, 'SementeR': 2033329836, 'gameCycles': 210435, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 1731, 'Cycle': 1731, 'posicao': 'livre'}",
+  "teclas ctrl+2",
+  "depois: {'SementeS': 27866, 'SementeR': 2033329836, 'gameCycles': 211077, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 1731, 'Cycle': 1731, 'posicao': 'livre'}",
+  "ctrl+2: comandos [3], _TemBModePop[6] = 15",
+  "antes: {'SementeS': 27866, 'SementeR': 2033329836, 'gameCycles': 211077, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 1731, 'Cycle': 1731, 'posicao': 'livre'}",
+  "teclas 4",
+  "depois: {'SementeS': 27866, 'SementeR': 2033329836, 'gameCycles': 211743, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 1731, 'Cycle': 1731, 'posicao': 'livre'}",
+  "4: comandos [5], _TemBModePop[6] = 15"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "DROPdir": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ],
+  "DROPdir": [
+   "DROPdir",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_001726",
+  "tick_001727"
+ ],
+ "selecao": [
+  "1726",
+  "1727"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}
