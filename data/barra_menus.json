@@ -26,7 +26,7 @@
   ],
   "marca_x": 5,
   "marca_y": 3,
-  "cores": {"fundo": 15, "texto": 0, "realce": 4, "texto_realce": 15, "borda": 0},
+  "cores": {"fundo": 15, "texto": 0, "realce": 19, "texto_realce": 20, "borda": 0},
   "_texto_pausa": "_SetMenuOptionText(0x41, …) troca o texto do item 0xFD41 pelo do DGROUP: 0x911 '&Pause\\tShift+0' com o jogo andando, 0x900 'Un&pause\\tShift+0' pausado (o objeto do banco traz '&Pause   \\tShift+0', só usado antes do primeiro _SetMenuEntries). Bancada: m05 e n05.",
   "texto_pausa": ["&Pause\tShift+0", "Un&pause\tShift+0"],
   "_comandos": "_InitMenu numera os itens 0xFD01 + 16 × menu + item (separadores incluídos); _ProcMenu decide pelo byte baixo. Ver docs/spec/telas/menus.md, tabela dos itens.",
@@ -95,7 +95,7 @@
     "indice_continuar": 14,
     "ajuste": [-3, 0],
     "_moldura": "Moldura de diálogo do Windows dentro do contorno preto: 4 linhas na cor do título ativo (bancada n02 e n09).",
-    "moldura": {"cor": 4, "espessura": 4}
+    "moldura": {"cor": 16, "espessura": 4}
   },
   "sobre": {
     "_comentario": "File → About: _AboutDialog (1000:cf3a) pausa o jogo (_SetPause(1)), abre a janela 31 e alterna a figura (aboutPic2) com os créditos da lista 4/1700 na fonte 4, centrados, rolando um pixel por passo dentro de aboutPic2; depois da última linha, a figura volta. Um clique (ou Espaço/Insert) com a figura e até passos_para_fechar[0] passos só começa a rolagem; na rolagem, fecha depois de passos_para_fechar[1] passos. Ao fechar, a pausa volta a ser a de antes. Tempos medidos na bancada (n07–n12, m12–m15).",
@@ -108,6 +108,6 @@
     "ms_por_passo": 165,
     "passos_para_fechar": [1, 3],
     "ajuste": [0, 0],
-    "moldura": {"cor": 4, "espessura": 4}
+    "moldura": {"cor": 16, "espessura": 4}
   }
 }

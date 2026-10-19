@@ -10,5 +10,5 @@
   "primeiro_item_submenu": 2,
   "deslocamento": [0, 2],
   "cor_item_atual": 9,
-  "moldura": {"topo": 74, "ajuste_x": 0, "largura_borda": 5, "cor_borda": 4, "cor_contorno": 0, "ajuste_conteudo": [0, 0]}
+  "moldura": {"topo": 74, "ajuste_x": 0, "largura_borda": 5, "cor_borda": 16, "cor_contorno": 0, "ajuste_conteudo": [0, 0]}
 }

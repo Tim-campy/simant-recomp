@@ -31,7 +31,7 @@
   "altura_titulo": 18,
   "_fonte_titulo": "Fontes (índices de interface.json) do título do Windows, a primeira que existir: 6 = System do Windows 3.1 (VGASYS.FON da instalação do usuário, SimAnt-T/WINDOWS/SYSTEM); 0 = Gaia8x14 do jogo.",
   "fonte_titulo": [6, 0],
-  "titulo_ativo": [4, 15],
+  "titulo_ativo": [16, 18],
   "titulo_inativo": [15, 0],
   "cor_linha": 0,
   "cor_fundo": 8,
@@ -79,8 +79,8 @@
       "cor_fundo": 15,
       "cor_texto": 0,
       "cor_desabilitado": 7,
-      "cor_realce": 4,
-      "cor_texto_realce": 15,
+      "cor_realce": 19,
+      "cor_texto_realce": 20,
       "cor_borda": 0
     }
   },
