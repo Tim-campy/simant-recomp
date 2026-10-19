@@ -5,7 +5,7 @@
 //!
 //! Especificação: docs/spec/telas/abertura.md ("Escolha do jogo") e docs/spec/telas/quintal.md.
 
-use engine::core::menu_ferramentas::{ItemMenu, MenuFerramentas};
+use engine::core::menu_ferramentas::{ItemMenu, MenuFerramentas, QualMenu};
 use engine::core::navegacao::Evento as EventoNav;
 use engine::core::popup_castas::{CliqueBarras, PopupCastas};
 use engine::core::quadro::Quadro;
@@ -170,26 +170,37 @@ fn tratar_efeitos(s: &mut Sessao, efeitos: Vec<Efeito>) {
     s.partida.processar_eventos_do_estado();
 }
 
-/// Botão de ferramentas (`_RibbonToolsMenu`): Quick Game → Experimental; no Experimental abre o
-/// menu; no Full Game e no Tutorial, nada (o original mostra só uma figura no Full Game).
+/// Botão de ferramentas (`_RibbonToolsMenu`): no Quick Game abre o menu de um item (janela 10) e,
+/// escolhido o item, vira Experimental; no Jogo Completo abre a figura da janela 11, que não faz nada;
+/// no Experimental abre o menu de ferramentas; no Tutorial, nada.
 fn botao_ferramentas(s: &mut Sessao) {
+    let Some(r) = s.tela.retangulo_da_faixa(&s.modos.menu.cfg.botao) else { return };
     match s.partida.estado.partida.tipo_jogo {
         1 => {
-            let c = Contexto { tabelas: &s.modos.tabelas_exp, amarela: &s.partida.tabelas_amarela, inimigos: &s.partida.regras.inimigos };
-            let e = &mut s.partida.estado;
-            let efeitos = experimental::quick_para_experimental(e, c);
-            println!("Quick Game -> Experimental");
-            tratar_efeitos(s, efeitos);
-        }
-        3 => {
-            if let Some(r) = s.tela.retangulo_da_faixa(&s.modos.menu.cfg.botao) {
-                let atual = Ferramenta::de_i16(s.partida.estado.partida.ferramenta_experimental);
-                s.modos.menu.abrir(r, atual);
+            if s.modos.menu.abrir_por_tipo(QualMenu::Quick, r) {
                 s.modos.menu_aberto = true;
+            } else {
+                // Sem a janela 10 nos dados: vira Experimental direto (o comportamento antigo).
+                quick_para_experimental(s);
             }
+        }
+        2 => s.modos.menu_aberto = s.modos.menu.abrir_por_tipo(QualMenu::Completo, r),
+        3 => {
+            let atual = Ferramenta::de_i16(s.partida.estado.partida.ferramenta_experimental);
+            s.modos.menu.abrir(r, atual);
+            s.modos.menu_aberto = true;
         }
         _ => println!("ferramentas: nada neste tipo de jogo"),
     }
+}
+
+/// O item da janela 10: o Quick Game vira Experimental (`_RibbonToolsMenu`, seção 5 da spec).
+fn quick_para_experimental(s: &mut Sessao) {
+    let c = Contexto { tabelas: &s.modos.tabelas_exp, amarela: &s.partida.tabelas_amarela, inimigos: &s.partida.regras.inimigos };
+    let e = &mut s.partida.estado;
+    let efeitos = experimental::quick_para_experimental(e, c);
+    println!("Quick Game -> Experimental");
+    tratar_efeitos(s, efeitos);
 }
 
 fn clique_no_menu(s: &mut Sessao, x: i32, y: i32) {
@@ -202,6 +213,11 @@ fn clique_no_menu(s: &mut Sessao, x: i32, y: i32) {
     let (f, sub, fecha) = match item {
         ItemMenu::Ferramenta(f) => (f, None, s.modos.menu.submenu.is_none()),
         ItemMenu::Subopcao(f, i) => (f, Some(i), true),
+        ItemMenu::ParaExperimental => {
+            s.modos.menu_aberto = false;
+            quick_para_experimental(s);
+            return;
+        }
     };
     let mut ctl = s.modos.controle_exp.clone();
     let c = Contexto { tabelas: &s.modos.tabelas_exp, amarela: &s.partida.tabelas_amarela, inimigos: &s.partida.regras.inimigos };
@@ -569,6 +585,56 @@ mod testes {
         assert!(soltar_no_menu(&mut s, ix, iy));
         assert_eq!(s.partida.estado.partida.ferramenta_experimental, Ferramenta::Formiga as i16);
         assert!(!s.modos.menu_aberto);
+    }
+
+    /// Botão de ferramentas no Quick Game (`_RibbonToolsMenu`, janela 10): apertar abre o menu de um
+    /// item; soltar no próprio botão fecha sem mudar nada; soltar no item vira Experimental. No Jogo
+    /// Completo abre a figura da janela 11 e soltar não faz nada.
+    #[test]
+    fn botao_de_ferramentas_no_quick_e_no_completo() {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
+        let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
+        let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores.clone()).unwrap();
+        assert_eq!(s.partida.estado.partida.tipo_jogo, 1);
+        let (bx, by) = (354, 70 - 37);
+        clique_na_faixa(&mut s, bx, by);
+        assert!(s.modos.menu_aberto && s.modos.menu.qual == QualMenu::Quick);
+        let rgb = s.quadro_rgb().unwrap();
+        if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+            crate::salvar_png(&PathBuf::from(saida).join("menu_quick.png"), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
+        }
+        assert!(soltar_no_menu(&mut s, bx, by));
+        assert!(!s.modos.menu_aberto);
+        assert_eq!(s.partida.estado.partida.tipo_jogo, 1, "soltar fora do item não muda nada");
+        clique_na_faixa(&mut s, bx, by);
+        let o = s.modos.menu.origem;
+        let (ix, iy) = (i32::from(o.0) + 40, i32::from(o.1) + 10);
+        assert!(mover_no_menu(&mut s, ix, iy));
+        assert!(s.modos.menu.realce_quick);
+        assert!(soltar_no_menu(&mut s, ix, iy));
+        assert!(!s.modos.menu_aberto);
+        assert_eq!(s.partida.estado.partida.tipo_jogo, 3, "o item vira Experimental");
+
+        let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
+        s.partida.estado.partida.tipo_jogo = 2;
+        clique_na_faixa(&mut s, bx, by);
+        assert!(s.modos.menu_aberto && s.modos.menu.qual == QualMenu::Completo);
+        let rgb = s.quadro_rgb().unwrap();
+        if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+            crate::salvar_png(&PathBuf::from(saida).join("menu_completo.png"), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
+        }
+        let o = s.modos.menu.origem;
+        assert!(soltar_no_menu(&mut s, i32::from(o.0) + 40, i32::from(o.1) + 10));
+        assert!(!s.modos.menu_aberto);
+        assert_eq!(s.partida.estado.partida.tipo_jogo, 2);
     }
 
     /// Bancada (qemu_ui_barras_direito.txt, 2026-10-18): segurar o botão no número da população preta

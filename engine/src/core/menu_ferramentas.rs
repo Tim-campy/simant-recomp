@@ -1,5 +1,7 @@
 //! Menu de ferramentas do Experimental (janela 9 `editToolsMenu`) e os submenus das ferramentas
-//! (janelas 12–17), sem SDL: posição, desenho e qual item está sob o mouse.
+//! (janelas 12–17), sem SDL: posição, desenho e qual item está sob o mouse. O mesmo botão abre, no
+//! Quick Game, o menu de um item `editToExp` (janela 10) e, no Jogo Completo, a figura
+//! `editNoExpMenu` (janela 11) (`_RibbonToolsMenu` `1010:de76`).
 //!
 //! Especificação: docs/spec/telas/experimental.md §2 (`_DoExpMenu` `1010:6ee2`, `_win_DoProxMenu`).
 //! As regras das ferramentas estão em `rules::experimental`. Dados: data/menu_ferramentas.json.
@@ -40,6 +42,23 @@ pub struct ConfigMenuFerramentas {
     /// sem moldura (o desenho anterior do port).
     #[serde(default)]
     pub moldura: Option<MolduraMenu>,
+    /// Janela do botão no Quick Game (10 `editToExp`, um item: vira Experimental) e no Jogo Completo
+    /// (11 `editNoExpMenu`, só a figura). 0 = o botão não abre nada naquele tipo de jogo.
+    #[serde(default)]
+    pub janela_quick: u16,
+    #[serde(default)]
+    pub janela_completo: u16,
+}
+
+/// Qual dos menus do botão de ferramentas está aberto.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QualMenu {
+    /// Janela 9 com os submenus (Experimental).
+    Experimental,
+    /// Janela 10, um item (Quick Game).
+    Quick,
+    /// Janela 11, sem item (Jogo Completo).
+    Completo,
 }
 
 /// `_RibbonToolsMenu` abre a janela 9 em x = (direita do botão − largura + esquerda) / 2; a janela tem
@@ -64,6 +83,8 @@ pub enum ItemMenu {
     Ferramenta(Ferramenta),
     /// Subopção da ferramenta (índice do item no submenu).
     Subopcao(Ferramenta, u8),
+    /// O item `editToExpMode` da janela 10: o Quick Game vira Experimental.
+    ParaExperimental,
 }
 
 /// O menu aberto: onde está e qual submenu está aberto.
@@ -71,6 +92,13 @@ pub struct MenuFerramentas {
     pub cfg: ConfigMenuFerramentas,
     menu: Janela,
     submenus: Vec<Option<Janela>>,
+    /// Janelas 10 e 11 (`None` sem a janela no `cfg`).
+    quick: Option<Janela>,
+    completo: Option<Janela>,
+    /// Qual menu foi aberto por último.
+    pub qual: QualMenu,
+    /// Janela 10: o item está realçado (o mouse sobre ele).
+    pub realce_quick: bool,
     /// Canto do objeto 0 do menu na área cliente.
     pub origem: (i16, i16),
     /// Submenu aberto (ferramenta) e o canto dele.
@@ -96,17 +124,67 @@ impl MenuFerramentas {
         let cfg: ConfigMenuFerramentas = recursos.dados(ARQUIVO_CONFIG)?;
         let menu = carregar_janela(recursos, cfg.janela)?;
         let submenus = cfg.submenus.iter().map(|&id| if id == 0 { Ok(None) } else { carregar_janela(recursos, id).map(Some) }).collect::<Result<_, _>>()?;
-        Ok(MenuFerramentas { cfg, menu, submenus, origem: (0, 0), submenu: None, realce: None, externo: None })
+        let opcional = |id: u16| if id == 0 { Ok(None) } else { carregar_janela(recursos, id).map(Some) };
+        let (quick, completo) = (opcional(cfg.janela_quick)?, opcional(cfg.janela_completo)?);
+        Ok(MenuFerramentas {
+            cfg,
+            menu,
+            submenus,
+            quick,
+            completo,
+            qual: QualMenu::Experimental,
+            realce_quick: false,
+            origem: (0, 0),
+            submenu: None,
+            realce: None,
+            externo: None,
+        })
+    }
+
+    /// A janela do menu aberto.
+    fn janela(&self) -> &Janela {
+        match self.qual {
+            QualMenu::Experimental => &self.menu,
+            QualMenu::Quick => self.quick.as_ref().unwrap_or(&self.menu),
+            QualMenu::Completo => self.completo.as_ref().unwrap_or(&self.menu),
+        }
+    }
+
+    /// Abre o menu do Quick Game (janela 10) ou do Jogo Completo (janela 11) junto ao botão, na mesma
+    /// conta de `_RibbonToolsMenu` e com a mesma moldura da janela 9 (as três têm os mesmos bits de
+    /// estilo, 0x41/0x18). Devolve false se a janela não está no `cfg` (ou com `Experimental`, que
+    /// abre por [`MenuFerramentas::abrir`]).
+    pub fn abrir_por_tipo(&mut self, qual: QualMenu, botao: Retangulo) -> bool {
+        let existe = match qual {
+            QualMenu::Experimental => false,
+            QualMenu::Quick => self.quick.is_some(),
+            QualMenu::Completo => self.completo.is_some(),
+        };
+        if !existe {
+            return false;
+        }
+        self.qual = qual;
+        self.submenu = None;
+        self.realce = None;
+        self.realce_quick = false;
+        self.posicionar(botao);
+        true
     }
 
     /// Abre o menu junto ao botão (retângulo na área cliente), com o item da ferramenta `atual`
     /// realçado.
     pub fn abrir(&mut self, botao: Retangulo, atual: Option<Ferramenta>) {
+        self.qual = QualMenu::Experimental;
         self.submenu = None;
         self.realce = atual;
+        self.posicionar(botao);
+    }
+
+    /// `_RibbonToolsMenu`: x = (direita do botão − largura + esquerda) / 2 (com a moldura medida).
+    fn posicionar(&mut self, botao: Retangulo) {
         match &self.cfg.moldura {
             Some(m) => {
-                let r = self.menu.objetos[0].retangulo;
+                let r = self.janela().objetos[0].retangulo;
                 let (w, h) = (r.dir - r.esq, r.base - r.topo);
                 let b = m.largura_borda;
                 let esq = (botao.dir - w + botao.esq) / 2 + m.ajuste_x;
@@ -138,8 +216,24 @@ impl MenuFerramentas {
         j.objetos.iter().skip(self.cfg.primeiro_item_submenu).enumerate().map(|(i, o)| (i as u8, deslocar(o.retangulo, base, origem))).collect()
     }
 
+    /// O item da janela 10 (o objeto `primeiro_item`), na tela.
+    fn item_quick(&self) -> Option<Retangulo> {
+        let j = self.quick.as_ref()?;
+        let base = j.retangulo();
+        j.objetos.get(self.cfg.primeiro_item).map(|o| deslocar(o.retangulo, base, self.origem))
+    }
+
     /// Item sob o ponto. Um item com submenu abre o submenu ao lado e devolve a ferramenta.
     pub fn item_em(&mut self, x: i32, y: i32) -> Option<ItemMenu> {
+        match self.qual {
+            QualMenu::Experimental => {}
+            QualMenu::Quick => {
+                self.realce_quick = self.item_quick().is_some_and(|r| contem(r, x, y));
+                return self.realce_quick.then_some(ItemMenu::ParaExperimental);
+            }
+            // `_win_DoProxMenu` só devolve objetos a partir do 2: a figura não é item.
+            QualMenu::Completo => return None,
+        }
         if let Some((f, _)) = self.submenu {
             if let Some((i, _)) = self.itens_submenu().into_iter().find(|(_, r)| contem(*r, x, y)) {
                 return Some(ItemMenu::Subopcao(f, i));
@@ -153,7 +247,7 @@ impl MenuFerramentas {
 
     /// O ponto cai no menu ou no submenu aberto.
     pub fn contem(&self, x: i32, y: i32) -> bool {
-        let base = self.menu.retangulo();
+        let base = self.janela().retangulo();
         self.externo.is_some_and(|r| contem(r, x, y))
             || contem(deslocar(base, base, self.origem), x, y)
             || self.submenu.is_some_and(|(f, o)| {
@@ -173,8 +267,13 @@ impl MenuFerramentas {
             }
             _ => None,
         };
-        let mut pendentes = desenhar_objetos(q, recursos, interface, &self.menu, self.origem, interno);
-        if let Some((_, r)) = self.itens().find(|(f, _)| Some(*f) == self.realce) {
+        let mut pendentes = desenhar_objetos(q, recursos, interface, self.janela(), self.origem, interno);
+        let realcado = match self.qual {
+            QualMenu::Experimental => self.itens().find(|(f, _)| Some(*f) == self.realce).map(|(_, r)| r),
+            QualMenu::Quick => self.item_quick().filter(|_| self.realce_quick),
+            QualMenu::Completo => None,
+        };
+        if let Some(r) = realcado {
             let antes = q.recorte;
             if let Some(i) = interno {
                 q.recorte = Some(i);
