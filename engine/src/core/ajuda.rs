@@ -107,7 +107,7 @@ pub struct ConfigAjuda {
     /// `WinHelp(…, HELP_CONTEXT, n)` do índice (F1 no original abre o índice com HELP_INDEX).
     pub contexto_indice: u32,
     pub cores: CoresAjuda,
-    /// Menus, Search, History e popups (core/ajuda_janelas.rs). Opcional (API 0.24): sem ele, os
+    /// Menus, Search, History e popups (core/ajuda_janelas.rs). Opcional (API 0.25): sem ele, os
     /// botões Search e History não fazem nada e os popups trocam o tópico, como antes.
     #[serde(default)]
     pub janelas: Option<super::ajuda_janelas::ConfigJanelasAjuda>,

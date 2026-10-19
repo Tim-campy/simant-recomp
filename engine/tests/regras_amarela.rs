@@ -447,14 +447,14 @@ fn quadros_da_morte_pela_aranha_e_pela_formiga_leao() {
         let musica = s.rand1(5);
         matar_amarela(&mut e, t(), causa);
         let ev = &e.eventos;
-        let quadro = ev.iter().position(|x| matches!(x, Evento::QuadroAranha(_) | Evento::QuadroFormigaLeao));
+        let quadro = ev.iter().position(|x| matches!(x, Evento::DialogoAranha { .. } | Evento::QuadroFormigaLeao));
         let m = ev.iter().position(|x| matches!(x, Evento::Musica(_))).unwrap();
         assert_eq!(ev[m], Evento::Musica(t().musicas.morte_base + musica as u16), "{causa:?} {eventos}");
         let morte = ev.iter().position(|x| *x == Evento::QuadroAmarela { imagem: 9100, indice: 0 }).unwrap();
         assert!(morte > m);
         match (causa, eventos) {
             (CausaMorte::Aranha, 1) => {
-                assert_eq!(ev[quadro.unwrap()], Evento::QuadroAranha(if r == 0 { 10047 } else { 10048 }));
+                assert_eq!(ev[quadro.unwrap()], Evento::DialogoAranha { texto: if r == 0 { 10047 } else { 10048 } });
                 assert!(quadro.unwrap() < m);
             }
             (CausaMorte::FormigaLeao, _) => assert!(quadro.unwrap() < m),

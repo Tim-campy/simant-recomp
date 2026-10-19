@@ -65,6 +65,9 @@ pub struct Extras {
     /// Colunas e linhas da janela de edição quando o vetor não é da janela padrão da bancada
     /// (25 × 19): no Tutorial ela abre maior (39 × 21). Usado ao centralizar a vista dentro do tick.
     pub vista_edicao: Option<(i32, i32)>,
+    /// A janela de edição estava aberta (`EdicaoAberta`; padrão: sim, como em todas as gravações da
+    /// bancada até 2026-10-18). Com ela aberta, os desenhos de dentro do tick sorteiam S (rng.md).
+    pub edicao_aberta: Option<bool>,
     /// Primeira leitura de `_MacTickCount` feita pelo tick depois de fechada uma caixa modal
     /// (`MacTickCount_depois_da_caixa` do extras.json; só em `antes`).
     pub relogio_depois_da_caixa: Option<u32>,
@@ -89,6 +92,8 @@ struct ExtrasJson {
     janela_na_frente: Option<i64>,
     #[serde(rename = "VistaEdicao", default)]
     vista_edicao: Option<(i32, i32)>,
+    #[serde(rename = "EdicaoAberta", default)]
+    edicao_aberta: Option<bool>,
 }
 
 impl From<ExtrasJson> for Extras {
@@ -106,6 +111,7 @@ impl From<ExtrasJson> for Extras {
             time_temp: j.time_temp.map(|v| v as i32),
             janela_na_frente: j.janela_na_frente.map(|v| v as u16),
             vista_edicao: j.vista_edicao,
+            edicao_aberta: j.edicao_aberta,
             relogio_depois_da_caixa: None,
         }
     }
@@ -239,6 +245,11 @@ pub fn montar_entrada(v: &VetorTick, layout: &LayoutSave) -> Result<Entrada, Str
     e.superficie.vida.dados.clone_from(&v.vida_antes.a);
     e.ninho_b.vida.dados.clone_from(&v.vida_antes.b);
     e.ninho_r.vida.dados.clone_from(&v.vida_antes.r);
+    // A janela de edição da bancada, para os desenhos de dentro do tick (`desenho::EdicaoNoTick`).
+    if x.edicao_aberta.unwrap_or(true) {
+        let (w, h) = x.vista_edicao.unwrap_or(VISTA_BANCADA);
+        e.edicao_no_tick = Some(Box::new(super::desenho::EdicaoNoTick::padrao(w, h)));
+    }
     Ok(Entrada { estado: e, vida_reconstruida, pendencias_vida, ida_e_volta })
 }
 
@@ -462,37 +473,9 @@ fn aplicar_vista_da_bancada(e: &mut Estado, vista: (i32, i32)) {
             e.vistas.plano = plano;
             e.vistas.modo_mapa = plano;
         }
-        let (px, py) = centralizar_edicao(e.vistas.ponto, i32::from(x), i32::from(y), plano, vista);
+        let (px, py) = super::desenho::centralizar_vista(e.vistas.ponto, i32::from(x), i32::from(y), plano, vista);
         e.vistas.ponto = (px as i16, py as i16);
     }
-}
-
-/// `_CenterEdit` (`1010:1620`, telas/jogo.md "Centralizar"): anda `_MapPnt` até (x − w/2, y − h/2)
-/// como uma reta de Bresenham em ponto fixo (o eixo menor pode ficar um passo aquém) e aplica os limites.
-fn centralizar_edicao(ponto: (i16, i16), x: i32, y: i32, plano: i16, vista: (i32, i32)) -> (i32, i32) {
-    let (w, h) = vista;
-    let (mut px, mut py) = (ponto.0 as i32, ponto.1 as i32);
-    let (dx, dy) = (x - px - w / 2, y - py - h / 2);
-    let (ax, ay) = (dx.unsigned_abs(), dy.unsigned_abs());
-    let (sx, sy) = (dx.signum(), dy.signum());
-    let (maior, menor) = (ax.max(ay), ax.min(ay));
-    if let Some(fracao) = (menor << 16).checked_div(maior) {
-        let mut acum: u32 = 0;
-        for _ in 0..maior {
-            acum += fracao;
-            let anda_menor = acum & 0x1_0000 != 0;
-            acum &= !0x1_0000;
-            if ax >= ay {
-                px += sx;
-                py += if anda_menor { sy } else { 0 };
-            } else {
-                py += sy;
-                px += if anda_menor { sx } else { 0 };
-            }
-        }
-    }
-    let largura = if plano == 1 { 128 } else { 64 };
-    (px.clamp(0, largura - w), py.clamp(0, 64 - h))
 }
 
 /// `RegrasOriginais` para rodar um vetor: com a memória do tutorial (`_TimeTemp`) do vetor, quando

@@ -972,9 +972,10 @@ pub enum Evento {
     /// ao fundar uma colônia). O índice escolhe o texto (lista 1010, 23 + índice). A interface só o
     /// mostra com Options → Events.
     QuadroAmarela { imagem: u16, indice: i16 },
-    /// `_SpiderDialog` (`1000:673a`): a aranha comendo a amarela e o quadro de texto `texto` (já
-    /// sorteado no tick, `_SRand1(2)`). Só pedido com Options → Events.
-    QuadroAranha(u16),
+    /// `_SpiderDialog` (`1000:673a`): a aranha comeu a amarela (só com Options → Events). O original
+    /// mostra a animação da aranha (bitmap 12000 e os quadros seguintes) e depois o quadro com o texto
+    /// `texto` (SHARED tipo 4), escolhido por um `S1(2)` dentro do tick (as regras já sortearam).
+    DialogoAranha { texto: u16 },
     /// `_LionDialog` (`1000:80a0`): a formiga-leão comendo a amarela. Só pedido com Options → Events.
     QuadroFormigaLeao,
     /// `_DrawSimPayoff` (`1000:cda8`): animação da vitória sobre o quintal (vitória do Jogo Completo,
@@ -1204,6 +1205,14 @@ pub struct Estado {
     pub passo_queda: (u8, u8),
     /// Pedidos à interface acumulados desde a última vez que foram retirados.
     pub eventos: Vec<Evento>,
+    /// A janela de edição para os desenhos que o original faz DENTRO do tick (`_GotoMyAnt`,
+    /// `_DoEditUpdateDraw` nas animações...), que sorteiam S (palpos da aranha, balões): `None` = janela
+    /// fechada ou sem interface (nenhum desenho). Quem roda o tick (interface, comparador) preenche.
+    /// regras/rng.md, "Desenho dentro do tick"; `rules::desenho::EdicaoNoTick`.
+    pub edicao_no_tick: Option<Box<super::desenho::EdicaoNoTick>>,
+    /// Índice das tabelas dos palpos da aranha no último redesenho da janela de edição (o `S1(4)` de
+    /// `_DrawPalps`; 0 quando não há sorteio). Só para o desenho (`core::aranha_edicao`).
+    pub palpos_aranha: u8,
 }
 
 /// Índice de cor nas tabelas por cor (`modos_do_tick`).
@@ -1270,6 +1279,8 @@ impl Estado {
             camada_edicao: -1,
             passo_queda: (0, 255),
             eventos: Vec::new(),
+            edicao_no_tick: None,
+            palpos_aranha: 0,
         }
     }
 

@@ -3,6 +3,7 @@
 pub mod acoes_mods;
 pub mod ajuda;
 pub mod ajuda_janelas;
+pub mod aranha_edicao;
 pub mod ajuda_contexto;
 pub mod avisos;
 pub mod baloes;

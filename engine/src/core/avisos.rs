@@ -42,6 +42,10 @@ pub struct ConfigQuadro {
     pub tecla_continuar: String,
     pub nao_forcadas: Vec<u16>,
     pub imagens: HashMap<String, u16>,
+    /// Cor da faixa larga da moldura (a moldura de diálogo do Windows, na cor da barra de título
+    /// ativa); sem ela, a de `interface.json` → `borda.cor` (telas/mensagens.md).
+    #[serde(default)]
+    pub cor_borda: Option<u8>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -120,11 +124,11 @@ pub struct SequenciaAmarela {
     pub som_sobreposta: Option<u16>,
     pub espera_sobreposta_tickcount: u64,
     /// Texto escrito no objeto `dialogText` (9101: `_win_PrintfAtObj` com a fonte 4). Opcional
-    /// (API 0.24).
+    /// (API 0.25).
     #[serde(default)]
     pub texto: Option<TextoQuadroAmarela>,
     /// Deslocamento da janela medido na bancada (9100 e 9101 ficam 2 pixels à esquerda dos outros
-    /// bitmaps do mesmo tamanho) [causa em aberto]. Opcional (API 0.24).
+    /// bitmaps do mesmo tamanho) [causa em aberto]. Opcional (API 0.25).
     #[serde(default)]
     pub ajuste: [i16; 2],
 }
@@ -145,16 +149,16 @@ pub struct TextoQuadroAmarela {
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigQuadroAmarela {
     /// Contorno externo na área cliente medido na bancada com o bitmap 9110. Só documentação desde a
-    /// API 0.24: o contorno sai do tamanho do bitmap ([`geometria_janela_imagem`]).
+    /// API 0.25: o contorno sai do tamanho do bitmap ([`geometria_janela_imagem`]).
     #[serde(default)]
     pub externo: Option<[i16; 4]>,
     pub borda: i16,
     pub cor_borda: u8,
-    /// Linha de 1 pixel por fora da borda (preta na bancada). Opcional (API 0.24).
+    /// Linha de 1 pixel por fora da borda (preta na bancada). Opcional (API 0.25).
     #[serde(default)]
     pub cor_externa: Option<u8>,
     /// Cor da borda com outra janela por cima (a da aranha embaixo do quadro de texto: branca na
-    /// bancada). Opcional (API 0.24); sem ela, a de sempre.
+    /// bancada). Opcional (API 0.25); sem ela, a de sempre.
     #[serde(default)]
     pub cor_borda_inativa: Option<u8>,
     /// Canto do bitmap; a área que o mostra tem o tamanho dele menos 1 pixel em cada eixo (o resto é
@@ -179,7 +183,7 @@ pub struct ConfigAvisos {
     /// Opcional (API 0.22): sem ele, `_YellowDialog` não aparece.
     #[serde(default)]
     pub quadro_amarela: Option<ConfigQuadroAmarela>,
-    /// Opcional (API 0.24): `_SpiderDialog`, `_LionDialog` e `_DrawSimPayoff`; sem ele (ou sem
+    /// Opcional (API 0.25): `_SpiderDialog`, `_LionDialog` e `_DrawSimPayoff`; sem ele (ou sem
     /// `quadro_amarela`, que dá a geometria da janela), não aparecem.
     #[serde(default)]
     pub quadros_animados: Option<ConfigQuadrosAnimados>,
@@ -683,10 +687,12 @@ fn ret_i32(x: i32, y: i32, w: i32, h: i32) -> Retangulo {
     Retangulo { esq: x as i16, topo: y as i16, dir: (x + w) as i16, base: (y + h) as i16 }
 }
 
-/// Moldura do Windows: 1 pixel na cor externa e o resto na cor da borda (data/interface.json).
-fn desenhar_borda(q: &mut Quadro, interface: &Interface, r: Retangulo) {
+/// Moldura do Windows: 1 pixel na cor externa e o resto na cor da borda (data/interface.json, ou
+/// `cor` quando dada).
+fn desenhar_borda(q: &mut Quadro, interface: &Interface, r: Retangulo, cor: Option<u8>) {
     let b = &interface.moldura.borda;
-    q.preencher(r, b.cor, b.cor);
+    let c = cor.unwrap_or(b.cor);
+    q.preencher(r, c, c);
     q.contorno(Retangulo { dir: r.dir - 1, base: r.base - 1, ..r }, b.cor_externa);
 }
 
@@ -716,7 +722,7 @@ pub fn desenhar_quadro(
     let larguras: Vec<i32> = linhas.iter().map(|l| fonte.largura_texto(l) as i32).collect();
     let h = fonte.altura() as i32;
     let g = geometria_quadro(cfg, interface, q.largura as i32, q.altura as i32, &larguras, h, bm.as_ref().map(|b| b.altura as i32));
-    desenhar_borda(q, interface, g.externo);
+    desenhar_borda(q, interface, g.externo, cfg.cor_borda);
     let area = objeto(&janela, &cfg.objeto_texto)?;
     let cor = interface.cores.get(area.cor as usize).copied().unwrap_or(crate::formats::janela::Cor { frente: 0, fundo: 15, fundo2: 15 });
     let i = g.interior;

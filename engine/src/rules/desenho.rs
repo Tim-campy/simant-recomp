@@ -111,11 +111,16 @@ pub fn desenhar_colonias(e: &mut Estado) {
 /// `_DrawPalps` (`1010:2594`) dentro de `_DrawSpider`, a cada redesenho da janela de edição com a
 /// aranha visível (`_PreDrawSpider`: `_SpidOn`, plano 0 ou 1 e a aranha dentro da vista — quem sabe é
 /// a interface) e `_SMode` ≠ 5: um `SRand1(4)`, exceto com `_SMode` < 2 e `_MeSMode` < 6.
+/// O índice sorteado fica em `Estado::palpos_aranha` (0 sem sorteio), para o desenho.
 pub fn desenhar_palpos(e: &mut Estado) -> u32 {
-    if e.aranha.estado == 5 || (e.aranha.estado < 2 && e.amarela.modo_aranha < 6) {
+    if e.aranha.estado == 5 {
         return 0;
     }
-    e.s.rand1(4);
+    if e.aranha.estado < 2 && e.amarela.modo_aranha < 6 {
+        e.palpos_aranha = 0;
+        return 0;
+    }
+    e.palpos_aranha = e.s.rand1(4) as u8;
     1
 }
 
@@ -179,6 +184,134 @@ pub fn desenhar_edicao(e: &mut Estado, j: &JanelasDesenho, t: &TabelasDesenho) -
     }
     baloes::escolher_balao(e, t.baloes);
     passos
+}
+
+// ---------------------------------------------------------------------------------------------
+// Desenho DENTRO do tick (rng.md, "Desenho dentro do tick")
+// ---------------------------------------------------------------------------------------------
+
+/// A janela de edição para os redesenhos que o original faz no meio do tick: `_GotoMyAnt` (quando
+/// `_CenterEdit` move a vista), `_DoEditUpdateDraw`/`_DoEditAndMapUpdateDraw` (mortes, nascimento,
+/// animações, trofalaxia, entrada e saída do ninho). Cada um passa por `_UpdateEdit`, que só exige a
+/// janela **aberta** (não precisa estar na frente), e sorteia como o redesenho do timer
+/// ([`desenhar_edicao`]). Quem roda o tick põe isto em `Estado::edicao_no_tick` (`None` = janela
+/// fechada: nada é desenhado).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EdicaoNoTick {
+    /// `_editWidth`, `_editHeight` (células da vista).
+    pub largura: i32,
+    pub altura: i32,
+    /// `_TickCount` usado pelos prazos dos balões "Silly" dentro do tick [hipótese: o do começo do
+    /// tick; o original lê o relógio a cada desenho].
+    pub tick_count: u32,
+    /// `data/baloes.json` e `_Dx8`/`_Dy8` (balão da aranha).
+    pub baloes: std::sync::Arc<TabelasBaloes>,
+    pub d8: ([i8; 8], [i8; 8]),
+    /// `_MapPlane` e `_MapPnt` como o original os deixa no meio do tick: copiados de `Estado::vistas`
+    /// no começo ([`comecar_tick`]) e movidos por [`centralizar_no_tick`]. A vista de verdade continua
+    /// sendo movida depois do tick pelos pedidos `Evento::CentralizarNaAmarela`, com o mesmo cálculo.
+    pub plano: i16,
+    pub ponto: (i16, i16),
+    /// Dentro de um tick (entre [`comecar_tick`] e [`terminar_tick`]); fora dele não há desenho daqui.
+    pub no_tick: bool,
+    /// Redesenhos e passos de S feitos dentro do último tick (conferência).
+    pub desenhos: u32,
+    pub passos: u32,
+}
+
+impl EdicaoNoTick {
+    pub fn new(largura: i32, altura: i32, baloes: std::sync::Arc<TabelasBaloes>, d8: ([i8; 8], [i8; 8])) -> EdicaoNoTick {
+        EdicaoNoTick { largura, altura, tick_count: 0, baloes, d8, plano: 0, ponto: (0, 0), no_tick: false, desenhos: 0, passos: 0 }
+    }
+
+    /// Com as tabelas embutidas (testes e vetores).
+    pub fn padrao(largura: i32, altura: i32) -> EdicaoNoTick {
+        let i = super::inimigos::TabelasInimigos::padrao();
+        EdicaoNoTick::new(largura, altura, std::sync::Arc::new(TabelasBaloes::padrao().clone()), (i.dx8, i.dy8))
+    }
+}
+
+/// Começo do tick: a vista do tick parte de `_MapPlane`/`_MapPnt`.
+pub fn comecar_tick(e: &mut Estado) {
+    let (plano, ponto) = (e.vistas.plano, e.vistas.ponto);
+    if let Some(j) = e.edicao_no_tick.as_deref_mut() {
+        j.plano = plano;
+        j.ponto = ponto;
+        j.no_tick = true;
+        j.desenhos = 0;
+        j.passos = 0;
+    }
+}
+
+/// Fim do tick: os desenhos daqui param (o resto é do redesenho do timer, [`redesenho_do_timer`]).
+pub fn terminar_tick(e: &mut Estado) {
+    if let Some(j) = e.edicao_no_tick.as_deref_mut() {
+        j.no_tick = false;
+    }
+}
+
+/// `_UpdateEdit` (`1010:11e0`) dentro do tick: o redesenho da janela de edição (`FUN_1010_16d4`) com a
+/// vista do tick, se a janela está aberta. Devolve os passos de S.
+pub fn desenhar_no_tick(e: &mut Estado) -> u32 {
+    let Some(j) = e.edicao_no_tick.as_deref().filter(|j| j.no_tick) else { return 0 };
+    let (baloes, d8, tick_count) = (j.baloes.clone(), j.d8, j.tick_count);
+    let (plano, (x, y), w, h) = (j.plano, j.ponto, j.largura, j.altura);
+    let visivel = aranha_visivel(e, plano, i32::from(x), i32::from(y), w, h);
+    let janelas = JanelasDesenho { aranha_visivel: visivel, tick_count, ..Default::default() };
+    let tabelas = TabelasDesenho { baloes: &baloes, d8: (&d8.0, &d8.1) };
+    let passos = desenhar_edicao(e, &janelas, &tabelas);
+    if let Some(j) = e.edicao_no_tick.as_deref_mut() {
+        j.desenhos += 1;
+        j.passos += passos;
+    }
+    passos
+}
+
+/// A parte de vista de `_GotoMyAnt` (`1000:a764`) dentro do tick, com a amarela em (`plano`, x, y):
+/// fora do Experimental, `_CenterEdit` no plano mostrado ou, noutro plano, `_SetMapPlaneLocation`
+/// (troca o plano e centraliza); se a vista andou, `_UpdateEdit` redesenha. Devolve os passos de S.
+pub fn centralizar_no_tick(e: &mut Estado, plano: i16, x: i16, y: i16) -> u32 {
+    if e.partida.tipo_jogo == 3 || plano <= 0 {
+        return 0;
+    }
+    let Some(j) = e.edicao_no_tick.as_deref_mut().filter(|j| j.no_tick) else { return 0 };
+    j.plano = plano;
+    let antes = j.ponto;
+    let (px, py) = centralizar_vista(antes, i32::from(x), i32::from(y), plano, (j.largura, j.altura));
+    j.ponto = (px as i16, py as i16);
+    if j.ponto == antes {
+        return 0;
+    }
+    desenhar_no_tick(e)
+}
+
+/// `_CenterEdit` (`1010:1620`, telas/jogo.md "Centralizar"): anda `_MapPnt` até (x − w/2, y − h/2)
+/// como uma reta de Bresenham em ponto fixo (`FUN_1010_616c`: o eixo menor pode ficar um passo aquém)
+/// e aplica os limites do plano (128 × 64 na superfície, 64 × 64 nos ninhos).
+pub fn centralizar_vista(ponto: (i16, i16), x: i32, y: i32, plano: i16, vista: (i32, i32)) -> (i32, i32) {
+    let (w, h) = vista;
+    let (mut px, mut py) = (ponto.0 as i32, ponto.1 as i32);
+    let (dx, dy) = (x - px - w / 2, y - py - h / 2);
+    let (ax, ay) = (dx.unsigned_abs(), dy.unsigned_abs());
+    let (sx, sy) = (dx.signum(), dy.signum());
+    let (maior, menor) = (ax.max(ay), ax.min(ay));
+    if let Some(fracao) = (menor << 16).checked_div(maior) {
+        let mut acum: u32 = 0;
+        for _ in 0..maior {
+            acum += fracao;
+            let anda_menor = acum & 0x1_0000 != 0;
+            acum &= !0x1_0000;
+            if ax >= ay {
+                px += sx;
+                py += if anda_menor { sy } else { 0 };
+            } else {
+                py += sy;
+                px += if anda_menor { sx } else { 0 };
+            }
+        }
+    }
+    let largura = if plano == 1 || plano == 0 { 128 } else { 64 };
+    (px.clamp(0, largura - w), py.clamp(0, 64 - h))
 }
 
 /// Contadores do `MYTIMERFUNC`/`_UpdateWindows` que não vão no save (a interface os guarda).
@@ -246,6 +379,50 @@ mod testes {
         e.vistas.modo_mapa = 1;
         e.s = super::super::rng::GeradorS::new(0x1234);
         e
+    }
+
+    /// A amarela em (65, 32) da superfície com a aranha comendo ao lado (vetor amarela_morte_aranha).
+    fn aranha_a_vista() -> Estado {
+        let mut e = Estado::vazio();
+        e.s = super::super::rng::GeradorS::new(0x1234);
+        e.vistas.plano = 1;
+        e.vistas.ponto = (0, 0);
+        e.aranha.ligada = 1;
+        e.aranha.estado = 3;
+        e.aranha.x = 64 * 16 + 8;
+        e.aranha.y = 32 * 16 + 8;
+        e.edicao_no_tick = Some(Box::new(EdicaoNoTick::padrao(25, 19)));
+        e
+    }
+
+    #[test]
+    fn desenho_no_tick_so_dentro_do_tick_e_com_a_janela_aberta() {
+        let mut e = aranha_a_vista();
+        assert_eq!(desenhar_no_tick(&mut e), 0, "fora do tick");
+        comecar_tick(&mut e);
+        assert_eq!(desenhar_no_tick(&mut e), 0, "aranha fora da vista (0, 0)");
+        assert_eq!(centralizar_no_tick(&mut e, 1, 65, 32), 1, "a vista andou: redesenho com os palpos");
+        assert_eq!(e.edicao_no_tick.as_ref().unwrap().ponto, (53, 22), "o eixo menor fica um passo aquém");
+        assert_eq!(centralizar_no_tick(&mut e, 1, 65, 32), 1, "anda o passo que faltou");
+        assert_eq!(centralizar_no_tick(&mut e, 1, 65, 32), 0, "a vista não andou: sem redesenho");
+        assert_eq!(desenhar_no_tick(&mut e), 1);
+        e.aranha.estado = 5;
+        assert_eq!(desenhar_no_tick(&mut e), 0, "morrendo: sem palpos");
+        terminar_tick(&mut e);
+        e.aranha.estado = 3;
+        assert_eq!(desenhar_no_tick(&mut e), 0, "fora do tick");
+        e.edicao_no_tick = None;
+        comecar_tick(&mut e);
+        assert_eq!(centralizar_no_tick(&mut e, 1, 65, 32), 0, "janela fechada");
+    }
+
+    #[test]
+    fn centralizar_no_tick_no_experimental_nao_desenha() {
+        let mut e = aranha_a_vista();
+        e.partida.tipo_jogo = 3;
+        comecar_tick(&mut e);
+        assert_eq!(centralizar_no_tick(&mut e, 1, 65, 32), 0);
+        assert_eq!(e.edicao_no_tick.as_ref().unwrap().ponto, (0, 0));
     }
 
     #[test]

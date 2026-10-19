@@ -550,13 +550,13 @@ impl Sessao<'_> {
                         avisos::linhas_do_texto(self.recursos, id).iter().map(|l| l.iter().map(|&b| b as char).collect()).collect();
                     println!("[tick {t}] mensagem {id}: {}", texto.join(" / "));
                 }
+                EventoRegras::DialogoAranha { texto } => println!("[tick {t}] quadro da aranha, texto {texto} (_SpiderDialog)"),
                 EventoRegras::Musica(id) => println!("[tick {t}] música {id}"),
                 EventoRegras::Som(_) | EventoRegras::TemaDoNinho | EventoRegras::Espera(_) => {} // tocados por som::Audio
                 EventoRegras::Animacao(_) => {} // a Partida guarda e mostra os quadros
                 EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
                 EventoRegras::EscolherColonia => println!("[tick {t}] escolher outra colônia (_SpecialXfer)"),
                 EventoRegras::QuadroAmarela { imagem, .. } => println!("[tick {t}] quadro da amarela {imagem} (_YellowDialog)"),
-                EventoRegras::QuadroAranha(texto) => println!("[tick {t}] quadro da aranha, texto {texto} (_SpiderDialog)"),
                 EventoRegras::QuadroFormigaLeao => println!("[tick {t}] quadro da formiga-leão (_LionDialog)"),
                 EventoRegras::AnimacaoVitoria => println!("[tick {t}] animação da vitória (_DrawSimPayoff)"),
                 EventoRegras::CentralizarNaAmarela { .. } | EventoRegras::MensagemFaixa(_) => {} // a faixa é da Partida
