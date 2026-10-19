@@ -10,8 +10,9 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use engine::core::gerenciador::Rolagem;
 use engine::core::quadro::Quadro;
-use engine::core::tela_jogo::{compor_tela_de_jogo, ConfigTelaJogo};
+use engine::core::tela_jogo::{compor_tela_de_jogo, ConfigTelaJogo, TelaDeJogo};
 use engine::core::telas::Interface;
 use engine::formats::save::{JogoSalvo, LayoutSave};
 use engine::paleta::Paleta;
@@ -85,7 +86,18 @@ fn main() {
     let layout = LayoutSave::carregar(&dados.join("save_layout.json")).unwrap();
     let jogo = JogoSalvo::abrir(&layout, save).unwrap();
 
-    let (q, pendentes) = compor_tela_de_jogo(&cfg, &recursos, &interface, &jogo).unwrap();
+    // PALPOS=k: índice dos palpos da aranha (o S1(4) do último redesenho do original).
+    let (q, pendentes) = match std::env::var("PALPOS").ok().and_then(|v| v.parse::<u8>().ok()) {
+        None => compor_tela_de_jogo(&cfg, &recursos, &interface, &jogo).unwrap(),
+        Some(k) => {
+            let mut tela = TelaDeJogo::carregar(&cfg, &recursos, &interface, &jogo).unwrap();
+            tela.aranha.palpos = k;
+            let nav = tela.navegacao(&jogo, cfg.edicao.posicao).unwrap();
+            let (mx, my) = nav.maximo();
+            tela.estado_moldura.rolagem = [Rolagem { pos: nav.vista.x, max: mx }, Rolagem { pos: nav.vista.y, max: my }];
+            tela.compor(&recursos, &interface, &nav).unwrap()
+        }
+    };
     println!("pendências: {pendentes:?}");
     let paleta: Paleta = recursos.dados("paleta.json").unwrap();
     let rgb = paleta.rgb().unwrap();
@@ -93,11 +105,16 @@ fn main() {
     salvar_png(q.largura, q.altura, &px, &saida.join("tela_jogo.png"));
 
     if let Some(captura) = a.get(4) {
-        comparar(&q, Path::new(captura), saida);
+        // região da aranha: ±48 pixels em volta do centro (_SpidX/_SpidY na vista do save)
+        let v = |n: &str| jogo.i16(n).unwrap() as i32;
+        let (mx, my) = jogo.par_i16("MapPnt").unwrap();
+        let (cx, cy) = (24 + v("SpidX") - 16 * mx as i32, 158 + v("SpidY") - 16 * my as i32);
+        let caixa = ((cx - 48).max(24) as usize, (cy - 48).max(158) as usize, (cx + 48).min(424) as usize, (cy + 48).min(462) as usize);
+        comparar(&q, Path::new(captura), saida, caixa);
     }
 }
 
-fn comparar(q: &Quadro, captura: &Path, saida: &Path) {
+fn comparar(q: &Quadro, captura: &Path, saida: &Path, aranha: (usize, usize, usize, usize)) {
     let (cw, ch, c) = ler_png(captura);
     assert!(cw == q.largura && ch == q.altura + TOPO, "captura {cw}x{ch} não bate com a tela {}x{}", q.largura, q.altura);
     let no_dialogo = |x: usize, y: usize| x >= DIALOGO.0 && x < DIALOGO.2 && y >= DIALOGO.1 && y < DIALOGO.3;
@@ -133,6 +150,7 @@ fn comparar(q: &Quadro, captura: &Path, saida: &Path) {
         Regiao { nome: "janela de edição (moldura + mapa)", caixa: (20, 135, 444, 480) },
         Regiao { nome: "mapa (área visível do editTileArea)", caixa: (24, 158, 424, 462) },
         Regiao { nome: "tela inteira", caixa: (0, TOPO, 640, 480) },
+        Regiao { nome: "aranha (±48 pixels do centro)", caixa: aranha },
     ];
     let igual = |x: usize, y: usize| mapa.get(&q.pixels[(y - TOPO) * q.largura + x]).map(|m| m.0) == Some(cap(x, y - TOPO));
     for r in &regioes {
@@ -167,7 +185,7 @@ fn comparar(q: &Quadro, captura: &Path, saida: &Path) {
     }
     salvar_png(cw, ch, &tela, &saida.join("tela_jogo_640x480_mapeada.png"));
     salvar_png(cw, ch, &diff, &saida.join("diferencas.png"));
-    let recortes = [("formigas", (200, 290, 280, 330), 6), ("faixa", (0, TOPO, 320, TOPO + 73), 3)];
+    let recortes = [("formigas", (200, 290, 280, 330), 6), ("faixa", (0, TOPO, 320, TOPO + 73), 3), ("aranha", aranha, 5)];
     for (nome, caixa, escala) in recortes {
         for (sufixo, img) in [("port", &tela), ("captura", &c)] {
             let (w, h, a) = ampliar(img, cw, caixa, escala);

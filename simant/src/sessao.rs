@@ -548,6 +548,7 @@ impl Sessao<'_> {
                         avisos::linhas_do_texto(self.recursos, id).iter().map(|l| l.iter().map(|&b| b as char).collect()).collect();
                     println!("[tick {t}] mensagem {id}: {}", texto.join(" / "));
                 }
+                EventoRegras::DialogoAranha { texto } => println!("[tick {t}] quadro da aranha, texto {texto} (_SpiderDialog)"),
                 EventoRegras::Musica(id) => println!("[tick {t}] música {id}"),
                 EventoRegras::Som(_) | EventoRegras::TemaDoNinho | EventoRegras::Espera(_) => {} // tocados por som::Audio
                 EventoRegras::Animacao(_) => {} // a Partida guarda e mostra os quadros

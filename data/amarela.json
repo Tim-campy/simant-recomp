@@ -56,6 +56,8 @@
     "sem_corpo": 10056,
     "outra_colonia": 10058,
     "transferida": 10059,
+    "_aranha_comeu": "_SpiderDialog (1000:673a), só com Events: depois da animação, _SRand1(2) escolhe o texto (SHARED tipo 4): 0 → 0x273F, senão 0x2740 (regras/rng.md, desenho dentro do tick).",
+    "aranha_comeu": [10047, 10048],
     "_faixa": "_EditMessage com a lista SHARED 4/1010 (_WindPromptStrs): _EatMyFood (1020:8cda) tipo 1 → [11] \"You feel much better now!\", tipo 2 → [12] \"Thank you for your contribution\" (duração 0x78), tipo 3 → [13] \"Cannibalism has restored your health\" (0xb4); _DoAntMoveY (1028:75f4), passagem para o ninho vermelho → [4] \"You have entered the red nest\" (0x168). Nenhuma é importante.",
     "faixa_comida_recebida": {"lista": 1010, "indice": 11, "duracao": 120, "importante": false},
     "faixa_doacao": {"lista": 1010, "indice": 12, "duracao": 120, "importante": false},

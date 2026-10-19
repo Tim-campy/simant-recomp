@@ -760,6 +760,112 @@ def cenario_c07(c: Sessao, saida, n):
     return c.gravar(saida, n)
 
 
+# ------------------------------------------------------------------------------------------------
+# Desenho da aranha na janela de edição (telas/jogo.md, "Aranha na janela de edição")
+# ------------------------------------------------------------------------------------------------
+
+# (nome, variáveis escritas antes do redesenho). Cada caso redesenha a vista (Ctrl+seta e volta) com
+# o jogo pausado e grava a tela, o estado e o S antes/depois (os palpos sorteiam S1(4) por redesenho).
+CASOS_ARANHA = (
+    [(f"andando_d{d}", {"SMode": 1, "SpidDir": d, "Scycle": d}) for d in range(8)]
+    + [("parada_d0_q5", {"SMode": 0, "SpidDir": 0, "Scycle": 5}),
+       ("perseguindo_d3", {"SMode": 2, "SpidDir": 3, "Scycle": 2}),
+       ("comendo_d6", {"SMode": 3, "SpidDir": 6, "Scycle": 4}),
+       ("fugindo_d5", {"SMode": 4, "SpidDir": 5, "Scycle": 7})]
+    + [(f"agonia_q{q}", {"SMode": 5, "SpidDir": 2, "Scycle": q, "DeathCnt": 450}) for q in range(4)]
+    + [("jogador_d1", {"SMode": 1, "SpidDir": 1, "Scycle": 3, "MeMode": 1, "MeSMode": 6}),
+       ("jogador_d4_parado", {"SMode": 0, "SpidDir": 4, "Scycle": 0, "MeMode": 1, "MeSMode": 0})]
+)
+
+
+def cenario_aranha_desenho(c: Sessao, saida, n):
+    """Capturas da aranha na janela de edição (snapshot rico): pausa (Shift+0), vista da superfície,
+    aranha no meio da vista em cada caso de CASOS_ARANHA (ou só os de ARANHA_CASOS="a,b"), redesenho
+    com Ctrl+Up/Ctrl+Down. Grava NOME.png, NOME.ANT e aranha.json (S antes/depois, vista, aranha)."""
+    import os
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+8")
+    time.sleep(2)
+    c.mj.sessao_gdb()
+    c.escrever("MeMoveMe", 0)
+    s = c.save()
+    mx, my = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2)
+    # a aranha 1 célula à direita e 1 abaixo do meio (fora do centro exato: não cobre a amarela)
+    cx, cy = mx + ct.COLS // 2, my + ct.LINS // 2
+    escolhidos = [n.strip() for n in os.environ.get("ARANHA_CASOS", "").split(",") if n.strip()]
+    reg = {"vista": [mx, my], "celula": [cx, cy], "casos": {}}
+    teclas = ("ctrl+down", "ctrl+up") if my == 0 else ("ctrl+up", "ctrl+down")
+    for nome, vs in CASOS_ARANHA:
+        if escolhidos and nome not in escolhidos:
+            continue
+        c.mj.sessao_gdb()
+        base = {"SpidOn": 1, "SpidX": cx * 16 + 8, "SpidY": cy * 16 + 8, "MeMode": 0, "MeSMode": 0, "Starg": -2}
+        base.update(vs)
+        for k, v in base.items():
+            c.escrever(k, v)
+        s0 = c.ler("SementeS")
+        c.teclas(*teclas)
+        time.sleep(2.5)
+        c.mj.sessao_gdb()
+        s1 = c.ler("SementeS")
+        ct.tela(c, saida, nome)
+        (pasta / f"{nome}.ANT").write_bytes(c.mj.estado())
+        st = c.save()
+        reg["casos"][nome] = {"escrito": base, "S_antes": s0, "S_depois": s1, "passos_S": ct.passos_s(s0, s1),
+                              "MapPnt": [st.ler("MapPnt", 0, 2), st.ler("MapPnt", 1, 2)]}
+        c.log(f"{nome}: S {s0} -> {s1} ({reg['casos'][nome]['passos_S']} passos)")
+    # sem deixar a amarela "virada aranha" na memória
+    c.escrever("MeMode", 0)
+    (pasta / "aranha.json").write_text(json.dumps(reg, indent=1) + chr(10), encoding="utf-8")
+    return []
+
+
+def cenario_bichos_desenho(c: Sessao, saida, n):
+    """Capturas dos bichos grandes que são tiles do _MapA (formiga-leão, lagarta, bicho-de-conta,
+    pedrinha): pausa, superfície e, para cada um achado no mapa, a vista centrada nele. Para garantir a
+    pedrinha cuspida, escreve 0x51 numa célula de chão livre ao lado da formiga-leão 0. Grava NOME.png,
+    NOME.ANT e bichos.json."""
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+8")
+    time.sleep(2)
+    c.mj.sessao_gdb()
+    c.escrever("MeMoveMe", 0)
+    c.escrever("SpidOn", 0)
+    s = c.save()
+    lx, ly = c.mj.ler_variavel("LionListX", 10)[0], c.mj.ler_variavel("LionListY", 10)[0]
+    alvos = {"formiga_leao": (lx, ly)}
+    if s.celula("MapA", lx + 2, ly) < 0x10:
+        mapa_escrever(c, "MapA", lx + 2, ly, 0x51)
+    cel = lambda f: next(((x, y) for x in range(128) for y in range(64) if f(s.celula("MapA", x, y))), None)
+    for nome, f in (("lagarta", lambda v: 0x68 <= v <= 0x6F), ("bicho_de_conta", lambda v: 0x70 <= v <= 0x73),
+                    ("pedrinha", lambda v: 0x51 <= v <= 0x53)):
+        p = cel(f)
+        if p:
+            alvos[nome] = p
+    reg = {}
+    for nome, (x, y) in alvos.items():
+        c.mj.sessao_gdb()
+        px0 = max(0, min(128 - ct.COLS, x - ct.COLS // 2))
+        py0 = max(1, min(63 - ct.LINS, y - ct.LINS // 2))
+        c.escrever_elemento("MapPnt", 0, px0, 2)
+        c.escrever_elemento("MapPnt", 1, py0, 2)
+        c.teclas("ctrl+up", "ctrl+down")
+        time.sleep(2.5)
+        c.mj.sessao_gdb()
+        ct.tela(c, saida, nome)
+        (pasta / f"{nome}.ANT").write_bytes(c.mj.estado())
+        reg[nome] = {"celula": [x, y]}
+        c.log(f"{nome} em ({x}, {y})")
+    (pasta / "bichos.json").write_text(json.dumps(reg, indent=1) + chr(10), encoding="utf-8")
+    return []
+
+
 VIDA_RICO = ("vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução "
              "de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a "
              "preparação também escreve marcas no mapa de vida")

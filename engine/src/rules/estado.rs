@@ -970,6 +970,10 @@ pub enum Evento {
     /// `_YellowDialog(bitmap)` (`1000:8262`): quadro com imagem da amarela (trofalaxia: 9110). A
     /// interface só o mostra com Options → Events.
     QuadroAmarela(u16),
+    /// `_SpiderDialog` (`1000:673a`): a aranha comeu a amarela (só com Options → Events). O original
+    /// mostra a animação da aranha (bitmap 12000 e os quadros seguintes) e depois o quadro com o texto
+    /// `texto` (SHARED tipo 4), escolhido por um `S1(2)` dentro do tick (as regras já sortearam).
+    DialogoAranha { texto: u16 },
     /// `_SpecialXfer` (`1000:7eb6`): depois do quadro 10058, o jogador escolhe outra colônia preta no
     /// mapa do quintal. A interface chama `troca_patch::iniciar_transferencia_especial` e, no clique,
     /// `troca_patch::escolher_colonia` (no original, dentro do tick; no port, logo depois).
@@ -1194,6 +1198,14 @@ pub struct Estado {
     pub passo_queda: (u8, u8),
     /// Pedidos à interface acumulados desde a última vez que foram retirados.
     pub eventos: Vec<Evento>,
+    /// A janela de edição para os desenhos que o original faz DENTRO do tick (`_GotoMyAnt`,
+    /// `_DoEditUpdateDraw` nas animações...), que sorteiam S (palpos da aranha, balões): `None` = janela
+    /// fechada ou sem interface (nenhum desenho). Quem roda o tick (interface, comparador) preenche.
+    /// regras/rng.md, "Desenho dentro do tick"; `rules::desenho::EdicaoNoTick`.
+    pub edicao_no_tick: Option<Box<super::desenho::EdicaoNoTick>>,
+    /// Índice das tabelas dos palpos da aranha no último redesenho da janela de edição (o `S1(4)` de
+    /// `_DrawPalps`; 0 quando não há sorteio). Só para o desenho (`core::aranha_edicao`).
+    pub palpos_aranha: u8,
 }
 
 /// Índice de cor nas tabelas por cor (`modos_do_tick`).
@@ -1260,6 +1272,8 @@ impl Estado {
             camada_edicao: -1,
             passo_queda: (0, 255),
             eventos: Vec::new(),
+            edicao_no_tick: None,
+            palpos_aranha: 0,
         }
     }
 

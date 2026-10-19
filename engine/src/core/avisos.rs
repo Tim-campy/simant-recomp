@@ -41,6 +41,10 @@ pub struct ConfigQuadro {
     pub tecla_continuar: String,
     pub nao_forcadas: Vec<u16>,
     pub imagens: HashMap<String, u16>,
+    /// Cor da faixa larga da moldura (a moldura de diálogo do Windows, na cor da barra de título
+    /// ativa); sem ela, a de `interface.json` → `borda.cor` (telas/mensagens.md).
+    #[serde(default)]
+    pub cor_borda: Option<u8>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -543,10 +547,12 @@ fn ret_i32(x: i32, y: i32, w: i32, h: i32) -> Retangulo {
     Retangulo { esq: x as i16, topo: y as i16, dir: (x + w) as i16, base: (y + h) as i16 }
 }
 
-/// Moldura do Windows: 1 pixel na cor externa e o resto na cor da borda (data/interface.json).
-fn desenhar_borda(q: &mut Quadro, interface: &Interface, r: Retangulo) {
+/// Moldura do Windows: 1 pixel na cor externa e o resto na cor da borda (data/interface.json, ou
+/// `cor` quando dada).
+fn desenhar_borda(q: &mut Quadro, interface: &Interface, r: Retangulo, cor: Option<u8>) {
     let b = &interface.moldura.borda;
-    q.preencher(r, b.cor, b.cor);
+    let c = cor.unwrap_or(b.cor);
+    q.preencher(r, c, c);
     q.contorno(Retangulo { dir: r.dir - 1, base: r.base - 1, ..r }, b.cor_externa);
 }
 
@@ -576,7 +582,7 @@ pub fn desenhar_quadro(
     let larguras: Vec<i32> = linhas.iter().map(|l| fonte.largura_texto(l) as i32).collect();
     let h = fonte.altura() as i32;
     let g = geometria_quadro(cfg, interface, q.largura as i32, q.altura as i32, &larguras, h, bm.as_ref().map(|b| b.altura as i32));
-    desenhar_borda(q, interface, g.externo);
+    desenhar_borda(q, interface, g.externo, cfg.cor_borda);
     let area = objeto(&janela, &cfg.objeto_texto)?;
     let cor = interface.cores.get(area.cor as usize).copied().unwrap_or(crate::formats::janela::Cor { frente: 0, fundo: 15, fundo2: 15 });
     let i = g.interior;
