@@ -98,7 +98,49 @@ def cenario_pontuacao(c: Sessao, saida, n):
     return []
 
 
+def svga_examine(disco, overlay, saida):
+    """Bancada SVGA 640x480 em 256 cores, num boot só (a paleta não volta depois de um loadvm): Quick
+    Game pausado, e o Examine segurando o botão sobre duas formigas da janela de edição (a primeira
+    abertura da sessão e a segunda). A área do mapa começa em x = 20 na SVGA (a janela de edição fica 4
+    pixels à esquerda da VGA, telas/resolucao.md §7)."""
+    import qemu_bancada as qb
+    from ant_editar import Save
+    saida = Path(saida).resolve()
+    saida.mkdir(parents=True, exist_ok=True)
+    rel = saida.relative_to(qb.RAIZ.resolve()).as_posix()
+    b = qb.Bancada(overlay, 16, None, disco)
+    try:
+        for ln in ("esperar 70", "teclas spc", "esperar 4", "teclas spc", "esperar 6", "clicar_em 345 228",
+                   "esperar 20", "teclas shift+0", "esperar 3", f"capturar {rel}/e00_quick.png"):
+            b.executar(ln)
+        b.executar("pausar")
+        s = Save(b.mj.estado())
+        b.executar("continuar")
+        mx, my, plano = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2), s.ler("MapPlane")
+        lista = {1: "A", 2: "B", 3: "R"}[plano]
+        me = (s.ler("MeLocX"), s.ler("MeLocY")) if s.ler("MePlane") == plano else None
+        alvos = [(f["X"], f["Y"], f["T"]) for _, f in ct.formigas(s, lista)
+                 if mx <= f["X"] < mx + ct.COLS and my <= f["Y"] < my + ct.LINS and (f["X"], f["Y"]) != me]
+        b.log(f"vista ({plano}, {mx}, {my}); formigas na vista {alvos[:6]}")
+        reg = {"vista": [plano, mx, my], "examine": []}
+        for k, (x, y, t) in enumerate(alvos[:2]):
+            px, py = 20 + (x - mx) * ct.TILE + 8, ct.MAPA_Y0 + (y - my) * ct.TILE + 8
+            for ln in (f"ir_para {px} {py}", "apertar", "esperar 3", f"capturar {rel}/e0{k + 1}_examine.png",
+                       "ir_para 2 2", "soltar", "esperar 2"):
+                b.executar(ln)
+            reg["examine"].append([x, y, t, px, py])
+        b.executar("pausar")
+        qb.gravar(saida / "e_estado.ANT", b.mj.estado())
+        (saida / "examine.json").write_text(json.dumps(reg) + "\n", encoding="utf-8")
+        b.executar("fim")
+    finally:
+        b.fechar()
+
+
 if __name__ == "__main__":
+    if len(sys.argv) == 5 and sys.argv[1] == "svga_examine":
+        svga_examine(sys.argv[2], sys.argv[3], sys.argv[4])
+        sys.exit(0)
     for nome, f in list(globals().items()):
         if nome.startswith("cenario_"):
             setattr(ct, nome, f)

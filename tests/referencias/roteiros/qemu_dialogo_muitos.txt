@@ -1,0 +1,55 @@
+# Diálogo "Load Ant Hill" com muitos arquivos (rolagem) e troca de unidade e de pasta (telas/arquivos.md §6).
+# Disquete re_trabalho/ag_fecha/muitos.img: 18 .ANT (ALFA ... ROMEU; montado com caso_ant.montar_disquete).
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_dialogo_muitos.txt --overlay <cópia do c_overlay.qcow2>
+snapshot_carregar quick
+esperar 2
+disquete re_trabalho/ag_fecha/muitos.img
+esperar 1
+teclas ctrl+l
+esperar 3
+teclas n
+esperar 3
+capturar re_trabalho/ag_fecha/dlg/d00_load_c.png
+# Unidade A: pelo campo do nome ("a:" e Enter).
+digitar a
+teclas shift+semicolon
+teclas ret
+esperar 4
+capturar re_trabalho/ag_fecha/dlg/d01_load_a.png
+# Seta de baixo da barra da lista (um item), duas vezes.
+clicar_em 222 226
+esperar 1
+capturar re_trabalho/ag_fecha/dlg/d02_seta_baixo_1.png
+clicar_em 222 226
+esperar 1
+capturar re_trabalho/ag_fecha/dlg/d03_seta_baixo_2.png
+# Trilho abaixo do polegar (uma página).
+clicar_em 222 205
+esperar 1
+capturar re_trabalho/ag_fecha/dlg/d04_pagina_baixo.png
+# Seta de cima.
+clicar_em 222 136
+esperar 1
+capturar re_trabalho/ag_fecha/dlg/d05_seta_cima.png
+# Um item da lista (clique simples: nome no campo).
+clicar_em 120 150
+esperar 1
+capturar re_trabalho/ag_fecha/dlg/d06_item.png
+# Volta ao C: e sobe para a raiz pela árvore (duplo clique no "c:\").
+teclas alt+n
+esperar 1
+digitar c
+teclas shift+semicolon
+teclas ret
+esperar 4
+capturar re_trabalho/ag_fecha/dlg/d07_load_c_de_novo.png
+mouse_canto
+mover 285 137
+clicar
+clicar
+esperar 4
+capturar re_trabalho/ag_fecha/dlg/d08_raiz.png
+teclas esc
+esperar 2
+capturar re_trabalho/ag_fecha/dlg/d09_cancel.png
+fim

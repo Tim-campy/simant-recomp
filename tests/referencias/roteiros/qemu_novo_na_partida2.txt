@@ -1,0 +1,64 @@
+# Jogo novo escolhido durante a partida (Ctrl+N) para Experimental, Tutorial e Quick Game, como qemu_novo_na_partida.txt
+# (que faz o Full Game): do snapshot quick, pausa (Shift+0), estado e sementes, Ctrl+N, clique no tipo, estado depois.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_novo_na_partida2.txt --overlay <cópia do c_overlay.qcow2>
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+pausar
+estado re_trabalho/ag_fecha/novo_exp_antes.ANT
+extras re_trabalho/ag_fecha/novo_exp_antes_extras.json
+continuar
+teclas ctrl+n
+esperar 5
+mouse_canto
+mover 185 375
+esperar 1
+clicar
+esperar 8
+capturar re_trabalho/ag_fecha/novo_exp.png
+pausar
+estado re_trabalho/ag_fecha/novo_exp.ANT
+extras re_trabalho/ag_fecha/novo_exp_extras.json
+continuar
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+pausar
+estado re_trabalho/ag_fecha/novo_tut_antes.ANT
+extras re_trabalho/ag_fecha/novo_tut_antes_extras.json
+continuar
+teclas ctrl+n
+esperar 5
+mouse_canto
+mover 180 225
+esperar 1
+clicar
+esperar 8
+capturar re_trabalho/ag_fecha/novo_tut.png
+pausar
+estado re_trabalho/ag_fecha/novo_tut.ANT
+extras re_trabalho/ag_fecha/novo_tut_extras.json
+continuar
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+pausar
+estado re_trabalho/ag_fecha/novo_quick_antes.ANT
+extras re_trabalho/ag_fecha/novo_quick_antes_extras.json
+continuar
+teclas ctrl+n
+esperar 5
+mouse_canto
+mover 345 228
+esperar 1
+clicar
+esperar 8
+capturar re_trabalho/ag_fecha/novo_quick.png
+pausar
+estado re_trabalho/ag_fecha/novo_quick.ANT
+extras re_trabalho/ag_fecha/novo_quick_extras.json
+continuar
+fim

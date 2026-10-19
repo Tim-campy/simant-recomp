@@ -88,6 +88,12 @@ pub fn jogo_novo_com_geradores(
         e.amarela.renascer_x = anterior.amarela.renascer_x;
         e.amarela.renascer_y = anterior.amarela.renascer_y;
     }
+    // No Experimental `_AddFood` não roda e a operária posta em (0x40, 0x20) não ganha direção:
+    // `_LastFoodDrop` e `_MeDir` ficam os da partida anterior (bancada, Quick → Experimental).
+    if tipo == TipoJogo::Experimental {
+        e.ambiente.ultima_comida = anterior.ambiente.ultima_comida;
+        e.amarela.dir = anterior.amarela.dir;
+    }
     // _NewGame: a lição só recomeça no Tutorial (tipo 0). `_LessonTemp` não muda antes do primeiro
     // tick (0 na bancada; o `_GotoMyAnt` que o põe em 1 não roda aqui).
     if tipo != TipoJogo::Tutorial {
