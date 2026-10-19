@@ -42,7 +42,7 @@ Todas as teclas vêm de `data/partida.json`, `data/navegacao.json`, `data/janela
 | `--escala N`, `--janela LxA` | vídeo (vencem `data/video.json`; padrão 640×480, escala 1; `0` = a maior que cabe) |
 | `--sem-som`, `--soundfont ARQ.sf2` | sem áudio; SoundFont General MIDI para as músicas (ou `SIMANT_SOUNDFONT`; sem ela, sintetizador simples) |
 | `--preferencias ARQ`, `--sem-preferencias` | arquivo das opções guardadas entre partidas (no lugar do `[SimAnt]` do `WIN.INI`; padrão em `%APPDATA%\SimAnt recomp\SimAnt\`) |
-| `--ticks N`, `--avancar-ms MS`, `--acoes A,B`, `--quintal M`, `--janela-mapa M` | testes sem interação: roda ticks, passa tempo real, aplica ações de navegação, abre o quintal ou o mapa num modo |
+| `--ticks N`, `--avancar-ms MS`, `--acoes A,B`, `--quintal M`, `--janela-mapa M`, `--mini-mapa N` | testes sem interação: roda ticks, passa tempo real, aplica ações de navegação, abre o quintal, o mapa num modo ou o mini mapa (N aberturas) |
 | `--exportar-tela-jogo ARQ.png`, `--exportar-telas DIR`, `--exportar-som DIR`, `--capturar-janela ARQ.png`, `--sair-apos-ms N` | grava a tela de jogo, as telas da abertura, os efeitos e músicas em WAV, ou o que a janela mostrava |
 
 A lista completa, com as opções de depuração, está no comentário do topo de `simant/src/main.rs` e em `simant/src/opcoes.rs`.

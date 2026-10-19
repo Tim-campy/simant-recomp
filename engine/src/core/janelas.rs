@@ -199,6 +199,15 @@ pub struct JanelasControle {
     /// Último clique (ou arrasto) na área da janela do mapa, em coordenadas da área cliente; a
     /// interface o converte em célula e centraliza a vista (`_MapAreaEvent`).
     pub clique_mapa: Option<(i32, i32)>,
+    /// O último clique na área do mapa foi duplo: depois de centralizar, a janela de edição vem para
+    /// a frente (`_MapAreaEvent` com os bits 0x60 do evento → `_OpenEditWindow`).
+    pub clique_mapa_duplo: bool,
+    /// Shift e Ctrl apertados no clique (a interface os põe antes de [`Self::clicar`]).
+    pub shift: bool,
+    pub ctrl: bool,
+    /// Shift+clique na área do mapa (ponto, duplo): vira o clique da janela de edição na célula
+    /// (`_MapAreaEvent` → `_processEdit`), sem centralizar nem arrastar.
+    pub ordem_mapa: Option<(i32, i32, bool)>,
     /// Último clique na área da janela Info (`_ProcInfoEvent`).
     pub clique_info: Option<(i32, i32)>,
 }
@@ -266,6 +275,10 @@ impl JanelasControle {
             porcentagem: [true, true],
             arrastando: None,
             clique_mapa: None,
+            clique_mapa_duplo: false,
+            shift: false,
+            ctrl: false,
+            ordem_mapa: None,
             clique_info: None,
             posicoes: interface.posicoes.clone(),
             faixa: interface.moldura.faixa.altura,
@@ -424,13 +437,13 @@ impl JanelasControle {
         let c = self.gerente.pressionar(x, y, duplo);
         if let Clique::Cliente(id) = c {
             if let Some(ctl) = self.controle(id) {
-                self.clique_no_conteudo(recursos, e, ctl, x, y)?;
+                self.clique_no_conteudo(recursos, e, ctl, x, y, duplo)?;
             }
         }
         Ok(c)
     }
 
-    fn clique_no_conteudo(&mut self, recursos: &Recursos, e: &mut Estado, c: Controle, x: i32, y: i32) -> Result<(), String> {
+    fn clique_no_conteudo(&mut self, recursos: &Recursos, e: &mut Estado, c: Controle, x: i32, y: i32, duplo: bool) -> Result<(), String> {
         if c == Controle::Quintal {
             return Ok(());
         }
@@ -445,8 +458,13 @@ impl JanelasControle {
             }
             Controle::Mapa => {
                 if Self::objeto(&janela, &g, &self.cfg.mapa.objeto_area, true).is_some_and(|(r, _)| contem(r, x, y)) {
-                    self.clique_mapa = Some((x, y));
-                    self.arrastando = Some(c);
+                    if self.shift {
+                        self.ordem_mapa = Some((x, y, duplo));
+                    } else {
+                        self.clique_mapa = Some((x, y));
+                        self.clique_mapa_duplo = duplo;
+                        self.arrastando = Some(c);
+                    }
                 }
             }
             Controle::Historico => self.historico.clicar(&janela, &g, x, y),

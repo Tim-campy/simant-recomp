@@ -39,6 +39,7 @@ impl Sessao<'_> {
         self.janelas.gerente.arrasto = None;
         self.janelas.gerente.menu = None;
         self.modos.janela.na_frente = antiga.modos.janela.na_frente;
+        self.mini.reaberto = antiga.mini.reaberto;
         if let Some(c) = self.janelas.janelas_padrao(self.partida.nav.plano_mapa) {
             self.depois_de_abrir(c);
         }
