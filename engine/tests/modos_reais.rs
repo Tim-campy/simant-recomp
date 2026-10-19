@@ -52,7 +52,10 @@ fn select_a_game_bate_com_os_cliques_da_bancada() {
 fn menu_de_ferramentas_e_submenus() {
     let Some(r) = recursos() else { return };
     let mut m = MenuFerramentas::carregar(&r).unwrap();
-    m.abrir(Retangulo { esq: 100, topo: 40, dir: 125, base: 60 }, None);
+    let vga = engine::core::resolucao::PerfilDriver { alinhamento_x: 8, ..Default::default() };
+    m.abrir(Retangulo { esq: 100, topo: 40, dir: 125, base: 60 }, None, &vga);
+    // Área de dentro da moldura no byte (VGA de 16 cores), como nas capturas i05/q01/f01.
+    assert_eq!(m.origem.0 % 8, 0);
     // Itens de 17 pixels a partir de (3, 3) do objeto 0 (janela 9 do WINGANT).
     let (ox, oy) = (i32::from(m.origem.0), i32::from(m.origem.1));
     assert_eq!(m.item_em(ox + 10, oy + 5), Some(ItemMenu::Ferramenta(Ferramenta::Info)));
