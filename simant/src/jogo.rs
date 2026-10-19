@@ -359,6 +359,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 }
                 Event::MouseMotion { x, y, mousestate, .. } => {
                     cursor = (x, y);
+                    // Cursor desenhado pelo port (lente invertida do MAGCURSOR): acompanha o mouse.
+                    redesenhar |= cursores.por_software().is_some();
                     if let Some((m, _)) = &mut s.menu {
                         redesenhar |= m.mover(x, y);
                         continue;
@@ -560,7 +562,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
             }
         }
         // WM_SETCURSOR: cursor do modo de ajuda e das ferramentas do Experimental.
-        cursores.atualizar(s, cursor.0, cursor.1);
+        redesenhar |= cursores.atualizar(s, cursor.0, cursor.1);
         // WM_ACTIVATEAPP: o estado da janela é lido a cada quadro (não só pelos eventos de foco, que
         // podem ser engolidos por um laço modal como o do Examine).
         let ativa = janela_ativa(canvas.window());
@@ -629,6 +631,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         if pedidos.iter().any(|e| matches!(e, engine::rules::estado::Evento::AnimacaoVitoria)) {
             // _DrawSimPayoff: _MapToYard, _SetYardMode(0), _SetMapPlane(0) e _DrawYard antes da janela.
             modos::aplicar_acao_quintal(s, engine::core::quintal_mapa::AcaoQuintal::ModoQuintal, true);
+            // _DrawYard desenha os dados da faixa 35 (não é o Ctrl+Y).
+            s.modos.janela.tempo_faixa = None;
             redesenhar = true;
         }
         audio.tratar(&pedidos, &s.partida.estado.partida.opcoes);
@@ -647,7 +651,11 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
             redesenhar = true;
         }
         if redesenhar {
-            let cliente = s.quadro_rgb()?;
+            let mut cliente = s.quadro_rgb()?;
+            if let Some(c) = cursores.por_software() {
+                let (w, h) = (s.tela.cfg.largura as usize, s.tela.cfg.altura as usize);
+                ajuda_ui::desenhar_cursor(c, &mut cliente, w, h, cursor.0, cursor.1);
+            }
             let rgb = menus_ui::compor(s, &cliente, foco.unwrap_or(true));
             textura.update(None, &rgb, lw as usize * 3).map_err(|e| e.to_string())?;
             redesenhar = false;

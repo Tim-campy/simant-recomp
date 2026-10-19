@@ -129,6 +129,19 @@ def extrair(exe):
         ],
         "dados_faixa": {"fonte": 0, "rainhas": "ribQueens", "colonias_pretas": "ribBlackCols", "colonias_vermelhas": "ribRedCols"},
         "_origem_dados_faixa": "_DrawYardData 1010:acd8: _font_SetFont(3) [a lista de fontes do port numera diferente: medido, o índice 0 (Gaia8x14) bate 98,5% em full_yard.png], _QueenStorageB em 0x231a, _ColonyTotalBlack/Red em 0x231d/0x231e",
+        "barras_faixa": {
+            "barras": [
+                {"objeto": "ribYellowH2", "valor": "saude_amarela", "marca": "aviso_saude_amarela"},
+                {"objeto": "ribBlackH2", "valor": "saude_preta", "marca": "aviso_saude_colonia"},
+                {"objeto": "ribBlackP2", "valor": "populacao_preta"},
+                {"objeto": "ribRedH2", "valor": "saude_vermelha"},
+                {"objeto": "ribRedP2", "valor": "populacao_vermelha"},
+            ],
+            "numeros": [{"objeto": "ribBlacks2", "valor": "populacao_preta"}, {"objeto": "ribReds2", "valor": "populacao_vermelha"}],
+            "fonte_numeros": 3,
+            "encolher": 1,
+        },
+        "_origem_barras_faixa": "_DrawYardData 1010:acd8: _BpopT e _RpopT em 0x231b/0x231c (fonte 3, como os números da faixa 34), _win_DrawHBar de _MeHealth, _HealthB, _BpopT/max, _HealthR (0 sem vermelhas)/100 e _RpopT/max em 0x231f, 0x2320, 0x2322, 0x2321, 0x2323, e _GInvBox nos limiares _BlkWarnHealth (0x2320) e _MeWarnHealth (0x231f); mesma regra de barras_faixa de tela_jogo.json",
         "_origem_teclas": "ACCELERATORTABLE do SIMANTW.EXE: Ctrl+Y/5/6/7 = comandos 0xFD21-0xFD24 (_ProcMenu: modo 0-3 e abre o quintal), Ctrl+M = 0xFD12 (_OpenMapYard)",
     }
 
