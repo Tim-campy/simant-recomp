@@ -481,7 +481,8 @@ mod testes {
     fn exporta_musica_pelo_caminho_fm_sem_saturar() {
         let Some(r) = recursos() else { return };
         let cfg: ConfigSom = r.dados(config::ARQUIVO).unwrap();
-        assert_eq!(cfg.sintetizador, Some(TipoSintetizador::Fm), "data/som.json usa o FM por padrão");
+        // O padrão de data/som.json é o simples (escolha do usuário, 2026-10-19); o FM segue selecionável.
+        assert_eq!(cfg.sintetizador, Some(TipoSintetizador::Simples), "data/som.json usa o simples por padrão");
         let banco = banco_fm(&r, &cfg).unwrap();
         // badnews (11007) é a música mais forte do banco; call2arm (11013), outra curta.
         for id in [11007u16, 11013] {

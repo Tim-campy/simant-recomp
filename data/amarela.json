@@ -25,6 +25,7 @@
     "quadros_loucura_atras": 8,
     "espera_quadro_ms": 165,
     "espera_loucura_ms": 110,
+    "espera_ovo_ms": 220,
     "morte_para_com_musica": true
   },
   "musicas": {
@@ -86,6 +87,7 @@
     "quadros_loucura_atras": "_AnimYellowInsane, janela atrás",
     "espera_quadro_ms": "_AnimYellowFight: cada quadro espera _MacTickCount() > início + 6; o relógio anda 3 a cada 55 ms (quintal.md, Relógios), logo 3 degraus = 165 ms entre quadros (o primeiro espera só o próximo degrau). A interface para a simulação e mostra os quadros nesse tempo (regras/som.md, formiga-amarela.md §10.2)",
     "espera_loucura_ms": "_AnimYellowInsane 1028:8078: espera _MacTickCount() > início + 3; o relógio do Mac anda 3 a cada 55 ms, logo 2 degraus = 110 ms (a mesma conta dá os 165 ms da luta, conferidos na bancada pelo _TickCount de cada quadro: +3 por quadro)",
+    "espera_ovo_ms": "_YellowBirth 1000:739e: cada estágio do ovo (2–7) espera _MacTickCount() chegar a início + 10; o relógio do Mac anda 3 a cada 55 ms, logo 4 degraus = 220 ms (só apresentação)",
     "morte_para_com_musica": "_AnimYellowFight: códigos 1–9 com música ligada saem quando _mySongIsDone, sempre verdadeiro no caminho MCI (regras/som.md)",
     "recrutar_5": "_YellowCommand 1000:87ba, comando 1",
     "recrutar_10": "comando 2",

@@ -269,7 +269,7 @@ No port: `Estado::camada_edicao`, ligado por `rules/amarela.rs` (tecla 0 e desli
 
 ### Fila de eventos
 
-As regras não chamam janela nem som: deixam pedidos em `Estado::eventos`. Depois de cada tick e de cada entrada do jogador, a `Partida` esvazia essa fila:
+As regras não chamam janela nem som: deixam pedidos em `Estado::eventos`. Depois de cada tick e de cada entrada do jogador, a `Partida` esvazia essa fila numa **linha do tempo** e os apresenta em ordem (desde 2026-10-19; [../regras/formiga-amarela.md](../regras/formiga-amarela.md) §9.4): uma animação da amarela ou um aviso modal seguram os pedidos seguintes até acabarem, nenhum tick roda enquanto sobra pedido, e a janela de edição mostra o último instantâneo desenhado dentro do tick (`Evento::Instantaneo`):
 
 - `CentralizarNaAmarela` (`_GotoMyAnt`, `1000:a764`, pedido por `rules/amarela.rs` com AutoTrack ligado a cada passo de `_DoAntMoveY`, com Home, Backspace sem ordem, clique na própria amarela, ordem impossível, morte...) é tratado na hora: no Experimental nada (o original toca o som de erro); se a amarela está no plano mostrado (> 0), `_CenterEdit(_MeLoc)`; senão, `_SetMapPlaneLocation(_MePlane, _MeLoc)`, que troca o plano e centraliza **uma** vez, sem ler nem gravar o ponto lembrado [código].
 - `Mensagem(id)`, `Musica(id)` e `DialogoFimDeJogo` vão para a fila da interface (`Partida::retirar_eventos`, escritos no terminal; música sem som). `Mensagem` e `DialogoFimDeJogo` também viram **avisos modais** (`Partida::avisos`): o quadro de mensagem e o diálogo de fim de jogo, que param a simulação até serem fechados, como `_StopSimulation` ([mensagens.md](mensagens.md)). `_EndGameDialog` é pedido a cada tick enquanto `_IsGameOver` ≠ 0; a `Partida` repassa só o primeiro.

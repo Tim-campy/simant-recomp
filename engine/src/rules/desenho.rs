@@ -9,7 +9,7 @@
 //! `core::partida`), as caixas de fim de jogo e da aranha.
 
 use super::baloes::{self, TabelasBaloes};
-use super::estado::Estado;
+use super::estado::{Estado, Evento, QuadroAnimacao};
 use super::geracao::Cor;
 
 /// Gotas da chuva redesenhadas por quadro (`_Draw_SimYard`, `1010:b462`): 14 posições sorteadas.
@@ -274,7 +274,35 @@ pub fn desenhar_no_tick(e: &mut Estado) -> u32 {
         j.desenhos += 1;
         j.passos += passos;
     }
+    // O instantâneo do que foi desenhado, para a linha do tempo da apresentação (só lê o estado).
+    if let Some(quadro) = foto_da_edicao(e, plano) {
+        let plano = plano.max(1);
+        e.eventos.push(Evento::Instantaneo { plano, quadro: Box::new(quadro) });
+    }
     passos
+}
+
+/// A janela de edição do plano `plano` (1 superfície, 2 ninho preto, 3 ninho vermelho; 0 conta como
+/// a superfície) como `_DoEditUpdateDraw` a desenharia agora: mapa de chão, mapa de vida e os campos
+/// `_Me*` que o desenho da marca 0xFF lê. Só lê o estado.
+pub fn foto_da_edicao(e: &Estado, plano: i16) -> Option<QuadroAnimacao> {
+    let (mapa, vida) = match plano {
+        0 | 1 => (&e.superficie.mapa, &e.superficie.vida),
+        2 => (&e.ninho_b.mapa, &e.ninho_b.vida),
+        3 => (&e.ninho_r.mapa, &e.ninho_r.vida),
+        _ => return None,
+    };
+    let a = &e.amarela;
+    Some(QuadroAnimacao {
+        mapa: mapa.dados.clone(),
+        vida: vida.dados.clone(),
+        x: a.x,
+        y: a.y,
+        tipo: a.tipo,
+        dir: a.dir,
+        ovo: a.ovo,
+        base: a.base,
+    })
 }
 
 /// A parte de vista de `_GotoMyAnt` (`1000:a764`) dentro do tick, com a amarela em (`plano`, x, y):

@@ -34,7 +34,10 @@ contain. (The full guide, in Portuguese, is `LEIAME.txt`.)
    - *Início* (start): the title screen and "Select a Game", a new game (*Rápido* = Quick,
      *Completo* = Full, *Experimental*, *Tutorial*) or a saved game (`.ANT`).
    - *Vídeo*: emulated resolution, window scale and size, the Windows 3.1 title bar, video driver
-     profile. *Som*: sound on/off and the music synthesizer (FM, simple, SoundFont `.sf2`). *Mods*: the
+     profile (with *Moldura Win 3.1*, the window loses the system frame and behaves like a Windows 3.1
+     window: drag by the title, double-click it or the right button to maximize/restore, resize by the
+     gray frame, Alt+F4 asks to save). *Som*: sound on/off and the music synthesizer (simple — the
+     default —, FM, SoundFont `.sf2`). *Mods*: the
      mods folder and a checkbox per mod. *Preferências*: keep options between games, `WIN.INI` to read
      the original's options from.
    - *Linha de comando equivalente*: the matching `--` options (section below), editable (press Enter to
@@ -74,7 +77,10 @@ and pick another one.
 You are the **yellow ant** of a black colony, fighting the red ants in a suburban backyard. Click to
 move, double-click to act (attack, ask for food, pick up/drop, dig); hold the button on the yellow ant
 for its menu. **1/2** recruit 5/10 workers, **3/4** release half/all, **0** alarm, **X** switch body,
-**Shift+0** pause, **Shift+1..4** speed, **Ctrl+S** save, **Ctrl+L** load, **F1** help. The original
+**Shift+0** pause, **Shift+1..4** speed (Fast and Ultra run at 2.5× and 5× Normal; while the window is
+not focused the game runs at Slow and resumes on focus — `--velocidades original` and
+`--sem-foco original`, or the *Fast/Ultra do 486* and *Lenta sem foco* checkboxes, restore the
+original pace), **Ctrl+S** save, **Ctrl+L** load, **F1** help. The original
 cheat codes work (type `heal`, `just`, `qeen`, `eggs`... during a game). All keys are configurable in
 `data/*.json`.
 

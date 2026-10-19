@@ -37,8 +37,35 @@ use crate::scripts::{Gancho, PedidoMod, RegrasComScripts, Scripts};
 /// Nome do arquivo de dados (sobrescrevível por mod).
 pub const ARQUIVO_CONFIG: &str = "partida.json";
 
+/// Como Fast e Ultra viram ritmo (data/partida.json, `relogio.ritmo_velocidades`).
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ModoRitmo {
+    /// O laço ocupado de `MYTIMERFUNC` com `voltas_por_periodo` (o 486 da bancada: ~66,7 e ~90,9
+    /// ticks/s). É o original.
+    #[default]
+    Original,
+    /// Extensão do port (escolha do usuário, 2026-10-19): as velocidades com multiplicador andam a
+    /// `multiplicador × ticks_por_segundo_normal`, como num processador mais lento; o tick é o mesmo.
+    Proporcional,
+}
+
+/// Ritmo das velocidades (extensão do port; docs/decisoes.md, 2026-10-19, "Ritmo das velocidades").
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct RitmoVelocidades {
+    #[serde(default)]
+    pub modo: ModoRitmo,
+    /// Ticks por segundo da Normal no original (1 a cada 3 mensagens de 55 ms: 6,06).
+    #[serde(default)]
+    pub ticks_por_segundo_normal: f64,
+    /// Por `_GameSpeed` (slow, normal, fast, ultra): múltiplo de `ticks_por_segundo_normal`, ou
+    /// `null` = a regra do original para essa velocidade.
+    #[serde(default)]
+    pub multiplicadores: Vec<Option<f64>>,
+}
+
 /// Ritmo das mensagens de temporizador e do redesenho (data/partida.json, "relogio").
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct ConfigRelogio {
     /// Intervalo pedido ao `SetTimer` com o aplicativo em foco (17 ms).
     pub intervalo_mensagem_ms: u32,
@@ -57,6 +84,15 @@ pub struct ConfigRelogio {
     pub redesenho_mapa_a_cada: Vec<u32>,
     /// Sem foco, redesenha só a cada N ticks (`quadros & 7 == 0`).
     pub redesenho_sem_foco_a_cada: u32,
+    /// Ritmo de Fast/Ultra (ausente = o original).
+    #[serde(default)]
+    pub ritmo_velocidades: RitmoVelocidades,
+    /// Extensão do port (escolha do usuário, 2026-10-19): sem o foco do sistema, a cadência é a
+    /// desta velocidade (0 = Slow), ou a escolhida se for mais lenta; volta sozinha com o foco. Só
+    /// a cadência: `_GameSpeed` (o save, a marca do menu Speed, o desenho) não muda. `null`/ausente
+    /// = o original (o ritmo não muda sem foco).
+    #[serde(default)]
+    pub sem_foco_velocidade: Option<i16>,
 }
 
 /// Estado de uma chamada de `MYTIMERFUNC` em andamento (simulacao-visao-geral.md §2): o laço só
@@ -154,7 +190,7 @@ pub enum BotaoTeclado {
 }
 
 /// Conteúdo de data/partida.json.
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct ConfigPartida {
     pub relogio: ConfigRelogio,
     pub teclas: Vec<AtalhoPartida>,
@@ -203,6 +239,11 @@ impl ConfigPartida {
     pub fn botao_da_tecla(&self, nome: &str) -> Option<BotaoTeclado> {
         self.teclas_clique.iter().find(|(k, _)| k.eq_ignore_ascii_case(nome)).map(|(_, &v)| v)
     }
+}
+
+/// Valor de uma tabela por `_GameSpeed` (0 slow … 3 ultra; fora disso, o último).
+fn na_velocidade<T: Copy>(tabela: &[T], v: i16, padrao: T) -> T {
+    usize::try_from(v).ok().and_then(|i| tabela.get(i).copied()).or(tabela.last().copied()).unwrap_or(padrao)
 }
 
 /// `_ELayerMode` que o botão de cheiro da faixa (`_MapMode` n) liga: 4 ninho preto → 1, 5 trilha preta
@@ -318,18 +359,28 @@ pub struct Partida {
     anel_trapaca: AnelTrapaca,
     /// Ticks pedidos por `avancar_ticks` dos scripts (API 0.17) ainda por rodar.
     ticks_de_mods: u32,
-    /// Animações da amarela pedidas no último tick (`_AnimYellowFight`, `_AnimYellowInsane`), em
-    /// ordem, e o `ms_total` em que a primeira começou. Enquanto duram, a simulação fica parada
+    /// A animação da amarela em andamento (`_AnimYellowFight`, `_AnimYellowInsane`, os estágios do
+    /// ovo de `_YellowBirth`) e o `ms_total` em que começou. Enquanto dura, a simulação fica parada
     /// (`bloqueio_ms`) e a janela de edição mostra o quadro da vez (`quadro_animado`).
     animacoes: Vec<AnimacaoDaAmarela>,
     animacao_inicio_ms: u64,
-    /// Avisos modais pedidos antes da animação no mesmo tick (o quadro da aranha ou da formiga-leão
-    /// vem antes de `_AnimYellowFight`): a animação só começa quando eles fecham.
-    modais_antes_da_animacao: usize,
+    /// Linha do tempo da apresentação: os pedidos do tick ainda não apresentados. O original faz
+    /// tudo dentro do tick, em sequência e parado em cada quadro modal e em cada animação; o port
+    /// roda o tick inteiro e apresenta os pedidos na mesma ordem, um depois do outro: uma animação
+    /// ou um aviso modal seguram o resto (centralizações, outros quadros, músicas) até acabarem, e
+    /// nenhum tick roda enquanto sobra algo aqui (regras/formiga-amarela.md §9.4).
+    apresentacao: VecDeque<Evento>,
+    /// O último instantâneo da janela de edição apresentado (`Evento::Instantaneo`, ou o último
+    /// quadro de uma animação): enquanto a apresentação não acaba, a janela de edição mostra isto
+    /// no lugar do estado (que já é o do fim do tick).
+    quadro_congelado: Option<(i16, QuadroAnimacao)>,
     /// Quadro mostrado no último redesenho (animação, quadro), para só redesenhar quando muda.
     quadro_mostrado: Option<(usize, usize)>,
     /// Rodando os ticks pedidos pelos mods de uma vez: as animações não param nada.
     avanco_rapido: bool,
+    /// Ritmo proporcional (`ritmo_velocidades`): voltas do laço de `MYTIMERFUNC` ainda por dar,
+    /// acumuladas a cada mensagem (a fração de volta fica guardada).
+    credito_voltas: f64,
 }
 
 impl Partida {
@@ -389,9 +440,11 @@ impl Partida {
             ticks_de_mods: 0,
             animacoes: Vec::new(),
             animacao_inicio_ms: 0,
-            modais_antes_da_animacao: 0,
+            apresentacao: VecDeque::new(),
+            quadro_congelado: None,
             quadro_mostrado: None,
             avanco_rapido: false,
+            credito_voltas: 0.0,
         };
         p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
         p.funcoes_botoes_quintal = p.cfg.botoes_usuario_quintal.as_ref().map(|b| b.funcoes.clone()).unwrap_or_default();
@@ -403,11 +456,33 @@ impl Partida {
 
     /// `_GameSpeed` como índice das tabelas (0 slow … 3 ultra; fora disso, o último).
     fn indice_velocidade<T: Copy>(&self, tabela: &[T], padrao: T) -> T {
-        usize::try_from(self.estado.partida.velocidade)
-            .ok()
-            .and_then(|v| tabela.get(v).copied())
-            .or(tabela.last().copied())
-            .unwrap_or(padrao)
+        na_velocidade(tabela, self.estado.partida.velocidade, padrao)
+    }
+
+    /// Velocidade da cadência: `_GameSpeed`, ou, sem foco e com `sem_foco_velocidade`, a mais lenta
+    /// das duas (extensão do port). Só decide o ritmo dos ticks (voltas e atraso), nunca o estado.
+    pub fn velocidade_efetiva(&self) -> i16 {
+        let v = self.estado.partida.velocidade;
+        match self.cfg.relogio.sem_foco_velocidade {
+            Some(lenta) if !self.ativo => v.min(lenta),
+            _ => v,
+        }
+    }
+
+    /// Ritmo proporcional: voltas (= ticks em Fast/Ultra) por mensagem de temporizador na velocidade
+    /// `v`, ou `None` se ela segue o laço do original.
+    fn voltas_por_mensagem(&self, v: i16) -> Option<f64> {
+        let ritmo = &self.cfg.relogio.ritmo_velocidades;
+        if ritmo.modo != ModoRitmo::Proporcional {
+            return None;
+        }
+        let m = usize::try_from(v).ok().and_then(|i| ritmo.multiplicadores.get(i).copied().flatten())?;
+        Some(m * ritmo.ticks_por_segundo_normal * self.intervalo_ms() as f64 / 1000.0)
+    }
+
+    /// Ticks por segundo da velocidade `v` no ritmo proporcional (`None` = a do laço do original).
+    pub fn ticks_por_segundo(&self, v: i16) -> Option<f64> {
+        self.voltas_por_mensagem(v).map(|n| n * 1000.0 / self.intervalo_ms() as f64)
     }
 
     /// Intervalo atual entre mensagens de temporizador (ms): o pedido ao `SetTimer` (17 ms, ou
@@ -420,7 +495,8 @@ impl Partida {
     }
 
     /// Foco do aplicativo (`WM_ACTIVATEAPP`): sem foco, o código pede 170 ms, mas o ritmo medido não
-    /// muda (`data/partida.json`, `intervalo_sem_foco_ms` = 17); só o redesenho fica mais raro.
+    /// muda (`data/partida.json`, `intervalo_sem_foco_ms` = 17); só o redesenho fica mais raro. Com
+    /// `sem_foco_velocidade` (extensão do port), a cadência cai para a lenta até o foco voltar.
     pub fn definir_foco(&mut self, ativo: bool) {
         self.ativo = ativo;
     }
@@ -438,16 +514,19 @@ impl Partida {
         // O GetTickCount continua andando durante quadros modais e esperas.
         self.ms_total += ms;
         if self.animando() {
-            // _AnimYellowFight: o programa inteiro espera; um quadro modal pedido no mesmo tick (a
-            // morte depois da luta perdida) só aparece depois da animação.
+            // _AnimYellowFight: o programa inteiro espera; o que o tick pediu depois da animação (a
+            // morte depois da luta perdida, o renascimento) só é apresentado quando ela acaba.
             let espera = ms.min(self.bloqueio_ms);
             self.bloqueio_ms -= espera;
             self.acompanhar_animacao();
-            if self.animando() {
-                return Avanco::default();
+            if !self.animando() {
+                self.seguir_apresentacao();
             }
             self.resto_ms = 0;
             return Avanco::default();
+        }
+        if !self.apresentacao.is_empty() {
+            self.seguir_apresentacao();
         }
         let sobreposta = self.avisos.sobreposta_visivel();
         let animado = self.avisos.animado().cloned();
@@ -460,10 +539,10 @@ impl Partida {
         let pedidos = self.avisos.retirar_pedidos();
         self.eventos.extend(pedidos);
         if self.animando() {
-            // Fecharam os quadros que vinham antes da animação: ela começa agora.
+            // Fechou o quadro que vinha antes de uma animação: ela começa agora.
             return Avanco::default();
         }
-        if self.avisos.tem_modal() || self.escolher_colonia || self.parada_pela_interface {
+        if self.avisos.tem_modal() || self.escolher_colonia || self.parada_pela_interface || !self.apresentacao.is_empty() {
             self.resto_ms = 0;
             self.laco = LacoTimer::default();
             return Avanco::default();
@@ -495,7 +574,7 @@ impl Partida {
                 self.resto_ms = 0;
                 break;
             }
-            if self.avisos.tem_modal() {
+            if self.avisos.tem_modal() || !self.apresentacao.is_empty() {
                 // _StopSimulation: KillTimer, e as WM_TIMER pendentes são descartadas.
                 self.resto_ms = 0;
                 self.laco = LacoTimer::default();
@@ -523,14 +602,31 @@ impl Partida {
             self.relogio.contar_mensagem();
             self.laco = LacoTimer { dentro: true, ..LacoTimer::default() };
         }
-        let voltas = self.indice_velocidade(&self.cfg.relogio.voltas_por_periodo.clone(), 1).max(1);
+        let velocidade = self.velocidade_efetiva();
+        let por_mensagem = self.voltas_por_mensagem(velocidade);
+        let voltas = match por_mensagem {
+            // Ritmo proporcional: as voltas que couberem no crédito (pode ser nenhuma, como num
+            // processador em que uma volta leva mais que uma mensagem: as mensagens se acumulam e
+            // são drenadas juntas). O teto evita uma rajada depois de uma parada.
+            Some(n) => {
+                self.credito_voltas = (self.credito_voltas + n).min(3.0 * n + 1.0);
+                self.credito_voltas.floor() as u32
+            }
+            None => {
+                self.credito_voltas = 0.0;
+                na_velocidade(&self.cfg.relogio.voltas_por_periodo, velocidade, 1).max(1)
+            }
+        };
         let mut ticks = 0;
         let havia_modal = self.avisos.tem_modal();
         for _ in 0..voltas {
             // `_gameCycles` (9:9b2c) conta as voltas do laço, rode ou não o tick. Zero significa
             // "sem relógio do laço" para `quintal::Relogios`: pula o 0 na volta.
             self.estado.ciclos_jogo = self.estado.ciclos_jogo.wrapping_add(1).max(1);
-            if self.relogio.liberar_tick(&self.estado, &self.cfg_simulacao) {
+            if por_mensagem.is_some() {
+                self.credito_voltas -= 1.0;
+            }
+            if self.relogio.liberar_tick_na_velocidade(&self.estado, &self.cfg_simulacao, velocidade) {
                 self.rodar_tick();
                 ticks += 1;
                 if self.bloqueio_ms > 0 {
@@ -538,8 +634,9 @@ impl Partida {
                     self.laco = LacoTimer::default();
                     return ticks;
                 }
-                if !havia_modal && self.avisos.tem_modal() {
-                    // _StopSimulation: o quadro para o temporizador; o port encerra a chamada.
+                if (!havia_modal && self.avisos.tem_modal()) || !self.apresentacao.is_empty() {
+                    // _StopSimulation: o quadro para o temporizador; o port encerra a chamada. O
+                    // resto da apresentação do tick também segura os ticks seguintes.
                     self.laco = LacoTimer::default();
                     return ticks;
                 }
@@ -720,30 +817,59 @@ impl Partida {
     /// Quadro de animação da amarela a mostrar agora na janela de edição: o plano animado e o
     /// quadro (mapa, vida e marca da amarela naquele instante). Cada quadro fica `espera_ms` na tela;
     /// o último aparece só no fim da espera (no original o tick continua logo depois dele).
+    ///
+    /// Sem animação, enquanto a apresentação do tick não acabou (um aviso modal na frente), o
+    /// último instantâneo da janela de edição (`Evento::Instantaneo`): o original fica parado no
+    /// meio do tick com a janela desenhada até ali.
     pub fn quadro_animado(&self) -> Option<(i16, &QuadroAnimacao)> {
-        let (k, q) = self.indice_do_quadro()?;
-        let a = &self.animacoes[k];
-        Some((a.plano, &a.quadros[q]))
-    }
-
-    /// Há uma animação da amarela em andamento (a simulação está parada por ela). Uma animação que
-    /// espera os quadros pedidos antes dela ainda não conta.
-    pub fn animando(&self) -> bool {
-        !self.animacoes.is_empty() && self.modais_antes_da_animacao == 0
-    }
-
-    /// Um aviso modal fechou: se a animação esperava por ele, e era o último, ela começa.
-    fn modal_fechado(&mut self) {
-        if self.modais_antes_da_animacao == 0 {
-            return;
+        if let Some((k, q)) = self.indice_do_quadro() {
+            let a = &self.animacoes[k];
+            return Some((a.plano, &a.quadros[q]));
         }
-        self.modais_antes_da_animacao -= 1;
-        if self.modais_antes_da_animacao == 0 && !self.animacoes.is_empty() {
-            self.animacao_inicio_ms = self.ms_total;
-            self.bloqueio_ms += self.animacoes.iter().map(|a| a.duracao_ms()).sum::<u64>();
-            self.quadro_mostrado = None;
+        if let Some(a) = self.animacoes.last() {
+            if let Some(q) = a.quadros.last() {
+                return Some((a.plano, q));
+            }
+        }
+        self.quadro_congelado.as_ref().map(|(p, q)| (*p, q))
+    }
+
+    /// Há uma animação da amarela em andamento (a simulação está parada por ela).
+    pub fn animando(&self) -> bool {
+        !self.animacoes.is_empty()
+    }
+
+    /// A apresentação do último tick ainda não acabou (há pedidos esperando um aviso modal ou uma
+    /// animação acabar).
+    pub fn apresentando(&self) -> bool {
+        !self.apresentacao.is_empty()
+    }
+
+    /// Um aviso modal fechou: a apresentação do tick continua de onde parou.
+    fn modal_fechado(&mut self) {
+        self.seguir_apresentacao();
+    }
+
+    /// O que segura a apresentação: uma animação, um aviso modal ou a escolha de `_SpecialXfer`.
+    fn apresentacao_parada(&self) -> bool {
+        self.animando() || self.avisos.tem_modal() || self.escolher_colonia
+    }
+
+    /// Apresenta os pedidos do tick em ordem até um que segure a apresentação (ou até o fim). No
+    /// fim, sem nada segurando, a janela de edição volta a mostrar o estado.
+    fn seguir_apresentacao(&mut self) {
+        while !self.apresentacao_parada() {
+            let Some(ev) = self.apresentacao.pop_front() else { break };
+            self.tratar_evento(ev);
+        }
+        if self.apresentacao.is_empty() && !self.apresentacao_parada() && self.quadro_congelado.take().is_some() {
             self.redesenhar = true;
         }
+        if self.estado.partida.fim_de_jogo == 0 {
+            self.fim_anunciado = false;
+        }
+        self.aplicar_pedidos_dos_mods();
+        self.saidas_dos_scripts();
     }
 
     /// Clique ou tecla com um quadro animado na frente (`_SpiderDialog`, `_LionDialog`,
@@ -762,9 +888,6 @@ impl Partida {
     }
 
     fn indice_do_quadro(&self) -> Option<(usize, usize)> {
-        if self.modais_antes_da_animacao > 0 {
-            return None;
-        }
         let mut t = self.ms_total.saturating_sub(self.animacao_inicio_ms);
         for (k, a) in self.animacoes.iter().enumerate() {
             let d = a.duracao_ms();
@@ -784,6 +907,10 @@ impl Partida {
         }
         let atual = self.indice_do_quadro();
         if atual.is_none() || self.bloqueio_ms == 0 {
+            // Acabou: a janela fica com o último quadro até o próximo desenho.
+            if let Some(a) = self.animacoes.last() {
+                self.quadro_congelado = a.quadros.last().map(|q| (a.plano, q.clone()));
+            }
             self.animacoes.clear();
             self.quadro_mostrado = None;
             self.redesenhar = true;
@@ -843,99 +970,107 @@ impl Partida {
         ];
     }
 
-    /// Esvazia a fila do estado: centralizar é feito aqui (`_GotoMyAnt`); o resto vai para a
-    /// interface. `_EndGameDialog` é pedido a cada tick enquanto o jogo acabou: só o primeiro é
-    /// repassado (de novo só depois que `_IsGameOver` voltar a 0). Mensagens e fim de jogo também
-    /// entram nos avisos (quadros modais).
+    /// Esvazia a fila do estado na linha do tempo da apresentação e apresenta o que der
+    /// ([`Partida::seguir_apresentacao`]).
     fn tratar_eventos(&mut self) {
-        for ev in self.estado.retirar_eventos() {
-            if let Some(s) = self.scripts.as_mut().filter(|s| s.tem_gancho(Gancho::AoEvento)) {
-                s.ao_evento(&ev, &mut self.estado);
-            }
-            match ev {
-                Evento::CentralizarNaAmarela { plano, x, y } => self.ir_para_amarela(plano, x, y),
-                Evento::DialogoFimDeJogo => {
-                    if !self.fim_anunciado {
-                        self.fim_anunciado = true;
-                        self.eventos.push_back(ev);
-                        // _EndGameDialog: música de vitória ou derrota com Options → Music ligado.
-                        if self.estado.partida.opcoes[1] != 0 {
-                            let f = &self.avisos.cfg.fim_de_jogo;
-                            let m = if self.estado.partida.pretas_venceram != 0 { f.musica_vitoria } else { f.musica_derrota };
-                            self.eventos.push_back(Evento::Musica(m));
-                        }
-                        let agora = self.agora();
-                        self.avisos.receber_fim_de_jogo(&self.estado, agora);
+        let novos = self.estado.retirar_eventos();
+        self.apresentacao.extend(novos);
+        self.seguir_apresentacao();
+    }
+
+    /// Apresenta um pedido: centralizar é feito aqui (`_GotoMyAnt`); o resto vai para a interface.
+    /// `_EndGameDialog` é pedido a cada tick enquanto o jogo acabou: só o primeiro é repassado (de
+    /// novo só depois que `_IsGameOver` voltar a 0). Mensagens e fim de jogo também entram nos
+    /// avisos (quadros modais).
+    fn tratar_evento(&mut self, ev: Evento) {
+        if let Evento::Instantaneo { plano, quadro } = ev {
+            self.quadro_congelado = Some((plano, *quadro));
+            self.redesenhar = true;
+            return;
+        }
+        if let Some(s) = self.scripts.as_mut().filter(|s| s.tem_gancho(Gancho::AoEvento)) {
+            s.ao_evento(&ev, &mut self.estado);
+        }
+        match ev {
+            Evento::CentralizarNaAmarela { plano, x, y } => self.ir_para_amarela(plano, x, y),
+            Evento::DialogoFimDeJogo => {
+                if !self.fim_anunciado {
+                    self.fim_anunciado = true;
+                    self.eventos.push_back(ev);
+                    // _EndGameDialog: música de vitória ou derrota com Options → Music ligado.
+                    if self.estado.partida.opcoes[1] != 0 {
+                        let f = &self.avisos.cfg.fim_de_jogo;
+                        let m = if self.estado.partida.pretas_venceram != 0 { f.musica_vitoria } else { f.musica_derrota };
+                        self.eventos.push_back(Evento::Musica(m));
                     }
-                }
-                Evento::MensagemFaixa(m) => {
-                    use super::avisos::TextoFaixa;
                     let agora = self.agora();
-                    let opcao = self.estado.partida.opcoes[4] != 0;
-                    // Lista 0: limpar (`_EditMessage(0, …)`); duração 0xFFFE: permanente.
-                    let texto = (m.lista != 0).then_some(TextoFaixa::Lista { lista: m.lista, indice: m.indice as usize });
-                    let duracao = (m.duracao != 0xFFFE && m.lista != 0).then_some(u32::from(m.duracao));
-                    self.avisos.editar(texto, duracao, m.importante, opcao, agora);
-                    self.redesenhar = true;
+                    self.avisos.receber_fim_de_jogo(&self.estado, agora);
                 }
-                Evento::EscolherColonia => {
-                    // _SpecialXfer: a interface abre o quintal e espera o clique numa colônia, depois
-                    // do quadro 10058; a simulação fica parada até lá.
-                    self.escolher_colonia = true;
-                    self.eventos.push_back(ev);
-                }
-                Evento::QuadroAmarela { imagem, indice } => {
-                    // _YellowDialog: só com Options → Events (_OptionStates[3]).
-                    if self.estado.partida.opcoes[3] != 0 {
-                        self.avisos.receber_quadro_amarela(imagem, indice);
-                    }
-                    self.eventos.push_back(ev);
-                }
-                Evento::DialogoAranha { texto } => {
-                    // _SpiderDialog: as regras já conferiram Events e sortearam o texto; a animação da
-                    // aranha (janela 26) e depois o quadro com o texto.
-                    self.avisos.receber_animado(TipoAnimado::Aranha, Some(texto));
-                    self.eventos.push_back(ev);
-                }
-                Evento::QuadroFormigaLeao => {
-                    self.avisos.receber_animado(TipoAnimado::FormigaLeao, None);
-                    self.eventos.push_back(ev);
-                }
-                Evento::AnimacaoVitoria => {
-                    // _DrawSimPayoff: a interface traz o quintal para a frente (_MapToYard, modo 0,
-                    // plano 0) e a janela 26 vem por cima.
-                    self.avisos.receber_animado(TipoAnimado::Vitoria, None);
-                    self.eventos.push_back(ev);
-                }
-                Evento::Mensagem(id) => {
-                    let licoes = &self.regras.quintal.conselhos.licoes;
-                    self.avisos.receber_mensagem(id, self.estado.partida.opcoes[3] != 0, licoes);
-                    self.eventos.push_back(ev);
-                }
-                Evento::Animacao(a) => {
-                    if !self.avanco_rapido && !a.quadros.is_empty() {
-                        if self.animacoes.is_empty() {
-                            self.animacao_inicio_ms = self.ms_total;
-                            // Os quadros pedidos antes, no mesmo tick (aranha, formiga-leão), vêm
-                            // primeiro: a animação espera eles fecharem.
-                            self.modais_antes_da_animacao = self.avisos.modais_na_fila();
-                        }
-                        if self.modais_antes_da_animacao == 0 {
-                            self.bloqueio_ms += a.duracao_ms();
-                        }
-                        self.animacoes.push(*a);
-                        self.quadro_mostrado = None;
-                        self.redesenhar = true;
-                    }
-                }
-                outro => self.eventos.push_back(outro),
             }
+            Evento::MensagemFaixa(m) => {
+                use super::avisos::TextoFaixa;
+                let agora = self.agora();
+                let opcao = self.estado.partida.opcoes[4] != 0;
+                // Lista 0: limpar (`_EditMessage(0, …)`); duração 0xFFFE: permanente.
+                let texto = (m.lista != 0).then_some(TextoFaixa::Lista { lista: m.lista, indice: m.indice as usize });
+                let duracao = (m.duracao != 0xFFFE && m.lista != 0).then_some(u32::from(m.duracao));
+                self.avisos.editar(texto, duracao, m.importante, opcao, agora);
+                self.redesenhar = true;
+            }
+            Evento::EscolherColonia => {
+                // _SpecialXfer: a interface abre o quintal e espera o clique numa colônia, depois
+                // do quadro 10058; a simulação fica parada até lá.
+                self.escolher_colonia = true;
+                self.eventos.push_back(ev);
+            }
+            Evento::QuadroAmarela { imagem, indice } => {
+                // _YellowDialog: só com Options → Events (_OptionStates[3]).
+                if self.estado.partida.opcoes[3] != 0 {
+                    self.avisos.receber_quadro_amarela(imagem, indice);
+                }
+                self.eventos.push_back(ev);
+            }
+            Evento::DialogoAranha { texto } => {
+                // _SpiderDialog: as regras já conferiram Events e sortearam o texto; a animação da
+                // aranha (janela 26) e depois o quadro com o texto.
+                self.avisos.receber_animado(TipoAnimado::Aranha, Some(texto));
+                self.eventos.push_back(ev);
+            }
+            Evento::QuadroFormigaLeao => {
+                self.avisos.receber_animado(TipoAnimado::FormigaLeao, None);
+                self.eventos.push_back(ev);
+            }
+            Evento::AnimacaoVitoria => {
+                // _DrawSimPayoff: a interface traz o quintal para a frente (_MapToYard, modo 0,
+                // plano 0) e a janela 26 vem por cima.
+                self.avisos.receber_animado(TipoAnimado::Vitoria, None);
+                self.eventos.push_back(ev);
+            }
+            Evento::Mensagem(id) => {
+                let licoes = &self.regras.quintal.conselhos.licoes;
+                self.avisos.receber_mensagem(id, self.estado.partida.opcoes[3] != 0, licoes);
+                self.eventos.push_back(ev);
+            }
+            Evento::Animacao(a) => {
+                if !self.avanco_rapido && !a.quadros.is_empty() {
+                    // A animação começa agora (o que veio antes no tick, como o quadro da aranha,
+                    // já foi apresentado) e segura o resto da apresentação.
+                    self.animacao_inicio_ms = self.ms_total;
+                    self.bloqueio_ms += a.duracao_ms();
+                    self.animacoes.push(*a);
+                    self.quadro_mostrado = None;
+                    self.redesenhar = true;
+                    // Os sons e as esperas entre os quadros vêm logo depois do pedido da animação:
+                    // vão já para a interface, que os espalha no tempo dos quadros.
+                    while matches!(self.apresentacao.front(), Some(Evento::Som(_) | Evento::Espera(_))) {
+                        if let Some(ev) = self.apresentacao.pop_front() {
+                            self.tratar_evento(ev);
+                        }
+                    }
+                }
+            }
+            outro => self.eventos.push_back(outro),
         }
-        if self.estado.partida.fim_de_jogo == 0 {
-            self.fim_anunciado = false;
-        }
-        self.aplicar_pedidos_dos_mods();
-        self.saidas_dos_scripts();
     }
 
     // --- scripts dos mods ----------------------------------------------------------------------
@@ -1542,6 +1677,15 @@ mod testes {
         Partida::nova(e, nav(), RegrasOriginais::default(), TabelasAmarela::padrao().clone(), cfg_sim(), cfg(), cfg_avisos())
     }
 
+    /// Partida com o ritmo do original (o laço de `MYTIMERFUNC` do 486 da bancada, sem a lenta sem
+    /// foco): as extensões do port desligadas.
+    fn partida_original(velocidade: i16) -> Partida {
+        let mut p = partida(velocidade);
+        p.cfg.relogio.ritmo_velocidades.modo = ModoRitmo::Original;
+        p.cfg.relogio.sem_foco_velocidade = None;
+        p
+    }
+
     #[test]
     fn sorteios_do_desenho_depois_do_tick_seguem_as_janelas() {
         // Chuva com o quintal (Yard) aberto na frente: depois do tick, 14 gotas = 28 sorteios de S
@@ -1674,7 +1818,8 @@ mod testes {
     #[test]
     fn quadro_da_aranha_vem_antes_da_luta_e_a_morte_depois() {
         // _YellowDeath(1) com Events: _SpiderDialog (animação e texto), _AnimYellowFight e
-        // _YellowDialog(9100), nessa ordem; a luta espera os dois quadros da aranha fecharem.
+        // _YellowDialog(9100), nessa ordem; a luta espera os dois quadros da aranha fecharem, e o
+        // 9100 espera a luta acabar.
         let mut p = partida(1);
         p.estado.partida.opcoes[3] = 1;
         let q = crate::rules::estado::QuadroAnimacao { mapa: vec![0; 4096], vida: vec![0; 4096], x: 5, y: 6, tipo: 0x70, dir: 0, ovo: 0, base: 0 };
@@ -1693,11 +1838,13 @@ mod testes {
         assert!(!p.animando());
         assert_eq!(p.fechar_modal(), Some(Modal::Quadro { texto: 10047, imagem: None }));
         assert!(p.animando(), "fechado o texto, a luta começa");
-        assert_eq!(p.avisos.modal(), Some(&Modal::Amarela { imagem: 9100, indice: 0 }));
+        assert_eq!(p.avisos.modal(), None, "o 9100 só depois da luta");
         p.avancar(100);
         assert!(p.animando(), "2 quadros: 165 ms");
         p.avancar(100);
         assert!(!p.animando());
+        assert_eq!(p.avisos.modal(), Some(&Modal::Amarela { imagem: 9100, indice: 0 }));
+        assert_eq!(p.quadro_animado().map(|(pl, q)| (pl, q.tipo)), Some((1, 0x70)), "atrás do 9100, o último quadro da luta");
         p.avancar(55);
         assert!(p.avisos.residual().is_none(), "o _YellowDialog(9100) reaproveita a janela");
         assert_eq!(p.fechar_modal(), Some(Modal::Amarela { imagem: 9100, indice: 0 }));
@@ -1722,9 +1869,9 @@ mod testes {
     fn clique_esquerdo_encerra_o_laco_de_mytimerfunc() {
         // Fast: sem clique a primeira mensagem roda as 5 voltas (5 ticks); com o botão esquerdo
         // apertado antes, o teste de saída da primeira volta consulta o botão e devolve o controle.
-        let mut sem = partida(2);
+        let mut sem = partida_original(2);
         assert_eq!(sem.mensagem_de_timer(), 5);
-        let mut com = partida(2);
+        let mut com = partida_original(2);
         com.botao_esquerdo_apertado();
         assert_eq!(com.mensagem_de_timer(), 1);
         // O bit foi consumido: a mensagem seguinte abre outra chamada com as 5 voltas.
@@ -1739,8 +1886,8 @@ mod testes {
         // tick 128, por isso a conta para antes).
         assert_eq!(ticks_em(&mut partida(0), 18), 2, "slow: 1 tick a cada 6 mensagens (330 ms)");
         assert_eq!(ticks_em(&mut partida(1), 18), 6, "normal: 1 tick a cada 3 mensagens (165 ms)");
-        assert_eq!(ticks_em(&mut partida(2), 18), 66, "fast: 2 × 5 + 1 por chamada");
-        assert_eq!(ticks_em(&mut partida(3), 18), 90, "ultra: 2 × 7 + 1 por chamada");
+        assert_eq!(ticks_em(&mut partida_original(2), 18), 66, "fast: 2 × 5 + 1 por chamada");
+        assert_eq!(ticks_em(&mut partida_original(3), 18), 90, "ultra: 2 × 7 + 1 por chamada");
         let mut p = partida(0);
         assert_eq!(ticks_em(&mut p, 6), 0);
         assert_eq!(ticks_em(&mut p, 1), 1, "a sétima mensagem abre a terceira chamada com atraso 7");
@@ -1752,9 +1899,82 @@ mod testes {
         let antes = p.estado.ciclos_jogo;
         assert_eq!(ticks_em(&mut p, 3), 1);
         assert!(p.estado.ciclos_jogo - antes > 20);
-        let mut p = partida(3);
+        let mut p = partida_original(3);
         let t = ticks_em(&mut p, 30);
         assert_eq!(p.estado.ciclos_jogo, t);
+    }
+
+    /// Ticks em `ms` de tempo real, em avanços de 16 ms (um quadro a 60 Hz).
+    fn ticks_em_ms(p: &mut Partida, ms: u64) -> u32 {
+        (0..ms / 16).map(|_| p.avancar(16).ticks).sum()
+    }
+
+    #[test]
+    fn ritmo_proporcional_de_fast_e_ultra() {
+        // Escolha do usuário (2026-10-19): Fast ≈ 2,5 × Normal e Ultra ≈ 5 × Normal (data/partida.json).
+        let p = partida(1);
+        assert_eq!(p.cfg.relogio.ritmo_velocidades.modo, ModoRitmo::Proporcional, "padrão de data/partida.json");
+        assert_eq!(p.ticks_por_segundo(1), None, "Normal segue o laço do original");
+        let fast = p.ticks_por_segundo(2).unwrap();
+        let ultra = p.ticks_por_segundo(3).unwrap();
+        assert!((fast - 15.15).abs() < 0.01 && (ultra - 30.3).abs() < 0.01, "{fast} {ultra}");
+        // ~90 ticks de cada (o estado vazio abre um quadro no tick 100, que para a simulação).
+        let normal = ticks_em_ms(&mut partida(1), 15_000);
+        let fast = ticks_em_ms(&mut partida(2), 6_000);
+        let ultra = ticks_em_ms(&mut partida(3), 3_000);
+        assert!((89..=92).contains(&normal), "normal: {normal} em 15 s");
+        assert!((89..=92).contains(&fast), "fast: {fast} em 6 s (15,15/s)");
+        assert!((89..=92).contains(&ultra), "ultra: {ultra} em 3 s (30,3/s)");
+        // Como no original em Fast/Ultra, cada volta do laço roda um tick: _gameCycles = ticks.
+        let mut p = partida(3);
+        let t = ticks_em_ms(&mut p, 2_000);
+        assert_eq!(p.estado.ciclos_jogo, t);
+        // Pausado, o crédito não se acumula numa rajada: ao despausar, o ritmo segue o mesmo.
+        let mut p = partida(3);
+        p.aplicar(AcaoPartida::Pausa);
+        assert_eq!(ticks_em_ms(&mut p, 5_000), 0);
+        p.aplicar(AcaoPartida::Pausa);
+        assert!(ticks_em(&mut p, 1) <= 2, "sem rajada depois da pausa");
+    }
+
+    #[test]
+    fn os_ticks_sao_os_mesmos_em_qualquer_ritmo() {
+        // O ritmo só muda quando os ticks rodam: a sequência de estados é a mesma nos dois modos.
+        let mut orig = partida_original(2);
+        let mut prop = partida(2);
+        let n = 60;
+        while orig.estado.partida.tempo < n {
+            orig.mensagem_de_timer();
+        }
+        while prop.estado.partida.tempo < n {
+            prop.mensagem_de_timer();
+        }
+        assert_eq!(orig.estado.partida.tempo, prop.estado.partida.tempo);
+        assert_eq!(orig.estado.s, prop.estado.s);
+        assert_eq!(orig.estado.ciclos_jogo, prop.estado.ciclos_jogo);
+    }
+
+    #[test]
+    fn sem_foco_a_cadencia_cai_para_a_lenta_e_volta() {
+        // Escolha do usuário (2026-10-19): sem foco, a Slow; com o foco, a escolhida. _GameSpeed
+        // (save, menu Speed) não muda.
+        let mut p = partida(3);
+        p.definir_foco(false);
+        assert_eq!((p.velocidade_efetiva(), p.estado.partida.velocidade), (0, 3));
+        let lenta = ticks_em_ms(&mut p, 10_000);
+        assert!((29..=32).contains(&lenta), "slow: {lenta} em 10 s");
+        assert_eq!(p.estado.partida.velocidade, 3, "o _GameSpeed fica");
+        p.definir_foco(true);
+        assert_eq!(p.velocidade_efetiva(), 3);
+        assert!(ticks_em_ms(&mut p, 1_000) >= 28, "de volta à Ultra");
+        // Já na Slow, nada muda; sem a opção, o ritmo do original (o mesmo sem foco).
+        let mut p = partida(0);
+        p.definir_foco(false);
+        assert_eq!(p.velocidade_efetiva(), 0);
+        let mut p = partida_original(1);
+        p.definir_foco(false);
+        assert_eq!(p.velocidade_efetiva(), 1);
+        assert_eq!(ticks_em(&mut p, 18), 6, "normal sem foco no original");
     }
 
     #[test]
@@ -1876,6 +2096,8 @@ mod testes {
         for _ in 0..3 {
             tick(&mut p.estado, &mut r);
             p.tratar_eventos();
+            // O fim de jogo é modal: segura a apresentação até fechar.
+            p.fechar_modal();
         }
         // _CenterEdit em (43, 30) com 25 × 19 (_editWidth da bancada): canto (31, 21).
         assert_eq!((p.nav.vista.x, p.nav.vista.y), (31, 21));
@@ -1884,6 +2106,99 @@ mod testes {
             p.retirar_eventos(),
             vec![Evento::Musica(7), Evento::DialogoFimDeJogo, Evento::Musica(7), Evento::Musica(7)]
         );
+    }
+
+    /// Regras em que a amarela, na superfície em (10, 10), perde a luta para um soldado vermelho em
+    /// (11, 10) e renasce do ovo preto em (30, 10) do ninho preto (as regras de verdade:
+    /// `_YellowFight` → `_YellowDeath(0)` → `_YellowBirth`).
+    struct LutaPerdida;
+    impl RegrasQuintal for LutaPerdida {}
+    impl RegrasInimigos for LutaPerdida {}
+    impl RegrasSuperficie for LutaPerdida {}
+    impl RegrasNinho for LutaPerdida {}
+    impl RegrasConselhos for LutaPerdida {}
+    impl RegrasAmarela for LutaPerdida {
+        fn mover_amarela(&mut self, e: &mut Estado) {
+            crate::rules::amarela::lutar_com_amarela(e, TabelasAmarela::padrao(), 1, 0);
+        }
+    }
+
+    fn partida_da_luta_perdida() -> Partida {
+        use crate::formats::save::{Formiga, Lista};
+        let mut p = partida(1);
+        let e = &mut p.estado;
+        e.partida.tipo_jogo = 1;
+        e.partida.opcoes[1] = 0; // sem música: os quadros da luta correm
+        e.partida.opcoes[3] = 1; // Events
+        let a = &mut e.amarela;
+        (a.plano, a.x, a.y, a.tipo, a.dir, a.saude, a.aviso_saude) = (1, 10, 10, 0x10, 2, 100, 30);
+        (a.comeu_tipo, a.ovo_carregado, a.contorno_contagem, a.ninho_iniciado) = (-1, 0xFD, -2, 1);
+        crate::rules::amarela::simular_amarela(e, TabelasAmarela::padrao());
+        e.adicionar_formiga(Lista::A, Formiga { x: 11, y: 10, modo: 2, tipo: 0xB6, s: 0 });
+        e.ninho_b.lista.adicionar(Formiga { x: 30, y: 10, modo: 8, tipo: 3, s: 0 });
+        e.ninho_b.vida.definir(30, 10, 3);
+        // Uma semente de R em que o soldado vermelho vence.
+        let semente = (0..).find(|&s| crate::rules::rng::GeradorR::new(s).rrand(10) >= 2).unwrap();
+        e.r = crate::rules::rng::GeradorR::new(semente);
+        p
+    }
+
+    #[test]
+    fn morte_na_luta_e_apresentada_na_ordem_do_original() {
+        // _YellowFight perdido, dentro de um tick: _GotoMyAnt no lugar da luta, _AnimYellowFight ali,
+        // o quadro 10032 com a vista ainda no lugar da morte (a amarela já fora do mapa de vida),
+        // e só depois _YellowBirth: _GotoMyAnt no ovo, os estágios do ovo e o quadro 9101.
+        let mut p = partida_da_luta_perdida();
+        let estado_final = {
+            let mut q = partida_da_luta_perdida();
+            q.preparar_edicao_no_tick();
+            tick(&mut q.estado, &mut LutaPerdida);
+            q.estado.eventos.clear();
+            q.estado
+        };
+        p.preparar_edicao_no_tick();
+        tick(&mut p.estado, &mut LutaPerdida);
+        p.tratar_eventos();
+        // O estado já é o do fim do tick (a apresentação não roda regras de novo).
+        assert_eq!((p.estado.amarela.plano, p.estado.amarela.x, p.estado.amarela.y), (2, 30, 10));
+        // 1. A luta, no lugar dela.
+        assert!(p.animando());
+        assert_eq!(p.nav.plano_mapa, 1, "a vista foi para a luta, na superfície");
+        let v = &p.nav.vista;
+        assert!((v.x..v.x + v.largura).contains(&10) && (v.y..v.y + v.altura).contains(&10));
+        assert_eq!(p.quadro_animado().map(|(pl, q)| (pl, q.tipo, q.x, q.y)), Some((1, 0x70, 10, 10)));
+        assert_eq!(p.avisos.modal(), None, "o quadro da morte só depois da luta");
+        assert_eq!(p.avancar(5000).ticks, 0);
+        // 2. A morte: o quadro com a vista ainda na superfície e a janela de edição como o original a
+        // desenhou em _YellowDeath (sem a amarela; o cadáver no lugar dela).
+        assert!(!p.animando());
+        assert!(matches!(p.avisos.modal(), Some(Modal::Quadro { texto: 10032, .. })), "{:?}", p.avisos.modal());
+        assert_eq!(p.nav.plano_mapa, 1);
+        let (pl, q) = p.quadro_animado().expect("a janela de edição parada no instante da morte");
+        assert_eq!(pl, 1);
+        assert_ne!(q.vida[10 * 64 + 10], 0xFF, "a amarela já saiu do mapa de vida");
+        assert!(p.apresentando());
+        assert_eq!(p.avancar(5000).ticks, 0, "nenhum tick com a apresentação parada");
+        // 3. O renascimento: a vista vai ao ovo, no ninho preto, e os estágios do ovo.
+        p.fechar_modal();
+        assert_eq!(p.nav.plano_mapa, 2, "a câmera vai ao corpo novo só depois do quadro");
+        assert!(p.animando(), "os estágios do ovo");
+        assert_eq!(p.quadro_animado().map(|(pl, q)| (pl, q.x, q.y, q.ovo, q.tipo)), Some((2, 30, 10, 2, 0)));
+        assert_eq!(p.avisos.modal(), None);
+        p.avancar(6 * 220);
+        // 4. "You have been reborn!" com a formiga pronta na tela.
+        assert!(!p.animando());
+        assert_eq!(p.avisos.modal(), Some(&Modal::Amarela { imagem: 9101, indice: 1 }));
+        assert_eq!(p.quadro_animado().map(|(pl, q)| (pl, q.tipo)), Some((2, 0x10)));
+        p.fechar_modal();
+        assert!(!p.apresentando());
+        assert!(p.quadro_animado().is_none(), "acabada a apresentação, a janela mostra o estado");
+        // A apresentação não muda o estado do fim do tick (geradores, amarela, mapas).
+        assert_eq!((p.estado.s, p.estado.r), (estado_final.s, estado_final.r));
+        assert_eq!(format!("{:?}", p.estado.amarela), format!("{:?}", estado_final.amarela));
+        assert_eq!(p.estado.superficie.vida.dados, estado_final.superficie.vida.dados);
+        assert_eq!(p.estado.ninho_b.vida.dados, estado_final.ninho_b.vida.dados);
+        assert!(p.avancar(2000).ticks > 0, "a simulação volta");
     }
 
     #[test]

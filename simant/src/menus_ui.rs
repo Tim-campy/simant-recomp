@@ -40,6 +40,9 @@ pub struct MenusUi {
     pub moldura: Option<ConfigMolduraPrincipal>,
     /// Botão do título apertado e se o cursor ainda está nele.
     apertado: Option<(ParteTitulo, bool)>,
+    /// Sem a borda do sistema, a janela não está maximizada: botão de maximizar e o menu de sistema
+    /// de uma janela restaurada (moldura_janela.rs).
+    pub restaurada: bool,
 }
 
 impl MenusUi {
@@ -54,6 +57,7 @@ impl MenusUi {
             relogio: Instant::now(),
             moldura: None,
             apertado: None,
+            restaurada: false,
         })
     }
 
@@ -72,6 +76,22 @@ impl MenusUi {
             self.barra.sistema = antiga.barra.sistema.clone();
             self.barra.topo = antiga.barra.topo;
             self.moldura = Some(m.clone());
+        }
+    }
+
+    /// A janela do sistema (sem borda) foi restaurada ou maximizada: o menu de sistema do Windows 3.1
+    /// habilita Maximize na restaurada e Restore na maximizada (Move e Size ficam acinzentados: o
+    /// arrasto e o redimensionamento são pelo mouse).
+    pub fn definir_restaurada(&mut self, restaurada: bool) {
+        self.restaurada = restaurada;
+        if let Some(s) = self.barra.sistema.as_mut() {
+            for (c, h) in s.comandos.iter().zip(s.habilitados.iter_mut()) {
+                match c {
+                    Some(ComandoPrincipal::Restaurar) => *h = !restaurada,
+                    Some(ComandoPrincipal::Maximizar) => *h = restaurada,
+                    _ => {}
+                }
+            }
         }
     }
 
@@ -435,7 +455,7 @@ pub fn compor(s: &Sessao, cliente: &[u8], foco: bool) -> Vec<u8> {
     // arquivo) ou com o WinHelp (outro aplicativo) com o foco.
     let ativa = foco && s.dialogo.is_none() && !(s.ajuda.aberto && s.ajuda.foco);
     let apertado = s.menus.apertado.filter(|&(_, dentro)| dentro).map(|(p, _)| p);
-    let titulo = EstadoTitulo { ativa, caixa_realcada: s.menus.barra.sistema_realcado(), apertado };
+    let titulo = EstadoTitulo { ativa, caixa_realcada: s.menus.barra.sistema_realcado(), apertado, restaurada: s.menus.restaurada };
     let (w, hc) = (s.tela.cfg.largura as usize, s.tela.cfg.altura as usize);
     compor_barras(&s.menus, &s.interface, &s.cores, &titulo, &estado_menus(s), cliente, w, hc)
 }

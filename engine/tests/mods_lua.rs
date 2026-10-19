@@ -436,6 +436,8 @@ pub(crate) mod api017 {
         assert_eq!(e.vermelha.populacao_quintal.0[3 * 16 + 9], 20);
         p.retirar_eventos();
         escolher(&mut p, 8);
+        // A loucura (_AnimYellowInsane) é apresentada antes do quadro da morte.
+        p.avancar(10_000);
         assert!(p.retirar_eventos().contains(&Evento::Mensagem(10040)), "_YellowDeath(8): morreu de fome");
         escolher(&mut p, 9);
         assert_eq!(p.estado.menino.no_numero, 32);
@@ -484,6 +486,8 @@ pub(crate) mod api017 {
         assert_ne!(p.estado.r, r0, "um RRand(15)");
         escolher(&mut p, 1);
         assert_eq!((p.estado.partida.fim_de_jogo, p.estado.partida.pretas_venceram), (1, 1));
+        // O quadro do Mystery fecha antes (a apresentação segue a ordem dos pedidos).
+        while p.fechar_modal().is_some() {}
         p.rodar_tick();
         assert!(p.retirar_eventos().contains(&Evento::DialogoFimDeJogo));
     }
