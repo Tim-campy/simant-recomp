@@ -9,7 +9,8 @@
 //!   opções da janela: [--resolucao LxA] [--escala N] [--janela LxA] [--sair-apos-ms N [--capturar-janela ARQ.png]]
 //!   (padrões em data/video.json: tela virtual 640×480 em escala 1, como a bancada; simant/src/video.rs;
 //!   --resolucao 800x600 ou 1024x768 muda o layout como o original, docs/spec/telas/resolucao.md)
-//!   som (simant/src/som): [--sem-som] [--soundfont ARQ.sf2] [--exportar-som DIR]
+//!   som (simant/src/som): [--sem-som] [--soundfont ARQ.sf2] [--sintetizador simples|soundfont|fm]
+//!     [--exportar-som DIR [--exportar-musica ID]]
 //!   preferências do jogador (simant/src/preferencias.rs): [--preferencias ARQ] [--sem-preferencias]
 //!   [--win-ini ARQ] (origem enquanto não há preferências gravadas; padrão: WINDOWS/WIN.INI acima do jogo)
 //!

@@ -7,6 +7,56 @@ use serde::Deserialize;
 
 pub const ARQUIVO: &str = "som.json";
 
+/// Sintetizador das músicas.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TipoSintetizador {
+    /// Ondas básicas por família GM (`sintetizador.rs`).
+    Simples,
+    /// `rustysynth` com a SoundFont de `soundfont` (sem ela, cai no simples).
+    Soundfont,
+    /// FM no estilo do OPL2/OPL3 com o banco de `fm` (`fm.rs`), o timbre da Sound Blaster.
+    Fm,
+}
+
+impl TipoSintetizador {
+    pub fn de_nome(nome: &str) -> Option<TipoSintetizador> {
+        match nome {
+            "simples" => Some(TipoSintetizador::Simples),
+            "soundfont" => Some(TipoSintetizador::Soundfont),
+            "fm" => Some(TipoSintetizador::Fm),
+            _ => None,
+        }
+    }
+}
+
+/// Caminho FM: banco de timbres e ganho.
+#[derive(Clone, Debug, Deserialize)]
+pub struct ConfigFm {
+    /// Banco JSON do port, lido de `data/` (sobrescrevível por mod).
+    #[serde(default = "banco_padrao")]
+    pub banco: String,
+    /// Banco `.op2` (DMX/GENMIDI) do usuário, lido em tempo de execução; tem precedência sobre `banco`.
+    #[serde(default)]
+    pub banco_op2: Option<String>,
+    /// Multiplica o `ganho` do banco.
+    #[serde(default = "ganho_padrao")]
+    pub ganho: f32,
+}
+
+fn banco_padrao() -> String {
+    "opl_banco.json".into()
+}
+fn ganho_padrao() -> f32 {
+    1.0
+}
+
+impl Default for ConfigFm {
+    fn default() -> Self {
+        ConfigFm { banco: banco_padrao(), banco_op2: None, ganho: 1.0 }
+    }
+}
+
 /// De onde vêm as músicas.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -36,6 +86,11 @@ pub struct ConfigSom {
     /// SoundFont (.sf2) para o `rustysynth`; sem ela, o sintetizador simples. Relativo à pasta atual.
     #[serde(default)]
     pub soundfont: Option<String>,
+    /// Sintetizador (API 0.31). Ausente: SoundFont se houver uma, senão o simples (como até a 0.30).
+    #[serde(default)]
+    pub sintetizador: Option<TipoSintetizador>,
+    #[serde(default)]
+    pub fm: ConfigFm,
     pub musica_abertura: Option<u16>,
     pub musica_jogo_novo: Option<u16>,
     /// Tempo de soltura depois da última nota, ao exportar (segundos).
