@@ -1353,6 +1353,8 @@ fn jogo_completo(e: &mut Estado, t: &TabelasQuintal, ultima_vermelha: i16) {
         e.eventos.push(Evento::Mensagem(m.vitoria));
         e.partida.fim_de_jogo = 1;
         e.partida.pretas_venceram = 1;
+        // `_DrawSimPayoff` (sempre, sem olhar Events).
+        e.eventos.push(Evento::AnimacaoVitoria);
         return;
     }
     let c = &e.preta.castas;

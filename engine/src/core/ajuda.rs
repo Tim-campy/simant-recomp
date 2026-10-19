@@ -14,7 +14,8 @@ use super::quadro::Quadro;
 use super::telas::Interface;
 use crate::formats::bitmap::Bitmap;
 use crate::formats::fonte::Fonte;
-use crate::formats::hlp::{Alinhamento, ArquivoAjuda, Item, Salto, Topico};
+use super::ajuda_janelas::{JanelaHistorico, Sobreposta};
+use crate::formats::hlp::{Alinhamento, ArquivoAjuda, Item, PalavraChave, Salto, Topico};
 use crate::formats::janela::Retangulo;
 use crate::recursos::Recursos;
 
@@ -106,6 +107,10 @@ pub struct ConfigAjuda {
     /// `WinHelp(…, HELP_CONTEXT, n)` do índice (F1 no original abre o índice com HELP_INDEX).
     pub contexto_indice: u32,
     pub cores: CoresAjuda,
+    /// Menus, Search, History e popups (core/ajuda_janelas.rs). Opcional (API 0.25): sem ele, os
+    /// botões Search e History não fazem nada e os popups trocam o tópico, como antes.
+    #[serde(default)]
+    pub janelas: Option<super::ajuda_janelas::ConfigJanelasAjuda>,
 }
 
 /// O que a interface faz depois de uma entrada no visor.
@@ -126,36 +131,44 @@ enum Conteudo {
 }
 
 #[derive(Clone, Debug)]
-struct Peca {
-    x: i32,
-    largura: i32,
+pub(crate) struct Peca {
+    pub(crate) x: i32,
+    pub(crate) largura: i32,
     conteudo: Conteudo,
-    salto: Option<Salto>,
+    pub(crate) salto: Option<Salto>,
 }
 
 #[derive(Clone, Debug)]
-struct Linha {
-    topo: i32,
-    altura: i32,
-    base: i32,
-    pecas: Vec<Peca>,
+pub(crate) struct Linha {
+    pub(crate) topo: i32,
+    pub(crate) altura: i32,
+    pub(crate) base: i32,
+    pub(crate) pecas: Vec<Peca>,
 }
 
 /// O visor aberto: o arquivo lido, o tópico e a rolagem.
 pub struct VisorAjuda {
     pub cfg: ConfigAjuda,
     pub arquivo: ArquivoAjuda,
-    topico: usize,
-    historico: Vec<usize>,
-    rolagem: i32,
+    pub(crate) topico: usize,
+    pub(crate) historico: Vec<usize>,
+    pub(crate) rolagem: i32,
     figuras: HashMap<u16, Bitmap>,
+    /// Palavras-chave da busca (|KWBTREE).
+    pub(crate) palavras: Vec<PalavraChave>,
+    /// Menu, Search ou popup aberto (recebe a entrada).
+    pub(crate) sobreposta: Option<Sobreposta>,
+    /// Janela History aberta.
+    pub(crate) janela_historico: Option<JanelaHistorico>,
+    /// Tópicos mostrados, do mais antigo ao mais recente (a lista do History).
+    pub(crate) visitados: Vec<usize>,
 }
 
-fn ret(e: i16, t: i16, d: i16, b: i16) -> Retangulo {
+pub(crate) fn ret(e: i16, t: i16, d: i16, b: i16) -> Retangulo {
     Retangulo { esq: e, topo: t, dir: d, base: b }
 }
 
-fn contem(r: Retangulo, x: i32, y: i32) -> bool {
+pub(crate) fn contem(r: Retangulo, x: i32, y: i32) -> bool {
     x >= i32::from(r.esq) && x < i32::from(r.dir) && y >= i32::from(r.topo) && y < i32::from(r.base)
 }
 
@@ -166,7 +179,7 @@ fn cor_mais_proxima(c: [u8; 3], cores: &[[u8; 3]]) -> u8 {
 }
 
 /// Texto transparente com a célula em (x, y).
-fn escrever(q: &mut Quadro, f: &Fonte, x: i32, y: i32, texto: &[u8], cor: u8) {
+pub(crate) fn escrever(q: &mut Quadro, f: &Fonte, x: i32, y: i32, texto: &[u8], cor: u8) {
     let img = f.imagem(texto);
     for j in 0..img.altura {
         for i in 0..img.largura {
@@ -180,7 +193,7 @@ fn escrever(q: &mut Quadro, f: &Fonte, x: i32, y: i32, texto: &[u8], cor: u8) {
 /// Texto com `&`: escreve sem o `&` e sublinha a letra seguinte (linha de base + 2). Acinzentado
 /// (`GrayString`): só os pixels com x + y par [medido no Back
 /// desabilitado de a06].
-fn escrever_mnemonico(q: &mut Quadro, f: &Fonte, x: i32, y: i32, texto: &str, cor: u8, cinza: bool) {
+pub(crate) fn escrever_mnemonico(q: &mut Quadro, f: &Fonte, x: i32, y: i32, texto: &str, cor: u8, cinza: bool) {
     let bytes: Vec<u8> = texto.bytes().filter(|&b| b != b'&').collect();
     let img = f.imagem(&bytes);
     let ponto = |q: &mut Quadro, px: i32, py: i32| {
@@ -207,7 +220,7 @@ fn escrever_mnemonico(q: &mut Quadro, f: &Fonte, x: i32, y: i32, texto: &str, co
     }
 }
 
-fn largura_sem_e(f: &Fonte, texto: &str) -> i32 {
+pub(crate) fn largura_sem_e(f: &Fonte, texto: &str) -> i32 {
     let bytes: Vec<u8> = texto.bytes().filter(|&b| b != b'&').collect();
     f.largura_texto(&bytes) as i32
 }
@@ -237,19 +250,32 @@ impl VisorAjuda {
             }
         }
         let indice = arquivo.topico_do_contexto(cfg.contexto_indice).unwrap_or(0);
-        Ok(VisorAjuda { cfg, arquivo, topico: indice, historico: Vec::new(), rolagem: 0, figuras })
+        let palavras = arquivo.palavras_chave()?;
+        Ok(VisorAjuda {
+            cfg,
+            arquivo,
+            topico: indice,
+            historico: Vec::new(),
+            rolagem: 0,
+            figuras,
+            palavras,
+            sobreposta: None,
+            janela_historico: None,
+            visitados: vec![indice],
+        })
     }
 
     pub fn topico_atual(&self) -> &Topico {
         &self.arquivo.topicos[self.topico]
     }
 
-    fn ir_para(&mut self, i: usize) {
+    pub(crate) fn ir_para(&mut self, i: usize) {
         if i != self.topico {
             self.historico.push(self.topico);
         }
         self.topico = i;
         self.rolagem = 0;
+        self.visitar(i);
     }
 
     /// `HELP_CONTEXT n`: vai para o tópico do contexto (false se o contexto não existe; fica onde
@@ -260,6 +286,8 @@ impl VisorAjuda {
                 self.topico = i;
                 self.historico.clear();
                 self.rolagem = 0;
+                self.sobreposta = None;
+                self.visitar(i);
                 true
             }
             None => false,
@@ -285,12 +313,11 @@ impl VisorAjuda {
             AcaoBotao::Voltar => !self.historico.is_empty(),
             AcaoBotao::Anterior => t.anterior.and_then(|n| self.arquivo.topico_do_numero(n)).is_some(),
             AcaoBotao::Seguinte => t.seguinte.and_then(|n| self.arquivo.topico_do_numero(n)).is_some(),
-            // Sem diálogo de busca nem lista de histórico no port (divergencias.md).
             AcaoBotao::Busca | AcaoBotao::Historico => true,
         }
     }
 
-    fn acionar(&mut self, a: AcaoBotao) {
+    pub(crate) fn acionar(&mut self, a: AcaoBotao) {
         if !self.habilitado(a) {
             return;
         }
@@ -305,6 +332,7 @@ impl VisorAjuda {
                 if let Some(i) = self.historico.pop() {
                     self.topico = i;
                     self.rolagem = 0;
+                    self.visitar(i);
                 }
             }
             AcaoBotao::Anterior | AcaoBotao::Seguinte => {
@@ -313,7 +341,8 @@ impl VisorAjuda {
                     self.ir_para(i);
                 }
             }
-            AcaoBotao::Busca | AcaoBotao::Historico => {}
+            AcaoBotao::Busca => self.abrir_busca(),
+            AcaoBotao::Historico => self.abrir_historico(),
         }
     }
 
@@ -326,18 +355,18 @@ impl VisorAjuda {
         ret(e, t, d, b)
     }
 
-    fn interno(&self) -> Retangulo {
+    pub(crate) fn interno(&self) -> Retangulo {
         let e = self.externo();
         let k = self.cfg.espessura_moldura;
         ret(e.esq + k, e.topo + k, e.dir - k, e.base - k)
     }
 
-    fn faixa_titulo(&self) -> Retangulo {
+    pub(crate) fn faixa_titulo(&self) -> Retangulo {
         let i = self.interno();
         ret(i.esq, i.topo, i.dir, i.topo + self.cfg.altura_titulo)
     }
 
-    fn faixa_menu(&self) -> Retangulo {
+    pub(crate) fn faixa_menu(&self) -> Retangulo {
         let t = self.faixa_titulo();
         ret(t.esq, t.base + 1, t.dir, t.base + 1 + self.cfg.altura_menu)
     }
@@ -355,22 +384,23 @@ impl VisorAjuda {
     }
 
     /// Área do texto do tópico (com a barra, se houver).
-    fn area_texto(&self) -> Retangulo {
+    pub(crate) fn area_texto(&self) -> Retangulo {
         let b = self.faixa_botoes();
         let i = self.interno();
         ret(i.esq, b.base, i.dir, i.base)
     }
 
-    fn caixa_menu_sistema(&self) -> Retangulo {
+    pub(crate) fn caixa_menu_sistema(&self) -> Retangulo {
         let t = self.faixa_titulo();
         ret(t.esq, t.topo, t.esq + self.cfg.altura_titulo, t.base)
     }
 
+    /// O ponto está na janela de ajuda ou numa janela dela (popup, Search, History).
     pub fn contem(&self, x: i32, y: i32) -> bool {
-        contem(self.externo(), x, y)
+        contem(self.externo(), x, y) || self.contem_janelas(x, y)
     }
 
-    fn fonte<'a>(&self, interface: &'a Interface, i: usize) -> Option<&'a Fonte> {
+    pub(crate) fn fonte<'a>(&self, interface: &'a Interface, i: usize) -> Option<&'a Fonte> {
         interface
             .fontes
             .get(i)
@@ -395,11 +425,15 @@ impl VisorAjuda {
 
     /// Linhas do tópico atual para a largura útil `largura` (a partir da margem).
     fn layout(&self, interface: &Interface, largura: i32) -> Vec<Linha> {
+        self.layout_topico(interface, self.topico, i32::from(self.cfg.margem_texto), largura)
+    }
+
+    /// Linhas do tópico `topico` com a margem e a largura útil dadas.
+    pub(crate) fn layout_topico(&self, interface: &Interface, topico: usize, margem: i32, largura: i32) -> Vec<Linha> {
         let mut linhas: Vec<Linha> = Vec::new();
         let mut y = 0;
-        let margem = i32::from(self.cfg.margem_texto);
         let metricas = |fi: usize| self.fonte(interface, fi).map_or((16, 13), |f| (f.altura() as i32, f.ascendente() as i32));
-        for p in &self.topico_atual().paragrafos {
+        for p in &self.arquivo.topicos[topico].paragrafos {
             let mut atual: Vec<Peca> = Vec::new();
             let mut x = margem;
             let mut fonte_linha = self.fonte_do_arquivo(p.fonte_final);
@@ -525,8 +559,19 @@ impl VisorAjuda {
 
     /// Clique esquerdo em (x, y) da área cliente do port.
     pub fn clicar(&mut self, interface: &Interface, x: i32, y: i32, duplo: bool) -> RespostaAjuda {
-        if !self.contem(x, y) {
+        // Com popup ou menu aberto, qualquer clique é deles (fecham sem seguir o clique).
+        let prende = matches!(self.sobreposta, Some(Sobreposta::Popup { .. }) | Some(Sobreposta::Menu { .. }));
+        if !self.contem(x, y) && !prende {
+            if let Some(h) = self.janela_historico.as_mut() {
+                h.foco = false;
+            }
             return RespostaAjuda::Fora;
+        }
+        if let Some(sair) = self.clicar_janelas(x, y, duplo) {
+            return if sair { RespostaAjuda::Fechar } else { RespostaAjuda::Nada };
+        }
+        if matches!(self.sobreposta, Some(Sobreposta::Busca(_))) || !contem(self.externo(), x, y) {
+            return RespostaAjuda::Nada;
         }
         if contem(self.caixa_menu_sistema(), x, y) {
             // Duplo clique na caixa do menu de sistema fecha (o menu em si não é desenhado).
@@ -561,12 +606,22 @@ impl VisorAjuda {
         let dy = y - i32::from(a.topo) + self.rolagem;
         let dx = x - i32::from(a.esq);
         let alvo = linhas.iter().find(|l| dy >= l.topo && dy < l.topo + l.altura).and_then(|l| {
-            l.pecas.iter().find(|p| p.salto.is_some() && dx >= p.x && dx < p.x + p.largura).and_then(|p| p.salto)
+            l.pecas.iter().find(|p| p.salto.is_some() && dx >= p.x && dx < p.x + p.largura).and_then(|p| {
+                // Ponto quente: a peça; uma figura vai até a linha de base (onde ela termina).
+                let altura = if matches!(p.conteudo, Conteudo::Figura(_)) { l.base } else { l.altura };
+                p.salto.map(|s| (s, l.topo, altura, p.x, p.largura))
+            })
         });
-        if let Some(s) = alvo {
+        if let Some((s, topo, altura, px, pl)) = alvo {
             if let Some(i) = self.arquivo.topico_do_numero(s.numero_topico) {
-                // Popups (0xE0) também trocam o tópico no port (divergencias.md).
-                self.ir_para(i);
+                if s.popup && self.cfg.janelas.is_some() {
+                    // Popup (0xE0): janela pequena abaixo do ponto quente (a peça na linha).
+                    let (ax, ay) = (i32::from(a.esq), i32::from(a.topo) - self.rolagem);
+                    let quente = ret((ax + px) as i16, (ay + topo) as i16, (ax + px + pl) as i16, (ay + topo + altura) as i16);
+                    self.abrir_popup(interface, i, quente);
+                } else {
+                    self.ir_para(i);
+                }
             }
         }
         RespostaAjuda::Nada
@@ -575,6 +630,14 @@ impl VisorAjuda {
     /// Tecla (nome do SDL). Esc fecha; setas, PageUp/PageDown, Home/End rolam; Backspace = Back;
     /// a letra sublinhada de um botão (com ou sem Alt) aciona o botão.
     pub fn tecla(&mut self, interface: &Interface, nome: &str) -> RespostaAjuda {
+        self.tecla_com(interface, nome, false, false)
+    }
+
+    /// Como [`VisorAjuda::tecla`], com Alt (abre os menus pela letra) e Shift (maiúsculas no Search).
+    pub fn tecla_com(&mut self, interface: &Interface, nome: &str, alt: bool, shift: bool) -> RespostaAjuda {
+        if let Some(sair) = self.tecla_janelas(nome, alt, shift) {
+            return if sair { RespostaAjuda::Fechar } else { RespostaAjuda::Nada };
+        }
         let a = self.area_texto();
         let pagina = i32::from(a.base - a.topo);
         match nome {
@@ -626,7 +689,12 @@ impl VisorAjuda {
         let sistema = self.fonte(interface, self.cfg.fonte_sistema);
         // Título: caixa do menu de sistema, faixa azul com o nome, botões de minimizar e maximizar.
         let t = self.faixa_titulo();
-        q.preencher(t, c.titulo, c.titulo);
+        let inativas = self.cfg.janelas.as_ref().map(|j| (j.cores.titulo_inativo, j.cores.texto_titulo_inativo));
+        let (cor_titulo, cor_texto_titulo) = match inativas {
+            Some(par) if !self.janela_ativa() => par,
+            _ => (c.titulo, c.texto_titulo),
+        };
+        q.preencher(t, cor_titulo, cor_titulo);
         let h = self.cfg.altura_titulo;
         let caixa = self.caixa_menu_sistema();
         q.preencher(caixa, c.botao, c.botao);
@@ -652,7 +720,7 @@ impl VisorAjuda {
             let (x0, x1) = (i32::from(caixa.dir) + 1, i32::from(min.esq) - 1);
             let x = (x0 + x1 - w) / 2;
             q.recorte = Some(ret(x0 as i16, t.topo, x1 as i16, t.base));
-            escrever(q, f, x, i32::from(t.topo) + (i32::from(h) - f.altura() as i32) / 2, self.cfg.titulo.as_bytes(), c.texto_titulo);
+            escrever(q, f, x, i32::from(t.topo) + (i32::from(h) - f.altura() as i32) / 2, self.cfg.titulo.as_bytes(), cor_texto_titulo);
             q.recorte = None;
         }
         q.linha(i32::from(i.esq), i32::from(t.base), i32::from(i.dir) - 1, i32::from(t.base), c.linha);
@@ -702,8 +770,20 @@ impl VisorAjuda {
         let area_texto = if com_barra { ret(a.esq, a.topo, self.barra().esq - 1, a.base) } else { a };
         q.recorte = Some(area_texto);
         let (ax, ay) = (i32::from(a.esq), i32::from(a.topo) - self.rolagem);
-        for l in &linhas {
-            if ay + l.topo > i32::from(a.base) || ay + l.topo + l.altura < i32::from(a.topo) {
+        self.desenhar_linhas(q, interface, &linhas, ax, ay, a);
+        q.recorte = None;
+        if com_barra {
+            self.desenhar_barra(q, &linhas);
+        }
+        self.desenhar_janelas(q, interface);
+        q.recorte = antes;
+    }
+
+    /// Desenha as linhas com a origem do texto em (ax, ay), pulando as que ficam fora de `area`.
+    pub(crate) fn desenhar_linhas(&self, q: &mut Quadro, interface: &Interface, linhas: &[Linha], ax: i32, ay: i32, area: Retangulo) {
+        let c = &self.cfg.cores;
+        for l in linhas {
+            if ay + l.topo > i32::from(area.base) || ay + l.topo + l.altura < i32::from(area.topo) {
                 continue;
             }
             for p in &l.pecas {
@@ -726,14 +806,9 @@ impl VisorAjuda {
                 }
             }
         }
-        q.recorte = None;
-        if com_barra {
-            self.desenhar_barra(q, &linhas);
-        }
-        q.recorte = antes;
     }
 
-    fn desenhar_botao_titulo(&self, q: &mut Quadro, b: Retangulo) {
+    pub(crate) fn desenhar_botao_titulo(&self, q: &mut Quadro, b: Retangulo) {
         let c = &self.cfg.cores;
         q.preencher(b, c.botao, c.botao);
         let (x0, y0, x1, y1) = (i32::from(b.esq), i32::from(b.topo), i32::from(b.dir) - 1, i32::from(b.base) - 1);

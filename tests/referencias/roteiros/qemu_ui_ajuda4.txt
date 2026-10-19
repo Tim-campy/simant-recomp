@@ -1,0 +1,31 @@
+# WinHelp do SimAnt: Search por Alt+S, tópico Queens (figura com popup 0xE0), clique no popup e fechamento.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_ajuda4.txt --overlay re_trabalho/qemu/ov_winhelp.qcow2
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+teclas f1
+esperar 6
+teclas alt+s
+esperar 3
+capturar re_trabalho/agente_ui/winhelp/p01_alt_s.png
+digitar queen
+teclas ret
+esperar 3
+teclas alt+g
+esperar 4
+ir_para 250 285
+esperar 1
+capturar re_trabalho/agente_ui/winhelp/p02_sobre_figura.png
+clicar
+esperar 3
+capturar re_trabalho/agente_ui/winhelp/p03_popup.png
+clicar_em 400 400
+esperar 2
+capturar re_trabalho/agente_ui/winhelp/p04_fechou_clique.png
+clicar_em 250 285
+esperar 3
+teclas spc
+esperar 2
+capturar re_trabalho/agente_ui/winhelp/p05_fechou_tecla.png
+fim

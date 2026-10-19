@@ -5,6 +5,7 @@
 //!   contexto: número (0x2200, 4…); sem ele, o índice.
 //!   --topico N: abre o tópico N (índice da lista) em vez de um contexto.
 //!   --rolar PIXELS, --clicar X Y (repetível): entrada depois de abrir.
+//!   --tecla NOME, --alt LETRA, --shift NOME, --digitar TEXTO: teclas (nomes do SDL) depois de abrir.
 //!   --listar: imprime os tópicos (índice, posição e título).
 
 use std::path::Path;
@@ -42,6 +43,24 @@ fn main() {
                 let (x, y) = (num(&a[i + 1]) as i32, num(&a[i + 2]) as i32);
                 println!("clique ({x}, {y}): {:?}", v.clicar(&interface, x, y, false));
                 i += 2;
+            }
+            "--tecla" | "--alt" | "--shift" => {
+                let (alt, shift) = (a[i] == "--alt", a[i] == "--shift");
+                println!("tecla {}: {:?}", a[i + 1], v.tecla_com(&interface, &a[i + 1], alt, shift));
+                i += 1;
+            }
+            "--digitar" => {
+                for c in a[i + 1].chars() {
+                    let nome = if c == ' ' { "Space".to_string() } else { c.to_ascii_uppercase().to_string() };
+                    v.tecla_com(&interface, &nome, false, c.is_ascii_uppercase());
+                }
+                i += 1;
+            }
+            "--altura-popup" => {
+                if let Some(j) = v.cfg.janelas.as_mut() {
+                    j.popup.tela[1] = num(&a[i + 1]) as i16;
+                }
+                i += 1;
             }
             "--listar" => {
                 for (k, t) in v.arquivo.topicos.iter().enumerate() {

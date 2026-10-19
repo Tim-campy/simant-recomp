@@ -93,12 +93,18 @@ pub fn clique_no_visor(s: &mut Sessao, x: i32, y: i32, duplo: bool) -> bool {
 }
 
 /// Tecla com o visor aberto e com o foco (nome da tecla do SDL). Devolve se tratou.
+#[cfg(test)]
 pub fn tecla_no_visor(s: &mut Sessao, nome: &str) -> bool {
+    tecla_no_visor_com(s, nome, false, false)
+}
+
+/// Como [`tecla_no_visor`], com Alt (menus do WinHelp) e Shift (maiúsculas no Search).
+pub fn tecla_no_visor_com(s: &mut Sessao, nome: &str, alt: bool, shift: bool) -> bool {
     if !(s.ajuda.aberto && s.ajuda.foco) {
         return false;
     }
     let Some(v) = s.ajuda.visor.as_mut() else { return false };
-    match v.tecla(&s.interface, nome) {
+    match v.tecla_com(&s.interface, nome, alt, shift) {
         RespostaAjuda::Fechar => fechar(s),
         RespostaAjuda::Nada | RespostaAjuda::Fora => {}
     }

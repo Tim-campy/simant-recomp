@@ -52,5 +52,56 @@
     "texto": 0,
     "salto": 2,
     "trilho": 8
+  },
+  "_janelas": "Menus, Search, History e popups do WinHelp 3.1 (engine/src/core/ajuda_janelas.rs, docs/spec/telas/ajuda.md §4). Medidas da bancada QEMU (re_trabalho/agente_ui/winhelp/medidas.md, capturas w01–w06, s01–s09, p01–p05). Retângulos [x0, y0, x1, y1] inclusivos, relativos ao canto externo da janela de ajuda (tela do original: x − 213, y − 2). Cores: índices das 16 do Windows do port (data/paleta.json: 0 preto, 4 azul-escuro, 7 cinza-escuro, 8 cinza-claro, 11 amarelo, 15 branco). Os itens dos menus que o port não tem (Open, Print, Copy, Annotate, Define, How to Use Help, Always on Top, About Help) só fecham o menu [divergência]. popup.largura e a posição do popup vêm de uma só amostra [hipótese].",
+  "janelas": {
+    "fonte_menu": 6,
+    "fonte_dialogo": 7,
+    "altura_item_menu": 18,
+    "altura_separador": 7,
+    "x_texto_menu": 16,
+    "menus": [
+      {"destaque": [4, 43], "largura": 114, "itens": [{"texto": "&Open..."}, {"texto": "-"}, {"texto": "&Print Topic"}, {"texto": "P&rint Setup..."}, {"texto": "-"}, {"texto": "E&xit", "acao": "sair"}]},
+      {"destaque": [44, 84], "largura": 99, "itens": [{"texto": "&Copy..."}, {"texto": "-"}, {"texto": "&Annotate..."}]},
+      {"destaque": [85, 165], "largura": 85, "itens": [{"texto": "&Define..."}]},
+      {"destaque": [166, 211], "largura": 139, "itens": [{"texto": "&How to Use Help"}, {"texto": "Always on &Top"}, {"texto": "-"}, {"texto": "&About Help..."}]}
+    ],
+    "busca": {
+      "externo": [27, 46, 425, 376],
+      "titulo": "Search",
+      "rotulo_palavra": ["Type a &word, or select one from the list.", "Then choose Show Topics."],
+      "rotulo_palavra_em": [39, 82],
+      "altura_rotulo": 14,
+      "caixa_texto": [39, 116, 297, 138],
+      "lista_palavras": [57, 138, 413, 218],
+      "botao_cancelar": [319, 81, 413, 103],
+      "botao_mostrar": [319, 109, 413, 131],
+      "botao_ir": [319, 237, 413, 259],
+      "separador": [39, 228, 413, 229],
+      "rotulo_topicos": "Select a &topic, then choose Go To.",
+      "rotulo_topicos_em": [39, 243],
+      "lista_topicos": [38, 271, 414, 363],
+      "cancelar": "Cancel",
+      "fechar": "Close",
+      "mostrar": "&Show Topics",
+      "ir": "&Go To"
+    },
+    "historico": {
+      "externo": [0, 158, 212, 317],
+      "titulo": "Windows Help History",
+      "maximo": 40
+    },
+    "popup": {
+      "largura": 238,
+      "borda": 2,
+      "sombra": 12,
+      "margem": [9, 1, 9, 4],
+      "abaixo_do_ponto": 0,
+      "tela": [640, 442]
+    },
+    "altura_item_lista": 13,
+    "recuo_texto_lista": 3,
+    "largura_barra_lista": 17,
+    "cores": {"linha": 0, "selecao": 4, "texto_selecao": 15, "sombra_menu": 8, "face": 8, "luz": 15, "sombra": 7, "fundo": 15, "texto": 0, "borda_dialogo": 4, "titulo_inativo": 15, "texto_titulo_inativo": 0, "foco": 11}
   }
 }

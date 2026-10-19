@@ -1,0 +1,36 @@
+# WinHelp do SimAnt (F1): menus File/Edit/Bookmark/Help, menu de sistema, Search, History e popup.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_ajuda2.txt --overlay re_trabalho/qemu/ov_winhelp.qcow2
+# Capturas em re_trabalho/agente_ui/winhelp/ (fora do git). Coordenadas da tela 640x480.
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+teclas f1
+esperar 6
+capturar re_trabalho/agente_ui/winhelp/w00_indice.png
+# --- menus ---
+clicar_em 240 33
+esperar 1
+capturar re_trabalho/agente_ui/winhelp/w01_menu_file.png
+teclas right
+esperar 1
+capturar re_trabalho/agente_ui/winhelp/w02_menu_edit.png
+teclas right
+esperar 1
+capturar re_trabalho/agente_ui/winhelp/w03_menu_bookmark.png
+teclas right
+esperar 1
+capturar re_trabalho/agente_ui/winhelp/w04_menu_help.png
+teclas down
+esperar 1
+capturar re_trabalho/agente_ui/winhelp/w05_menu_help_item2.png
+teclas esc esc
+esperar 1
+# menu de sistema
+clicar_em 226 15
+esperar 1
+capturar re_trabalho/agente_ui/winhelp/w06_menu_sistema.png
+teclas esc esc
+esperar 1
+capturar re_trabalho/agente_ui/winhelp/w07_fechou_menus.png
+fim

@@ -129,9 +129,20 @@ fn colonias_no_quintal() {
 fn sem_equivalente_nao_muda_nada() {
     let mut e = jogo();
     let antes = e.clone();
-    for ef in [Ef::AnimacaoVitoria, Ef::BancoDeDados, Ef::RedeServidor, Ef::RedeCliente] {
+    for ef in [Ef::BancoDeDados, Ef::RedeServidor, Ef::RedeCliente] {
         assert!(ef.sem_equivalente());
         aplicar(&mut e, tt(), ta(), ef);
     }
+    assert!(e == antes);
+}
+
+#[test]
+fn fred_pede_a_animacao_da_vitoria_e_nao_muda_o_estado() {
+    // `_CheatKeys` caso 0x14: só `_DrawSimPayoff` (desenho e música).
+    let mut e = jogo();
+    let antes = e.clone();
+    assert!(!Ef::AnimacaoVitoria.sem_equivalente());
+    aplicar(&mut e, tt(), ta(), Ef::AnimacaoVitoria);
+    assert_eq!(e.retirar_eventos(), vec![engine::rules::estado::Evento::AnimacaoVitoria]);
     assert!(e == antes);
 }

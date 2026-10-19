@@ -19,7 +19,9 @@ Cada arquivo interno começa com 9 bytes: `i32` reservado, `i32` usado (tamanho 
 
 O diretório é um arquivo interno com uma árvore B+: depois dos 9 bytes, o cabeçalho da árvore (38 bytes): `u16` magia 0x293B, `u16` flags, `u16` tamanho da página (1024), 16 bytes de estrutura ("z4"), `i16` 0, `i16` divisões, `i16` página raiz, `i16` −1, `i16` total de páginas, `i16` níveis, `i32` entradas. As páginas vêm em seguida. Página folha: `u16` livre, `i16` número de entradas, `i16` página anterior, `i16` página seguinte, e as entradas (nome terminado em 0, `i32` posição do arquivo interno). Página de índice: `u16` livre, `i16` entradas, `i16` primeira página filha, … — para achar a primeira folha basta descer pela primeira filha e seguir as "seguintes". No SIMANT.HLP a árvore tem um nível e uma página [arquivo].
 
-Arquivos internos do SIMANT.HLP [arquivo]: `bm0`…`bm65` (figuras), `|Phrases`, `|SYSTEM`, `|TOPIC`, `|TOMAP`, `|FONT`, `|CTXOMAP`, `|KWDATA`, `|KWMAP`, `|KWBTREE` (palavras-chave da busca) e `|TTLBTREE` (títulos). O port não lê os quatro últimos.
+Arquivos internos do SIMANT.HLP [arquivo]: `bm0`…`bm65` (figuras), `|Phrases`, `|SYSTEM`, `|TOPIC`, `|TOMAP`, `|FONT`, `|CTXOMAP`, `|KWDATA`, `|KWMAP`, `|KWBTREE` (palavras-chave da busca) e `|TTLBTREE` (títulos). O port lê o `|KWBTREE` e o `|KWDATA` (desde 2026-10-18, `ArquivoAjuda::palavras_chave`) e não lê o `|KWMAP` nem o `|TTLBTREE`.
+
+`|KWBTREE` [arquivo]: árvore B+ como o diretório (magia 0x293B, páginas de 2048 bytes, cabeçalho de 38 bytes; raiz em +26, níveis em +32, 128 entradas no SIMANT.HLP). Nas folhas (`u16` livre, `i16` entradas, `i16` anterior, `i16` seguinte), cada entrada é a palavra-chave (ASCIIZ), `u16` quantidade de tópicos e `i32` deslocamento no `|KWDATA`, que é um vetor de `u32` com as posições dos tópicos (como as do `|CTXOMAP`). A ordem das folhas é a alfabética da lista do Search ("About", "Alarm", "Altruism"…; bancada s01).
 
 ## 2. `|SYSTEM`
 
