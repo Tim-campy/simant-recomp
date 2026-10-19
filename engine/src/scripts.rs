@@ -1694,6 +1694,11 @@ fn tabela_evento(lua: &Lua, ev: &Evento) -> mlua::Result<Table> {
             t.set("quadros", a.quadros.len())?;
             t.set("espera_ms", a.espera_ms)?;
         }
+        // A partida não repassa os instantâneos aos scripts (só apresentação).
+        Evento::Instantaneo { plano, .. } => {
+            t.set("tipo", "instantaneo")?;
+            t.set("plano", *plano)?;
+        }
     }
     Ok(t)
 }
