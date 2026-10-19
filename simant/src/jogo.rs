@@ -110,10 +110,11 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
             p.aplicar_opcoes(&mut s.partida.estado.partida.opcoes);
         }
         p.aplicar_botoes(&mut s.partida.funcoes_botoes);
+        p.aplicar_botoes_quintal(&mut s.partida.funcoes_botoes_quintal);
     }
     let r = laco_partida(&mut s, titulo, o, jogo_novo);
     if let Some(caminho) = &o.preferencias {
-        let p = preferencias::Preferencias::do_momento(&s.partida.estado.partida.opcoes, &s.partida.funcoes_botoes);
+        let p = preferencias::Preferencias::do_momento(&s.partida.estado.partida.opcoes, &s.partida.funcoes_botoes, &s.partida.funcoes_botoes_quintal);
         match p.gravar(caminho) {
             Ok(()) => println!("preferências gravadas em {}", caminho.display()),
             Err(e) => eprintln!("preferências: {e}"),

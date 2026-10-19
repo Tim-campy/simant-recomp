@@ -155,7 +155,9 @@ Os objetos `ribUserDef1A`–`1H` (ids `0x2210`–`0x2217`) chamam `_DoUserButton
 | 14 | `_SaveGame(1)` (§6) |
 | 15 | abre a janela de edição e `_GotoMyAnt` |
 
-Com **Ctrl** apertado (`GetAsyncKeyState(VK_CONTROL)`; o código empurra 0x11 — uma versão anterior deste documento dizia "segurado"), abre a janela 36 (`iconMenu`, bitmap 7200, 16 ícones) para escolher a função do botão; com Shift, só muda este botão, sem Shift os dois botões equivalentes das faixas 34 e 35 [código]. O menu e o estado desenhado dos botões estão em [janelas.md](janelas.md) §4.4 e §5.
+Com **Ctrl** apertado (`GetAsyncKeyState(VK_CONTROL)`; o código empurra 0x11 — uma versão anterior deste documento dizia "segurado"), abre a janela 36 (`iconMenu`, bitmap 7200, 16 ícones) para escolher a função do botão; com Shift, só muda este botão, sem Shift os dois botões equivalentes das faixas 34 e 35 [código].
+
+A faixa 35 (quintal) tem os seus: `ribUserDef2A`–`2H` (ids `0x230b`–`0x2312`, objetos 11–18 da janela 35), tratados por `_ProcYardRibbonEvent` com `_DoUserButton(id, id − 0x230b)`; a tabela é `_yardUserButton` (`1048:0022`, padrão igual ao da faixa 34: 15, 0, 1, 3, 7, 6, 5, 10; `WIN.INI` `yarduserbuttonN`). `_DoUserButton` escolhe a tabela pelo byte alto do id (0x22 → `1048:0012`, senão `1048:0022`) e, sem Shift, grava a função nas duas tabelas e chama `_SetUserButton` para os dois ids (id ± 0xFB) [código]. **Port** (2026-10-18): `partida.json` → `botoes_usuario_quintal`, `Partida::funcoes_botoes_quintal`; clique, Ctrl+clique (menu de ícones) e o estado desenhado (bitmaps e ligado) como os da faixa 34; preferências `botoes_quintal`. Teste `botoes_da_faixa_e_menu_da_amarela`. **Sem captura da faixa 35 com botões trocados.** O menu e o estado desenhado dos botões estão em [janelas.md](janelas.md) §4.4 e §5.
 
 **Bancada:** o 6º botão (`ribUserDef1F`, em (159, 96) da tela) mostrou "Game speed now fast." partindo de normal (`m2`) [bancada].
 

@@ -72,7 +72,7 @@ pub fn selecao_da_abertura(recursos: &Recursos, interface: &Interface) -> Result
 pub fn desenhar_faixa(s: &Sessao, q: &mut Quadro) -> Vec<String> {
     let m = &s.modos;
     if m.janela.na_frente {
-        return m.quintal.desenhar_faixa(q, s.recursos, &s.interface, &s.partida.estado);
+        return m.quintal.desenhar_faixa(q, s.recursos, &s.interface, &s.partida.estado, &s.partida.estado_dos_botoes());
     }
     // _NewGame: no Experimental o botão de ferramentas da faixa usa outros bitmaps.
     if s.partida.estado.partida.tipo_jogo == 3 {
@@ -333,6 +333,11 @@ pub fn clique_na_faixa(s: &mut Sessao, x: i32, y: i32) -> Resposta {
     if s.modos.janela.na_frente {
         // Faixa 35 no lugar da 34.
         if y < i32::from(s.interface.moldura.faixa.altura) {
+            // Botões configuráveis da faixa 35 (`_ProcYardRibbonEvent` → `_DoUserButton`): quem
+            // trata é o laço da janela, como os da faixa 34.
+            if s.botao_usuario_em(x, y).is_some() {
+                return Resposta::Seguir;
+            }
             if let Some(a) = s.modos.quintal.acao_da_faixa_em(x, y) {
                 aplicar_acao_quintal(s, a, false);
             }

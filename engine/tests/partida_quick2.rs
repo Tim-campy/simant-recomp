@@ -229,9 +229,17 @@ fn botoes_da_faixa_e_menu_da_amarela() {
     assert_eq!(b[0].3, None);
     p.botao_usuario(5);
     assert_eq!(p.estado_dos_botoes()[6].3, Some(true));
-    p.definir_funcao_do_botao("ribUserDef1A", 11);
+    p.definir_funcao_do_botao("ribUserDef1A", 11, true);
     assert_eq!(p.funcao_do_botao("ribUserDef1A"), Some(11));
     assert_eq!(p.estado_dos_botoes()[0], ("ribUserDef1A".to_string(), 14484, 14434, Some(false)));
+    // Faixa 35: a mesma tabela padrão; com Shift só o botão escolhido muda, sem Shift os dois de
+    // mesmo índice (_DoUserButton).
+    assert_eq!(p.funcao_do_botao("ribUserDef2A"), Some(15));
+    assert_eq!(p.estado_dos_botoes()[8].0, "ribUserDef2A");
+    p.definir_funcao_do_botao("ribUserDef2B", 8, false);
+    assert_eq!((p.funcao_do_botao("ribUserDef2B"), p.funcao_do_botao("ribUserDef1B")), (Some(8), Some(8)));
+    p.definir_funcao_do_botao("ribUserDef2B", 9, true);
+    assert_eq!((p.funcao_do_botao("ribUserDef2B"), p.funcao_do_botao("ribUserDef1B")), (Some(9), Some(8)));
     // Segurando o botão na própria amarela: menu; o item "Recruit 5" (código 1) recruta.
     let (x, y) = (p.estado.amarela.x as i32, p.estado.amarela.y as i32);
     p.iniciar_espera_do_clique();

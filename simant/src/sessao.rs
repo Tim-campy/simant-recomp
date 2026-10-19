@@ -373,16 +373,22 @@ impl Sessao<'_> {
 
     /// Botão configurável da faixa sob (x, y): a função dele (`_DoUserButton`).
     pub(crate) fn botao_usuario_em(&self, x: i32, y: i32) -> Option<u16> {
-        self.tela.objetos_da_faixa_em(x, y).iter().find_map(|n| self.partida.funcao_do_botao(n))
+        self.objetos_da_faixa_visivel_em(x, y).iter().find_map(|n| self.partida.funcao_do_botao(n))
+    }
+
+    /// Objetos da faixa que está na tela (a 35 com o quintal ativado por último, senão a 34) sob (x, y).
+    fn objetos_da_faixa_visivel_em(&self, x: i32, y: i32) -> Vec<String> {
+        let objetos = if self.modos.janela.na_frente { self.modos.quintal.objetos_da_faixa_em(x, y) } else { self.tela.objetos_da_faixa_em(x, y) };
+        objetos.into_iter().map(String::from).collect()
     }
 
     /// Ctrl+clique num botão configurável: abre o menu de ícones (`_DoUserButton`, janela 36).
     pub(crate) fn abrir_menu_de_icones(&mut self, x: i32, y: i32) -> bool {
-        let Some(nome) = self.tela.objetos_da_faixa_em(x, y).into_iter().find(|n| self.partida.funcao_do_botao(n).is_some()) else {
+        let Some(nome) = self.objetos_da_faixa_visivel_em(x, y).into_iter().find(|n| self.partida.funcao_do_botao(n).is_some()) else {
             return false;
         };
-        let nome = nome.to_string();
-        let Some((r, _)) = self.tela.objeto_da_faixa(&nome) else { return false };
+        let r = if self.modos.janela.na_frente { self.modos.quintal.retangulo_da_faixa(&nome) } else { self.tela.objeto_da_faixa(&nome).map(|(r, _)| r) };
+        let Some(r) = r else { return false };
         let [dx, dy] = self.menus_cfg.deslocamento_icones;
         let limite = Retangulo { esq: 0, topo: 0, dir: self.tela.cfg.largura as i16, base: self.tela.cfg.altura as i16 };
         match MenuAberto::abrir(self.recursos, &self.interface, &self.menus_cfg.icones, i32::from(r.esq + dx), i32::from(dy), limite) {
@@ -431,7 +437,7 @@ impl Sessao<'_> {
                 println!("menu da amarela: comando {c}{}", if ok { "" } else { " (erro)" });
             }
             AlvoMenu::Botao(nome) => {
-                self.partida.definir_funcao_do_botao(&nome, u16::from(c));
+                self.partida.definir_funcao_do_botao(&nome, u16::from(c), shift);
                 println!("botão {nome}: função {c}");
             }
         }
@@ -520,6 +526,7 @@ impl Sessao<'_> {
             self.partida.estado.partida.opcoes = antiga.partida.estado.partida.opcoes;
         }
         self.partida.funcoes_botoes = antiga.partida.funcoes_botoes.clone();
+        self.partida.funcoes_botoes_quintal = antiga.partida.funcoes_botoes_quintal.clone();
     }
 
     /// Diz à partida quais janelas estão abertas e na frente (sorteios do desenho depois de cada

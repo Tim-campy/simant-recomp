@@ -163,6 +163,10 @@ pub struct ConfigPartida {
     /// Espera de `_processEdit` no clique simples, em unidades de `_TickCount` (6).
     pub espera_clique_simples_tickcount: u64,
     pub botoes_usuario: BotoesUsuario,
+    /// Botões configuráveis da faixa 35 (`ribUserDef2A`–`2H`, tabela `1048:0022`). Opcional (API
+    /// 0.22): sem ele, a faixa do quintal não tem botões configuráveis.
+    #[serde(default)]
+    pub botoes_usuario_quintal: Option<BotoesUsuario>,
     pub marcadores: ConfigMarcadores,
 }
 
@@ -259,6 +263,8 @@ pub struct Partida {
     pub marcadores: [Option<(i16, i32, i32)>; 7],
     /// Função de cada botão configurável da faixa (`1048:0012`), trocada pelo menu de ícones.
     pub funcoes_botoes: Vec<u16>,
+    /// Os da faixa 35 (`_yardUserButton`, `1048:0022`).
+    pub funcoes_botoes_quintal: Vec<u16>,
     /// `_showTrails` (botão 4): trilhas na janela do mapa — os rastros das formigas acumulados, não
     /// o feromônio (telas/mapa.md §2.6).
     pub mostrar_trilhas: bool,
@@ -334,6 +340,7 @@ impl Partida {
             pausar_ao_fechar: false,
             marcadores: [None; 7],
             funcoes_botoes: Vec::new(),
+            funcoes_botoes_quintal: Vec::new(),
             mostrar_trilhas: false,
             janelas_desenho: JanelasDesenho { ativa: true, edicao_aberta: true, edicao_na_frente: true, ..Default::default() },
             contadores_redesenho: ContadoresRedesenho::default(),
@@ -351,6 +358,7 @@ impl Partida {
             avanco_rapido: false,
         };
         p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
+        p.funcoes_botoes_quintal = p.cfg.botoes_usuario_quintal.as_ref().map(|b| b.funcoes.clone()).unwrap_or_default();
         p.vistas_para_estado();
         p
     }
@@ -1097,30 +1105,57 @@ impl Partida {
         ok
     }
 
-    /// Função do botão configurável com esse nome de objeto.
-    pub fn funcao_do_botao(&self, objeto: &str) -> Option<u16> {
-        let b = &self.cfg.botoes_usuario;
-        b.objetos.iter().position(|o| o == objeto).and_then(|i| self.funcoes_botoes.get(i).copied())
+    /// (faixa, índice) do botão configurável com esse nome de objeto: faixa 0 = 34, 1 = 35.
+    fn botao_configuravel(&self, objeto: &str) -> Option<(usize, usize)> {
+        if let Some(i) = self.cfg.botoes_usuario.objetos.iter().position(|o| o == objeto) {
+            return Some((0, i));
+        }
+        let q = self.cfg.botoes_usuario_quintal.as_ref()?;
+        q.objetos.iter().position(|o| o == objeto).map(|i| (1, i))
     }
 
-    /// Menu de ícones: troca a função do botão (`_SetUserButton`).
-    pub fn definir_funcao_do_botao(&mut self, objeto: &str, f: u16) {
-        if let Some(i) = self.cfg.botoes_usuario.objetos.iter().position(|o| o == objeto) {
-            if let Some(v) = self.funcoes_botoes.get_mut(i) {
+    fn funcoes_da_faixa(&mut self, faixa: usize) -> &mut Vec<u16> {
+        if faixa == 0 {
+            &mut self.funcoes_botoes
+        } else {
+            &mut self.funcoes_botoes_quintal
+        }
+    }
+
+    /// Função do botão configurável com esse nome de objeto (faixa 34 ou 35).
+    pub fn funcao_do_botao(&self, objeto: &str) -> Option<u16> {
+        let (faixa, i) = self.botao_configuravel(objeto)?;
+        if faixa == 0 { self.funcoes_botoes.get(i) } else { self.funcoes_botoes_quintal.get(i) }.copied()
+    }
+
+    /// Menu de ícones: troca a função do botão (`_SetUserButton`). Com `so_este` (Shift apertado), só
+    /// este; senão também o botão de mesmo índice da outra faixa (`_DoUserButton`, `1000:04c4`).
+    pub fn definir_funcao_do_botao(&mut self, objeto: &str, f: u16, so_este: bool) {
+        let Some((faixa, i)) = self.botao_configuravel(objeto) else { return };
+        let faixas: &[usize] = if so_este { &[faixa] } else { &[0, 1] };
+        for &k in faixas {
+            if let Some(v) = self.funcoes_da_faixa(k).get_mut(i) {
                 *v = f;
-                self.redesenhar = true;
             }
         }
+        self.redesenhar = true;
     }
 
     /// Estado desenhado dos botões configuráveis (`_SetUserButton`/`_UpdateUserButtons`): nome,
     /// bitmaps (selecionado, normal) da função e, nos botões de alternar, se estão ligados.
     pub fn estado_dos_botoes(&self) -> Vec<(String, u16, u16, Option<bool>)> {
-        let b = &self.cfg.botoes_usuario;
+        let mut v = self.estado_dos_botoes_de(&self.cfg.botoes_usuario, &self.funcoes_botoes);
+        if let Some(q) = &self.cfg.botoes_usuario_quintal {
+            v.extend(self.estado_dos_botoes_de(q, &self.funcoes_botoes_quintal));
+        }
+        v
+    }
+
+    fn estado_dos_botoes_de(&self, b: &BotoesUsuario, funcoes: &[u16]) -> Vec<(String, u16, u16, Option<bool>)> {
         let p = &self.estado.partida;
         b.objetos
             .iter()
-            .zip(&self.funcoes_botoes)
+            .zip(funcoes)
             .map(|(nome, &f)| {
                 let ligado = match f {
                     4 => Some(self.mostrar_trilhas),

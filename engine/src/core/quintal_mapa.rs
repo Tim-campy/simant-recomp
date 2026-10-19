@@ -780,8 +780,10 @@ impl DesenhoQuintal {
         }
     }
 
-    /// Desenha a faixa 35 no lugar da 34, com o botão do modo e Automatic/Manual selecionados.
-    pub fn desenhar_faixa(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, e: &Estado) -> Vec<String> {
+    /// Desenha a faixa 35 no lugar da 34, com o botão do modo e Automatic/Manual selecionados e os
+    /// botões configuráveis (`botoes`: nome, bitmaps selecionado/normal e se está ligado, de
+    /// `Partida::estado_dos_botoes`).
+    pub fn desenhar_faixa(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, e: &Estado, botoes: &[(String, u16, u16, Option<bool>)]) -> Vec<String> {
         let c = &self.cfg;
         let f = &interface.moldura.faixa;
         q.preencher(Retangulo { esq: 0, topo: 0, dir: q.largura as i16, base: f.altura }, f.fundo, f.fundo);
@@ -790,6 +792,16 @@ impl DesenhoQuintal {
         let rainha = if e.controles.modo_por_rainha == 1 { 0 } else { 1 };
         let grupos: [(&[String], &str); 2] = [(&c.botao_do_modo, &c.botao_do_modo[modo]), (&c.botoes_rainhas, &c.botoes_rainhas[rainha])];
         for ob in faixa.objetos.iter_mut() {
+            if let Some((_, s, n, ligado)) = botoes.iter().find(|b| b.0 == ob.nome) {
+                if let crate::formats::janela::Conteudo::BotaoBitmap { selecionado, normal } = &mut ob.conteudo {
+                    (*selecionado, *normal) = (*s, *n);
+                }
+                if ligado.unwrap_or(false) {
+                    ob.flags |= FLAG_SELECIONADO;
+                } else {
+                    ob.flags &= !FLAG_SELECIONADO;
+                }
+            }
             for (grupo, escolhido) in grupos {
                 if grupo.contains(&ob.nome) {
                     if ob.nome == escolhido {
