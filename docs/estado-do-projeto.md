@@ -172,8 +172,8 @@ Regras
 - A lista 4/1100 por estágio (`regras/ciclo-de-vida.md`, "Lacunas"). (C-04 a C-07 verificados em 2026-10-18, vetores `ovos_*`.)
 - Amarela vermelha pondo ovo preto e recriação da cauda em lutas (`regras/ciclo-de-vida.md`, [hipótese]).
 - Morte natural (T1), luta e proporção de vitórias (T5, T6), revoada natural (T8), estratégia vermelha (T9), recrutamento pelo jogador (T11) (`regras/superficie.md`).
-- Pedrinha cuspida pela formiga-leão (`regras/inimigos.md`). (Cerco da aranha e da formiga-leão, fuga, vingança, faro, laser e aranha do jogador verificados em 2026-10-18, testes-tick.md "Quinta rodada".)
-- Desenho dentro do tick (`_DrawPalps` e `_SpiderDialog` sorteiam S no meio do tick; medido, não implementado): deixa pendente `amarela_morte_aranha/1793`, a morte da amarela pela aranha (`regras/rng.md`, `regras/inimigos.md`).
+- Pedrinha cuspida pela formiga-leão (`regras/inimigos.md`; a regra; o desenho da pedrinha, um tile, foi conferido em 2026-10-18, `telas/jogo.md`). (Cerco da aranha e da formiga-leão, fuga, vingança, faro, laser e aranha do jogador verificados em 2026-10-18, testes-tick.md "Quinta rodada".)
+- Desenho dentro do tick: **implementado e verificado em 2026-10-18** só na morte da amarela pela aranha (`amarela_morte_aranha/1793` 307/307). Os outros pontos (`_YellowBirth`, `_AnimYellowInsane`, `_DoAntMoveY`, `_DoTroph`, aranha do jogador com AutoTrack, balões "Silly" no meio do tick) seguem o código, sem vetor com a aranha à vista ou com "Silly" (`regras/rng.md`, "Desenho dentro do tick").
 - Afogamento de adultas no ninho (1/100 por tick, `regras/ninho.md` 8.3) e N-02, N-04, N-05, N-08, N-11. (N-01, N-07, N-10, N-12, N-14, N-15 verificados em 2026-10-18, vetores `ninho_*`.)
 - Defeitos do original marcados [hipótese] no ninho (`regras/ninho.md`) e coluna 106 de `_CarpetFloorR` (`divergencias.md`).
 - Suavização dupla na volta de `_Cycle` e giro duplo de `_GetNestDir` (`regras/feromonios.md`).
@@ -191,7 +191,7 @@ Jogo ao vivo
 
 Telas
 - Rainha amarela 0xFE e outras resoluções (`telas/jogo.md`, "Não verificado"). Navegação, superfície e ninho vermelho na edição: verificados em 2026-10-18 (`telas/jogo.md`, "Verificação").
-- Desenho da aranha na janela de edição (`_DrawSpider`: o port não desenha a aranha; visto na captura do menu da aranha, `telas/janelas.md` §7).
+- Desenho da aranha: o recorte das retas na borda da vista (`_os_ClipLine`, 8 pixels de diferença numa captura) [hipótese]. (Corpo, pernas, palpos e agonia conferidos em 2026-10-18, 18 capturas 99,91–100%, `telas/jogo.md`.)
 - Altura mínima da edição e clique comido na janela de trás (`telas/janelas.md` §8, [hipótese]).
 - Cores do mapa (`_ConvColor`) (`telas/mapa.md`, [hipótese]).
 - Cartões 127 e 129 do Info (não alcançáveis por clique a partir do Top Card) e clique em palavra em negrito (`telas/info.md` §6).
@@ -210,6 +210,8 @@ Diálogos
 **Feito depois desta revisão (2026-10-18, branch dos balões; detalhes nas specs citadas):** balões "Silly" da janela de edição (anotação no tick, sorteios do redesenho na ordem do original, desenho; sorteios e desenho conferidos na bancada, 100% nas regiões dos balões do ovo e da rainha: `telas/baloes.md`); `_DrawEditGraphs` não desenha nos modos do Windows (`_displayType` 9/10), então não há o que fazer (`telas/baloes.md` §3); quadro da trofalaxia (`_YellowDialog` 9110, 100% na bancada: `telas/mensagens.md` §10); PLACE parando a simulação e repetindo com Shift (`telas/quintal.md` §5.3); `_SpecialXfer` ao vivo, logo depois do tick (a troca dentro do tick continua sendo divergência registrada); comida que cai na casa (`_DropFoodA` com `_DROPdir`, `regras/superficie.md` 8.2, sem caso na bancada); avisos do Experimental na faixa; botões configuráveis da faixa 35; animações da amarela com a ordem real das janelas; segunda metade da rainha amarela na reconstrução da vida. API de mods 0.22.
 
 **Feito depois desta revisão (2026-10-18, branch da janela do mapa; detalhes em `telas/mapa.md` §§1, 4, 7–9):** mini mapa (existe no Windows: botão `ribToYellow`; modal, pausa, 1 pixel por célula; 99,99–100% na bancada); Shift+clique no mapa dá a ordem (ou a ferramenta) sem centralizar, duplo clique traz a janela de edição, arrasto centraliza durante o movimento (todos conferidos na bancada); `_win_Swap` conferido com o mapa movido; `_ELayerMode` completo e `_EditScentMenu` documentado como inalcançável no Windows; `_DrawMapData` completo. API de mods 0.23 (`data/mini_mapa.json`).
+
+**Feito depois desta revisão (2026-10-18, branch da aranha e do desenho dentro do tick):** desenho dentro do tick (os sorteios do redesenho da janela de edição em `_GotoMyAnt` e nos `_DoEditUpdateDraw` das mortes, nascimento, animações, trofalaxia e `_DoAntMoveY`, e o `S1(2)` de `_SpiderDialog`; `regras/rng.md`): `amarela_morte_aranha/1793` sai dos pendentes e **todos os 145 vetores de tick batem 307/307**; aranha desenhada na janela de edição (corpo, pernas, palpos, agonia, aranha do jogador; 18 capturas 99,91–100% e o menu da aranha 100%: `telas/jogo.md`); formiga-leão, lagarta, bicho-de-conta e pedrinhas conferidos (tiles, 100% nas suas células); moldura azul-escura da caixa de mensagem/lição (100%: `telas/mensagens.md` §3.3). API de mods 0.24 (`data/desenho_aranha.json`, `Evento::DialogoAranha`, `quadro.cor_borda`, `mensagens.aranha_comeu`).
 
 Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; **G** = uma semana ou mais.
 
@@ -254,7 +256,7 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 
 | Item | Esforço |
 |---|---|
-| Desenho dentro do tick (`_DrawPalps`/`_SpiderDialog`) para fechar `amarela_morte_aranha` | P–M |
+| ~~Desenho dentro do tick (`_DrawPalps`/`_SpiderDialog`) para fechar `amarela_morte_aranha`~~ (feito em 2026-10-18) | — |
 | Capturas: cartões 127 e 129 do Info, rainha amarela 0xFE, outras resoluções (navegação, Examine, menus, History, triângulo, 51 cartões e abertura feitos em 2026-10-18) | P |
 | Comparação de áudio com o original: DOSBox-X com SB16/OPL3 e captura de WAV (a bancada QEMU com SB16 foi tentada e não serve, `regras/som.md`) | M |
 | Ritmo fast/ultra numa máquina real (com `-icount` feito: `simulacao-visao-geral.md` §3.3) | P |

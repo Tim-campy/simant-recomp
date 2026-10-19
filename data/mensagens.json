@@ -8,6 +8,8 @@
   "quadro": {
     "_janela": "_PictureDialog abre a janela 30 (0x1e00, picStrWin) com o retângulo calculado; o texto usa a fonte 4 (_font_SetFont(4)) e a cor do objeto 1 (picStrArea).",
     "janela": 30,
+    "_cor_borda": "Moldura de diálogo do Windows na cor da barra de título ativa: azul-escuro (índice 4) na bancada QEMU (Windows Default), igual ao título da janela de edição (tela_jogo.json, cor_titulo); medido na caixa da lição 14 (tick 622 de tutorial_completo): 1 pixel preto e 4 azul-escuros, como o port. Sem a chave, vale interface.json → borda.cor (a cor medida no ambiente do DOSBox-X).",
+    "cor_borda": 4,
     "fonte": 4,
     "objeto_texto": "picStrArea",
     "objeto_clique": "picStrClick",

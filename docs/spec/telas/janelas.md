@@ -64,7 +64,7 @@ Ver mensagens.md §7. O port começa a espera ao apertar (`Partida::iniciar_espe
 ### 4.2 `_AntMenu` (`1010:6d24`)
 
 - Janela 7 (formiga), 8 (rainha alada sem colônia: `_MeType` = 0x40 e `8:8a6c` = 0) ou 32 (aranha, `9:9fe8` = 1), aberta por `_win_DoProxMenu` no ponto do clique e mantida dentro da janela principal; o item sob o cursor fica invertido (`_GRectInv`); ao soltar, o item vira `_YellowCommand` pela tabela do DGROUP (`1048:1baa` = 1, 2, 4, 5, 6, 0; `1ba6` = 8, 9, 0; `1bb0` = 10, 11, 6, 0); com Shift, o 2 (recrutar 10) vira 3 (todas). Código 0 = Help [código + DGROUP].
-- Posição: o contorno externo (borda do Windows de 5 pixels) 19 pixels à direita e 8 abaixo do clique no menu da formiga [medido em j09]. **100%** igual à captura j09. **Rainha alada e aranha (bancada, 2026-10-18, `cenarios_tick.py gravar menu_amarela`, snapshots full e rico; para a aranha, X e clique na célula dela antes):** 3 à direita e 0 abaixo (rainha) e 1 à direita e 8 abaixo (aranha), uma captura de cada [causa da diferença não localizada; `_win_Open(id, x, y)` recebe o mesmo ponto]. O port usa o deslocamento de cada menu (`data/menus.json`): rainha **99,02%** (o cursor); o menu da aranha bate, mas a região tem 87% porque o port não desenha a aranha. A moldura sai azul-escura na bancada e azul-clara no port: é a cor de borda ativa do Windows de cada ambiente (QEMU × DOSBox-X), não do jogo [hipótese]. O original abre o menu da aranha segurando o botão na célula da aranha, que não tem marca no mapa de vida.
+- Posição: o contorno externo (borda do Windows de 5 pixels) 19 pixels à direita e 8 abaixo do clique no menu da formiga [medido em j09]. **100%** igual à captura j09. **Rainha alada e aranha (bancada, 2026-10-18, `cenarios_tick.py gravar menu_amarela`, snapshots full e rico; para a aranha, X e clique na célula dela antes):** 3 à direita e 0 abaixo (rainha) e 1 à direita e 8 abaixo (aranha), uma captura de cada [causa da diferença não localizada; `_win_Open(id, x, y)` recebe o mesmo ponto]. O port usa o deslocamento de cada menu (`data/menus.json`): rainha **99,02%** (o cursor); o menu da aranha bate; a região tinha 87% porque o port não desenhava a aranha, e com o desenho dela (2026-10-18, [jogo.md](jogo.md) "Aranha na janela de edição") a área do mapa da mesma captura sai 100%. A moldura sai azul-escura na bancada e azul-clara no port: é a cor de borda ativa do Windows de cada ambiente (QEMU × DOSBox-X), não do jogo [hipótese]. O original abre o menu da aranha segurando o botão na célula da aranha, que não tem marca no mapa de vida.
 
 ### 4.3 Examine (`_MagnifyMenu`, `1010:6b4c`)
 
@@ -109,7 +109,7 @@ Os botões de alternar (4 trilhas, 5 pausa, 7 Music, 9 Sound Effects, 10 Silly, 
 
 Testes: `core/triangulo.rs`, `core/menus.rs`, `core/historico.rs`, `formats/bitmap.rs` (planar), `engine/tests/tela_jogo_real.rs` (clique no triângulo, Set, Auto), `engine/tests/partida_quick2.rs` (botões, menu da amarela, marcadores).
 
-**Verificado em 2026-10-18:** arrasto no triângulo, History com dados, menus da rainha e da aranha, Examine na sessão (seções 2.1, 3, 4.2, 4.3; `tests/referencias/README.md`). **Não verificado:** outras resoluções; o desenho da aranha (o port não a desenha).
+**Verificado em 2026-10-18:** arrasto no triângulo, History com dados, menus da rainha e da aranha, Examine na sessão (seções 2.1, 3, 4.2, 4.3; `tests/referencias/README.md`). **Não verificado:** outras resoluções. (O desenho da aranha foi conferido em 2026-10-18, jogo.md.)
 
 
 ## 8. Gerenciador de janelas: moldura, ordem, foco, cliques e rolagem

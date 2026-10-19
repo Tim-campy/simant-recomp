@@ -823,6 +823,49 @@ def cenario_aranha_desenho(c: Sessao, saida, n):
     return []
 
 
+def cenario_bichos_desenho(c: Sessao, saida, n):
+    """Capturas dos bichos grandes que são tiles do _MapA (formiga-leão, lagarta, bicho-de-conta,
+    pedrinha): pausa, superfície e, para cada um achado no mapa, a vista centrada nele. Para garantir a
+    pedrinha cuspida, escreve 0x51 numa célula de chão livre ao lado da formiga-leão 0. Grava NOME.png,
+    NOME.ANT e bichos.json."""
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+8")
+    time.sleep(2)
+    c.mj.sessao_gdb()
+    c.escrever("MeMoveMe", 0)
+    c.escrever("SpidOn", 0)
+    s = c.save()
+    lx, ly = c.mj.ler_variavel("LionListX", 10)[0], c.mj.ler_variavel("LionListY", 10)[0]
+    alvos = {"formiga_leao": (lx, ly)}
+    if s.celula("MapA", lx + 2, ly) < 0x10:
+        mapa_escrever(c, "MapA", lx + 2, ly, 0x51)
+    cel = lambda f: next(((x, y) for x in range(128) for y in range(64) if f(s.celula("MapA", x, y))), None)
+    for nome, f in (("lagarta", lambda v: 0x68 <= v <= 0x6F), ("bicho_de_conta", lambda v: 0x70 <= v <= 0x73),
+                    ("pedrinha", lambda v: 0x51 <= v <= 0x53)):
+        p = cel(f)
+        if p:
+            alvos[nome] = p
+    reg = {}
+    for nome, (x, y) in alvos.items():
+        c.mj.sessao_gdb()
+        px0 = max(0, min(128 - ct.COLS, x - ct.COLS // 2))
+        py0 = max(1, min(63 - ct.LINS, y - ct.LINS // 2))
+        c.escrever_elemento("MapPnt", 0, px0, 2)
+        c.escrever_elemento("MapPnt", 1, py0, 2)
+        c.teclas("ctrl+up", "ctrl+down")
+        time.sleep(2.5)
+        c.mj.sessao_gdb()
+        ct.tela(c, saida, nome)
+        (pasta / f"{nome}.ANT").write_bytes(c.mj.estado())
+        reg[nome] = {"celula": [x, y]}
+        c.log(f"{nome} em ({x}, {y})")
+    (pasta / "bichos.json").write_text(json.dumps(reg, indent=1) + chr(10), encoding="utf-8")
+    return []
+
+
 VIDA_RICO = ("vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução "
              "de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a "
              "preparação também escreve marcas no mapa de vida")

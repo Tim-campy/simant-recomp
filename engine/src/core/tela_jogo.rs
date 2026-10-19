@@ -354,6 +354,9 @@ pub struct TelaDeJogo {
     balao: Option<crate::rules::baloes::Balao>,
     /// Balões da janela de edição: tabelas, peças e falas (listas do banco), carregados uma vez.
     baloes: Option<BaloesDaEdicao>,
+    /// A aranha (`_DrawSpider`): o que o desenho lê do estado, e os sprites e tabelas.
+    pub aranha: super::aranha_edicao::AranhaNaEdicao,
+    desenho_aranha: Option<super::aranha_edicao::DesenhoAranha>,
 }
 
 /// O que o desenho dos balões da janela de edição precisa (docs/spec/telas/baloes.md).
@@ -413,6 +416,26 @@ impl TelaDeJogo {
                 None
             }
         };
+        let desenho_aranha = match super::aranha_edicao::DesenhoAranha::carregar(recursos) {
+            Ok(d) => Some(d),
+            Err(erro) => {
+                pendencias.push(format!("aranha da edição: {erro}"));
+                None
+            }
+        };
+        let aranha = {
+            let v = |nome: &str| jogo.i16(nome).map(i32::from).unwrap_or(0);
+            super::aranha_edicao::AranhaNaEdicao {
+                ligada: v("SpidOn") != 0,
+                x: v("SpidX"),
+                y: v("SpidY"),
+                dir: v("SpidDir"),
+                estado: v("SMode"),
+                ciclo: v("Scycle"),
+                jogador: v("MeMode") == 1,
+                palpos: 0,
+            }
+        };
         let mapa = |p: Plano| -> Result<Vec<u8>, String> {
             let s = bloco_do_mapa(p);
             let bytes = jogo.bloco(s).ok_or(format!("bloco {s} ausente"))?;
@@ -449,6 +472,8 @@ impl TelaDeJogo {
             camada_edicao: None,
             balao: None,
             baloes,
+            aranha,
+            desenho_aranha,
             bitmaps_da_faixa: Vec::new(),
             titulo: String::new(),
             selecao_da_faixa: Vec::new(),
@@ -469,6 +494,17 @@ impl TelaDeJogo {
         };
         self.valores_faixa = super::barras_faixa::ValoresFaixa::do_estado(e);
         self.balao = e.baloes.desenhado;
+        let s = &e.aranha;
+        self.aranha = super::aranha_edicao::AranhaNaEdicao {
+            ligada: s.ligada != 0,
+            x: i32::from(s.x),
+            y: i32::from(s.y),
+            dir: i32::from(s.dir),
+            estado: i32::from(s.estado),
+            ciclo: i32::from(s.ciclo_pernas),
+            jogador: e.amarela.modo == 1,
+            palpos: e.palpos_aranha,
+        };
         // _DoCalcTile: com _ELayerMode 0..4, a superfície mostra o feromônio no lugar do chão.
         let f = &e.feromonios;
         self.camada_edicao = match e.camada_edicao {
@@ -630,6 +666,9 @@ impl TelaDeJogo {
         q.recorte = Some(partes.cliente);
         let r = desenhar_vista(&mut q, vista, &cena, (ax as i32, ay as i32));
         if r.is_ok() {
+            if let Some(d) = &self.desenho_aranha {
+                d.desenhar(&mut q, &self.aranha, vista, (ax as i32, ay as i32));
+            }
             self.desenhar_balao(&mut q, interface, nav, (ax as i32, ay as i32));
         }
         q.recorte = None;
