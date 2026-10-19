@@ -34,7 +34,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 | 5 | Telas e janelas | 85% | 70% | quase todas as janelas existem e foram comparadas (93–100%); faltam balões, gráficos de saúde da edição, partes da ajuda |
 | 6 | Diálogos e menus | 60% | 50% | **sem barra de menus do Windows** (File/Window/View/Options/Speed); "Load Game" do "Select a Game" não existe |
 | 7 | Som e música | 75% | 35% | efeitos e músicas das regras e do Experimental tocam; sons de menus e diálogos não; timbre diferente; nada comparado de ouvido |
-| 8 | Modos (Quick, Completo, Experimental, Tutorial) | 90% | 75% | os quatro existem e têm vetores; tutorial é o menos conferido |
+| 8 | Modos (Quick, Completo, Experimental, Tutorial) | 90% | 80% | os quatro existem e têm vetores; tutorial conferido da lição 1 ao fim (`tutorial_completo/`, 2026-10-18) |
 | 9 | Salvar/carregar | 95% | 90% | `.ANT` aceito pelo original; Load com `_RandYard` conferido; `Tutorial.Ant` gerado |
 | 10 | Mods (dados + Lua) | 90% | n/a | API 0.20, 37 JSON sobrescrevíveis (todos, inclusive `jogo.json`), tabelas comuns uma vez só em `comum.json`, Lua em sandbox, seção "Planejado"; testes em `mods.rs`, `mods_lua.rs` e `mod_trapacas.rs` |
 | 11 | Ferramentas e testes | 90% | n/a | 30 ferramentas em `tools/`, bancada QEMU com gdbstub, 518 testes |
@@ -114,7 +114,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 | Quick Game | 95% | 90% | quase todos os vetores saem do snapshot `quick`/`rico` |
 | Jogo Completo | 90% | 80% | `jogo_completo/`, `full_600`, troca de patch, PLACE, `_SpecialXfer`, 38 patches da casa; PLACE não para a simulação nem aceita Shift |
 | Experimental | 90% | 85% | ações `exp_*` 307/307; textos do quadro de exame e avisos das listas 4/1010, 4/1100–1103 não desenhados (`telas/experimental.md` §10) |
-| Tutorial | 80% | 50% | vetores `tutorial/` (lições 1–3) e Load de `Tutorial.Ant`; as demais lições e as condições de janela só pelo código |
+| Tutorial | 85% | 85% | vetores `tutorial/` (lições 1–3) e `tutorial_completo/` (as 56 lições jogadas no original com as ações pedidas, 309 ticks 307/307 depois de corrigir o prazo das lições 7/9/0x1A; condições de janela conferidas com a janela anotada pela bancada) e Load de `Tutorial.Ant`; a caixa da lição difere na moldura (conselhos.md §3.1) |
 
 ### 2.9 Salvar/carregar
 
@@ -178,7 +178,6 @@ Regras
 - Suavização dupla na volta de `_Cycle` e giro duplo de `_GetNestDir` (`regras/feromonios.md`).
 - Textos do balão do menino (lista 4/1200) (`regras/quintal.md`).
 - Seção 13 de `regras/formiga-amarela.md` além de Y-01..Y-04; animações de choque, morte com a edição atrás e loucura (`_AnimYellowInsane`).
-- Tutorial além das lições 1–3 (`regras/conselhos.md`, `testes-tick.md`).
 - Retorno exato de `_CalcScore` e o sentido da nota 3 (`regras/simulacao-visao-geral.md`).
 
 Geração de mundo
@@ -256,7 +255,6 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 | Vetores para cerco, laser, aranha do jogador, morte da amarela por inimigos, pisada e cortador | M |
 | Casos estatísticos (C-04..C-07, N-01/07/10/12) com semente forçada | M |
 | Capturas: navegação, superfície e ninho vermelho, Examine, menus da rainha e da aranha, 42 cartões do Info, abertura (duração e Espaço) | M |
-| Tutorial completo (todas as lições) em vetores | M |
 | Comparação de áudio com o original (bancada com placa de som ou DOSBox-X com SB16) | M |
 | Ritmo fast/ultra numa máquina real ou com `icount` | P |
 
