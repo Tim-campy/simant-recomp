@@ -565,7 +565,8 @@ mod testes {
         s.mensagem(0x99, 36, 120);
         let x = render(&mut s, 8_820);
         let f = frequencia(&x[100..4000], 44_100.0);
-        assert!((f - 130.8).abs() < 6.0, "{f} Hz");
+        // Janela curta (o som decai): a contagem de cruzamentos erra até um ciclo.
+        assert!((f - 130.8).abs() < 12.0, "{f} Hz");
         // Nota sem timbre na percussão: nada toca.
         s.mensagem(0x99, 90, 120);
         assert_eq!(s.vozes.len(), 1);

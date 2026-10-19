@@ -1,0 +1,3978 @@
+{
+ "_comentario": "Banco FM próprio do port (2 operadores por timbre, campos dos registradores do OPL). Gerado por tools/gerar_banco_opl.py; ver docs/spec/formatos/som.md, 'Sintetizador FM'. melodicos: 128 programas General MIDI; percussao: nota do canal 10 -> timbre com nota_fixa (nota ausente = silêncio). curva_volume_db: atenuação = -curva x log10(vel x volume x expressão). ganho: 1 = um canal no máximo dá 1/8 da escala, como o chip.",
+ "tremolo_profundo": true,
+ "vibrato_profundo": true,
+ "curva_volume_db": 40.0,
+ "ganho": 2.25,
+ "melodicos": [
+  {
+   "nome": "Acoustic Grand Piano",
+   "modulador": {
+    "mult": 1,
+    "tl": 24,
+    "ar": 15,
+    "dr": 4,
+    "sl": 6,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Bright Acoustic Piano",
+   "modulador": {
+    "mult": 1,
+    "tl": 20,
+    "ar": 15,
+    "dr": 4,
+    "sl": 6,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Electric Grand Piano",
+   "modulador": {
+    "mult": 1,
+    "tl": 22,
+    "ar": 15,
+    "dr": 4,
+    "sl": 6,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Honky-tonk Piano",
+   "modulador": {
+    "mult": 1,
+    "tl": 10,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 5,
+    "sustenta": true,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 2,
+    "sl": 15,
+    "rr": 5,
+    "sustenta": true,
+    "ksr": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Electric Piano 1",
+   "modulador": {
+    "mult": 1,
+    "tl": 30,
+    "ar": 15,
+    "dr": 4,
+    "sl": 6,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "Electric Piano 2",
+   "modulador": {
+    "mult": 14,
+    "tl": 32,
+    "ar": 15,
+    "dr": 4,
+    "sl": 6,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   },
+   "realimentacao": 2
+  },
+  {
+   "nome": "Harpsichord",
+   "modulador": {
+    "mult": 4,
+    "tl": 18,
+    "ar": 15,
+    "dr": 4,
+    "sl": 6,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true,
+    "onda": 1
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Clavinet",
+   "modulador": {
+    "mult": 3,
+    "tl": 16,
+    "ar": 15,
+    "dr": 4,
+    "sl": 6,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true,
+    "onda": 1
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Celesta",
+   "modulador": {
+    "mult": 7,
+    "tl": 34,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 6,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   }
+  },
+  {
+   "nome": "Glockenspiel",
+   "modulador": {
+    "mult": 6,
+    "tl": 34,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   }
+  },
+  {
+   "nome": "Music Box",
+   "modulador": {
+    "mult": 5,
+    "tl": 34,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 4,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   },
+   "realimentacao": 2
+  },
+  {
+   "nome": "Vibraphone",
+   "modulador": {
+    "mult": 4,
+    "tl": 34,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 2,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   }
+  },
+  {
+   "nome": "Marimba",
+   "modulador": {
+    "mult": 3,
+    "tl": 34,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 6,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   }
+  },
+  {
+   "nome": "Xylophone",
+   "modulador": {
+    "mult": 10,
+    "tl": 34,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 6,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 3,
+    "tl": 0,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "Tubular Bells",
+   "modulador": {
+    "mult": 3,
+    "tl": 34,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 2,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   },
+   "realimentacao": 1
+  },
+  {
+   "nome": "Dulcimer",
+   "modulador": {
+    "mult": 5,
+    "tl": 34,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6,
+    "ksr": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksr": true
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "Drawbar Organ",
+   "modulador": {
+    "mult": 1,
+    "tl": 4,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 2
+   },
+   "realimentacao": 2,
+   "aditivo": true
+  },
+  {
+   "nome": "Percussive Organ",
+   "modulador": {
+    "mult": 2,
+    "tl": 6,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 4,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1
+   },
+   "aditivo": true
+  },
+  {
+   "nome": "Rock Organ",
+   "modulador": {
+    "mult": 1,
+    "tl": 4,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 2
+   },
+   "realimentacao": 2,
+   "aditivo": true
+  },
+  {
+   "nome": "Church Organ",
+   "modulador": {
+    "mult": 1,
+    "tl": 8,
+    "ar": 13,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "onda": 1,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 2,
+    "ar": 13,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "onda": 2,
+    "vib": true
+   },
+   "realimentacao": 3,
+   "aditivo": true
+  },
+  {
+   "nome": "Reed Organ",
+   "modulador": {
+    "mult": 1,
+    "tl": 22,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Accordion",
+   "modulador": {
+    "mult": 1,
+    "tl": 22,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Harmonica",
+   "modulador": {
+    "mult": 1,
+    "tl": 26,
+    "ar": 11,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 2,
+    "ar": 11,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1,
+    "vib": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Tango Accordion",
+   "modulador": {
+    "mult": 1,
+    "tl": 22,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Acoustic Guitar (nylon)",
+   "modulador": {
+    "mult": 1,
+    "tl": 26,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 2,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Acoustic Guitar (steel)",
+   "modulador": {
+    "mult": 3,
+    "tl": 18,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 2,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Electric Guitar (jazz)",
+   "modulador": {
+    "mult": 1,
+    "tl": 16,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 2,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "Electric Guitar (clean)",
+   "modulador": {
+    "mult": 3,
+    "tl": 22,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 2,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Electric Guitar (muted)",
+   "modulador": {
+    "mult": 1,
+    "tl": 20,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true,
+    "ksl": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Overdriven Guitar",
+   "modulador": {
+    "mult": 1,
+    "tl": 14,
+    "ar": 15,
+    "dr": 1,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 1,
+    "sl": 3,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Distortion Guitar",
+   "modulador": {
+    "mult": 1,
+    "tl": 14,
+    "ar": 15,
+    "dr": 1,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 1,
+    "sl": 3,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Guitar Harmonics",
+   "modulador": {
+    "mult": 4,
+    "tl": 28,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 4,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "Acoustic Bass",
+   "modulador": {
+    "mult": 1,
+    "tl": 18,
+    "ar": 15,
+    "dr": 2,
+    "sl": 4,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 1,
+    "sl": 3,
+    "rr": 7,
+    "sustenta": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Electric Bass (finger)",
+   "modulador": {
+    "mult": 1,
+    "tl": 14,
+    "ar": 15,
+    "dr": 2,
+    "sl": 4,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 0,
+    "ar": 15,
+    "dr": 1,
+    "sl": 3,
+    "rr": 7,
+    "sustenta": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Electric Bass (pick)",
+   "modulador": {
+    "mult": 1,
+    "tl": 12,
+    "ar": 15,
+    "dr": 2,
+    "sl": 4,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 0,
+    "ar": 15,
+    "dr": 1,
+    "sl": 3,
+    "rr": 7,
+    "sustenta": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Fretless Bass",
+   "modulador": {
+    "mult": 1,
+    "tl": 22,
+    "ar": 15,
+    "dr": 2,
+    "sl": 4,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 1,
+    "sl": 3,
+    "rr": 7,
+    "sustenta": true
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "Slap Bass 1",
+   "modulador": {
+    "mult": 1,
+    "tl": 10,
+    "ar": 15,
+    "dr": 2,
+    "sl": 4,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 0,
+    "ar": 15,
+    "dr": 1,
+    "sl": 3,
+    "rr": 7,
+    "sustenta": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Slap Bass 2",
+   "modulador": {
+    "mult": 1,
+    "tl": 10,
+    "ar": 15,
+    "dr": 2,
+    "sl": 4,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 0,
+    "ar": 15,
+    "dr": 1,
+    "sl": 3,
+    "rr": 7,
+    "sustenta": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Synth Bass 1",
+   "modulador": {
+    "mult": 1,
+    "tl": 16,
+    "ar": 15,
+    "dr": 3,
+    "sl": 4,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 1,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Synth Bass 2",
+   "modulador": {
+    "mult": 1,
+    "tl": 16,
+    "ar": 15,
+    "dr": 3,
+    "sl": 4,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 1,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Violin",
+   "modulador": {
+    "mult": 1,
+    "tl": 24,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 8,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Viola",
+   "modulador": {
+    "mult": 1,
+    "tl": 24,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 8,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Cello",
+   "modulador": {
+    "mult": 1,
+    "tl": 24,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 8,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Contrabass",
+   "modulador": {
+    "mult": 1,
+    "tl": 24,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 8,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Tremolo Strings",
+   "modulador": {
+    "mult": 1,
+    "tl": 24,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "am": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 8,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Pizzicato Strings",
+   "modulador": {
+    "mult": 1,
+    "tl": 26,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 7,
+    "sustenta": true
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "Orchestral Harp",
+   "modulador": {
+    "mult": 2,
+    "tl": 34,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 5,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 5,
+    "sustenta": true
+   },
+   "realimentacao": 2
+  },
+  {
+   "nome": "Timpani",
+   "modulador": {
+    "mult": 0,
+    "tl": 16,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "String Ensemble 1",
+   "modulador": {
+    "mult": 1,
+    "tl": 26,
+    "ar": 8,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 7,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "String Ensemble 2",
+   "modulador": {
+    "mult": 1,
+    "tl": 26,
+    "ar": 6,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 5,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Synth Strings 1",
+   "modulador": {
+    "mult": 1,
+    "tl": 26,
+    "ar": 7,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 6,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Synth Strings 2",
+   "modulador": {
+    "mult": 1,
+    "tl": 26,
+    "ar": 5,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 4,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Choir Aahs",
+   "modulador": {
+    "mult": 1,
+    "tl": 34,
+    "ar": 7,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 7,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 2
+  },
+  {
+   "nome": "Voice Oohs",
+   "modulador": {
+    "mult": 1,
+    "tl": 34,
+    "ar": 7,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 7,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 2
+  },
+  {
+   "nome": "Synth Voice",
+   "modulador": {
+    "mult": 1,
+    "tl": 34,
+    "ar": 7,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 7,
+    "dr": 0,
+    "sl": 0,
+    "rr": 6,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 2
+  },
+  {
+   "nome": "Orchestra Hit",
+   "modulador": {
+    "mult": 1,
+    "tl": 10,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 7,
+    "sustenta": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Trumpet",
+   "modulador": {
+    "mult": 1,
+    "tl": 20,
+    "ar": 10,
+    "dr": 2,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Trombone",
+   "modulador": {
+    "mult": 1,
+    "tl": 22,
+    "ar": 10,
+    "dr": 2,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Tuba",
+   "modulador": {
+    "mult": 0,
+    "tl": 18,
+    "ar": 10,
+    "dr": 2,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Muted Trumpet",
+   "modulador": {
+    "mult": 2,
+    "tl": 26,
+    "ar": 10,
+    "dr": 2,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "French Horn",
+   "modulador": {
+    "mult": 1,
+    "tl": 30,
+    "ar": 10,
+    "dr": 2,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "Brass Section",
+   "modulador": {
+    "mult": 1,
+    "tl": 18,
+    "ar": 10,
+    "dr": 2,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Synth Brass 1",
+   "modulador": {
+    "mult": 1,
+    "tl": 16,
+    "ar": 10,
+    "dr": 2,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Synth Brass 2",
+   "modulador": {
+    "mult": 1,
+    "tl": 20,
+    "ar": 10,
+    "dr": 2,
+    "sl": 2,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Soprano Sax",
+   "modulador": {
+    "mult": 1,
+    "tl": 22,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 13,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Alto Sax",
+   "modulador": {
+    "mult": 1,
+    "tl": 22,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 13,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Tenor Sax",
+   "modulador": {
+    "mult": 1,
+    "tl": 22,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 13,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Baritone Sax",
+   "modulador": {
+    "mult": 1,
+    "tl": 22,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 13,
+    "dr": 1,
+    "sl": 1,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6,
+   "transposicao": -12
+  },
+  {
+   "nome": "Oboe",
+   "modulador": {
+    "mult": 3,
+    "tl": 30,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "English Horn",
+   "modulador": {
+    "mult": 3,
+    "tl": 28,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "Bassoon",
+   "modulador": {
+    "mult": 2,
+    "tl": 26,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Clarinet",
+   "modulador": {
+    "mult": 2,
+    "tl": 22,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 12,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Piccolo",
+   "modulador": {
+    "mult": 1,
+    "tl": 40,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 10,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 1
+  },
+  {
+   "nome": "Flute",
+   "modulador": {
+    "mult": 1,
+    "tl": 40,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 10,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 2
+  },
+  {
+   "nome": "Recorder",
+   "modulador": {
+    "mult": 1,
+    "tl": 40,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 10,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 2
+  },
+  {
+   "nome": "Pan Flute",
+   "modulador": {
+    "mult": 1,
+    "tl": 40,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 10,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "Blown Bottle",
+   "modulador": {
+    "mult": 1,
+    "tl": 40,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 10,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Shakuhachi",
+   "modulador": {
+    "mult": 1,
+    "tl": 40,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 10,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Whistle",
+   "modulador": {
+    "mult": 1,
+    "tl": 40,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 10,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   }
+  },
+  {
+   "nome": "Ocarina",
+   "modulador": {
+    "mult": 1,
+    "tl": 40,
+    "ar": 9,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 10,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 1
+  },
+  {
+   "nome": "Lead 1 (square)",
+   "modulador": {
+    "mult": 1,
+    "tl": 63,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 6,
+    "vib": true
+   }
+  },
+  {
+   "nome": "Lead 2 (sawtooth)",
+   "modulador": {
+    "mult": 1,
+    "tl": 18,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Lead 3 (calliope)",
+   "modulador": {
+    "mult": 1,
+    "tl": 28,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 0,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1,
+    "vib": true
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "Lead 4 (chiff)",
+   "modulador": {
+    "mult": 1,
+    "tl": 22,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Lead 5 (charang)",
+   "modulador": {
+    "mult": 1,
+    "tl": 14,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1,
+    "vib": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Lead 6 (voice)",
+   "modulador": {
+    "mult": 1,
+    "tl": 30,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "Lead 7 (fifths)",
+   "modulador": {
+    "mult": 1,
+    "tl": 24,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Lead 8 (bass + lead)",
+   "modulador": {
+    "mult": 1,
+    "tl": 20,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Pad 1 (new age)",
+   "modulador": {
+    "mult": 1,
+    "tl": 34,
+    "ar": 5,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 4,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 2
+  },
+  {
+   "nome": "Pad 2 (warm)",
+   "modulador": {
+    "mult": 1,
+    "tl": 30,
+    "ar": 5,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 4,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "Pad 3 (polysynth)",
+   "modulador": {
+    "mult": 1,
+    "tl": 24,
+    "ar": 5,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 4,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Pad 4 (choir)",
+   "modulador": {
+    "mult": 1,
+    "tl": 34,
+    "ar": 5,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 4,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 1
+  },
+  {
+   "nome": "Pad 5 (bowed)",
+   "modulador": {
+    "mult": 1,
+    "tl": 28,
+    "ar": 5,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 4,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Pad 6 (metallic)",
+   "modulador": {
+    "mult": 3,
+    "tl": 30,
+    "ar": 5,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 4,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "Pad 7 (halo)",
+   "modulador": {
+    "mult": 2,
+    "tl": 36,
+    "ar": 5,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 4,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 2
+  },
+  {
+   "nome": "Pad 8 (sweep)",
+   "modulador": {
+    "mult": 1,
+    "tl": 18,
+    "ar": 3,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 6,
+    "dr": 0,
+    "sl": 0,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "FX 1 (rain)",
+   "modulador": {
+    "mult": 5,
+    "tl": 26,
+    "ar": 6,
+    "dr": 1,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 6,
+    "dr": 2,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "FX 2 (soundtrack)",
+   "modulador": {
+    "mult": 1,
+    "tl": 26,
+    "ar": 6,
+    "dr": 1,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 6,
+    "dr": 2,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "FX 3 (crystal)",
+   "modulador": {
+    "mult": 7,
+    "tl": 26,
+    "ar": 6,
+    "dr": 1,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 6,
+    "dr": 2,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 2
+  },
+  {
+   "nome": "FX 4 (atmosphere)",
+   "modulador": {
+    "mult": 2,
+    "tl": 26,
+    "ar": 6,
+    "dr": 1,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 6,
+    "dr": 2,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "FX 5 (brightness)",
+   "modulador": {
+    "mult": 4,
+    "tl": 26,
+    "ar": 6,
+    "dr": 1,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 6,
+    "dr": 2,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "FX 6 (goblins)",
+   "modulador": {
+    "mult": 1,
+    "tl": 26,
+    "ar": 6,
+    "dr": 1,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 6,
+    "dr": 2,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "FX 7 (echoes)",
+   "modulador": {
+    "mult": 3,
+    "tl": 26,
+    "ar": 6,
+    "dr": 1,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 6,
+    "dr": 2,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "FX 8 (sci-fi)",
+   "modulador": {
+    "mult": 9,
+    "tl": 26,
+    "ar": 6,
+    "dr": 1,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 6,
+    "dr": 2,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Sitar",
+   "modulador": {
+    "mult": 3,
+    "tl": 28,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Banjo",
+   "modulador": {
+    "mult": 1,
+    "tl": 28,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Shamisen",
+   "modulador": {
+    "mult": 3,
+    "tl": 28,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "realimentacao": 5
+  },
+  {
+   "nome": "Koto",
+   "modulador": {
+    "mult": 1,
+    "tl": 28,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "Kalimba",
+   "modulador": {
+    "mult": 4,
+    "tl": 28,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6,
+    "sustenta": true
+   }
+  },
+  {
+   "nome": "Bag pipe",
+   "modulador": {
+    "mult": 1,
+    "tl": 20,
+    "ar": 14,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 14,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "onda": 1
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Fiddle",
+   "modulador": {
+    "mult": 1,
+    "tl": 24,
+    "ar": 10,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 11,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Shanai",
+   "modulador": {
+    "mult": 3,
+    "tl": 24,
+    "ar": 10,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 11,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "realimentacao": 6
+  },
+  {
+   "nome": "Tinkle Bell",
+   "modulador": {
+    "mult": 4,
+    "tl": 30,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6
+   }
+  },
+  {
+   "nome": "Agogo",
+   "modulador": {
+    "mult": 6,
+    "tl": 26,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6
+   }
+  },
+  {
+   "nome": "Steel Drums",
+   "modulador": {
+    "mult": 3,
+    "tl": 24,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "Woodblock",
+   "modulador": {
+    "mult": 9,
+    "tl": 20,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 3
+  },
+  {
+   "nome": "Taiko Drum",
+   "modulador": {
+    "mult": 0,
+    "tl": 10,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Melodic Tom",
+   "modulador": {
+    "mult": 1,
+    "tl": 14,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 4
+  },
+  {
+   "nome": "Synth Drum",
+   "modulador": {
+    "mult": 0,
+    "tl": 6,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Reverse Cymbal",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 2,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Guitar Fret Noise",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 2,
+    "sl": 4,
+    "rr": 5,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Breath Noise",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 8,
+    "dr": 2,
+    "sl": 4,
+    "rr": 5,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 0,
+    "ar": 10,
+    "dr": 3,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Seashore",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 4,
+    "dr": 2,
+    "sl": 4,
+    "rr": 5,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 3,
+    "dr": 3,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Bird Tweet",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 2,
+    "sl": 4,
+    "rr": 5,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 7,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Telephone Ring",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 12,
+    "dr": 2,
+    "sl": 4,
+    "rr": 5,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 4,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Helicopter",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 6,
+    "dr": 2,
+    "sl": 4,
+    "rr": 5,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 8,
+    "dr": 3,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Applause",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 4,
+    "dr": 2,
+    "sl": 4,
+    "rr": 5,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 4,
+    "dr": 3,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true
+   },
+   "realimentacao": 7
+  },
+  {
+   "nome": "Gunshot",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 2,
+    "sl": 4,
+    "rr": 5,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 6,
+    "rr": 5,
+    "sustenta": true
+   },
+   "realimentacao": 7
+  }
+ ],
+ "percussao": {
+  "35": {
+   "nome": "Acoustic Bass Drum",
+   "modulador": {
+    "mult": 0,
+    "tl": 10,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 7
+   },
+   "portadora": {
+    "mult": 0,
+    "tl": 0,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 4,
+   "nota_fixa": 24
+  },
+  "36": {
+   "nome": "Bass Drum 1",
+   "modulador": {
+    "mult": 0,
+    "tl": 10,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 7
+   },
+   "portadora": {
+    "mult": 0,
+    "tl": 0,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 4,
+   "nota_fixa": 26
+  },
+  "37": {
+   "nome": "Side Stick",
+   "modulador": {
+    "mult": 5,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 72
+  },
+  "38": {
+   "nome": "Acoustic Snare",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 7,
+   "nota_fixa": 60
+  },
+  "39": {
+   "nome": "Hand Clap",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 7,
+   "nota_fixa": 66
+  },
+  "40": {
+   "nome": "Electric Snare",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 7,
+   "nota_fixa": 62
+  },
+  "41": {
+   "nome": "Low Floor Tom",
+   "modulador": {
+    "mult": 0,
+    "tl": 22,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 8,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 3,
+   "nota_fixa": 35
+  },
+  "42": {
+   "nome": "Closed Hi-Hat",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 9,
+    "sl": 15,
+    "rr": 9
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 2,
+    "ar": 15,
+    "dr": 9,
+    "sl": 15,
+    "rr": 9
+   },
+   "realimentacao": 7,
+   "nota_fixa": 96
+  },
+  "43": {
+   "nome": "High Floor Tom",
+   "modulador": {
+    "mult": 0,
+    "tl": 22,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 8,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 3,
+   "nota_fixa": 37
+  },
+  "44": {
+   "nome": "Pedal Hi-Hat",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 4,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "realimentacao": 7,
+   "nota_fixa": 96
+  },
+  "45": {
+   "nome": "Low Tom",
+   "modulador": {
+    "mult": 0,
+    "tl": 22,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 8,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 3,
+   "nota_fixa": 41
+  },
+  "46": {
+   "nome": "Open Hi-Hat",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 5
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 2,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 5
+   },
+   "realimentacao": 7,
+   "nota_fixa": 96
+  },
+  "47": {
+   "nome": "Low-Mid Tom",
+   "modulador": {
+    "mult": 0,
+    "tl": 22,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 8,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 3,
+   "nota_fixa": 44
+  },
+  "48": {
+   "nome": "Hi-Mid Tom",
+   "modulador": {
+    "mult": 0,
+    "tl": 22,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 8,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 3,
+   "nota_fixa": 47
+  },
+  "49": {
+   "nome": "Crash Cymbal 1",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 3
+   },
+   "portadora": {
+    "mult": 3,
+    "tl": 2,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 3
+   },
+   "realimentacao": 7,
+   "nota_fixa": 90
+  },
+  "50": {
+   "nome": "High Tom",
+   "modulador": {
+    "mult": 0,
+    "tl": 22,
+    "ar": 15,
+    "dr": 5,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 8,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 3,
+   "nota_fixa": 50
+  },
+  "51": {
+   "nome": "Ride Cymbal 1",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 4
+   },
+   "portadora": {
+    "mult": 5,
+    "tl": 4,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 4
+   },
+   "realimentacao": 7,
+   "nota_fixa": 92
+  },
+  "52": {
+   "nome": "Chinese Cymbal",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 3
+   },
+   "portadora": {
+    "mult": 3,
+    "tl": 2,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 3
+   },
+   "realimentacao": 7,
+   "nota_fixa": 88
+  },
+  "53": {
+   "nome": "Ride Bell",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 4
+   },
+   "portadora": {
+    "mult": 7,
+    "tl": 6,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 4
+   },
+   "realimentacao": 7,
+   "nota_fixa": 94
+  },
+  "54": {
+   "nome": "Tambourine",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 4,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 7,
+   "nota_fixa": 92
+  },
+  "55": {
+   "nome": "Splash Cymbal",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 4
+   },
+   "portadora": {
+    "mult": 3,
+    "tl": 2,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 4
+   },
+   "realimentacao": 7,
+   "nota_fixa": 92
+  },
+  "56": {
+   "nome": "Cowbell",
+   "modulador": {
+    "mult": 4,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 79
+  },
+  "57": {
+   "nome": "Crash Cymbal 2",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 3
+   },
+   "portadora": {
+    "mult": 3,
+    "tl": 2,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 3
+   },
+   "realimentacao": 7,
+   "nota_fixa": 88
+  },
+  "58": {
+   "nome": "Vibraslap",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 4
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 6,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 4
+   },
+   "realimentacao": 7,
+   "nota_fixa": 70
+  },
+  "59": {
+   "nome": "Ride Cymbal 2",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 4
+   },
+   "portadora": {
+    "mult": 5,
+    "tl": 4,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 4
+   },
+   "realimentacao": 7,
+   "nota_fixa": 90
+  },
+  "60": {
+   "nome": "Hi Bongo",
+   "modulador": {
+    "mult": 1,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 74
+  },
+  "61": {
+   "nome": "Low Bongo",
+   "modulador": {
+    "mult": 1,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 67
+  },
+  "62": {
+   "nome": "Mute Hi Conga",
+   "modulador": {
+    "mult": 1,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 70
+  },
+  "63": {
+   "nome": "Open Hi Conga",
+   "modulador": {
+    "mult": 1,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 67
+  },
+  "64": {
+   "nome": "Low Conga",
+   "modulador": {
+    "mult": 1,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 60
+  },
+  "65": {
+   "nome": "High Timbale",
+   "modulador": {
+    "mult": 2,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 70
+  },
+  "66": {
+   "nome": "Low Timbale",
+   "modulador": {
+    "mult": 2,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 62
+  },
+  "67": {
+   "nome": "High Agogo",
+   "modulador": {
+    "mult": 4,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 86
+  },
+  "68": {
+   "nome": "Low Agogo",
+   "modulador": {
+    "mult": 4,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 79
+  },
+  "69": {
+   "nome": "Cabasa",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 6,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "realimentacao": 7,
+   "nota_fixa": 98
+  },
+  "70": {
+   "nome": "Maracas",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 9,
+    "sl": 15,
+    "rr": 9
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 6,
+    "ar": 15,
+    "dr": 9,
+    "sl": 15,
+    "rr": 9
+   },
+   "realimentacao": 7,
+   "nota_fixa": 98
+  },
+  "71": {
+   "nome": "Short Whistle",
+   "modulador": {
+    "mult": 1,
+    "tl": 40,
+    "ar": 13,
+    "dr": 0,
+    "sl": 0,
+    "rr": 9,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 13,
+    "dr": 0,
+    "sl": 0,
+    "rr": 9,
+    "sustenta": true,
+    "vib": true
+   },
+   "nota_fixa": 90
+  },
+  "72": {
+   "nome": "Long Whistle",
+   "modulador": {
+    "mult": 1,
+    "tl": 40,
+    "ar": 11,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 11,
+    "dr": 0,
+    "sl": 0,
+    "rr": 7,
+    "sustenta": true,
+    "vib": true
+   },
+   "nota_fixa": 90
+  },
+  "73": {
+   "nome": "Short Guiro",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 8,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "realimentacao": 7,
+   "nota_fixa": 80
+  },
+  "74": {
+   "nome": "Long Guiro",
+   "modulador": {
+    "mult": 15,
+    "tl": 0,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 2,
+    "tl": 8,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 7,
+   "nota_fixa": 80
+  },
+  "75": {
+   "nome": "Claves",
+   "modulador": {
+    "mult": 6,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 84
+  },
+  "76": {
+   "nome": "Hi Wood Block",
+   "modulador": {
+    "mult": 3,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 77
+  },
+  "77": {
+   "nome": "Low Wood Block",
+   "modulador": {
+    "mult": 3,
+    "tl": 30,
+    "ar": 15,
+    "dr": 8,
+    "sl": 15,
+    "rr": 8
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 2,
+   "nota_fixa": 72
+  },
+  "78": {
+   "nome": "Mute Cuica",
+   "modulador": {
+    "mult": 2,
+    "tl": 20,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 7
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 6,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 4,
+   "nota_fixa": 74
+  },
+  "79": {
+   "nome": "Open Cuica",
+   "modulador": {
+    "mult": 2,
+    "tl": 24,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6
+   },
+   "portadora": {
+    "mult": 1,
+    "tl": 0,
+    "ar": 15,
+    "dr": 4,
+    "sl": 15,
+    "rr": 6
+   },
+   "realimentacao": 3,
+   "nota_fixa": 67
+  },
+  "80": {
+   "nome": "Mute Triangle",
+   "modulador": {
+    "mult": 5,
+    "tl": 30,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "portadora": {
+    "mult": 3,
+    "tl": 0,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "nota_fixa": 96
+  },
+  "81": {
+   "nome": "Open Triangle",
+   "modulador": {
+    "mult": 5,
+    "tl": 30,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 4
+   },
+   "portadora": {
+    "mult": 3,
+    "tl": 0,
+    "ar": 15,
+    "dr": 3,
+    "sl": 15,
+    "rr": 4
+   },
+   "nota_fixa": 96
+  }
+ }
+}

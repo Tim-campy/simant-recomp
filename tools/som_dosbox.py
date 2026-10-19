@@ -13,6 +13,8 @@ Uso:
   python -I tools/som_dosbox.py midi ARQ.mid [--canais 1-10] [--ate 10]
   python -I tools/som_dosbox.py niveis ARQ.wav [--janela 1]
   python -I tools/som_dosbox.py comparar ORIGINAL.wav PORT.wav [--midi ARQ.mid] [--png saida.png]
+  python -I tools/som_dosbox.py harmonicos ARQ.mid ORIGINAL.wav INICIO_S PORT.wav CANAL
+  python -I tools/som_dosbox.py quadros VIDEO.avi PASTA [--cada 5]
 """
 import argparse
 import os
@@ -209,7 +211,7 @@ def ler_wav(arq):
 
 
 def ler_midi(arq):
-    """Notas [(segundos, canal 1-16, nota, velocidade, duração)] de um SMF formato 0/1."""
+    """Notas [(segundos, canal 1-16, nota, velocidade, duração, programa)] de um SMF formato 0/1."""
     d = open(arq, "rb").read()
     assert d[:4] == b"MThd"
     _, ntrilhas, divisao = struct.unpack(">HHH", d[8:14])
@@ -253,7 +255,7 @@ def ler_midi(arq):
                 eventos.append((tick, len(eventos), "canal", (status, *dados)))
     eventos.sort()
     tempo, ult_tick, seg = 500000, 0, 0.0
-    abertas, notas = {}, []
+    abertas, notas, programa = {}, [], {}
     for tick, _, tipo, v in eventos:
         seg += (tick - ult_tick) * tempo / divisao / 1e6
         ult_tick = tick
@@ -261,12 +263,14 @@ def ler_midi(arq):
             tempo = v
             continue
         st, c = v[0] & 0xF0, (v[0] & 0x0F) + 1
+        if st == 0xC0:
+            programa[c] = v[1]
         if st == 0x90 and v[2] > 0:
             abertas[(c, v[1])] = (seg, v[2])
         elif st in (0x80, 0x90):
             if (c, v[1]) in abertas:
                 ini, vel = abertas.pop((c, v[1]))
-                notas.append((ini, c, v[1], vel, seg - ini))
+                notas.append((ini, c, v[1], vel, seg - ini, programa.get(c, 0)))
     notas.sort()
     return notas
 
@@ -401,7 +405,7 @@ def comparar(orig, port, arq_midi=None, png=None, desloc_max_s=2.0):
     if arq_midi:
         notas = [x for x in ler_midi(arq_midi) if x[1] <= 9]
         rolo = np.zeros((len(mo), 12))
-        for t, _, nota, vel, dur in notas:
+        for t, _, nota, vel, dur, _ in notas:
             a_ = int((t + io) * qps)
             b_ = int((t + dur + io) * qps) + 1
             rolo[max(0, a_) : max(0, min(len(rolo), b_)), nota % 12] += vel
@@ -412,7 +416,7 @@ def comparar(orig, port, arq_midi=None, png=None, desloc_max_s=2.0):
         ctrl = np.mean([float((co_t[tem] * np.roll(rolo, melhor[1] + r, axis=0)[tem]).sum(1).mean()) for r in (37, 91, 173)])
         print(f"notas do MIDI (canais 1-9, croma da transcrição) contra o original: {melhor[0]:.3f} "
               f"(ajuste {melhor[1] / qps:+.2f} s); controle deslocado {ctrl:.3f}")
-        fim_m = max(t + d for t, _, _, _, d in notas)
+        fim_m = max(x[0] + x[4] for x in notas)
         print(f"MIDI: {len(notas)} notas, última termina em {fim_m:.2f} s; som do original dura {fo - io:.2f} s")
     if k >= 0:
         a, b = mo[k:], mp
@@ -525,6 +529,35 @@ def gravar_png(arq, linhas, tipo, largura):
                 + bloco(b"IDAT", zlib.compress(cru, 6)) + bloco(b"IEND", b""))
 
 
+def harmonicos(midi, orig, desloc, port, canal):
+    """Perfil harmônico médio (dB relativos ao maior, harmônicos 1-12) das notas isoladas de um
+    canal (nenhuma outra nota melódica começa 0,35 s antes nem durante; a percussão é ignorada), no original e no port."""
+    notas = [n for n in ler_midi(midi) if n[1] <= 10]
+    to, xo = ler_wav(orig)
+    tp, xp = ler_wav(port)
+    res = {"original": [], "port": []}
+    progs = set()
+    for n in notas:
+        t, c, nota, vel, dur, prog = n
+        if c != canal or dur < 0.12:
+            continue
+        if any(m is not n and m[1] != 10 and t - 0.35 < m[0] < t + dur for m in notas):
+            continue
+        progs.add(prog)
+        f0 = 440 * 2 ** ((nota - 69) / 12)
+        for k, (tx, x, o) in {"original": (to, xo, desloc), "port": (tp, xp, 0.0)}.items():
+            a, b = int((t + o + 0.03) * tx), int((t + o + min(dur, 0.25)) * tx)
+            seg = x[a:b] * np.hanning(b - a)
+            mag = np.abs(np.fft.rfft(seg, 8 * len(seg)))
+            fr = np.fft.rfftfreq(8 * len(seg), 1 / tx)
+            h = np.array([mag[(fr > f0 * i * 0.97) & (fr < f0 * i * 1.03)].max() for i in range(1, 13)])
+            res[k].append(20 * np.log10(h / h.max() + 1e-6))
+    print(f"canal {canal}, programa(s) {sorted(progs)}: {len(res['port'])} notas isoladas; harmônicos 1-12 (dB)")
+    for k, v in res.items():
+        if v:
+            print(f"  {k:8s} " + " ".join(f"{x:5.0f}" for x in np.mean(v, 0)))
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -547,6 +580,12 @@ def main():
     n = sub.add_parser("niveis")
     n.add_argument("arq")
     n.add_argument("--janela", type=float, default=1.0)
+    h = sub.add_parser("harmonicos")
+    h.add_argument("midi")
+    h.add_argument("original")
+    h.add_argument("desloc", type=float, help="início da música no original (s)")
+    h.add_argument("port")
+    h.add_argument("canal", type=int)
     k = sub.add_parser("comparar")
     k.add_argument("original")
     k.add_argument("port")
@@ -560,11 +599,13 @@ def main():
         quadros_chave(a.avi, a.pasta, a.cada)
     elif a.cmd == "midi":
         cs = canais(a.canais)
-        for t, ch, nota, vel, dur in ler_midi(a.arq):
+        for t, ch, nota, vel, dur, prog in ler_midi(a.arq):
             if ch in cs and t <= a.ate:
-                print(f"{t:8.3f} s  canal {ch:2d}  nota {nota:3d}  vel {vel:3d}  dur {dur:.3f}")
+                print(f"{t:8.3f} s  canal {ch:2d}  programa {prog:3d}  nota {nota:3d}  vel {vel:3d}  dur {dur:.3f}")
     elif a.cmd == "niveis":
         niveis(a.arq, a.janela)
+    elif a.cmd == "harmonicos":
+        harmonicos(a.midi, a.original, a.desloc, a.port, a.canal)
     else:
         comparar(a.original, a.port, a.midi, a.png, a.desloc_max)
 

@@ -65,7 +65,7 @@ impl Operador {
         }
     }
 
-    fn validar(&self) -> Result<(), String> {
+    pub fn validar(&self) -> Result<(), String> {
         let faixas = [(self.mult, 15), (self.ksl, 3), (self.tl, 63), (self.ar, 15), (self.dr, 15), (self.sl, 15), (self.rr, 15), (self.onda, 7)];
         if faixas.iter().any(|&(v, max)| v > max) {
             return Err(format!("operador fora das faixas do OPL: {self:?}"));
@@ -129,14 +129,15 @@ fn um() -> f32 {
 }
 
 impl Banco {
-    /// Lê o JSON do port e confere as faixas.
+    /// Lê o JSON do port e confere as faixas (o executável lê pelo `Recursos::dados`, com mods).
+    #[cfg(test)]
     pub fn de_json(bytes: &[u8]) -> Result<Banco, String> {
         let b: Banco = serde_json::from_slice(bytes).map_err(|e| format!("banco FM: {e}"))?;
         b.validar()?;
         Ok(b)
     }
 
-    fn validar(&self) -> Result<(), String> {
+    pub fn validar(&self) -> Result<(), String> {
         if self.melodicos.len() != 128 {
             return Err(format!("banco FM: {} timbres melódicos (precisa de 128)", self.melodicos.len()));
         }
@@ -235,6 +236,16 @@ mod testes {
         assert_eq!((t.realimentacao, t.aditivo, t.transposicao), (7, false, -12));
         assert_eq!(b.percussao[&35].nota_fixa, Some(60));
         assert_eq!(b.percussao.len(), 47);
+    }
+
+    #[test]
+    fn banco_do_port_carrega() {
+        let arq = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../data/opl_banco.json");
+        let b = Banco::de_json(&std::fs::read(arq).unwrap()).unwrap();
+        assert_eq!(b.melodicos.len(), 128);
+        assert!((35..=81).all(|n| b.percussao.get(&n).is_some_and(|t| t.nota_fixa.is_some())));
+        // Notas fora do mapa GM (as 85-95 dos .MID do SimAnt) ficam em silêncio.
+        assert!(!b.percussao.contains_key(&89));
     }
 
     #[test]

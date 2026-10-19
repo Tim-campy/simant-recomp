@@ -2,10 +2,13 @@
 //! SDL2. Especificação: docs/spec/regras/som.md e docs/spec/formatos/som.md.
 //!
 //! Opções de linha de comando (tratadas aqui): `--sem-som`, `--soundfont ARQ.sf2`,
+//! `--sintetizador simples|soundfont|fm`, `--exportar-musica ID` (com `--exportar-som`, só essa),
 //! `--exportar-som DIR` (grava os efeitos e as músicas em WAV e sai, sem abrir áudio).
 
+pub mod banco_fm;
 pub mod config;
 pub mod controle;
+pub mod fm;
 pub mod mixer;
 pub mod sintetizador;
 
@@ -18,9 +21,11 @@ use engine::formats::som::{self, CabecalhoMusica, TIPO_CABECALHO_MUSICA, TIPO_EF
 use engine::recursos::Recursos;
 use engine::rules::estado::Evento;
 
-use config::{ConfigSom, FonteMusica};
+use config::{ConfigSom, FonteMusica, TipoSintetizador};
 use controle::{Comando, ControleSom};
 use mixer::Mixer;
+use banco_fm::Banco;
+use fm::SintFm;
 use sintetizador::{SintSimples, SintSoundFont, Sintetizador};
 
 /// Opções de som da linha de comando.
@@ -29,6 +34,9 @@ pub struct OpcoesSom {
     pub desligado: bool,
     pub soundfont: Option<PathBuf>,
     pub exportar: Option<PathBuf>,
+    pub sintetizador: Option<TipoSintetizador>,
+    /// `--exportar-musica ID`: com `--exportar-som`, só essa música (e nenhum efeito).
+    pub so_musica: Option<u16>,
 }
 
 impl OpcoesSom {
@@ -38,6 +46,14 @@ impl OpcoesSom {
             "--sem-som" => self.desligado = true,
             "--soundfont" => self.soundfont = Some(valor()?.into()),
             "--exportar-som" => self.exportar = Some(valor()?.into()),
+            "--exportar-musica" => {
+                let v = valor()?;
+                self.so_musica = Some(v.parse().map_err(|_| format!("--exportar-musica: '{v}' não é um id"))?);
+            }
+            "--sintetizador" => {
+                let v = valor()?;
+                self.sintetizador = Some(TipoSintetizador::de_nome(&v).ok_or(format!("--sintetizador: '{v}' (simples, soundfont ou fm)"))?);
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -90,16 +106,45 @@ fn caminho_soundfont(cfg: &ConfigSom, opcoes: &OpcoesSom) -> Option<PathBuf> {
         .or_else(|| cfg.soundfont.as_ref().map(PathBuf::from))
 }
 
-/// Sintetizador escolhido: `rustysynth` com SoundFont, ou o simples (também se a SoundFont falhar).
-pub fn sintetizador(cfg: &ConfigSom, opcoes: &OpcoesSom, taxa: u32) -> Box<dyn Sintetizador> {
-    if let Some(sf) = caminho_soundfont(cfg, opcoes) {
-        match SintSoundFont::abrir(&sf, taxa) {
-            Ok(s) => {
-                println!("som: SoundFont {}", sf.display());
-                return Box::new(s);
-            }
-            Err(e) => eprintln!("som: SoundFont não carregada ({e}); usando o sintetizador simples"),
+/// Banco FM: o `.op2` do usuário (`fm.banco_op2`), se houver, senão o JSON de `data/` (com mods).
+pub fn banco_fm(recursos: &Recursos, cfg: &ConfigSom) -> Result<Banco, String> {
+    let mut banco = match &cfg.fm.banco_op2 {
+        Some(c) => Banco::de_op2(&std::fs::read(c).map_err(|e| format!("{c}: {e}"))?)?,
+        None => {
+            let b: Banco = recursos.dados(&cfg.fm.banco)?;
+            b.validar()?;
+            b
         }
+    };
+    banco.ganho *= cfg.fm.ganho;
+    Ok(banco)
+}
+
+/// Sintetizador escolhido (linha de comando, senão `sintetizador` de `data/som.json`; sem nenhum dos
+/// dois, SoundFont se houver uma, senão o simples). Uma SoundFont ou um banco FM que falhe cai no simples.
+pub fn sintetizador(recursos: &Recursos, cfg: &ConfigSom, opcoes: &OpcoesSom, taxa: u32) -> Box<dyn Sintetizador> {
+    let sf = caminho_soundfont(cfg, opcoes);
+    let tipo = opcoes.sintetizador.or(cfg.sintetizador).unwrap_or(if sf.is_some() {
+        TipoSintetizador::Soundfont
+    } else {
+        TipoSintetizador::Simples
+    });
+    match tipo {
+        TipoSintetizador::Soundfont => match sf {
+            Some(sf) => match SintSoundFont::abrir(&sf, taxa) {
+                Ok(s) => {
+                    println!("som: SoundFont {}", sf.display());
+                    return Box::new(s);
+                }
+                Err(e) => eprintln!("som: SoundFont não carregada ({e}); usando o sintetizador simples"),
+            },
+            None => eprintln!("som: nenhuma SoundFont indicada; usando o sintetizador simples"),
+        },
+        TipoSintetizador::Fm => match banco_fm(recursos, cfg) {
+            Ok(b) => return Box::new(SintFm::new(b, taxa, cfg.canal_percussao)),
+            Err(e) => eprintln!("som: banco FM não carregado ({e}); usando o sintetizador simples"),
+        },
+        TipoSintetizador::Simples => {}
     }
     Box::new(SintSimples::new(taxa, cfg.canal_percussao))
 }
@@ -161,7 +206,7 @@ impl<'a> Audio<'a> {
         let mut taxa = cfg.taxa_saida;
         let dispositivo = audio.open_playback(None, &pedido, |spec| {
             taxa = spec.freq as u32;
-            Saida(Mixer::new(taxa, sintetizador(&cfg, opcoes, taxa), cfg.volume_musica, cfg.volume_efeitos))
+            Saida(Mixer::new(taxa, sintetizador(self.recursos, &cfg, opcoes, taxa), cfg.volume_musica, cfg.volume_efeitos))
         })?;
         dispositivo.resume();
         self.taxa = taxa;
@@ -299,9 +344,9 @@ pub fn proximo_tema(
 // Exportação para WAV (sem abrir áudio)
 // ---------------------------------------------------------------------------------------------
 
-/// Renderiza uma sequência inteira (mais a cauda) em estéreo intercalado.
-pub fn renderizar_musica(eventos: Vec<EventoMidi>, sint: Box<dyn Sintetizador>, taxa: u32, cauda_s: f32) -> Vec<f32> {
-    let mut m = Mixer::new(taxa, sint, 1.0, 0.0);
+/// Renderiza uma sequência inteira (mais a cauda) em estéreo intercalado, com o volume `volume`.
+pub fn renderizar_musica(eventos: Vec<EventoMidi>, sint: Box<dyn Sintetizador>, taxa: u32, cauda_s: f32, volume: f32) -> Vec<f32> {
+    let mut m = Mixer::new(taxa, sint, volume, 0.0);
     m.tocar_musica(eventos);
     let mut saida = Vec::new();
     let mut bloco = vec![0.0; 2 * 1024];
@@ -316,7 +361,8 @@ pub fn renderizar_musica(eventos: Vec<EventoMidi>, sint: Box<dyn Sintetizador>, 
 }
 
 /// Grava `DIR/efeitos/efeito_NNN.wav` (PCM decodificado, exato, na taxa do original) e
-/// `DIR/musicas/<id>_<nome>.wav` (sintetizado). Não toca nada.
+/// `DIR/musicas/<id>_<nome>.wav` (sintetizado, com `volume_musica`, o nível em que toca no jogo; os
+/// efeitos saem sem o `volume_efeitos`). Não toca nada.
 pub fn exportar(recursos: &Recursos, opcoes: &OpcoesSom, dir: &Path) -> Result<(), String> {
     let cfg: ConfigSom = recursos.dados(config::ARQUIVO)?;
     let (dir_e, dir_m) = (dir.join("efeitos"), dir.join("musicas"));
@@ -325,7 +371,7 @@ pub fn exportar(recursos: &Recursos, opcoes: &OpcoesSom, dir: &Path) -> Result<(
     }
     let gravar = |c: PathBuf, b: Vec<u8>| std::fs::write(&c, b).map_err(|e| format!("{}: {e}", c.display()));
     let mut n = 0;
-    for id in 0..=1023u16 {
+    for id in (0..=1023u16).filter(|_| opcoes.so_musica.is_none()) {
         let Ok(pcm) = efeito_pcm(recursos, id) else { continue };
         gravar(dir_e.join(format!("efeito_{id:03}.wav")), som::wav(&pcm, cfg.taxa_efeitos, 1, 8))?;
         n += 1;
@@ -337,10 +383,19 @@ pub fn exportar(recursos: &Recursos, opcoes: &OpcoesSom, dir: &Path) -> Result<(
         ids.sort();
         ids.dedup();
     }
+    if let Some(so) = opcoes.so_musica {
+        ids.retain(|&id| id == so);
+    }
     for id in ids {
         match musica(recursos, &cfg, id)? {
             Ok(eventos) => {
-                let pcm = renderizar_musica(eventos, sintetizador(&cfg, opcoes, cfg.taxa_saida), cfg.taxa_saida, cfg.cauda_exportacao_s);
+                let pcm = renderizar_musica(
+                    eventos,
+                    sintetizador(recursos, &cfg, opcoes, cfg.taxa_saida),
+                    cfg.taxa_saida,
+                    cfg.cauda_exportacao_s,
+                    cfg.volume_musica,
+                );
                 let nome = cfg.musicas.get(&id).map(String::as_str).unwrap_or("banco");
                 let c = dir_m.join(format!("{id}_{nome}.wav"));
                 println!("{} ({:.1} s)", c.display(), pcm.len() as f64 / 2.0 / cfg.taxa_saida as f64);
@@ -414,12 +469,33 @@ mod testes {
         let cfg: ConfigSom = r.dados(config::ARQUIVO).unwrap();
         let eventos = musica(&r, &cfg, 11007).unwrap().unwrap();
         let fim = eventos.last().unwrap().segundos;
-        let pcm = renderizar_musica(eventos, Box::new(SintSimples::new(11025, 10)), 11025, 0.5);
+        let pcm = renderizar_musica(eventos, Box::new(SintSimples::new(11025, 10)), 11025, 0.5, 1.0);
         let duracao = pcm.len() as f64 / 2.0 / 11025.0;
         assert!(duracao >= fim + 0.4 && duracao < fim + 0.7, "{duracao} s para {fim} s de eventos");
         assert!(pcm.iter().any(|x| x.abs() > 0.05));
         let wav = som::wav_estereo_f32(&pcm, 11025);
         assert_eq!(wav.len(), 44 + pcm.len() * 2);
+    }
+
+    #[test]
+    fn exporta_musica_pelo_caminho_fm_sem_saturar() {
+        let Some(r) = recursos() else { return };
+        let cfg: ConfigSom = r.dados(config::ARQUIVO).unwrap();
+        assert_eq!(cfg.sintetizador, Some(TipoSintetizador::Fm), "data/som.json usa o FM por padrão");
+        let banco = banco_fm(&r, &cfg).unwrap();
+        // badnews (11007) é a música mais forte do banco; call2arm (11013), outra curta.
+        for id in [11007u16, 11013] {
+            let eventos = musica(&r, &cfg, id).unwrap().unwrap();
+            let fim = eventos.last().unwrap().segundos;
+            let sint = Box::new(SintFm::new(banco.clone(), 22_050, cfg.canal_percussao));
+            let pcm = renderizar_musica(eventos, sint, 22_050, 0.5, cfg.volume_musica);
+            let duracao = pcm.len() as f64 / 2.0 / 22_050.0;
+            assert!(duracao >= fim + 0.4 && duracao < fim + 0.7, "{id}: {duracao} s para {fim} s de eventos");
+            let pico = pcm.iter().fold(0.0f32, |m, v| m.max(v.abs()));
+            let rms = (pcm.iter().map(|v| (v * v) as f64).sum::<f64>() / pcm.len() as f64).sqrt();
+            assert!(pico < 0.95, "{id}: pico {pico} (saturação)");
+            assert!(rms > 0.01, "{id}: RMS {rms} (silêncio)");
+        }
     }
 
     #[test]
