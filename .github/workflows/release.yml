@@ -86,6 +86,8 @@ jobs:
           cp -r data "$dir/data"
           cp -r exemplos/mods "$dir/exemplos/mods"
           cp LICENSE "$dir/LICENSE.txt"
+          cp LICENSE-MIT "$dir/LICENSE-MIT.txt"
+          cp LICENSE-APACHE "$dir/LICENSE-APACHE.txt"
           cp LEIAME-usuario.md "$dir/LEIAME.txt"
           if [ -f README-user.md ]; then cp README-user.md "$dir/README.txt"; fi
           cp CHANGELOG.md "$dir/CHANGELOG.txt"

@@ -15,7 +15,9 @@ Arquivos preparados neste branch:
 | `README-user.md` | versão em inglês, opcional (vai como `README.txt` se existir) |
 | `docs/lancamento.md` | este documento |
 
-## 1. Licença do projeto **[DECIDIR]**
+## 1. Licença do projeto — **decidido (2026-10-19): "MIT OR Apache-2.0"**
+
+O usuário escolheu a opção recomendada. Arquivos: `LICENSE` (aviso da licença dupla e da exclusão dos arquivos do SimAnt original), `LICENSE-MIT`, `LICENSE-APACHE` (texto oficial de apache.org); `license = "MIT OR Apache-2.0"` no `Cargo.toml` do workspace; o pacote leva os três. A análise que levou à escolha segue abaixo.
 
 O repositório **não tem `LICENSE`** (conferido: nem `LICENSE*`, nem `COPYING*`, nem campo `license` nos
 `Cargo.toml`). Sem licença, o código público no GitHub é "todos os direitos reservados": dá para ler,
