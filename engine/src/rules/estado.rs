@@ -1185,6 +1185,10 @@ pub struct Estado {
     /// 4 trilha vermelha. Ligada pelo alarme da amarela (`_SetAlarmDropState`) e pelos botões de
     /// cheiro da faixa (jogo.md, "Camada de cheiro na janela de edição").
     pub camada_edicao: i16,
+    /// `_DROPdir` (`9:9c66`, fora do save) já resolvido no passo (dx, dy) da comida que cai na casa
+    /// (`TabelasCasa::passo_queda`): gravado quando um patch da casa é gerado; antes disso, o de
+    /// `_DROPdir` = 0 (variável zerada na carga do programa).
+    pub passo_queda: (u8, u8),
     /// Pedidos à interface acumulados desde a última vez que foram retirados.
     pub eventos: Vec<Evento>,
 }
@@ -1244,6 +1248,7 @@ impl Estado {
             relogio_mac: None,
             precisa_salvar: false,
             camada_edicao: -1,
+            passo_queda: (0, 255),
             eventos: Vec::new(),
         }
     }
@@ -1534,6 +1539,9 @@ impl Estado {
         // Mapas, listas e vida.
         e.ambiente.terreno = m.terreno as i16;
         e.ambiente.barreira = if m.terreno == 0 { ini.barreira_quintal } else { ini.barreira_casa };
+        if m.terreno == 1 {
+            e.passo_queda = m.passo_queda;
+        }
         e.superficie.mapa = Grade::de_bytes(SUPERFICIE, m.mapa_a.clone())?;
         e.superficie.vida = Grade::de_bytes(SUPERFICIE, m.vida_a.clone())?;
         e.ninho_b.mapa = Grade::de_bytes(NINHO, m.mapa_b.clone())?;

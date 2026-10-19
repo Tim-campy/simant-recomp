@@ -246,6 +246,8 @@ pub struct Mundo {
     pub terreno: u8,
     /// `_DROPdir` (`9:9c66`): para onde cai a comida largada na casa; só os patches da casa o gravam.
     pub queda: u8,
+    /// O passo da comida que cai com esse `_DROPdir` (`TabelasCasa::passo_queda`).
+    pub passo_queda: (u8, u8),
     pub mapa_a: Vec<u8>,
     pub mapa_b: Vec<u8>,
     pub mapa_r: Vec<u8>,
@@ -391,6 +393,7 @@ impl Mundo {
             tipo_jogo,
             terreno: 0,
             queda: 0,
+            passo_queda: (0, 255),
             mapa_a: vec![0; CELULAS_SUPERFICIE],
             mapa_b: vec![0; CELULAS_NINHO],
             mapa_r: vec![0; CELULAS_NINHO],
@@ -568,7 +571,9 @@ impl Mundo {
         self.terreno = 1;
         self.iniciar_formigas_leao(s, tab, 0);
         self.iniciar_bichos_de_conta(s, tab);
-        tab.casa.gerar(n, &mut ChaoDaCasa { mapa_a: &mut self.mapa_a, queda: &mut self.queda }, s)
+        tab.casa.gerar(n, &mut ChaoDaCasa { mapa_a: &mut self.mapa_a, queda: &mut self.queda }, s)?;
+        self.passo_queda = tab.casa.passo_queda(self.queda);
+        Ok(())
     }
 
     /// `_MakeYardPatch` (geracao-mundo.md §4).

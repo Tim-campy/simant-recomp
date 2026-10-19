@@ -462,7 +462,9 @@ Quintal: tile 0x48 (última unidade) → `Mapa = S16()` (chão); senão `Mapa �
 
 ### 8.2 `_DropFoodA(x, y)` (`1020:0d86`)
 
-Usada pela amarela e pela aranha morta. Quintal: tile > 0x4A → falha (devolve 0); tile < 0x48 → 0x48; senão +1. Casa: tile ≤ 3 → `(tile + 6)·4`; 8–0x17 (cadáver) → `((tile − 8) >> 2 + 6)·4`; 0x18–0x26 → +1; outro tile < 0x40 → a comida "cai" na direção da tabela `10:22be/22c2` indexada por `9:9c66` até achar piso (`< 4`) [detalhe da casa: em aberto]; ≥ 0x40 → falha. Sucesso: `_FoodA += 1`. Fato visto no código.
+Usada pela amarela e pela aranha morta. Quintal: tile > 0x4A → falha (devolve 0); tile < 0x48 → 0x48; senão +1. Casa: tile ≤ 3 → `(tile + 6)·4`; 8–0x17 (cadáver) → `((tile − 8) >> 2 + 6)·4`; 0x18–0x26 → +1; outro tile < 0x40 (4–7 e 0x27–0x3F) → a comida **cai**; ≥ 0x40 → falha. Sucesso: `_FoodA += 1`. Fato visto no código.
+
+**A queda** [código + desmontagem de `1020:0dfe`–`0ea4`]: com d = `_DROPdir` (`9:9c66`), dx = byte `10:22be + d` e dy = byte `10:22c2 + d` (tabelas `[0, 1, 0, 0xFF]` e `[0xFF, 0, 1, 0]`), **somados sem sinal** (`mov al, …; sub ah, ah`). A partir da própria célula: se o tile é < 4, recebe `(tile + 6)·4`, `_FoodA += 1` e para; senão anda (dx, dy); para se x sai de 0..127 ou y de 0..63. Devolve 1 mesmo quando a comida some. Como 0xFF soma 255, nas direções 0 (ladrilhos, "para cima") e 3 (carpete direito, "para a esquerda") a comida sai do mapa no primeiro passo e **some**; só cai de fato nas direções 1 (carpete esquerdo, para a direita) e 2 (cozinha, patches 9/36/37, para baixo) [hipótese: defeito do original (o código quer −1); comportamento seguido pelo port]. `_DROPdir` não está no save: depois de um Load vale o do último patch da casa gerado na sessão (0 se nenhum). **Port** (2026-10-18): `comum::largar_comida_superficie` + `comida_cai`, com `Estado::passo_queda` gravado ao gerar um patch da casa (tabela em `data/casa.json`, `direcoes_queda`); teste `comida_cai_na_casa_pelo_dropdir`. **Não conferido na bancada.**
 
 ### 8.3 `_AddFood(n, som)` (`1030:6a58`) e alimentação periódica
 
@@ -628,7 +630,7 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md). Ferramenta de leitura do
 ## Lacunas
 
 - Quem arma `_FlyAwayB` (revoada preta) e as regras de `_QueenStorage*`: documento de ciclo de vida (em paralelo).
-- Queda de comida na casa (`_DropFoodA`, tabela `10:22be/22c2` indexada por `9:9c66`).
+- Queda de comida na casa (`_DropFoodA`): especificada em 8.2 pelo código; falta um caso na bancada.
 - Significado prático dos modos 17/18 na superfície (se alguma formiga sai do ninho com eles).
 - `_ForceModeA/B`, `_StartAttack`, `_GetNewRedTask` e demais funções sem chamador: confirmar se há chamadas indiretas (tabela de ponteiros) com o Ghidra.
 - Ainda não conferidos no original: morte natural (T1), luta e proporção de vitórias (T5, T6), revoada (T8), estratégia vermelha (T9), recrutamento pelo jogador (T11). As regras foram conferidas só pelos casos da seção "Observado no original".

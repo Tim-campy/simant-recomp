@@ -66,6 +66,30 @@ pub struct TabelasCasa {
     pub rotinas: HashMap<String, Vec<Operacao>>,
     /// Receita de cada patch `n` = 0..37.
     pub patches: Vec<Vec<Operacao>>,
+    /// Passo da comida que cai (`_DropFoodA`): tabelas `10:22be` (x) e `10:22c2` (y) indexadas por
+    /// `_DROPdir`, somadas **sem sinal** (0xFF = +255 sai do mapa no primeiro passo).
+    #[serde(default = "direcoes_queda_padrao")]
+    pub direcoes_queda: DirecoesQueda,
+}
+
+/// `dx` e `dy` (bytes) por `_DROPdir` 0..3.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct DirecoesQueda {
+    pub dx: [u8; 4],
+    pub dy: [u8; 4],
+}
+
+fn direcoes_queda_padrao() -> DirecoesQueda {
+    DirecoesQueda { dx: [0, 1, 0, 255], dy: [255, 0, 1, 0] }
+}
+
+impl TabelasCasa {
+    /// Passo (dx, dy) da comida que cai com este `_DROPdir` (fora de 0..3: o de 0).
+    pub fn passo_queda(&self, dir: u8) -> (u8, u8) {
+        let d = &self.direcoes_queda;
+        let i = usize::from(dir).min(3);
+        (d.dx[i], d.dy[i])
+    }
 }
 
 impl Default for TabelasCasa {

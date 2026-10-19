@@ -232,6 +232,9 @@ pub fn aplicar_patch(e: &mut Estado, m: &Mundo, cfg: &ConfigSimulacao) -> Result
     // _MakeMap / _OverlayTileSet.
     e.ambiente.terreno = i16::from(m.terreno);
     e.ambiente.barreira = if m.terreno == 0 { ini.barreira_quintal } else { ini.barreira_casa };
+    if m.terreno == 1 {
+        e.passo_queda = m.passo_queda;
+    }
     e.superficie.mapa = Grade::de_bytes(SUPERFICIE, m.mapa_a.clone())?;
     e.superficie.vida = Grade::de_bytes(SUPERFICIE, m.vida_a.clone())?;
     for (n, mapa, saida, vida) in [
