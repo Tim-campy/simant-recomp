@@ -259,6 +259,10 @@ pub struct ConfigQuintalMapa {
     pub teclas: Vec<AtalhoQuintal>,
     /// Números da faixa 35 (`_DrawYardData`).
     pub dados_faixa: DadosFaixa,
+    /// Barras de saúde e população e os números das populações da faixa 35 (`_DrawYardData`, a
+    /// mesma regra das da faixa 34). Sem a chave (mod antigo), a faixa 35 fica sem elas.
+    #[serde(default)]
+    pub barras_faixa: super::barras_faixa::ConfigBarrasFaixa,
 }
 
 /// Objetos da faixa 35 onde `_DrawYardData` escreve, e a fonte.
@@ -365,23 +369,29 @@ pub struct JanelaQuintal {
     pub colocando_rainha: bool,
     /// Esperando o clique numa colônia preta (`_SpecialXfer`).
     pub escolhendo_colonia: bool,
-    /// `GameTime` de quando a faixa 35 tomou o lugar da 34 (`None` = a 34 na tela). Os números de
-    /// `_DrawYardData` só aparecem depois de um tick: a troca da faixa vem depois do desenho dos
-    /// dados e, com a simulação parada, nada os redesenha (bancada, `qemu_faixa35_botoes.txt`).
+    /// `GameTime` de quando a faixa 35 tomou o lugar da 34 **sem** os dados de `_DrawYardData`
+    /// (`None` = dados na faixa). Só Ctrl+Y/5/6/7 (`_ProcMenu` 0x21–0x24) trocam a faixa sem
+    /// redesenhar os dados; o botão Yard (`_MapToYard` → `_DrawYard`), o clique no quintal e o
+    /// Ctrl+M (`WM_NCACTIVATE` do quintal: troca e `_DrawYardData`) os desenham na hora. Sem dados,
+    /// eles só voltam no próximo tick (`_UpdateWindows`); com o jogo pausado, ficam vazios (bancada
+    /// 2026-10-19, `re_trabalho/agyard/b_faixa35/`: c1, d2 e d3 com dados, c4 e d4 vazios).
     pub tempo_faixa: Option<u32>,
 }
 
 impl JanelaQuintal {
-    /// A interface viu a faixa do momento: guarda o `GameTime` em que a 35 entrou no lugar da 34.
+    /// A faixa 35 acaba de entrar pelo Ctrl+Y/5/6/7, sem os dados, no `GameTime` `tempo`.
+    pub fn faixa_sem_dados(&mut self, tempo: u32) {
+        self.tempo_faixa = Some(tempo);
+    }
+
+    /// A interface viu a faixa do momento: com a 34 na tela, ou depois de um tick, a 35 tem os dados.
     pub fn acompanhar_faixa(&mut self, tempo: u32) {
-        match (self.na_frente, self.tempo_faixa) {
-            (true, None) => self.tempo_faixa = Some(tempo),
-            (false, Some(_)) => self.tempo_faixa = None,
-            _ => {}
+        if !self.na_frente || self.tempo_faixa.is_some_and(|t| t != tempo) {
+            self.tempo_faixa = None;
         }
     }
 
-    /// Os números da faixa 35 já foram desenhados (passou um tick desde a troca da faixa).
+    /// Os números e as barras da faixa 35 estão desenhados.
     pub fn dados_da_faixa(&self, tempo: u32) -> bool {
         self.tempo_faixa.is_none_or(|t| t != tempo)
     }
@@ -854,10 +864,20 @@ impl DesenhoQuintal {
                 }
             }
         }
-        let pendentes = desenhar_objetos(q, recursos, interface, &faixa, self.origem_faixa, None);
-        // _DrawYardData (fonte 3): rainhas guardadas e colônias pretas e vermelhas no quintal.
+        let mut pendentes = desenhar_objetos(q, recursos, interface, &faixa, self.origem_faixa, None);
+        // _DrawYardData: populações (fonte 3) e barras, depois rainhas guardadas e colônias pretas e
+        // vermelhas no quintal (fonte 0).
         let base = faixa.retangulo();
         let (dx, dy) = (self.origem_faixa.0 - base.esq, self.origem_faixa.1 - base.topo);
+        if com_dados {
+            let objeto = |nome: &str| {
+                let o = faixa.objetos.iter().find(|o| o.nome == nome)?;
+                let r = o.retangulo;
+                Some((Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy }, o.cor))
+            };
+            let v = super::barras_faixa::ValoresFaixa::do_estado(e);
+            pendentes.extend(super::barras_faixa::desenhar(q, interface, &c.barras_faixa, &v, &objeto));
+        }
         let valores = [
             (c.dados_faixa.rainhas.as_str(), e.preta.rainhas_guardadas.max(0)),
             (c.dados_faixa.colonias_pretas.as_str(), e.preta.total_colonias),
@@ -985,21 +1005,29 @@ mod testes {
 
     #[test]
     fn numeros_da_faixa_35_so_depois_de_um_tick() {
-        // qemu_faixa35_botoes.txt: pausado antes do Ctrl+Y, a faixa 35 fica sem os números; com um
-        // tick depois da troca, eles aparecem; voltar à 34 e de novo à 35 os apaga outra vez.
+        // qemu_faixa35_botoes.txt e agyard/b_faixa35: pausado, o Ctrl+Y deixa a faixa 35 sem os
+        // números até um tick; o botão Yard, o clique no quintal e o Ctrl+M os desenham na hora.
         let mut j = JanelaQuintal::default();
         j.acompanhar_faixa(100);
         assert!(j.dados_da_faixa(100), "faixa 34: nada a esconder");
         j.na_frente = true;
         j.acompanhar_faixa(100);
+        assert!(j.dados_da_faixa(100), "botão Yard ou clique: com os dados");
+        j.na_frente = false;
+        j.acompanhar_faixa(100);
+        j.na_frente = true;
+        j.faixa_sem_dados(100);
+        j.acompanhar_faixa(100);
+        assert!(!j.dados_da_faixa(100), "Ctrl+Y: vazios com o jogo parado");
+        j.acompanhar_faixa(100);
         assert!(!j.dados_da_faixa(100));
         j.acompanhar_faixa(101);
-        assert!(j.dados_da_faixa(101));
+        assert!(j.dados_da_faixa(101), "um tick depois");
+        assert_eq!(j.tempo_faixa, None);
         j.na_frente = false;
+        j.faixa_sem_dados(101);
         j.acompanhar_faixa(101);
-        j.na_frente = true;
-        j.acompanhar_faixa(101);
-        assert!(!j.dados_da_faixa(101));
+        assert!(j.dados_da_faixa(101), "a 34 na tela limpa");
     }
 
     #[test]

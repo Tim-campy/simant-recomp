@@ -39,11 +39,13 @@ impl Sessao<'_> {
         self.janelas.gerente = antiga.janelas.gerente.clone();
         self.janelas.gerente.arrasto = None;
         self.janelas.gerente.menu = None;
-        self.modos.janela.na_frente = antiga.modos.janela.na_frente;
         self.mini.reaberto = antiga.mini.reaberto;
         if let Some(c) = self.janelas.janelas_padrao(self.partida.nav.plano_mapa) {
             self.depois_de_abrir(c);
         }
+        // `_OpenEditWindow` ativa a janela de edição: o `WM_NCACTIVATE` dela troca a faixa 35 pela 34
+        // (o quintal que estava na frente não deixa a faixa dele no jogo novo).
+        self.modos.janela.na_frente = self.janelas.gerente.topo() == Some(self.janelas.cfg.quintal);
         self.sincronizar_janelas();
     }
 

@@ -367,15 +367,21 @@ impl JanelasControle {
         }
     }
 
-    /// `_SetDefaultWindows` (`1000:d66a`, Quick Game e Load): Caste e Behavior para a frente (abrindo),
-    /// o mapa (ou o quintal no plano 0) aberto se nenhum dos dois estiver, e a janela de edição por
-    /// cima. Devolve se abriu o mapa (`_YardToMap`) ou o quintal (`_MapToYard`).
+    /// `_SetDefaultWindows` (`1000:d66a`, jogo novo e Load): Caste e Behavior para a frente (abrindo),
+    /// o mapa (ou o quintal no plano 0) aberto se não estiver, e a janela de edição por cima. Devolve
+    /// se abriu o mapa (`_YardToMap`) ou o quintal (`_MapToYard`). Com a outra das duas aberta no
+    /// lugar dela, `_YardToMap`/`_MapToYard` trocam uma pela outra (`_win_Swap`): o quintal que tinha
+    /// tomado o lugar do mapa fecha e o mapa volta ali (jogo novo com o quintal aberto).
     pub fn janelas_padrao(&mut self, plano_mapa: i16) -> Option<Controle> {
         self.abrir(Controle::Castas);
         self.abrir(Controle::Tarefas);
-        let alvo = if plano_mapa == 0 { Controle::Quintal } else { Controle::Mapa };
+        let (alvo, outra) = if plano_mapa == 0 { (Controle::Quintal, Controle::Mapa) } else { (Controle::Mapa, Controle::Quintal) };
         let aberta = (!self.aberta(alvo)).then(|| {
-            self.abrir(alvo);
+            if self.aberta(outra) {
+                self.trocar(outra, alvo);
+            } else {
+                self.abrir(alvo);
+            }
             alvo
         });
         self.gerente.trazer_para_frente(ID_EDICAO);
