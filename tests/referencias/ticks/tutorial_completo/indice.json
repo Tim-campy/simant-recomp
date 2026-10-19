@@ -1,0 +1,138 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-18",
+ "gerador": "tools/cenarios_tick.py",
+ "snapshot": "tut",
+ "descricao": "Tutorial completo (snapshot tut): lições 1 a 56 e a 57 (fim), com as ações que cada lição pede feitas pela bancada (cenarios_tick.py gravar tutorial_completo): cliques calculados na janela de edição do Tutorial (39 x 21 tiles a partir de (0, 128)), teclas (Ctrl+M/E/B/C/Y/5/8, 2, 0, X), arrasto no triângulo do Behavior e clique segurado no gráfico de barras. Gravados inteiros só os ticks em que _TutorCnt chega a múltiplo de 8 (as gravações brutas têm 124 + 185 ticks, todos 307/307 menos os casos de testes-tick.md); aqui, 16 escolhidos: lição dada com ação (prazo da lição 7 contado do fechamento da caixa, _SetMyHealth(8), _AddBlackAnts 10 e 80, soma de _modeLevels, pulo da 0x2B, texto 11108 da 0x37, tick de _FullCount com a caixa antes do gato) e lição concluída por condição (escavação, andar e esperar, vista ou prazo, janela 0x100, defesa, troca de corpo, ninho vermelho, fim). Ticks até 929: 2ª gravação (com o relógio lido depois da caixa); de 984 em diante: 1ª gravação. extras.antes.JanelaNaFrente = janela que a bancada pôs na frente (anotada; o original não a guarda na memória do jogo); VistaEdicao = tamanho da janela de edição do Tutorial; MacTickCount_depois_da_caixa = leituras do relógio feitas pelo tick depois de a caixa fechar.",
+ "passos": [
+  "2ª gravação (lições 1-26):",
+  "lição 3: 40: cavar até (27, 12)",
+  "lição 3: 88: cavar até (30, 1)",
+  "lição 4: 142: cavar até (26, 1)",
+  "lição 4: 190: cavar até (22, 1)",
+  "lição 4: 238: cavar até (18, 1)",
+  "lição 5: 260: superfície por (18, 0)",
+  "lição 7: 292: andar até (23, 20)",
+  "lição 7: 340: andar até (29, 22)",
+  "lição 8: 371: clique na amarela",
+  "lição 8: 435: clique na amarela",
+  "lição 10: 528: Window > Map",
+  "lição 12: 560: Window > Edit",
+  "lição 13: 576: comida em (59, 51)",
+  "lição 14: 623: comida em (61, 51)",
+  "lição 16: 654: comida em (59, 51)",
+  "lição 18: 686: buraco (17, 30)",
+  "lição 19: 741: largar em (29, 2)",
+  "lição 19: 789: largar em (28, 2)",
+  "lição 20: 804: superfície por (30, 0)",
+  "lição 20: 852: superfície por (30, 0)",
+  "lição 21: 867: pedrinha em (16, 20)",
+  "lição 22: 891: largar em (17, 21)",
+  "lição 24: 922: recrutar 10 (tecla 2)",
+  "lição 26: 954: andar até (22, 23)",
+  "lição 26: 1002: andar até (28, 26)",
+  "1ª gravação (lições 27-57):",
+  "lição 27: 828: alarme (tecla 0) e andar até (23, 27)",
+  "lição 27: 876: alarme (tecla 0) e andar até (23, 27)",
+  "lição 27: 930: alarme (tecla 0) e andar até (18, 28)",
+  "lição 30: 977: troca de corpo com a preta em (18, 29)",
+  "lição 32: 1009: Window > Map",
+  "lição 33: 1025: View > Yard",
+  "lição 36: 1073: View > House",
+  "lição 38: 1104: View > Surface",
+  "lição 39: 1120: Window > Behavior",
+  "lição 41: 1152: passos [['arrastar', 190, 366, 165, 395]]",
+  "lição 42: 1167: passos [['tela', 31, 58], ['frente', 256]]",
+  "lição 42: 1231: Window > Map",
+  "lição 46: 1278: passos [['segurar', 590, 70, 1.5]]",
+  "lição 47: 1293: Window > Caste",
+  "lição 49: 1325: Window > Edit",
+  "lição 50: 1435: clique na amarela",
+  "lição 52: 1467: recrutar 10 cinco vezes (tecla 2)",
+  "lição 54: 1506: buraco vermelho (109, 32)",
+  "lição 54: 1554: buraco vermelho (109, 32)",
+  "lição 42 (1ª gravação): em 1167 o botão Patch (31, 58) da faixa não concluiu a lição (a janela do mapa não ficou na frente); em 1231 Ctrl+M concluiu"
+ ],
+ "primeira_entrada": {
+  "SementeS": 40449,
+  "SementeR": 2135432522,
+  "gameCycles": 101979,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 24141,
+  "GameTime": 1334,
+  "Cycle": 1334,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ]
+ },
+ "ticks": [
+  "tick_000252",
+  "tick_000291",
+  "tick_000362",
+  "tick_000519",
+  "tick_000535",
+  "tick_000575",
+  "tick_000622",
+  "tick_000905",
+  "tick_000929",
+  "tick_000984",
+  "tick_001151",
+  "tick_001245",
+  "tick_001324",
+  "tick_001599",
+  "tick_001607",
+  "tick_001631"
+ ],
+ "selecao": [
+  "252",
+  "291",
+  "362",
+  "519",
+  "535",
+  "575",
+  "622",
+  "905",
+  "929",
+  "984",
+  "1151",
+  "1245",
+  "1324",
+  "1599",
+  "1607",
+  "1631"
+ ],
+ "vida_nao_reconstruivel": {
+  "*": "formigas sobrepostas e vagas mortas (T = 0) nas mesmas células (ex.: buracos (14, 32) e (84, 31) no 1631): a reconstrução de _DoLoadInitializations deixa a marca de outra vaga, como em colonia_5min"
+ }
+}

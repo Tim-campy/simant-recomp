@@ -195,8 +195,9 @@ fn janela_de_castas_muda_os_niveis() {
     assert_eq!(j.janelas_padrao(2), Some(Controle::Mapa));
     assert_eq!(j.gerente.ordem(), vec![19, 18, 1, 0]);
     j.trazer_para_frente(Some(Controle::Castas));
-    // Ápice do triângulo (casteTriangle (392, 342) no layout, deslocamento (0, −52)): reprodutores 100%.
-    assert_eq!(j.clicar(&r, &mut e, 447, 290, false).unwrap(), Clique::Cliente(19));
+    // Ápice do triângulo (casteTriangle (392, 342) no layout, deslocamento (0, −52); largura 108 no
+    // triângulo do clique, que é o do botão): reprodutores 100%.
+    assert_eq!(j.clicar(&r, &mut e, 446, 290, false).unwrap(), Clique::Cliente(19));
     assert!(j.soltar());
     assert_eq!(e.controles.castas[0], 0xFFFF);
     assert_eq!(e.controles.casta_automatica, 0);
@@ -215,4 +216,67 @@ fn janela_de_castas_muda_os_niveis() {
     // Agora o mesmo ponto do Auto é da edição, que cobre a Caste: o Manual não é apertado.
     assert_eq!(j.clicar(&r, &mut e, 360, 323 - 52 + 5, false).unwrap(), Clique::Cliente(0));
     assert_eq!(e.controles.casta_automatica, 1);
+}
+
+/// Arrasto no triângulo das castas conferido na bancada (2026-10-18, `cenarios_tick.py gravar
+/// triangulo`, snapshot rico, jogo pausado): botão apertado em (435, 421) da tela, passando por
+/// (436, 370) e (460, 400), solto em (420, 395) (área cliente = tela − 38 linhas). O original leu
+/// `_casteLevels` = (18321, 39138, 8076), `_CasteAuto` = 0 e `_IdealCaste` = (59, 12, 14, 14).
+#[test]
+fn arrasto_no_triangulo_igual_a_bancada() {
+    use engine::core::janelas::{Controle, JanelasControle};
+    use engine::rules::estado::Estado;
+    let Some(r) = recursos() else { return };
+    let mut e = Estado::de_save(&quick2()).unwrap();
+    let cfg: ConfigTelaJogo = r.dados("tela_jogo.json").unwrap();
+    let interface = Interface::carregar(&r, cfg.tabela_posicoes).unwrap();
+    let area = engine::formats::janela::Retangulo { esq: 0, topo: 73, dir: 640, base: 442 };
+    let m = &cfg.edicao.moldura;
+    let mut j = JanelasControle::new(r.dados("janelas.json").unwrap(), &interface, &r, (m.retangulo(), m.metricas()), area).unwrap();
+    j.janelas_padrao(2);
+    j.trazer_para_frente(Some(Controle::Castas));
+    j.clicar(&r, &mut e, 435, 421 - 38, false).unwrap();
+    for (x, y) in [(436, 370), (460, 400), (420, 395)] {
+        j.mover(&r, &mut e, x, y - 38).unwrap();
+    }
+    j.soltar();
+    assert_eq!(e.controles.castas, [18321, 39138, 8076]);
+    assert_eq!(e.controles.casta_automatica, 0);
+    assert_eq!(e.controles.castas_ideais, [59, 12, 14, 14]);
+}
+
+/// Navegação conferida na bancada (2026-10-18, `cenarios_tick.py gravar navegacao`, snapshot rico,
+/// jogo pausado): o estado lido depois de cada tecla. Uma Ctrl+seta mandada pela bancada fica
+/// apertada ~150 ms e o laço de `MAINWNDPROC` repete o passo enquanto ela está apertada, por isso o
+/// número de passos por tecla variou de 1 a 3 (o de cada vista vem do `_MapPnt` lido).
+#[test]
+fn navegacao_igual_a_bancada() {
+    use engine::core::navegacao::{Acao, Navegacao};
+    let layout = LayoutSave::carregar(&raiz().join("data/save_layout.json")).unwrap();
+    let j = JogoSalvo::abrir(&layout, &raiz().join("tests/referencias/saves/NAV_RICO.ANT")).unwrap();
+    let mut n = Navegacao::do_save(&j, PosicaoVista::Salva, 25, 19).unwrap();
+    assert_eq!((n.plano_mapa, n.vista.x, n.vista.y), (1, 52, 23));
+    let pontos = n.pontos;
+    let passos: [(Acao, usize, (i16, i32, i32)); 11] = [
+        (Acao::LinhaDireita, 1, (1, 53, 23)),
+        (Acao::LinhaDireita, 2, (1, 55, 23)),
+        (Acao::LinhaAbaixo, 1, (1, 55, 24)),
+        (Acao::LinhaEsquerda, 1, (1, 54, 24)),
+        (Acao::LinhaAcima, 1, (1, 54, 23)),
+        // troca de plano: _CenterEdit no ponto lembrado (ninho preto (36, 9), vermelho (32, 1))
+        (Acao::NinhoPreto, 1, (2, 24, 0)),
+        (Acao::LinhaDireita, 3, (2, 27, 0)),
+        (Acao::NinhoVermelho, 1, (3, 20, 0)),
+        (Acao::Superficie, 1, (1, 52, 23)),
+        (Acao::LinhaAbaixo, 5, (1, 52, 28)),
+        // o plano que já está na tela também centraliza: a rolagem não muda o ponto lembrado
+        (Acao::Superficie, 1, (1, 52, 23)),
+    ];
+    for (k, (a, vezes, esperado)) in passos.into_iter().enumerate() {
+        for _ in 0..vezes {
+            n.aplicar(a);
+        }
+        assert_eq!((n.plano_mapa, n.vista.x, n.vista.y), esperado, "passo {k} ({a:?})");
+    }
+    assert_eq!(n.pontos, pontos, "a rolagem e a troca de plano não mudam os pontos lembrados");
 }

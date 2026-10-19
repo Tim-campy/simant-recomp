@@ -1,0 +1,43 @@
+# Cartões 152-156 (Common Species e as espécies) com esperas maiores: o cartão 152 demora a escrever o texto e um
+# clique antes disso se perde (ver telas/info.md §6).
+snapshot_carregar quick
+esperar 2
+disquete re_trabalho/info_todos/a.img
+esperar 1
+teclas ctrl+l
+esperar 3
+teclas n
+esperar 3
+digitar A
+teclas shift+semicolon
+digitar PORT50
+esperar 1
+teclas ret
+esperar 5
+clicar_em 105 97
+esperar 3
+capturar re_trabalho/info_todos/c128.png
+clicar_em 337 366
+esperar 6
+capturar re_trabalho/info_todos/r152.png
+clicar_em 345 374
+esperar 6
+capturar re_trabalho/info_todos/r153.png
+clicar_em 330 449
+esperar 5
+clicar_em 345 344
+esperar 6
+capturar re_trabalho/info_todos/r154.png
+clicar_em 330 449
+esperar 5
+clicar_em 344 389
+esperar 6
+capturar re_trabalho/info_todos/r155.png
+clicar_em 330 449
+esperar 5
+clicar_em 345 359
+esperar 6
+capturar re_trabalho/info_todos/r156.png
+clicar_em 330 449
+esperar 5
+fim

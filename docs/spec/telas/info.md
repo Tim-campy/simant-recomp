@@ -52,4 +52,6 @@ Conferência automática dos 53 cartões: `exportar_info JOGO SAIDA --conferir` 
 
 Testes: `core/info.rs` (registros do cartão 128, limpeza do texto, faces, quebra de linha, trechos, histórico e popup, geometria dos popups p911/p912), `engine/tests/modos_reais.rs` (cartão 128 lido do banco e os 53 cartões sem texto cortado).
 
-**Não verificado:** os outros 42 cartões contra capturas (só a conferência automática); clique numa palavra em negrito no original.
+**Todos os cartões alcançáveis (2026-10-18):** `tools/gerar_roteiro_info.py` monta, a partir das áreas de clique, o caminho mais curto do Top Card a cada cartão e gera `tests/referencias/roteiros/qemu_info_todos.txt` (capturas em `re_trabalho/info_todos/`). São **51 cartões** alcançáveis por clique; comparados com `exportar_info … --tela 280 222` na região (280, 223)–(599, 422): **99,64–99,96%** em todos (resta a última linha da área e o cursor). Observado: o cartão 152 (Common Species) escreveu o texto só depois de ~2 s, e um clique antes disso se perdeu (a primeira gravação parou ali); com esperas de 6 s (`qemu_info_especies.txt`) os cartões 152–156 deram 99,65–99,75%.
+
+**Não verificado:** os cartões 127 (Top Card duplicado) e 129 (Index), que nenhuma área de clique alcança a partir do 128; clique numa palavra em negrito no original.

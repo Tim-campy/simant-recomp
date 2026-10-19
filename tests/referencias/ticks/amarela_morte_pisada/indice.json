@@ -1,0 +1,87 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-18",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "rico",
+ "descricao": "Menino passeando no patch atual; uma execução de ensaio viu o pé cair em (68, 12) no 1712 e, na repetição, a amarela é posta nessa célula na entrada do 1712 (o gato fora de jogo): _FootFall acha 0xFF e chama _YellowDeath(5) (mensagem 10034); também a aranha (_SuserX/Y no retângulo) entra em agonia",
+ "passos": [
+  "NodeNum <- 38",
+  "BoyHere <- 3",
+  "BoyIsMowing <- 0",
+  "BoyX <- 399",
+  "BoyY <- 123",
+  "BoyPx <- 11",
+  "BoyPy <- 8",
+  "LastMowX <- 11",
+  "LastMowY <- 8",
+  "FootHere <- 1",
+  "MePlane <- 1",
+  "MeLocX <- 68",
+  "MeLocY <- 12",
+  "MeGoalPlane <- 1",
+  "MeGoalX <- 68",
+  "MeGoalY <- 12",
+  "MeLastX <- 68",
+  "MeLastY <- 12",
+  "MeMoveMe <- 0",
+  "MeCmd <- 0",
+  "MeHealth <- 90",
+  "amarela de (2, 36, 9) para (1, 68, 12)",
+  "CatDelay <- 2147483647",
+  "tick 1712 parado: tela em re_trabalho/cen/dialogo_1712_0.png; fechando a caixa",
+  "tick 1712 parado: tela em re_trabalho/cen/dialogo_1712_1.png; fechando a caixa"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ]
+ },
+ "ticks": [
+  "tick_001712"
+ ],
+ "selecao": [
+  "1712"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}

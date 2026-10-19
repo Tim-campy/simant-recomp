@@ -1,0 +1,88 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-18",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "rico",
+ "descricao": "A amarela na superfície ao lado da aranha, que já a persegue (_SMode = 2, _Starg = -1): no 1793 a aranha a come (_YellowDeath(1), _AnimYellowFight, quadro da aranha) e começa a mastigar (_EatCnt 50 - 1); renascimento como ovo",
+ "passos": [
+  "esperou até GameTime 1793",
+  "MePlane <- 1",
+  "MeLocX <- 65",
+  "MeLocY <- 32",
+  "MeGoalPlane <- 1",
+  "MeGoalX <- 65",
+  "MeGoalY <- 32",
+  "MeLastX <- 65",
+  "MeLastY <- 32",
+  "MeMoveMe <- 0",
+  "MeCmd <- 0",
+  "MeHealth <- 100",
+  "amarela de (2, 36, 9) para (1, 65, 32)",
+  "SpidOn <- 1",
+  "SpidX <- 1032",
+  "SpidY <- 520",
+  "SMode <- 2",
+  "Starg <- -2",
+  "EatCnt <- 0",
+  "SpidDir <- 2",
+  "StargLife <- 255",
+  "Starg <- -1",
+  "tick 1793 parado: tela em re_trabalho/cen/dialogo_1793_0.png; fechando a caixa",
+  "tick 1793 parado: tela em re_trabalho/cen/dialogo_1793_1.png; fechando a caixa"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ]
+ },
+ "ticks": [
+  "tick_001793"
+ ],
+ "selecao": [
+  "1793"
+ ],
+ "pendentes": {
+  "tick_001793": "desenho dentro do tick (isolado com cenarios_regras.py contar_aranha, breakpoints em _SRand1 e nas funções de desenho): o original sorteia 4 passos de S que o port não sorteia: S1(4) de _DrawPalps três vezes (o _DoEditUpdateDraw de _GotoMyAnt na morte, o de antes do laço de _AnimYellowFight e o do 1º quadro: a aranha está à vista e _SMode >= 2) e S1(2) de _SpiderDialog (opção Events). O port não desenha dentro do tick (rng.md, 'Fora'); o resto do tick vem em cascata"
+ },
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}

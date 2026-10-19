@@ -1,0 +1,65 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-18",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "rico",
+ "descricao": "C-04 e C-05 (ciclo-de-vida.md §3): na entrada do 1791 (_Cycle 1792, múltiplo de 128) os 13 ovos pretos com T = 7, _ModeAuto = 0 e _modeLevels[2] = 0, e os 21 ovos vermelhos com T = 0x87 e _HealthR = 20: os 13 pretos morrem na eclosão (_TotalEggsDiedB 0 -> 13); os vermelhos nascem 17 operárias (0x90) e 4 soldados (0xB0), nenhum macho ou rainha",
+ "passos": [
+  "ModeAuto <- 0",
+  "modeLevels[2] <- 0",
+  "HealthR <- 20"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ]
+ },
+ "ticks": [
+  "tick_001791"
+ ],
+ "selecao": [
+  "1791"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}

@@ -17,7 +17,7 @@ use crate::formats::bitmap::{Bitmap, TIPO_BITMAP};
 use crate::formats::fonte::Fonte;
 use crate::formats::janela::{Janela, Retangulo};
 use crate::recursos::Recursos;
-use crate::rules::estado::{Estado, Evento};
+use crate::rules::estado::Estado;
 use crate::rules::troca_patch::{self, ResultadoRainha, ResultadoTroca};
 
 /// Nome do arquivo de dados.
@@ -473,7 +473,7 @@ fn clicar_sem_parada(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Par
                 let e = &p.estado;
                 let par = |(x, y): (i16, i16)| (i32::from(x), i32::from(y));
                 p.nav.pontos = [par(e.vistas.ponto_quintal), par(e.vistas.ponto_superficie), par(e.preta.vista_ninho), par(e.vermelha.vista_ninho)];
-                p.estado.eventos.push(Evento::CentralizarNaAmarela);
+                p.estado.pedir_centralizar_na_amarela();
             }
         }
         p.processar_eventos_do_estado();
@@ -495,7 +495,7 @@ fn clicar_sem_parada(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Par
         let e = &p.estado;
         let par = |(x, y): (i16, i16)| (i32::from(x), i32::from(y));
         p.nav.pontos = [par(e.vistas.ponto_quintal), par(e.vistas.ponto_superficie), par(e.preta.vista_ninho), par(e.vermelha.vista_ninho)];
-        p.estado.eventos.push(Evento::CentralizarNaAmarela);
+        p.estado.pedir_centralizar_na_amarela();
     }
     p.processar_eventos_do_estado();
     Ok(RespostaQuintal::Troca(r))

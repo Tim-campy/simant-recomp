@@ -108,7 +108,7 @@ Fora do tick, o original consome S (nunca R) ao **redesenhar**. Fontes: pseudoc�
 | balão da aranha (fim de `_DrawSpider`), **depois** dos palpos | "Silly", aranha visível | `S64` + `S2` quando vence o prazo (sem pausa); depois, se `_SMode` mudou ou > 4, `S32` (mesmo pausado; a cada redesenho com `_SMode` = 5) | — |
 | `MYTIMERFUNC` | janela minimizada, jogo não pausado nem acabado | `SRand1(7)` por chamada do temporizador (ícone "Ant0"–"Ant6") | — |
 | `_EndGameDialog`, `_SpiderDialog` (dentro do tick) | fim de jogo; morte pela aranha com "Events" | um `S2`; um `S1(2)` (o texto do quadro; no port, em `rules/amarela.rs::matar_amarela`, antes do `S1(5)` da música, desde 2026-10-18) | — |
-| `_DoEditUpdateDraw`/`_GotoMyAnt` dentro do tick (`_DoAntMoveY`, `_YellowFight`, `_YellowDeath`...) | janela de edição aberta | os mesmos da janela de edição (palpos, balões), no meio do tick | — |
+| `_DoEditUpdateDraw`/`_GotoMyAnt` dentro do tick (`_DoAntMoveY`, `_YellowFight`, `_YellowDeath`...) | janela de edição aberta | os mesmos da janela de edição (palpos, balões), no meio do tick. **Medido** (2026-10-18, `cenarios_regras.py contar_aranha`: breakpoints em `_SRand1`, `_DrawPalps`, `_DoEditUpdateDraw`, `_GotoMyAnt`, `_SpiderDialog`): na morte da amarela pela aranha, `S1(4)` de `_DrawPalps` (chamado de `3:25bd`) no desenho de `_GotoMyAnt`, no de antes do laço de `_AnimYellowFight` e no do 1º quadro, e o `S1(2)` de `_SpiderDialog` (de `1:685a`) entre eles; os 8 `_DoEditUpdateDraw` depois do 2º `_GotoMyAnt` (a vista já no ninho) não sorteiam | — |
 
 `_DrawRain` (`1010:ba9e`, o mesmo bloco da chuva) e `_SubtractFood` não têm chamador no pseudocódigo [em aberto: ponteiro]. `_MysteryButton` e `_CheatKeys` sorteiam R e S, mas são entrada do jogador, não desenho.
 

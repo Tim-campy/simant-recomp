@@ -22,6 +22,9 @@ pub struct ConfigMenu {
     pub itens: Vec<String>,
     /// `_YellowCommand(código)` de cada item (menu da formiga) ou função do botão (menu de ícones).
     pub codigos: Vec<u8>,
+    /// Canto externo em relação ao clique, quando difere de `deslocamento_formiga` [medido].
+    #[serde(default)]
+    pub deslocamento: Option<[i16; 2]>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

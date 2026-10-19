@@ -106,6 +106,22 @@ Roteiros `tests/referencias/roteiros/qemu_ritmo.txt` e `qemu_ritmo_rapido.txt` (
 
 **Fato visto no código** (`_ProcMenu`, `1000:4fc2`, casos 0x43–0x46): o menu Speed → Slow/Normal/Fast/Ultra (e os aceleradores Shift+1..4) só gravam `_GameSpeed` e atualizam as marcas do menu e o texto do item Pause; **não** chamam `_EditMessage`. Só o botão configurável de velocidade (`_DoUserButton` caso 6) escreve "Game speed now …" na faixa. **Verificado na bancada:** depois de Shift+1, Shift+3 e Shift+4 a faixa ficou vazia ou com o conselho que já estava lá. O Pause do menu (0x41), ao contrário, escreve "Game Paused" (ou a instrução da ferramenta 10/11) e limpa ao despausar.
 
+### 3.3 Fast e ultra com CPU de velocidade fixa (`-icount`, 2026-10-18)
+
+Para limitar a faixa plausível numa máquina real, a velocidade da CPU emulada foi fixada com `-icount shift=N,sleep=on` (1 instrução = 2^N ns do relógio da VM). `tools/ritmo_icount.py N`: boot completo num overlay novo (um snapshot sem `-icount` não roda com ele), Quick Game, e `GameTime` medido em normal, fast e ultra contra o **contador de tiques do BIOS** (`0040:006C`, 18,2065 Hz no tempo da VM), lido com a VM pausada no começo e no fim de cada janela. Conferência da régua: normal deu 6,07 ticks/s (shift 5, 6, 7) e 5,94 (shift 4, janela de só 5 s da VM), contra 6,06 do modelo (§2). Em fast e ultra, `_gameCycles` anda 1,00 por tick em todas.
+
+| shift | Instruções/s da VM | Normal | Fast | Ultra | Janela (tempo da VM) |
+|---|---|---|---|---|---|
+| 7 | 7,8 milhões | 6,07 | 25,9 | 34,7 | 18–21 s |
+| 6 | 15,6 milhões | 6,07 | 51,4 | 52,4 | 10–12 s |
+| 5 | 31,3 milhões | 6,07 | 104,6 | 114,8 | 6–7 s |
+| 4 | 62,5 milhões | 5,94 | 185,8 | 189,8 | 4–5 s |
+| — (TCG livre, §3.1 e 2026-10-18 com o host carregado) | não fixo | 5,86 | 34–66 | 32–91 | 20 s |
+
+- **Fast cresce quase em proporção à CPU:** ≈ 3,0–3,3 ticks/s por milhão de instruções por segundo. Ultra fica entre 1,0 e 1,35 × fast (desenha 1 vez a cada 4 ticks em vez de 2; a diferença encolhe nas CPUs rápidas). [hipótese] a variação entre execuções (fast 25,9 com shift 7 contra 51,4/2 = 25,7 previsto; ultra 34,7 contra 26,2) vem do que está na janela de edição em cada medida.
+- **Faixa plausível numa máquina real** [hipótese: o `-icount` cobra 1 unidade por instrução, enquanto num 386/486 as instruções custam de 1 a dezenas de ciclos e o acesso à VGA é bem mais lento que na emulação; os números são um teto]: um 386DX-33 (~8–10 milhões de instruções/s) daria ~25–35 ticks/s em fast; um 486DX2-66 (~25–40 milhões), ~80–130; um Pentium, centenas. O port fixa 5 e 7 voltas por período (66,7 e 90,9 ticks/s, `data/partida.json`), o que corresponde a uma máquina de ~20–30 milhões de instruções/s na escala acima: dentro da faixa de um 486 da época.
+- O TCG sem `-icount` (bancada normal) roda numa velocidade que depende da carga do host: 55–66/91 numa medida, 33/32 noutra (com outra VM e uma análise em paralelo).
+
 ## 4. Pausa
 
 **Fato visto no código.**
@@ -341,7 +357,7 @@ Não verificado: nenhuma parte do tick foi comparada passo a passo com o origina
 
 ## Lacunas
 
-- Taxa de fast/ultra numa máquina real (só medida no QEMU TCG, §3.1) e cadência sem foco (170 ms → 220 ms [hipótese]).
+- Taxa de fast/ultra numa máquina real: só limitada por emulação (§3.1 TCG livre; §3.3 com `-icount`, ~3 ticks/s por milhão de instruções/s); nenhuma máquina real medida. Cadência sem foco (170 ms → 220 ms [hipótese]).
 - Detalhes de `_SimColonies`, `_DoSimYard` (menino, cachorro, gato, pássaro, cortador), `_DoAntLions`, `_MoveSpider`, `_DoPillar`/`_DoSow`, `_DoWater`: só a cadência está descrita aqui.
 - `_Feedback`: regras do tutorial e das mensagens de conselho.
 - Retorno exato de `_CalcScore` e o sentido da nota 3.

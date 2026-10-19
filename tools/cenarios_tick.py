@@ -44,6 +44,9 @@ class Sessao:
         self.dep.ir_entrada()
         self.inicio = self.dep.extras()
         self.passos = []
+        self.relogio_depois_da_caixa = False
+        self.fechou_na_entrada = False
+        self.anotar_relogio_caixa = False
 
     def log(self, msg):
         self.b.log(msg)
@@ -128,12 +131,13 @@ class Sessao:
         correndo (clique em (320, 310), dentro das caixas vistas; depois Enter), até 5 vezes. Armar
         antes importa: sem isso o tick terminava sem ser visto e os ticks seguintes rodavam soltos até o
         breakpoint, o que parecia "ticks aninhados" (tutorial/23, inseticida_morte/21 da 1ª gravação).
-        O relógio lido até a caixa é guardado; o que a caixa lê depois não."""
+        O relógio lido até a caixa é guardado; o que o tick lê depois da caixa, só com
+        `relogio_depois_da_caixa` (ver fechar_caixa_ate_o_retorno)."""
         dep, mj = self.dep, self.mj
         dep.ir_entrada()
         out = {"estado_antes.bin": mj.estado(), "vida_antes.bin": dep.vida()}
         ex = {"antes": dep.extras()}
-        relogio = []
+        relogio, depois_caixa = [], []
         try:
             dep.ir_saida(timeout=espera, relogio=relogio)
         except RuntimeError:
@@ -141,41 +145,104 @@ class Sessao:
             for k in range(5):
                 self.log(f"tick {gt} parado: tela em re_trabalho/cen/dialogo_{gt}_{k}.png; fechando a caixa")
                 self.b.executar(f"capturar re_trabalho/cen/dialogo_{gt}_{k}.png")
-                if self.fechar_caixa_ate_o_retorno(k):
+                # na 1ª tentativa, no tick do _FullCount (_Cycle múltiplo de 64: o gato lê o relógio
+                # depois da caixa) ou quando pedido (lições 7, 9 e 0x1A do tutorial: _GiveLesson lê o
+                # relógio para _TimeTemp depois de a caixa fechar)
+                anotar = self.relogio_depois_da_caixa and k == 0 and ((gt + 1) % 64 == 0 or self.anotar_relogio_caixa)
+                if self.fechar_caixa_ate_o_retorno(k, relogio=depois_caixa if anotar else None):
                     break
             else:
                 raise RuntimeError(f"tick {gt}: a caixa não fechou")
             ex["dialogos"] = k + 1
+            if self.fechou_na_entrada:
+                ex["depois_na_entrada_seguinte"] = True
         out["estado_depois.bin"] = mj.estado()
         out["vida_depois.bin"] = dep.vida()
         ex["depois"] = dep.extras()
         ex["antes"]["MacTickCount"] = relogio[0] if relogio and relogio[0] is not None else None
         ex["MacTickCount_lidos"] = relogio
+        if depois_caixa:
+            # leituras feitas pelo tick depois de a caixa fechar (antes.MacTickCount fica com a 1ª leitura
+            # do tick; sem leitura antes da caixa, é a 1ª daqui)
+            ex["MacTickCount_depois_da_caixa"] = depois_caixa
+            if ex["antes"]["MacTickCount"] is None:
+                ex["antes"]["MacTickCount"] = depois_caixa[0]
         out["extras.json"] = ex
         return out
 
-    def fechar_caixa_ate_o_retorno(self, k, limite=15):
+    def fechar_caixa_ate_o_retorno(self, k, limite=15, relogio=None):
         """Com a VM parada dentro do tick: arma o breakpoint do retorno de _DoAntSim, deixa a VM correr,
-        fecha a caixa (clique ou, nas tentativas ímpares, Enter) e espera parar no retorno."""
+        fecha a caixa (clique ou, nas tentativas ímpares, Enter) e espera parar no retorno.
+
+        Com `relogio` (lista), anota também as leituras de _MacTickCount feitas pelo resto do tick
+        depois da caixa (o _FullCount do tick múltiplo de 64 chama _Feedback, que abre a caixa da lição,
+        antes de _DoSimYard ler o relógio para o gato). A caixa em si não chama _MacTickCount (nos ticks
+        do tutorial com caixa e leitura, a leitura vem toda antes dela); se chamar antes do clique, a
+        anotação é abandonada."""
         import socket
         dep = self.dep
         g = self.mj.sessao_gdb()
+        if relogio is not None:
+            mac_ini, mac_ret = (self.mj.linear_codigo(*qb.MACTICKCOUNT), self.mj.linear_codigo(*qb.MACTICKCOUNT_RETF))
+            armado = mac_ini
+            g.breakpoint(armado)
         g.breakpoint(dep.retorno)
+        # também a entrada do tick seguinte: depois de algumas caixas (lição 50 do tutorial) o tick não
+        # volta ao retorno conhecido; o estado na entrada seguinte é o de depois do tick (entre dois ticks
+        # nada do save muda, testes-tick.md)
+        try:
+            entrada = dep.entrada()
+        except RuntimeError:
+            # o Windows descartou o segmento de código 6 (_DoAntSim) durante a caixa (memória da VM de
+            # 16 MB; visto na caixa com imagem da lição 50 do tutorial): sem breakpoint de entrada
+            entrada = None
+        if entrada is not None:
+            g.breakpoint(entrada)
         try:
             g.drenar()
             g.s.sendall(b"$c#63")
             time.sleep(0.2)
-            if k % 2 == 0:
-                qb.mouse_canto(self.q)
-                qb.mover_rel(self.q, 320, 310)
-                time.sleep(0.2)
-                self.botoes(False)
-            else:
-                self.q.cmd("send-key", keys=[{"type": "qcode", "data": "ret"}], **{"hold-time": 150})
+            try:
+                if k % 2 == 0:
+                    qb.mouse_canto(self.q)
+                    # caixas mais altas (com imagem, ex.: lição 50 do tutorial) têm o "Click here to
+                    # continue" mais embaixo e só fecham com o clique nele: 310, depois 337, depois 360
+                    qb.mover_rel(self.q, 320, (310, 337, 360)[k // 2 % 3])
+                    time.sleep(0.2)
+                    self.botoes(False)
+                else:
+                    self.q.cmd("send-key", keys=[{"type": "qcode", "data": "ret"}], **{"hold-time": 150})
+            except RuntimeError as erro:
+                # "VM not running": o tick só estava lento (o relógio lido muitas vezes, ex.: a caixa da
+                # lição do tutorial) e já parou no retorno, sem caixa nenhuma
+                if "not running" not in str(erro):
+                    raise
+                if relogio is not None and dep.pc()[0] == armado:
+                    self.log("o relógio foi lido com a caixa aberta: leituras depois da caixa não anotadas")
+                    g.breakpoint(armado, False)
+                    relogio = None
+                    return False
             g.s.settimeout(limite)
             try:
-                while not g._e_parada(g._proximo()):
-                    pass
+                while True:
+                    while not g._e_parada(g._proximo()):
+                        pass
+                    if relogio is None:
+                        break
+                    pc, regs = dep.pc()
+                    if pc != armado:
+                        break
+                    if pc == mac_ret:
+                        relogio.append((regs["EDX"] & 0xFFFF) << 16 | (regs["EAX"] & 0xFFFF))
+                    g.breakpoint(armado, False)
+                    if len(relogio) >= qb.MAX_LEITURAS_RELOGIO:
+                        relogio.append(None)
+                        relogio = None
+                    else:
+                        armado = mac_ret if armado == mac_ini else mac_ini
+                        g.breakpoint(armado)
+                    g.drenar()
+                    g.s.sendall(b"$c#63")
             except socket.timeout:
                 g.s.settimeout(30)
                 g.interromper()
@@ -184,8 +251,15 @@ class Sessao:
                 g.s.settimeout(30)
         finally:
             g.breakpoint(dep.retorno, False)
+            if entrada is not None:
+                g.breakpoint(entrada, False)
+            if relogio is not None:
+                g.breakpoint(armado, False)
         pc, _ = dep.pc()
-        return pc == dep.retorno
+        self.fechou_na_entrada = entrada is not None and pc == entrada
+        if self.fechou_na_entrada:
+            self.log("o tick não voltou ao retorno conhecido: estado de depois lido na entrada do seguinte")
+        return pc in (dep.retorno, entrada)
 
     def gravar(self, saida, n, parar=None):
         """Grava n ticks consecutivos em saida/tick_NNNNNN; `parar(save_depois)` encerra antes."""
@@ -1333,6 +1407,197 @@ def cenario_sprites_quintal(c: Sessao, saida, n):
     return []
 
 
+def cenario_navegacao(c: Sessao, saida, n):
+    """Navegação da janela de edição (telas/jogo.md "Navegação"), com o jogo pausado: Ctrl+setas na
+    superfície, troca de plano (Ctrl+9, Ctrl+0, Ctrl+8), Ctrl+seta num ninho e Ctrl+8 com a superfície
+    já na tela. Cada vista: captura NAV_nome.png e o estado em NAV_nome.ANT (o port desenha o mesmo
+    estado com `cargo run -p engine --example tela_jogo -- JOGO NAV_nome.ANT SAIDA NAV_nome.png`)."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+8")
+    time.sleep(2)
+    return capturar_vistas(c, saida, "nav", [
+        ("0_inicial", [], 1), ("1_ctrl_dir", ["ctrl+right"], 2), ("2_ctrl_dir2", ["ctrl+right", "ctrl+right"], 2),
+        ("3_ctrl_baixo", ["ctrl+down"], 2), ("4_ctrl_esq", ["ctrl+left"], 2), ("5_ctrl_cima", ["ctrl+up"], 2),
+        ("6_ninho_preto", ["ctrl+9"], 3), ("7_ninho_preto_dir", ["ctrl+right"], 2), ("8_ninho_vermelho", ["ctrl+0"], 3),
+        ("9_superficie", ["ctrl+8"], 3), ("a_superficie_baixo", ["ctrl+down", "ctrl+down"], 2),
+        ("b_superficie_de_novo", ["ctrl+8"], 3)])
+
+
+def segurar_em(c: Sessao, saida, nome, x, y, espera=2.0):
+    """Aperta o botão em (x, y) da tela, espera, captura NOME.png com o botão apertado e solta longe
+    (a ponta da seta vai para o canto antes de soltar, para não escolher item de menu)."""
+    c.dep.retomar()
+    qb.mouse_canto(c.q)
+    qb.mover_rel(c.q, x, y)
+    time.sleep(0.3)
+    c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": True, "button": "left"}}])
+    time.sleep(espera)
+    tela(c, saida, nome)
+    qb.mover_rel(c.q, -x + 2, -y + 2)
+    time.sleep(0.3)
+    c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": False, "button": "left"}}])
+    time.sleep(1)
+
+
+def cenario_examine_sessao(c: Sessao, saida, n):
+    """Examine várias vezes na mesma sessão (snapshot rico, ninho preto, jogo pausado): as mesmas três
+    formigas de `capturas`, na ordem ORDEM (variável de ambiente, padrão "1,0,2,1,0"), para ver se o
+    deslocamento de 3 pixels de examine_0 é da primeira abertura da sessão. Grava capt.ANT e
+    capturas.json no formato de `capturas` (comparar_capturas.py)."""
+    import os
+    ordem = [int(v) for v in os.environ.get("ORDEM", "1,0,2,1,0").split(",")]
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    (pasta / "capt.ANT").write_bytes(c.mj.estado())
+    s = c.save()
+    mx, my, plano = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2), s.ler("MapPlane")
+    lista = {1: "A", 2: "B", 3: "R"}[plano]
+    me = (s.ler("MeLocX"), s.ler("MeLocY")) if s.ler("MePlane") == plano else None
+    vistos, escolhidas = set(), []
+    for _, f in formigas(s, lista):
+        x, y, g = f["X"], f["Y"], (f["T"] & 0x78) >> 3
+        if not (mx <= x < mx + COLS and my <= y < my + LINS) or (x, y) == me or g in vistos:
+            continue
+        vistos.add(g)
+        escolhidas.append((x, y, f["T"], f["M"]))
+        if len(escolhidas) == 3:
+            break
+    reg = {"vista": [plano, mx, my], "examine": [], "ordem": ordem}
+    for k, i in enumerate(ordem):
+        x, y, t, m = escolhidas[i]
+        reg["examine"].append([x, y, t, m])
+        segurar_em(c, saida, f"examine_{k}", MAPA_X0 + (x - mx) * TILE + 8, MAPA_Y0 + (y - my) * TILE + 8, 1.5)
+    (pasta / "capturas.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"examine: {reg}")
+    return []
+
+
+def cenario_menu_amarela(c: Sessao, saida, n):
+    """_AntMenu: segura o botão na célula da amarela (vista do plano dela, jogo pausado) e captura o menu
+    (rainha alada sem colônia no snapshot full; formiga no rico). Com ARANHA=1 (snapshot rico), antes
+    vira a aranha: superfície, X (troca de corpo) e clique na célula da aranha; depois segura o botão
+    na célula da aranha. Grava menu.ANT (estado com o menu aberto) e menu.json (célula e pixel)."""
+    import os
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    c.teclas("shift+0")
+    time.sleep(1)
+    reg = {}
+    if os.environ.get("ARANHA"):
+        c.teclas("ctrl+8")
+        time.sleep(2)
+        c.mj.sessao_gdb()
+        sx, sy = c.ler("SpidX", sinal=True) >> 4, c.ler("SpidY", sinal=True) >> 4
+        reg["aranha"] = [sx, sy, c.ler("SpidOn"), c.ler("SMode")]
+        c.teclas("x")
+        time.sleep(1.5)
+        tela(c, saida, "troca_modo")
+        c.clicar_celula(sx, sy)
+        time.sleep(2)
+        c.mj.sessao_gdb()
+        reg["depois_da_troca"] = {v: c.ler(v, sinal=True) for v in ("MeMode", "MeLocX", "MeLocY", "MePlane", "CurGameTool", "GamePaused")}
+        tela(c, saida, "troca_feita")
+    else:
+        c.mj.sessao_gdb()
+        plano = c.ler("MePlane")
+        c.teclas({1: "ctrl+8", 2: "ctrl+9", 3: "ctrl+0"}[plano])
+        time.sleep(2)
+    c.mj.sessao_gdb()
+    s = c.save()
+    x, y = s.ler("MeLocX"), s.ler("MeLocY")
+    mx, my = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2)
+    if not (mx <= x < mx + COLS and my <= y < my + LINS):
+        px0 = max(0, min((128 if s.ler("MapPlane") < 2 else 64) - COLS, x - COLS // 2))
+        py0 = max(0, min(64 - LINS, y - LINS // 2))
+        c.escrever_elemento("MapPnt", 0, px0, 2)
+        c.escrever_elemento("MapPnt", 1, py0, 2)
+        c.teclas("ctrl+up", "ctrl+down")   # redesenha a vista com o _MapPnt novo
+        time.sleep(2)
+        c.mj.sessao_gdb()
+        s = c.save()
+        mx, my = s.ler("MapPnt", 0, 2), s.ler("MapPnt", 1, 2)
+    px, py = MAPA_X0 + (x - mx) * TILE + 8, MAPA_Y0 + (y - my) * TILE + 8
+    (pasta / "menu.ANT").write_bytes(c.mj.estado())
+    reg.update({"celula": [x, y], "vista": [s.ler("MapPlane"), mx, my], "pixel": [px, py],
+                "MeType": s.ler("MeType"), "MeNestStarted": c.ler("MeNestStarted")})
+    segurar_em(c, saida, "menu", px, py, 2.5)
+    tela(c, saida, "menu_solto")
+    (pasta / "menu.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    c.log(f"menu: {reg}")
+    return []
+
+
+def cenario_historico(c: Sessao, saida, n):
+    """History com dados (snapshot rico, jogo pausado): Ctrl+H, captura; depois um clique em cada ponto
+    de CLIQUES ("x,y;x,y", botões dos gráficos) com captura hist_K.png. Grava hist.ANT e hist.json."""
+    import os
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+h")
+    time.sleep(3)
+    c.mj.sessao_gdb()
+    (pasta / "hist.ANT").write_bytes(c.mj.estado())
+    tela(c, saida, "hist_0")
+    cliques = [tuple(int(v) for v in p.split(",")) for p in os.environ.get("CLIQUES", "").split(";") if p]
+    for k, (x, y) in enumerate(cliques):
+        clicar_tela(c, x, y)
+        time.sleep(2.5)
+        tela(c, saida, f"hist_{k + 1}")
+    (pasta / "hist.json").write_text(json.dumps({"cliques": cliques}) + "\n", encoding="utf-8")
+    return []
+
+
+def cenario_triangulo(c: Sessao, saida, n):
+    """Arrasto no triângulo das castas (CASTE=1, Ctrl+C) ou do comportamento (Ctrl+B), jogo pausado:
+    aperta em ARRASTO[0], passa pelos pontos seguintes com o botão apertado (captura em cada um) e solta
+    no último. Lê _casteLevels/_modeLevels, _CasteAuto/_ModeAuto e _IdealCaste antes e depois e grava o
+    estado de depois em tri.ANT. ARRASTO = "x,y;x,y;..." em pixels da tela."""
+    import os
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    casta = os.environ.get("CASTE", "1") == "1"
+    nomes = ("casteLevels", "CasteAuto", "IdealCaste") if casta else ("modeLevels", "ModeAuto")
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.teclas("ctrl+c" if casta else "ctrl+b")
+    time.sleep(3)
+    c.mj.sessao_gdb()
+    s = c.save()
+    reg = {"antes": {v: list(s.bytes_bloco(v)) for v in nomes}}
+    tela(c, saida, "tri_0")
+    pts = [tuple(int(v) for v in p.split(",")) for p in os.environ["ARRASTO"].split(";") if p]
+    c.dep.retomar()
+    qb.mouse_canto(c.q)
+    qb.mover_rel(c.q, *pts[0])
+    time.sleep(0.3)
+    c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": True, "button": "left"}}])
+    time.sleep(1)
+    tela(c, saida, "tri_1")
+    atual = pts[0]
+    for k, p in enumerate(pts[1:]):
+        qb.mover_rel(c.q, p[0] - atual[0], p[1] - atual[1])
+        atual = p
+        time.sleep(1)
+        tela(c, saida, f"tri_{k + 2}")
+    c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": False, "button": "left"}}])
+    time.sleep(1.5)
+    tela(c, saida, "tri_solto")
+    c.mj.sessao_gdb()
+    (pasta / "tri.ANT").write_bytes(c.mj.estado())
+    s = c.save()
+    reg["depois"] = {v: list(s.bytes_bloco(v)) for v in nomes}
+    reg["arrasto"] = pts
+    (pasta / "tri.json").write_text(json.dumps(reg) + "\n", encoding="utf-8")
+    c.log(f"triângulo: {reg}")
+    return []
+
+
 def cenario_salvo(c: Sessao, saida, n):
     """'Saved correctly': jogo pausado, Ctrl+S abre "Save Ant Hill As" (o Quick Game não tem nome),
     digita QUICK1 e Enter, confirma a substituição (Y); a caixa "%s Saved correctly" aparece; captura e fecha."""
@@ -1418,6 +1683,346 @@ def cenario_inseticida(c: Sessao, saida, n):
     for nome, v in (("NodeNum", 32), ("NodeCnt", 0), ("CurYardPnt", 12 << 16)):
         c.escrever(nome, v)
     return c.gravar(saida, n)
+
+
+# ------------------------------------------------------------------------------------------------
+# Tutorial completo (snapshot tut): as ações que cada lição pede, gravando os ticks do tutor
+# ------------------------------------------------------------------------------------------------
+
+# Janela de edição do Tutorial na bancada (640x480): área do mapa a partir de (0, 128), 39 x 21 tiles
+# de 16 px (medido em 2026-10-18 clicando em (600, 140) com _MapPnt = (9, 3): destino (46, 3)).
+TUT_X0, TUT_Y0, TUT_COLS, TUT_LINS = 0, 128, 39, 21
+TUT_VARS = ("TutLesson", "TutGiven", "TutorCnt", "TutHowLong", "LessonTemp")
+# janelas (_win_IsWinInFront): 0 edição, 0x100 mapa, 0x1200 Behavior, 0x1300 Caste, 0x1900 quintal
+TUT_TECLA_JANELA = {"ctrl+e": 0, "ctrl+m": 0x100, "ctrl+b": 0x1200, "ctrl+c": 0x1300}
+
+
+class Tutor:
+    """Estado do roteiro do tutorial: janela na frente (o que a bancada fez; o original não a expõe na
+    memória do jogo) e as ações já feitas por lição. Guardado em DIR_BRUTO/tutor.json para retomar
+    do snapshot "tutcur"."""
+
+    def __init__(self, c: Sessao, bruto):
+        self.c, self.arq = c, Path(bruto).resolve() / "tutor.json"
+        d = json.loads(self.arq.read_text(encoding="utf-8")) if self.arq.exists() else {}
+        self.frente = d.get("frente", 0)
+        self.acoes = {int(k): v for k, v in d.get("acoes", {}).items()}
+        self.ultima_acao = d.get("ultima_acao", -1000)
+
+    def salvar(self):
+        self.arq.parent.mkdir(parents=True, exist_ok=True)
+        self.arq.write_text(json.dumps({"frente": self.frente, "acoes": self.acoes, "ultima_acao": self.ultima_acao},
+                                       indent=1), encoding="utf-8")
+
+    def vars(self):
+        return {k: self.c.ler(k, sinal=True) for k in TUT_VARS}
+
+    def tecla(self, *combos, parar=True):
+        c = self.c
+        c.dep.retomar()
+        for k in combos:
+            c.q.cmd("send-key", keys=[{"type": "qcode", "data": p} for p in k.split("+")], **{"hold-time": 120})
+            time.sleep(0.25)
+            if k in TUT_TECLA_JANELA:
+                self.frente = TUT_TECLA_JANELA[k]
+        c.log(f"teclas {' '.join(combos)} (janela na frente: {self.frente:#x})")
+        time.sleep(0.3)
+        if parar:
+            c.entrada()
+
+    def visivel(self, x, y):
+        p = self.c.ler("MapPnt")
+        px, py = p & 0xFFFF, p >> 16
+        return px <= x < px + TUT_COLS and py <= y < py + TUT_LINS, px, py
+
+    def clicar(self, x, y, duplo=False, segurar=0.0, mover_vista=True):
+        """Clique na célula (x, y) do plano mostrado; se ela não está visível, põe antes _MapPnt para
+        que fique no centro (a vista muda, como se o jogador tivesse rolado)."""
+        c = self.c
+        ok, px, py = self.visivel(x, y)
+        if not ok and mover_vista:
+            larg = 128 if c.ler("MapPlane") < 2 else 64
+            px, py = max(0, min(larg - TUT_COLS, x - TUT_COLS // 2)), max(0, min(64 - TUT_LINS, y - TUT_LINS // 2))
+            c.escrever_elemento("MapPnt", 0, px, 2)
+            c.escrever_elemento("MapPnt", 1, py, 2)
+        self.clicar_tela(TUT_X0 + (x - px) * TILE + 8, TUT_Y0 + (y - py) * TILE + 8, duplo, segurar)
+        c.log(f"{'duplo ' if duplo else ''}clique na célula ({x}, {y}) com _MapPnt = ({px}, {py})")
+
+    def clicar_tela(self, x, y, duplo=False, segurar=0.0):
+        c = self.c
+        c.dep.retomar()
+        qb.mouse_canto(c.q)
+        qb.mover_rel(c.q, x, y)
+        time.sleep(0.15)
+        if segurar:
+            c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": True, "button": "left"}}])
+            time.sleep(segurar)
+            c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": False, "button": "left"}}])
+        else:
+            c.botoes(duplo)
+        time.sleep(0.2)
+        c.entrada()
+
+
+def _tut_perto(cands, x, y, dmin=0):
+    cands = [p for p in cands if max(abs(p[0] - x), abs(p[1] - y)) >= dmin]
+    return min(cands, key=lambda p: (abs(p[0] - x) + abs(p[1] - y), p)) if cands else None
+
+
+def _tut_celulas(s: Save, mapa, teste):
+    larg = 128 if mapa == "MapA" else 64
+    return [(x, y) for x in range(larg) for y in range(64) if teste(s.celula(mapa, x, y))]
+
+
+def _tut_plano(t: Tutor, plano):
+    """Põe a janela de edição no plano (1 superfície, 2 ninho preto, 3 vermelho) se ainda não está."""
+    if t.c.ler("MapPlane") != plano:
+        t.tecla({1: "ctrl+8", 2: "ctrl+9", 3: "ctrl+0"}[plano])
+
+
+def tut_acao(t: Tutor, licao, gt):
+    """A ação do jogador que a lição pede (textos SHARED 4/11000+). Devolve a descrição, ou None se a
+    lição não pede nada (só texto, ou espera)."""
+    c = t.c
+    s = c.save()
+    me = (s.ler("MeLocX"), s.ler("MeLocY"))
+    plano = s.ler("MePlane")
+    if licao in (3, 4):          # cavar: duplo clique na terra perto da amarela (ninho)
+        _tut_plano(t, plano)
+        mapa = {2: "MapB", 3: "MapR"}[plano]
+        alvo = _tut_perto(_tut_celulas(s, mapa, lambda v: 0x20 <= v <= 0x2E), *me, dmin=2 if licao == 3 else 4)
+        t.clicar(*alvo, duplo=True)
+        return f"cavar até {alvo}"
+    if licao in (5, 20):         # ir à superfície: duplo clique na linha 0 acima da amarela
+        _tut_plano(t, plano)
+        mapa = {2: "MapB", 3: "MapR"}[plano]
+        abertas = [(x, 0) for x in range(64) if s.celula(mapa, x, 0) == 0x18]
+        alvo = _tut_perto(abertas, *me) if abertas else (me[0], 0)
+        t.clicar(*alvo, duplo=not abertas)
+        return f"superfície por {alvo}"
+    if licao in (7, 26):         # andar na superfície
+        _tut_plano(t, 1)
+        livre = _tut_celulas(s, "MapA", lambda v: v < 0x10)
+        alvo = _tut_perto(livre, me[0] + 6, me[1] + 2, dmin=0)
+        t.clicar(*alvo)
+        return f"andar até {alvo}"
+    if licao in (8, 50):         # clicar na própria formiga (centraliza: _GotoMyAnt põe _LessonTemp = 1)
+        _tut_plano(t, plano if plano > 0 else 1)
+        t.clicar(*me)
+        return "clique na amarela"
+    if licao in (10, 32, 42):
+        t.tecla("ctrl+m")
+        return "Window > Map"
+    if licao in (12, 49):
+        t.tecla("ctrl+e")
+        return "Window > Edit"
+    if licao in (13, 14, 16):    # comida: chegar (13), comer (14, duplo clique) e pegar (16, duplo clique)
+        _tut_plano(t, 1)
+        comidas = _tut_celulas(s, "MapA", lambda v: 0x48 <= v <= 0x4B)
+        alvo = _tut_perto(comidas, *me, dmin=0 if licao == 13 else 1)
+        t.clicar(*alvo, duplo=licao != 13)
+        return f"comida em {alvo}"
+    if licao == 18:              # voltar ao ninho preto (buraco à esquerda)
+        _tut_plano(t, 1)
+        buracos = _tut_celulas(s, "MapA", lambda v: v == 0x50)
+        alvo = _tut_perto([b for b in buracos if b[0] < me[0]] or buracos, *me)
+        t.clicar(*alvo)
+        return f"buraco {alvo}"
+    if licao == 19:              # largar a comida no túnel (duplo clique numa célula de túnel vizinha)
+        _tut_plano(t, plano)
+        mapa = {2: "MapB", 3: "MapR"}[plano]
+        alvo = _tut_perto(_tut_celulas(s, mapa, lambda v: v < 8), *me, dmin=1)
+        t.clicar(*alvo, duplo=True)
+        return f"largar em {alvo}"
+    if licao == 21:              # pegar uma pedrinha
+        _tut_plano(t, 1)
+        alvo = _tut_perto(_tut_celulas(s, "MapA", lambda v: 0x51 <= v <= 0x53), *me)
+        t.clicar(*alvo, duplo=True)
+        return f"pedrinha em {alvo}"
+    if licao == 22:              # largar a pedrinha
+        _tut_plano(t, 1)
+        alvo = _tut_perto(_tut_celulas(s, "MapA", lambda v: v < 0x10), me[0] + 3, me[1], dmin=2)
+        t.clicar(*alvo, duplo=True)
+        return f"largar em {alvo}"
+    if licao == 24:
+        t.tecla("2")
+        return "recrutar 10 (tecla 2)"
+    if licao == 27:              # alarme e andar (a tecla 0 alterna: só se ainda não está ligado)
+        if not s.ler("MeDropAlarm"):
+            t.tecla("0")
+        _tut_plano(t, 1)
+        s = c.save()
+        me = (s.ler("MeLocX"), s.ler("MeLocY"))
+        alvo = _tut_perto(_tut_celulas(s, "MapA", lambda v: v < 0x10), me[0] - 5, me[1] + 1)
+        t.clicar(*alvo)
+        return f"alarme (tecla 0) e andar até {alvo}"
+    if licao == 30:              # troca de corpo: X e clique numa preta perto
+        _tut_plano(t, 1)
+        t.tecla("x", parar=False)       # a ferramenta de troca pausa o jogo até a troca dar certo
+        time.sleep(0.5)
+        s = c.save()                    # com o jogo pausado as formigas não andam até o clique
+        me = (s.ler("MeLocX"), s.ler("MeLocY"))
+        pretas = [(f["X"], f["Y"]) for _, f in formigas(s, "A") if not f["T"] & 0x80 and 0x10 <= f["T"] & 0x78 <= 0x38]
+        alvo = _tut_perto(pretas, *me, dmin=1)
+        t.clicar(*alvo)
+        return f"troca de corpo com a preta em {alvo}"
+    if licao == 33:
+        t.tecla("ctrl+y")
+        t.frente = 0x1900
+        return "View > Yard"
+    if licao == 36:
+        t.tecla("ctrl+5")
+        return "View > House"
+    if licao == 38:
+        t.tecla("ctrl+8")
+        return "View > Surface"
+    if licao == 39:
+        t.tecla("ctrl+b")
+        return "Window > Behavior"
+    if licao == 47:
+        t.tecla("ctrl+c")
+        return "Window > Caste"
+    if licao == 52:
+        for _ in range(5):
+            t.tecla("2")
+        return "recrutar 10 cinco vezes (tecla 2)"
+    if licao == 54:              # ir ao ninho vermelho (buraco à direita)
+        _tut_plano(t, 1)
+        buracos = _tut_celulas(s, "MapA", lambda v: v == 0x50)
+        alvo = max(buracos)
+        t.clicar(*alvo)
+        return f"buraco vermelho {alvo}"
+    return None
+
+
+def cenario_tutorial_completo(c: Sessao, saida, n):
+    """Tutorial do começo ao fim (snapshot tut), fazendo a ação que cada lição pede (tut_acao). Grava
+    inteiros (capturar_tick: estado, vida, extras, a caixa da lição capturada) só os ticks em que
+    `_TutorCnt` chega a um múltiplo de 8 (os únicos em que o tutor dá ou encerra uma lição); os outros
+    só andam. Em cada um, os extras levam `JanelaNaFrente` (a janela que a bancada pôs na frente). A
+    cada lição nova grava o snapshot "tutcur" no overlay, para retomar. Ações que dependem de
+    coordenadas de outras janelas (arrastar no triângulo, gráfico de barras) ficam para o ambiente:
+    TUT_PARAR=n para em lição n."""
+    import os
+    t = Tutor(c, saida)
+    c.relogio_depois_da_caixa = True
+    parar = int(os.environ.get("TUT_PARAR", "999"))
+    extra = json.loads(os.environ.get("TUT_EXTRA", "{}"))   # {"lição": [["tela"|"tecla"|..., ...]]}
+    nomes = []
+    c.entrada()
+    licao_ant = None
+    for _ in range(n):
+        v = t.vars()
+        gt = c.ler("GameTime", sinal=True)
+        if v["TutLesson"] != licao_ant:
+            c.log(f"GameTime {gt}: lição {v['TutLesson']} {v}")
+            if licao_ant is not None:
+                c.b.executar("snapshot_salvar tutcur")
+            licao_ant = v["TutLesson"]
+            t.salvar()
+        if v["TutLesson"] >= parar or v["TutLesson"] > 0x38 or v["TutLesson"] == 0:
+            c.log(f"fim: lição {v['TutLesson']}")
+            break
+        L = v["TutLesson"]
+        if v["TutGiven"] == 1 and (v["TutorCnt"] & 7) <= 1:
+            feitas = t.acoes.get(L, [])
+            espera = 48 if L in (3, 4, 7, 13, 14, 16, 18, 19, 20, 21, 22, 26, 27, 54) else 64
+            if (not feitas or gt - t.ultima_acao >= espera) and len(feitas) < 8:
+                if str(L) in extra and not feitas:
+                    desc = tut_extra(t, extra[str(L)])
+                else:
+                    desc = tut_acao(t, L, gt)
+                if desc:
+                    t.acoes.setdefault(L, []).append(f"{gt}: {desc}")
+                    t.ultima_acao = gt
+                    c.log(f"lição {L}: {desc}")
+                    t.salvar()
+                    c.entrada()
+                    continue
+        # _TutorCnt vai de 0 a 0x400 (volta a 0 depois de 0x400): 0x400 + 1 → 0 também é fronteira
+        # e no tick em que _Cycle chega a um múltiplo de 64, _FullCount chama _Feedback mais uma vez
+        prox = v["TutorCnt"] + 1 if v["TutorCnt"] < 0x400 else 0
+        prox2 = prox + 1 if prox < 0x400 else 0
+        if (prox & 7) == 0 or ((gt + 1) % 64 == 0 and (prox2 & 7) == 0):
+            c.anotar_relogio_caixa = v["TutGiven"] == 0 and L in (7, 9, 26)
+            try:
+                arqs = c.capturar_tick(espera=12)
+            except RuntimeError as erro:
+                # a caixa fechou mas o tick não voltou a um ponto conhecido (segmento de código
+                # descartado e recarregado pelo Windows): segue sem o vetor deste tick
+                c.log(f"tick {gt} sem vetor: {erro}")
+                t.sem_vetor = getattr(t, "sem_vetor", []) + [gt]
+                c.dep.retomar()
+                for y in (337, 310):
+                    qb.mouse_canto(c.q)
+                    qb.mover_rel(c.q, 320, y)
+                    time.sleep(0.2)
+                    c.botoes(False)
+                    time.sleep(1)
+                c.entrada()
+                continue
+            arqs["extras.json"]["antes"]["JanelaNaFrente"] = t.frente
+            arqs["extras.json"]["antes"]["VistaEdicao"] = [TUT_COLS, TUT_LINS]
+            arqs["extras.json"]["tutor_antes"] = v
+            arqs["extras.json"]["tutor_depois"] = t.vars()
+            gtv = arqs["extras.json"]["antes"]["GameTime"]
+            pasta = Path(saida).resolve() / f"tick_{gtv:06d}"
+            for nome_arq, conteudo in arqs.items():
+                qb.gravar(pasta / nome_arq, conteudo)
+            nomes.append(pasta.name)
+            if "dialogos" in arqs["extras.json"]:
+                for k in range(arqs["extras.json"]["dialogos"]):
+                    src = qb.RAIZ / f"re_trabalho/cen/dialogo_{gtv}_{k}.png"
+                    if src.exists():
+                        shutil.copy(src, pasta / f"dialogo_{k}.png")
+            c.log(f"{pasta.name}: {v} -> {arqs['extras.json']['tutor_depois']}")
+        else:
+            try:
+                c.dep.ir_saida(timeout=10)
+            except RuntimeError:
+                gtx = c.ler("GameTime", sinal=True)
+                c.log(f"tick {gtx} parado fora da fronteira do tutor; fechando a caixa")
+                c.b.executar(f"capturar re_trabalho/cen/fora_{gtx}.png")
+                for k in range(5):
+                    if c.fechar_caixa_ate_o_retorno(k):
+                        break
+        c.entrada()
+    t.salvar()
+    return nomes
+
+
+def tut_extra(t: Tutor, passos):
+    """Ações dadas pelo ambiente (TUT_EXTRA): ["tela", x, y], ["segurar", x, y, seg], ["arrastar", x0, y0,
+    x1, y1], ["tecla", combo], ["capturar", nome], ["frente", janela] (anota a janela que a ação pôs na
+    frente)."""
+    c = t.c
+    for p in passos:
+        if p[0] == "tela":
+            t.clicar_tela(p[1], p[2])
+        elif p[0] == "segurar":
+            t.clicar_tela(p[1], p[2], segurar=p[3])
+        elif p[0] == "tecla":
+            t.tecla(p[1])
+        elif p[0] == "frente":
+            t.frente = p[1]
+        elif p[0] == "capturar":
+            c.dep.retomar()
+            c.b.executar(f"capturar re_trabalho/cen/{p[1]}.png")
+            c.entrada()
+        elif p[0] == "arrastar":
+            c.dep.retomar()
+            qb.mouse_canto(c.q)
+            qb.mover_rel(c.q, p[1], p[2])
+            time.sleep(0.15)
+            c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": True, "button": "left"}}])
+            time.sleep(0.2)
+            for k in range(1, 6):
+                qb.mover_rel(c.q, (p[3] - p[1]) // 5, (p[4] - p[2]) // 5)
+                time.sleep(0.1)
+            c.q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": False, "button": "left"}}])
+            time.sleep(0.2)
+            c.entrada()
+    return f"passos {passos}"
 
 
 # ------------------------------------------------------------------------------------------------
