@@ -243,9 +243,11 @@ mod testes {
         let arq = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../data/opl_banco.json");
         let b = Banco::de_json(&std::fs::read(arq).unwrap()).unwrap();
         assert_eq!(b.melodicos.len(), 128);
-        assert!((35..=81).all(|n| b.percussao.get(&n).is_some_and(|t| t.nota_fixa.is_some())));
-        // Notas fora do mapa GM (as 85-95 dos .MID do SimAnt) ficam em silêncio.
-        assert!(!b.percussao.contains_key(&89));
+        // Notas que não soam no original (medido nas gravações do DOSBox-X, docs/spec/regras/som.md,
+        // "Percussão"): 59, 67, 70, 77 e 80 do mapa GM e as 85-95 de fora dele.
+        let mudas = [59, 67, 70, 77, 80];
+        assert!((35..=81).filter(|n| !mudas.contains(n)).all(|n| b.percussao.get(&n).is_some_and(|t| t.nota_fixa.is_some())));
+        assert!(mudas.iter().chain(&[85, 86, 89, 91, 95]).all(|n| !b.percussao.contains_key(n)));
     }
 
     #[test]

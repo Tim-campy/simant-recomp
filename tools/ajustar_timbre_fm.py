@@ -3,6 +3,8 @@ simant/src/som/fm.rs: mesma modulação, realimentação e formas de onda, sem e
 harmônico se aproxime de um perfil medido no original (tools/som_dosbox.py harmonicos).
 
 Uso: python -I tools/ajustar_timbre_fm.py "-10 0 -6 -22 -17 -17 -17 -18 -20 -21 -23 -24" [--ondas 0,1,2]
+         [--mults 0.5,1,2,3] [--mults-portadora 1,2,3]
+Um harmônico desconhecido (coberto por outra nota na medição) vai como "x" e fica fora do erro.
 Imprime os melhores candidatos (mult do modulador, mult da portadora, TL do modulador,
 realimentação, ondas). Serve de ponto de partida; o timbre final vai em tools/gerar_banco_opl.py.
 """
@@ -69,23 +71,28 @@ def main():
     ap.add_argument("alvo")
     ap.add_argument("--ondas", default="0,1,2")
     ap.add_argument("--mults", default="0.5,1,2,3")
+    ap.add_argument("--mults-portadora", default="1,2,3")
     a = ap.parse_args()
-    alvo = np.maximum(np.array([float(x) for x in a.alvo.split()]), -40)
+    alvo = np.maximum(np.array([np.nan if x in ("x", "nan") else float(x) for x in a.alvo.split()]), -40)
+    conhecido = ~np.isnan(alvo)
     ondas = [int(x) for x in a.ondas.split(",")]
     mults = [float(x) for x in a.mults.split(",")]
     res = []
     for mm in mults:
-        for mc in [1, 2, 3]:
+        for mc in [float(x) for x in a.mults_portadora.split(",")]:
             for wm in ondas:
                 for wc in ondas:
                     for fb in [0, 3, 5, 6, 7]:
                         for tl in range(0, 48, 3):
                             p = perfil(mm, mc, tl, fb, wm, wc)
-                            res.append((float(np.abs(p - alvo).mean()), mm, mc, tl, fb, wm, wc))
+                            # Perfil relativo ao maior harmônico conhecido, como na medição.
+                            p = p - p[conhecido].max()
+                            res.append((float(np.abs(p - alvo)[conhecido].mean()), mm, mc, tl, fb, wm, wc))
     res.sort()
     for r in res[:10]:
-        print("erro %.1f dB  mod mult %s  car mult %d  mod TL %d  fb %d  ondas %d/%d" % r)
-        print("   ", " ".join("%4.0f" % v for v in perfil(*r[1:])))
+        print("erro %.1f dB  mod mult %s  car mult %s  mod TL %d  fb %d  ondas %d/%d" % r)
+        p = perfil(*r[1:])
+        print("   ", " ".join("%4.0f" % v for v in p - p[conhecido].max()))
 
 
 if __name__ == "__main__":
