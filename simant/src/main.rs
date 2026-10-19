@@ -6,7 +6,8 @@
 //!   simant (--save ARQ.ANT | --novo-jogo [--semente N]) [--acoes a,b,...]
 //!          [--ticks N] [--avancar-ms MS] [--botoes F,F,...] [--historico B,B,...] [--fechar-avisos N] [--exportar-tela-jogo ARQ.png]
 //!          [--salvar ARQ.ANT]
-//!   opções da janela: [--resolucao LxA] [--escala N] [--janela LxA] [--sair-apos-ms N [--capturar-janela ARQ.png]]
+//!   opções da janela: [--resolucao LxA] [--escala N] [--janela LxA] [--moldura | --sem-moldura]
+//!     [--sair-apos-ms N [--capturar-janela ARQ.png]]
 //!   (padrões em data/video.json: tela virtual 640×480 em escala 1, como a bancada; simant/src/video.rs;
 //!   --resolucao 800x600 ou 1024x768 muda o layout como o original, docs/spec/telas/resolucao.md)
 //!   som (simant/src/som): [--sem-som] [--soundfont ARQ.sf2] [--sintetizador simples|soundfont|fm]
@@ -278,6 +279,9 @@ fn principal() -> Result<(), String> {
     // data/video.json (opcional; um mod pode trocá-lo) e, por cima, --escala e --janela.
     let arquivo_video = if recursos.existe_dado(video::ARQUIVO) { recursos.dados(video::ARQUIVO)? } else { video::ConfigVideo::default() };
     o.video = arquivo_video.com_linha_de_comando(o.resolucao, o.escala, o.janela);
+    if let Some(m) = o.moldura {
+        o.video.moldura_windows31 = m;
+    }
     // Tela virtual: tamanho da área cliente e tabela de posições da resolução imitada, pela regra
     // do original em data/resolucao.json (docs/spec/telas/resolucao.md).
     let regra: engine::core::resolucao::ConfigResolucao = recursos.dados(engine::core::resolucao::ARQUIVO)?;

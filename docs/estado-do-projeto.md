@@ -31,15 +31,15 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 | 3 | Geração de mundo | 96% (95%) | 75% | Quick Game byte a byte; casa pelos patches; Tutorial via Load; `_DROPdir` guardado; ramos de Full/Experimental e vários patches da casa sem caso |
 | 4 | Jogo ao vivo (laço, relógio, ritmo) | 95% (93%) | 67% (65%) | laço de `MYTIMERFUNC` com o clique esquerdo (2026-10-19); slow/normal medidos (3,0/6,0 ticks/s); fast/ultra e relógio do Mac com decisões do port; rolagem repetida a ~23 passos/s com a simulação parada (medido, 2026-10-19) |
 | 5 | Telas e janelas | 95% (94%) | 85% (83%) | todas as janelas alcançáveis existem e foram comparadas (93–100%), inclusive balões, aranha, mapa, mini mapa e Info (51 cartões); tela virtual 640/800/1024 e **perfil de driver** (VGA de 16 cores × 256 cores: alinhamento ao byte e cores do sistema), com as caixas, o WinHelp e a janela 26 conferidos na SVGA; desde 2026-10-19, cores do sistema 18–20 por driver, History do WinHelp no `WIN.INI`, contorno do arrasto em XOR, 9100/9101 e Status sem ajuste (100%/99,90%), faixa 35 e mapa depois do Load como no original |
-| 6 | Diálogos e menus | 93% (90%) | 83% (80%) | barra de menus do Windows (100% nas capturas), About, Status, Quit, Load Game, quadros da janela 26, menus de um item do botão de ferramentas no Quick/Completo (100%, 2026-10-19); faltam o menu de sistema da janela principal e os diálogos internos do WinHelp |
+| 6 | Diálogos e menus | 95% (93%) | 85% (83%) | barra de menus do Windows (100% nas capturas), About, Status, Quit, Load Game, quadros da janela 26, menus de um item do botão de ferramentas no Quick/Completo (100%, 2026-10-19); barra de título e menu de sistema da janela principal opcionais (`moldura_windows31`, 100% contra a bancada, 2026-10-19); faltam os diálogos internos do WinHelp |
 | 7 | Som e música | 86% (85%) | 55% | efeitos e músicas de regras, Experimental, diálogos e File → New ligados; sintetizador FM (OPL) próprio como padrão; abertura comparada com a captura do DOSBox-X (andamento, notas, volume relativo, timbre aproximado); demais músicas e efeitos dentro do jogo sem captura |
 | 8 | Modos (Quick, Completo, Experimental, Tutorial) | 94% (93%) | 84% (83%) | os quatro têm vetores; tutorial conferido da lição 1 ao fim; PLACE, `_SpecialXfer` ao vivo e avisos do Experimental feitos |
 | 9 | Salvar/carregar | 98% (95%) | 90% | `.ANT` aceito pelo original; Load com `_RandYard`; Load Game no "Select a Game"; preferências com o `WIN.INI` do usuário como origem (2026-10-19) |
-| 10 | Mods (dados + Lua) | 92% (90%) | n/a | API 0.32; dados mesclados por chave; ganchos dentro do tick; 42 `data/*.json` sobrescrevíveis (mais o `save_layout.json`, que não é) |
+| 10 | Mods (dados + Lua) | 92% (90%) | n/a | API 0.33; dados mesclados por chave; ganchos dentro do tick; 42 `data/*.json` sobrescrevíveis (mais o `save_layout.json`, que não é) |
 | 11 | Ferramentas e testes | 92% (90%) | n/a | 40 ferramentas em `tools/`, bancada QEMU com gdbstub (VGA e SVGA), 591 testes |
 | 12 | Documentação | 92% (90%) | n/a | 46 specs (~8,8 mil linhas), divergências revistas (33 em aberto, 56 resolvidas) |
 
-**Geral (conta em §6): cerca de 95% implementado e 79% verificado contra o original** (este último só nas áreas 1–9). Na revisão anterior: 88% e 70%.
+**Geral (conta em §6): cerca de 95% implementado e 80% verificado contra o original** (este último só nas áreas 1–9). Na revisão anterior: 88% e 70%.
 
 ## 2. Por área
 
@@ -68,7 +68,7 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 
 - **Completo e verificado:** temporizador de 55 ms com 3 mensagens por chamada; 6,06 ticks/s em normal e 3,03 em slow contra 6,0/3,0 na bancada; pausa (inclusive a amarela andando na pausa); simulação parada com quadro modal e nas animações; `_gameCycles` por volta.
 - **Feito nesta rodada:** o clique esquerdo encerra o laço de voltas como o `GetAsyncKeyState(VK_LBUTTON) & 1` do original (`simulacao-visao-geral.md` §2).
-- **Implementado com decisão do port, não verificado em máquina real:** fast/ultra com 5 e 7 voltas fixas (66,7 e 90,9 ticks/s; com `-icount` o original faz ~3 ticks/s em fast por milhão de instruções/s, então o port equivale a ~20–30 M instruções/s, um 486 da época; `simulacao-visao-geral.md` §3.3); relógio do Mac começando no maior prazo do save; `mac_por_tick` (9 na bancada); cadência sem foco 170 → 220 ms [hipótese].
+- **Implementado com decisão do port, não verificado em máquina real:** fast/ultra com 5 e 7 voltas fixas (66,7 e 90,9 ticks/s; com `-icount` o original faz ~3 ticks/s em fast por milhão de instruções/s, então o port equivale a ~20–30 M instruções/s, um 486 da época; `simulacao-visao-geral.md` §3.3); relógio do Mac começando no maior prazo do save; `mac_por_tick` (9 na bancada); cadência sem foco: medida igual à com foco (61 ticks em 10 s ativa, com a Task List e minimizada; 2026-10-19), e o port passou a 17 ms sem foco.
 - **Feito em 2026-10-19:** a repetição da rolagem no ritmo do redesenho medido (~23 passos/s, sem a repetição do sistema) e com a simulação parada durante o laço (`GameTime` parado na bancada, telas/jogo.md); descarte de efeito pedido no mesmo milissegundo (§2.7).
 
 ### 2.5 Telas e janelas (por janela)
@@ -79,7 +79,7 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 | "Select a Game" | 100% | 90% | 99,87% (Load Game desde 2026-10-18, não conferido na bancada) |
 | Tela de jogo: faixa 34 | 95% | 90% | botões, barras, popup das castas, marcadores, mini mapa conferidos; botões configuráveis com bitmaps trocados |
 | Tela de jogo: janela de edição | 95% | 90% | mapa 100%, janela 99,33–99,59%; balões "Silly" (100% nas regiões dos balões), aranha (18 capturas 99,91–100%), formiga-leão, lagarta, bicho-de-conta, navegação, superfície e ninho vermelho conferidos; `_DrawEditGraphs` não desenha nos modos do Windows (`telas/baloes.md` §3); faltam a rainha amarela 0xFE e a 2.ª metade de alguns bichos (tabela não localizada, `jogo.md`) |
-| Gerenciador de janelas | 90% | 75% | ordem, foco, arrasto, maximizar, menu de sistema, alinhamento da área cliente (`CS_BYTEALIGNCLIENT`); contorno XOR e menu de sistema aproximados; altura mínima [hipótese] |
+| Gerenciador de janelas | 90% | 75% | ordem, foco, arrasto, maximizar, menu de sistema, alinhamento da área cliente (`CS_BYTEALIGNCLIENT`); contorno XOR; menu de sistema com o acinzentado em cinza-claro, o realce acinzentado do `GrayString` e a caixa invertida (w04, 2026-10-19); altura mínima [hipótese] |
 | Caste / Behavior / History | 100% | 90% | 98,72–98,92% (título); arrasto no triângulo e History com dados conferidos na bancada |
 | Menus de segurar (amarela, rainha, aranha, ícones) | 100% | 95% | `_AntMenu` 100%, ícones 99,93%, rainha alada e aranha conferidos |
 | Mapa (`mapWin`) | 100% | 90% | 93,78–99,89% por modo; cliques, Shift, duplo clique, arrasto, troca com o quintal e alternância `_DrawMap`/`_DrawMapData` atrás; cores de `_ConvColor` [hipótese] |
@@ -99,7 +99,8 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 
 - **Completo e verificado:** barra de menus da janela principal (File, Window, View, Options, Speed; itens, marcas, aceleradores, navegação por teclado; 100% nas capturas m00–m08), About (98,81%), Status (`_ScoreDialog`, 100%), Quit (99,51%), quadros de mensagem, fim de jogo, "Saved correctly", pergunta do Load, Save As/Load (imitação), menus de segurar e de ícones, menu de ferramentas do Experimental, quadros animados da janela 26 (trofalaxia, 9100/9101, aranha, formiga-leão, vitória).
 - **Implementado, não verificado:** Cancel do "Load Ant Hill" aberto pela abertura (volta ao "Select a Game"; o Load Game em si foi conferido em 2026-10-19: o original fecha o "Select a Game" antes do diálogo, e o port passou a fazer o mesmo); Status no Full Game e no Experimental; a ajuda dos itens de menu com o modo de ajuda (`_ProcMenuHelp`); diálogos de arquivo modais em relação ao `WM_TIMER` [hipótese].
-- **Falta:** o menu de sistema e o título da janela principal (o port usa a janela do sistema operacional; por isso → no Speed volta direto ao File); o menu de um item (`editToExp`, janela 10; **feito em 2026-10-19**) do botão de ferramentas no Quick Game (o port vira Experimental direto); os diálogos internos do WinHelp (Open, Print, Annotate, Define…).
+- **Feito em 2026-10-19:** o título e o menu de sistema da janela principal (opção de vídeo `moldura_windows31`, padrão desligado, decisoes.md; com ela as setas passam pela caixa; telas/menus.md §8), conferidos 100% contra m00, m05b e s00–s16; e a coluna e a linha cinza-claro por fora dos menus (m01, m05b).
+- **Falta:** o menu de um item (`editToExp`, janela 10; **feito em 2026-10-19**) do botão de ferramentas no Quick Game (o port vira Experimental direto); os diálogos internos do WinHelp (Open, Print, Annotate, Define…).
 
 ### 2.7 Som e música
 
@@ -183,13 +184,13 @@ Geração de mundo
 - `_CanBeHouseHole`; patches da casa 5–7, 9, 15, 36/37 e cozinha sem pia; `_DigOutBNest/RNest`; ramos de Tutorial/Full/Experimental de `_InitYelloAnt`/`_RandWorld`; `_AddFood` com parâmetro ≥ 0; a queda de comida na cozinha e nos ladrilhos (`_DROPdir` 2 e 0).
 
 Jogo ao vivo
-- Taxa de fast/ultra em máquina real; cadência sem foco 170 → 220 ms; `mac_por_tick` fora da bancada.
+- Taxa de fast/ultra em máquina real; `mac_por_tick` fora da bancada. (A cadência sem foco foi medida em 2026-10-19: igual à com foco.)
 - O que o original mostra depois de `_XferPatch` (`_RandWorld` põe `_MapPnt` = (0x40, 0x20) e o original só redesenha; o port leva a vista até a amarela).
 
 Telas
 - Cartões 127 e 129 do Info e clique em palavra em negrito.
 - Telas maiores e perfil de driver: a VGA de 16 cores em 800×600 e 1024×768 (sem driver na bancada); Examine e mini mapa em 256 cores; as cores do perfil `svga256` além do título e do fundo (`divergencias.md`).
-- Altura mínima da edição e clique comido na janela de trás (`telas/janelas.md` §8, [hipótese]); contorno XOR e realce do menu de sistema.
+- Altura mínima da edição e clique comido na janela de trás (`telas/janelas.md` §8, [hipótese]); a fase do xadrez do item acinzentado realçado numa janela em x ímpar; a sombra dos menus das janelas filhas.
 - Cores do mapa (`_ConvColor`, [hipótese]).
 - Clique direito no Experimental e nas janelas de controle, F1 com janela de controle, Shift+F1, Delete, `yardHelpBut`, cursor das ferramentas (`telas/ajuda-contexto.md` §6).
 - Posição do menu de ferramentas no Quick Game; avisos do Experimental na faixa. Faixa 35 aberta com o jogo pausado: o original deixa vazios os números do quintal e as barras de saúde até o próximo redesenho, o port os desenha (`divergencias.md`, 2026-10-19).
@@ -203,7 +204,7 @@ Diálogos
 
 ## 4. Falta para concluir (priorizado)
 
-Itens da revisão anterior que **foram feitos** e saíram desta lista (detalhes nas specs citadas em §2): barra de menus com About, Status, Quit e os sons de menu; Load Game no "Select a Game"; balões "Silly"; gráficos de saúde (não desenham no Windows: nada a fazer); quadros da janela 26 (`_YellowDialog`, `_SpiderDialog`, `_LionDialog`, `_DrawSimPayoff`); PLACE parando a simulação e com Shift; `_SpecialXfer` ao vivo; botões configuráveis da faixa 35; queda de comida na casa (`_DROPdir`); textos do exame e avisos do Experimental; redesenho alternado do mapa atrás; mini mapa; desenho da aranha e desenho dentro do tick; AutoTrack da aranha do jogador; recorte das retas (`_os_ClipLine`); tutorial maximizado; tela virtual 640/800/1024; ordem real das janelas nas animações da amarela; e, nesta rodada, `_ExitHole` com a lista cheia, `_KillAntLion(-1)`, o clique esquerdo no laço, o `WIN.INI` como origem das preferências, os bitmaps empacotados/planares e `_LastColonyPopR`. **Feito depois desta revisão (2026-10-19, branch dos itens de alto e médio impacto, API 0.32):** `_SpecialXfer` trocando de patch dentro do tick (ao vivo, o tick é refeito com a escolha; ação `special_xfer` 307/307); menus de um item do botão de ferramentas no Quick Game (janela 10) e no Jogo Completo (janela 11), 100% contra a bancada; repetição da rolagem no ritmo medido (~23 passos/s) e com a simulação parada, como o laço de `MAINWNDPROC`; descarte de efeito pedido no mesmo milissegundo; cores do sistema do perfil de driver além do título e do fundo (índices 18–20; título da edição em `svga256` 100% fora do texto); a cor da abertura (já resolvida pelo perfil); a posição do WinHelp no `WIN.INI` (é a da janela History, medida); contorno do arrasto em XOR; e, dos ajustes de pixel, 9100/9101 (a janela 26 só alinha na criação) e Status (o ajuste somava ao alinhamento) com causa achada; a faixa 35 sem números até o primeiro tick e o mapa atrás desenhado logo no Load (as duas divergências da verificação dos ramos raros). A janela de placar (Ctrl+T) é o Status e está feita. `_DoDebugWin` é inalcançável (§2.13).
+Itens da revisão anterior que **foram feitos** e saíram desta lista (detalhes nas specs citadas em §2): barra de menus com About, Status, Quit e os sons de menu; Load Game no "Select a Game"; balões "Silly"; gráficos de saúde (não desenham no Windows: nada a fazer); quadros da janela 26 (`_YellowDialog`, `_SpiderDialog`, `_LionDialog`, `_DrawSimPayoff`); PLACE parando a simulação e com Shift; `_SpecialXfer` ao vivo; botões configuráveis da faixa 35; queda de comida na casa (`_DROPdir`); textos do exame e avisos do Experimental; redesenho alternado do mapa atrás; mini mapa; desenho da aranha e desenho dentro do tick; AutoTrack da aranha do jogador; recorte das retas (`_os_ClipLine`); tutorial maximizado; tela virtual 640/800/1024; ordem real das janelas nas animações da amarela; e, nesta rodada, `_ExitHole` com a lista cheia, `_KillAntLion(-1)`, o clique esquerdo no laço, o `WIN.INI` como origem das preferências, os bitmaps empacotados/planares e `_LastColonyPopR`. **Feito depois desta revisão (2026-10-19, branch dos itens de alto e médio impacto, API 0.32):** `_SpecialXfer` trocando de patch dentro do tick (ao vivo, o tick é refeito com a escolha; ação `special_xfer` 307/307); menus de um item do botão de ferramentas no Quick Game (janela 10) e no Jogo Completo (janela 11), 100% contra a bancada; repetição da rolagem no ritmo medido (~23 passos/s) e com a simulação parada, como o laço de `MAINWNDPROC`; descarte de efeito pedido no mesmo milissegundo; cores do sistema do perfil de driver além do título e do fundo (índices 18–20; título da edição em `svga256` 100% fora do texto); a cor da abertura (já resolvida pelo perfil); a posição do WinHelp no `WIN.INI` (é a da janela History, medida); contorno do arrasto em XOR; e, dos ajustes de pixel, 9100/9101 (a janela 26 só alinha na criação) e Status (o ajuste somava ao alinhamento) com causa achada; a faixa 35 sem números até o primeiro tick e o mapa atrás desenhado logo no Load (as duas divergências da verificação dos ramos raros). A janela de placar (Ctrl+T) é o Status e está feita. **Feito depois (2026-10-19, branch do título da janela principal, API 0.33):** barra de título e menu de sistema da janela principal (opcionais); realce e desenho do menu de sistema das janelas filhas (acinzentado, `GrayString`, caixa invertida); sombra dos menus; ritmo sem foco igual ao com foco (medido); e os ajustes de pixel do texto da faixa, do triângulo e dos níveis trocados pela regra do retângulo de `_win_Recalc` (direita e base − 1). `_DoDebugWin` é inalcançável (§2.13).
 
 Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; **G** = uma semana ou mais.
 
@@ -219,16 +220,14 @@ Não há outro item de alto impacto: tudo o que o jogador alcança no original e
 
 | Item | Esforço | Referência |
 |---|---|---|
-| Ajustes de pixel ainda sem causa: texto da faixa 1 pixel à esquerda, gato 1 pixel abaixo nos quadros 0–12 (o byte 3 dos bitmaps 1300–1329 é 0 em todos: não é o cabeçalho), título, triângulo e barras das janelas de controle (fim de jogo, Info, título na VGA, 9100/9101 e Status já explicados pelo alinhamento ao byte) | M | `divergencias.md`, §5 item 2 |
+| Ajustes de pixel que restam: gato 1 pixel abaixo nos quadros 0–12 (descartados cabeçalho, tabelas, largura e altura); o +1 com faixa de `_win_GetObjRect`/`_win_PrintfAtObj` que o pseudocódigo soma e nenhuma medição mostra (o texto da faixa, o triângulo e os níveis seguem a regra do `_win_Recalc` desde 2026-10-19); a base dos textos do fim de jogo e o deslocamento dos gráficos do History | M | `divergencias.md`, `formatos/janela.md` |
 | Menu aberto em 256 cores (realce pelo `OEMBIN`, sem captura) e a cor do sistema que muda com a paleta do jogo em 256 cores | P | `telas/resolucao.md` §7 |
 
 ### Baixo impacto
 
 | Item | Esforço | Referência |
 |---|---|---|
-| Menu de sistema e título da janela principal desenhados pelo port (setas além do Speed/File) | P–M | `telas/menus.md` §8 |
 | Diálogos internos do WinHelp (Open, Print, Annotate, Define, About…) | M | `telas/ajuda.md` |
-| Realce e desenho do menu de sistema das janelas filhas (o contorno do arrasto já é XOR) | P | `telas/janelas.md` §8 |
 | Byte 3 dos bitmaps, bits 4/8 das flags, layout binário tipo 0 (só se algum leitor aparecer) | P–M | `formatos/bitmap.md`, `formatos/banco-dat-ndx.md` |
 | `_SetMap` de `_KillAntLion(-1)` e as gravações em ponteiros do Windows (decidido não reproduzir) | — | `regras/inimigos.md` §1.4 |
 | Rede (NetBIOS, DDE) | G | fora do escopo declarado |
@@ -246,7 +245,7 @@ Não há outro item de alto impacto: tudo o que o jogador alcança no original e
 ## 5. Riscos e dívidas técnicas
 
 1. ~~Tabelas duplicadas nos JSON~~ (resolvido em 2026-10-18, `comum.json`, API 0.20).
-2. **Ajustes de pixel medidos sem causa conhecida** ([causa em aberto] em `divergencias.md`): texto da faixa 1 pixel à esquerda; gato 1 pixel abaixo nos quadros 0–12; título, triângulo e barras das janelas de controle. (9100/9101 e Status saíram em 2026-10-19: a janela 26 só alinha ao byte na criação, e o ajuste do Status somava ao alinhamento já aplicado.) Vários dos antigos foram explicados em 2026-10-19 pelo **perfil de driver** (o `CS_BYTEALIGNCLIENT` arredonda a área cliente a 8 pixels só no VGA planar: título +3, edição, janelas de controle, fim de jogo, Info, About, Examine, mini mapa) e viraram regra do driver em `data/resolucao.json`; o que sobra pode ter a mesma natureza e deve ser revisto com o perfil.
+2. **Ajustes de pixel medidos sem causa conhecida** ([causa em aberto] em `divergencias.md`): gato 1 pixel abaixo nos quadros 0–12; a ausência do +1 com faixa de `_win_GetObjRect` (desde 2026-10-19 o texto da faixa, o triângulo, os níveis, os números da faixa e o Status usam uma regra só, o retângulo de `_win_Recalc`, `Retangulo::do_recalc`). (9100/9101 e Status saíram em 2026-10-19: a janela 26 só alinha ao byte na criação, e o ajuste do Status somava ao alinhamento já aplicado.) Vários dos antigos foram explicados em 2026-10-19 pelo **perfil de driver** (o `CS_BYTEALIGNCLIENT` arredonda a área cliente a 8 pixels só no VGA planar: título +3, edição, janelas de controle, fim de jogo, Info, About, Examine, mini mapa) e viraram regra do driver em `data/resolucao.json`; o que sobra pode ter a mesma natureza e deve ser revisto com o perfil.
 3. **Hipóteses no relógio.** O relógio do Mac ao vivo começa no maior prazo do save; `mac_por_tick` = 9 só vale na bancada; sem relógio, `_GameTime × 6` [hipótese]. O gato, o cachorro e o balão do menino dependem disso, e com o gato e o cachorro **o consumo de sorteios** também: uma partida ao vivo não reproduz exatamente uma do original.
 4. **Ritmo de fast/ultra dependente da CPU no original.** O port fixa 5 e 7 voltas por período. `_BirdDelay` depende de `_gameCycles` e é a única entrada não determinística do tick.
 5. **Desenho que consome o gerador S fora do tick** (chuva e enxame do quintal): o port faz os sorteios à parte, entre os ticks (`full_600` bate com os 17.650 passos), mas as posições desenhadas da chuva são próprias. Os sorteios dentro do tick foram resolvidos em 2026-10-18/19.
@@ -269,16 +268,16 @@ Pesos por área, pensados no que importa para quem joga um port completo (as reg
 | Geração de mundo | 7 | 96 | 672 | 75 | 525 |
 | Jogo ao vivo | 8 | 95 | 760 | 67 | 536 |
 | Telas e janelas | 15 | 95 | 1.425 | 85 | 1.275 |
-| Diálogos e menus | 8 | 93 | 744 | 83 | 664 |
+| Diálogos e menus | 8 | 95 | 760 | 85 | 680 |
 | Som e música | 6 | 86 | 516 | 55 | 330 |
 | Modos | 8 | 94 | 752 | 84 | 672 |
 | Salvar/carregar | 4 | 98 | 392 | 90 | 360 |
 | Mods | 5 | 92 | 460 | n/a | — |
 | Ferramentas e testes | 3 | 92 | 276 | n/a | — |
 | Documentação | 3 | 92 | 276 | n/a | — |
-| **Total** | **100** | | **9.483** | | **7.067** (peso 89) |
+| **Total** | **100** | | **9.499** | | **7.083** (peso 89) |
 
-- **Implementado:** 9.483 / 100 = **≈ 95%** (era 8.775, ≈ 88%; 9.359 antes do caminho FM; 9.389 antes dos itens de alto e médio impacto de 2026-10-19).
-- **Verificado contra o original** (só as áreas 1–9, peso 89): 7.067 / 89 = **≈ 79%** (era 6.220, ≈ 70%; 6.844 antes da captura de áudio; 6.964 antes dos itens de 2026-10-19).
+- **Implementado:** 9.499 / 100 = **≈ 95%** (9.483 antes da barra de título, 2026-10-19; era 8.775, ≈ 88%; 9.359 antes do caminho FM; 9.389 antes dos itens de alto e médio impacto de 2026-10-19).
+- **Verificado contra o original** (só as áreas 1–9, peso 89): 7.083 / 89 = **≈ 80%** (7.067 antes da barra de título; era 6.220, ≈ 70%; 6.844 antes da captura de áudio; 6.964 antes dos itens de 2026-10-19).
 
 Leitura: a simulação está praticamente completa e amarrada ao original por vetores de tick inteiros; a interface alcançável pelo jogador existe inteira e foi comparada com capturas na maior parte. O que separa o port de "completo" é o som (timbre FM aproximado; só a abertura comparada com a captura); o resto são resíduos pequenos (§4). O que separa de "verificado" são os ramos raros das regras (§3), o áudio e as poucas janelas sem captura nas resoluções maiores e em 256 cores.

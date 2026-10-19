@@ -1,0 +1,98 @@
+# Barra de título e menu de sistema da janela principal (maximizada), botões de minimizar e restaurar,
+# título inativo (Task List) e GameTime com a janela minimizada. docs/spec/telas/menus.md §8.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_moldura_principal.txt --overlay re_trabalho/qemu/ov_moldura_tmp.qcow2
+# (o overlay é uma CÓPIA de ov_menus_quick.qcow2, com o snapshot "quick"; apagar depois)
+snapshot_carregar quick
+esperar 3
+mouse_canto
+mover 600 300
+esperar 1
+capturar re_trabalho/moldura/s00_inicio.png
+# Clique na caixa do menu de sistema
+clicar_em 8 8
+esperar 1
+capturar re_trabalho/moldura/s01_caixa_clique.png
+teclas esc
+esperar 1
+capturar re_trabalho/moldura/s02_esc.png
+teclas esc
+esperar 1
+# Alt+Espaço
+teclas alt+spc
+esperar 1
+capturar re_trabalho/moldura/s03_alt_espaco.png
+teclas down
+esperar 1
+capturar re_trabalho/moldura/s04_alt_espaco_baixo.png
+teclas esc
+esperar 1
+capturar re_trabalho/moldura/s05_alt_espaco_esc.png
+teclas esc
+esperar 1
+# Alt e seta para a esquerda: do File para a caixa do menu de sistema
+teclas alt
+esperar 1
+teclas left
+esperar 1
+capturar re_trabalho/moldura/s06_alt_esquerda.png
+teclas down
+esperar 1
+capturar re_trabalho/moldura/s07_alt_esquerda_baixo.png
+teclas esc
+teclas esc
+teclas esc
+esperar 1
+# Botão de minimizar apertado, arrastado para fora e solto (não minimiza)
+ir_para 611 8
+apertar
+esperar 1
+capturar re_trabalho/moldura/s08_min_apertado.png
+mover 0 100
+esperar 1
+capturar re_trabalho/moldura/s09_min_fora.png
+soltar
+esperar 1
+# Botão de restaurar apertado, arrastado para fora e solto
+ir_para 630 8
+apertar
+esperar 1
+capturar re_trabalho/moldura/s10_rest_apertado.png
+mover 0 100
+esperar 1
+soltar
+esperar 1
+capturar re_trabalho/moldura/s11_rest_solto_fora.png
+# Close do menu de sistema: a pergunta do Quit? Esc cancela.
+clicar_em 8 8
+esperar 1
+clicar_em 30 125
+esperar 2
+capturar re_trabalho/moldura/s12_close.png
+teclas esc
+esperar 2
+capturar re_trabalho/moldura/s13_close_cancelado.png
+# Task List (Ctrl+Esc): a janela do SimAnt fica inativa; GameTime em 10 s
+ler_variavel GameTime re_trabalho/moldura/gt_a.bin
+teclas ctrl+esc
+esperar 2
+capturar re_trabalho/moldura/s14_task_list.png
+ler_variavel GameTime re_trabalho/moldura/gt_b.bin
+esperar 10
+ler_variavel GameTime re_trabalho/moldura/gt_c.bin
+teclas esc
+esperar 2
+capturar re_trabalho/moldura/s15_task_list_esc.png
+# Ativa: GameTime em 10 s
+ler_variavel GameTime re_trabalho/moldura/gt_d.bin
+esperar 10
+ler_variavel GameTime re_trabalho/moldura/gt_e.bin
+# Minimize do menu de sistema; GameTime em 10 s minimizado
+clicar_em 8 8
+esperar 1
+clicar_em 30 82
+esperar 2
+capturar re_trabalho/moldura/s16_minimizado.png
+ler_variavel GameTime re_trabalho/moldura/gt_f.bin
+esperar 10
+ler_variavel GameTime re_trabalho/moldura/gt_g.bin
+fim

@@ -67,7 +67,7 @@ O port não muda a resolução do monitor: desenha uma **tela virtual** do Windo
 
 - `data/video.json`, `resolucao_virtual`: `[640, 480]` (padrão, a da bancada) ou `[800, 600]`, `[1024, 768]`. Linha de comando: `--resolucao LxA` (vence o arquivo).
 - `data/resolucao.json` guarda a regra do original como dados: linhas acima da área cliente (38), a escolha da tabela pela altura (até 480 → 0; senão 8) e as resoluções aceitas.
-- Com a tela virtual L × A, o executável usa: área cliente L × (A − 38); tabela de posições pela regra; a abertura (`data/telas.json`) e a tela de jogo (`data/tela_jogo.json`) com esse tamanho e essa tabela. A janela do SDL tem a resolução lógica L × (A − 38) na abertura e L × (A − 38 + barra de menus) na partida (a barra de título é a do sistema atual), ampliada pela `escala`.
+- Com a tela virtual L × A, o executável usa: área cliente L × (A − 38); tabela de posições pela regra; a abertura (`data/telas.json`) e a tela de jogo (`data/tela_jogo.json`) com esse tamanho e essa tabela. A janela do SDL tem a resolução lógica L × (A − 38) na abertura e L × (A − 38 + barra de menus) na partida (a barra de título é a do sistema atual), ampliada pela `escala`; com `moldura_windows31` (`data/video.json`), a partida ganha também a barra de título do Windows 3.1 e fica com L × A, a tela imitada inteira (telas/menus.md §8).
 - Código: `engine/src/core/resolucao.rs` (regra e aplicação), `simant/src/video.rs` e `simant/src/main.rs`.
 - Os testes e ferramentas que já existiam continuam com as configurações próprias: `tela_jogo.json` (640×442, tabela 0, a bancada) e as telas validadas do DOSBox-X (800×562, tabela 8).
 

@@ -429,8 +429,8 @@ impl JanelasControle {
     /// pixel a mais de `_win_GetObjRect`); conferido na bancada pelos níveis lidos depois de um arrasto
     /// (telas/janelas.md §2.1).
     fn triangulo(j: &Janela, g: &GeometriaControle, cfg: &ConfigControle) -> Option<Triangulo> {
-        let (r, _) = Self::objeto(j, g, &cfg.objeto_triangulo, false)?;
-        Some(Triangulo { esq: r.esq.into(), topo: r.topo.into(), dir: (r.dir - 1).into(), base: (r.base - 1).into() })
+        let r = Self::objeto(j, g, &cfg.objeto_triangulo, false)?.0.do_recalc();
+        Some(Triangulo { esq: r.esq.into(), topo: r.topo.into(), dir: r.dir.into(), base: r.base.into() })
     }
 
     /// Clique do botão esquerdo em (x, y): o gerenciador decide quem recebe (só a janela da frente
@@ -626,13 +626,11 @@ impl JanelasControle {
             Controle::Castas | Controle::Historico | Controle::Mapa | Controle::Info | Controle::Quintal => e.controles.castas,
             Controle::Tarefas => e.controles.tarefas,
         };
-        // O botão bate com as capturas (j01, j02) usando o retângulo do triângulo com 1 pixel a menos
-        // à direita e embaixo (em vez do pixel a mais de `_win_GetObjRect`) [medido; causa em aberto].
-        let triangulo_do_botao = Self::objeto(&janela, &g, &cfg.objeto_triangulo, false).map(|(r, _)| Triangulo {
-            esq: r.esq.into(),
-            topo: r.topo.into(),
-            dir: (r.dir - 1).into(),
-            base: (r.base - 1).into(),
+        // O retângulo do triângulo depois de `_win_Recalc` (direita e base − 1), sem o +1 de
+        // `_win_GetObjRect`: bate com as capturas (j01, j02) e com os níveis depois de um arrasto.
+        let triangulo_do_botao = Self::objeto(&janela, &g, &cfg.objeto_triangulo, false).map(|(r, _)| {
+            let r = r.do_recalc();
+            Triangulo { esq: r.esq.into(), topo: r.topo.into(), dir: r.dir.into(), base: r.base.into() }
         });
         if let Some(t) = triangulo_do_botao {
             if let Ok(bm) = recursos.objeto(Chave { tipo: TIPO_BITMAP, id: jc.bitmap_botao }).and_then(|d| Bitmap::decodificar(&d)) {
@@ -655,7 +653,7 @@ impl JanelasControle {
                 let c = cor(ci);
                 let antes = q.recorte.replace(r);
                 let t = texto_do_nivel(niveis[i], self.porcentagem[k], total);
-                q.texto(Retangulo { dir: r.dir - 1, ..r }, f, t.as_bytes(), 3, c.frente, c.fundo);
+                q.texto(Retangulo { base: r.base, ..r.do_recalc() }, f, t.as_bytes(), 3, c.frente, c.fundo);
                 q.recorte = antes;
             }
         }

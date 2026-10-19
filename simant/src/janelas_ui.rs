@@ -35,6 +35,7 @@ impl Sessao<'_> {
     /// Jogo novo ou Load durante a partida: as janelas do jogo anterior ficam onde estavam
     /// (`_NewGame`/`_LoadGame` não as fecham) e `_SetDefaultWindows` roda de novo.
     pub(crate) fn herdar_janelas(&mut self, antiga: &Sessao) {
+        self.menus.herdar_moldura(&antiga.menus);
         self.janelas.gerente = antiga.janelas.gerente.clone();
         self.janelas.gerente.arrasto = None;
         self.janelas.gerente.menu = None;

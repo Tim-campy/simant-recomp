@@ -42,7 +42,8 @@ pub const ARQUIVO_CONFIG: &str = "partida.json";
 pub struct ConfigRelogio {
     /// Intervalo pedido ao `SetTimer` com o aplicativo em foco (17 ms).
     pub intervalo_mensagem_ms: u32,
-    /// Intervalo sem foco (`WM_ACTIVATEAPP` com wParam = 0: 170 ms).
+    /// Intervalo sem foco (`WM_ACTIVATEAPP` com wParam = 0: o código pede 170 ms; o dado é 17, o ritmo
+    /// medido sem foco).
     pub intervalo_sem_foco_ms: u32,
     /// Resolução do temporizador do Windows 3.1 (55 ms, 18,2 Hz): o intervalo pedido é arredondado
     /// para cima até um múltiplo dela (o de 17 ms vira 55 ms).
@@ -418,7 +419,8 @@ impl Partida {
         pedido.div_ceil(resolucao) * resolucao
     }
 
-    /// Foco do aplicativo (`WM_ACTIVATEAPP`): sem foco, o temporizador fica em 170 ms.
+    /// Foco do aplicativo (`WM_ACTIVATEAPP`): sem foco, o código pede 170 ms, mas o ritmo medido não
+    /// muda (`data/partida.json`, `intervalo_sem_foco_ms` = 17); só o redesenho fica mais raro.
     pub fn definir_foco(&mut self, ativo: bool) {
         self.ativo = ativo;
     }
@@ -1602,7 +1604,7 @@ mod testes {
     fn dados_de_partida_carregam() {
         let c = cfg();
         assert_eq!(c.relogio.intervalo_mensagem_ms, 17);
-        assert_eq!(c.relogio.intervalo_sem_foco_ms, 170);
+        assert_eq!(c.relogio.intervalo_sem_foco_ms, 17, "sem foco, o ritmo medido é o mesmo");
         let t = |nome: &str, shift, ctrl| EventoTecla::Tecla { nome: nome.into(), ctrl, shift, alt: false };
         assert_eq!(c.acao_da_tecla(&t("0", true, false)), Some(AcaoPartida::Pausa));
         assert_eq!(c.acao_da_tecla(&t("3", true, false)), Some(AcaoPartida::VelocidadeRapida));
@@ -1814,12 +1816,16 @@ mod testes {
     }
 
     #[test]
-    fn sem_foco_o_temporizador_de_170_ms_vira_220_ms() {
+    fn sem_foco_o_ritmo_nao_muda() {
+        // Bancada (2026-10-19): 61 ticks em 10 s ativa, com a Task List na frente e minimizada.
         let mut p = partida(1);
         p.definir_foco(false);
-        assert_eq!(p.intervalo_ms(), 220);
-        assert_eq!(p.avancar(219).mensagens, 0);
+        assert_eq!(p.intervalo_ms(), 55);
+        assert_eq!(p.avancar(54).mensagens, 0);
         assert_eq!(p.avancar(1).mensagens, 1);
+        // Um mod que volte aos 170 ms do código tem o arredondamento para 220 ms.
+        p.cfg.relogio.intervalo_sem_foco_ms = 170;
+        assert_eq!(p.intervalo_ms(), 220);
     }
 
     #[test]

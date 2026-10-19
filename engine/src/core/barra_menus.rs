@@ -11,7 +11,8 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use super::gerenciador::{mnemonico, texto_a_esquerda};
+use super::gerenciador::{mnemonico, texto_a_esquerda, texto_acinzentado};
+use super::moldura_principal::{ComandoPrincipal, ConfigMolduraPrincipal, ParteTitulo};
 use super::quadro::Quadro;
 use crate::formats::fonte::Fonte;
 use crate::formats::janela::Retangulo;
@@ -79,6 +80,18 @@ pub struct CoresMenu {
     pub realce: u8,
     pub texto_realce: u8,
     pub borda: u8,
+    /// Texto dos itens acinzentados (só o menu de sistema da janela principal os tem): cinza-claro
+    /// [medido em m05b, s01 e w04]. Opcional (API 0.33).
+    #[serde(default = "cor_desabilitado_padrao")]
+    pub desabilitado: u8,
+    /// Cor da coluna e da linha deslocadas 1 pixel à direita e embaixo do menu aberto (cinza-claro,
+    /// medido em m01 e m05b); sem a chave, não desenha. Opcional (API 0.33).
+    #[serde(default)]
+    pub sombra: Option<u8>,
+}
+
+fn cor_desabilitado_padrao() -> u8 {
+    8
 }
 
 /// Tecla (nome do SDL) com Ctrl/Shift que dispara um comando do menu.
@@ -175,6 +188,20 @@ pub enum Resposta {
     Tratada(bool),
     /// Item escolhido (a barra já fechou).
     Comando(ComandoMenu),
+    /// Item do menu de sistema da janela principal escolhido (a barra já fechou).
+    Sistema(ComandoPrincipal),
+}
+
+/// Menu de sistema da janela principal (com `moldura_windows31`), percorrido junto com a barra: o
+/// Windows o trata como um menu antes do File (← no File e → no Speed chegam nele, m05b e s06).
+#[derive(Clone, Debug)]
+pub struct MenuSistema {
+    /// Textos com `&` e tab, como os do banco (`SEPARADOR` nos separadores).
+    pub itens: Vec<String>,
+    pub comandos: Vec<Option<ComandoPrincipal>>,
+    pub habilitados: Vec<bool>,
+    /// Caixa do menu na barra de título (o "título" deste menu).
+    pub caixa: Retangulo,
 }
 
 /// A barra de menus: configuração, textos do banco e estado.
@@ -187,6 +214,10 @@ pub struct BarraMenus {
     arrastando: bool,
     /// O menu já estava aberto quando o título foi apertado (o soltar no título fecha).
     reapertou: bool,
+    /// Menu de sistema da janela principal (só com a barra de título do Windows 3.1 desenhada).
+    pub sistema: Option<MenuSistema>,
+    /// Primeira linha da barra na janela do port (0, ou a altura da barra de título).
+    pub topo: i16,
 }
 
 fn contem(r: Retangulo, x: i32, y: i32) -> bool {
@@ -200,12 +231,64 @@ fn sem_e(texto: &str) -> Vec<u8> {
 
 impl BarraMenus {
     pub fn new(cfg: ConfigBarraMenus, menu: MenuBanco) -> BarraMenus {
-        BarraMenus { cfg, menu, estado: Estado::Fechado, arrastando: false, reapertou: false }
+        BarraMenus { cfg, menu, estado: Estado::Fechado, arrastando: false, reapertou: false, sistema: None, topo: 0 }
     }
 
-    /// Linhas ocupadas em cima da área cliente: a barra e a linha preta.
+    /// Liga a barra de título do Windows 3.1 em cima da barra (`moldura_windows31`): a barra desce
+    /// a altura do título e ganha o menu de sistema da janela principal.
+    pub fn ligar_sistema(&mut self, m: &ConfigMolduraPrincipal, largura: i16) {
+        let itens = m.itens.iter().map(|i| i.texto.clone().unwrap_or_else(|| SEPARADOR.to_string())).collect();
+        self.sistema = Some(MenuSistema {
+            itens,
+            comandos: m.itens.iter().map(|i| i.comando).collect(),
+            habilitados: m.itens.iter().map(|i| i.habilitado && i.texto.is_some()).collect(),
+            caixa: m.retangulo(ParteTitulo::Caixa, largura),
+        });
+        self.topo = m.altura_total();
+    }
+
+    /// Índice do menu de sistema (depois dos títulos), se houver.
+    pub fn indice_sistema(&self) -> Option<usize> {
+        self.sistema.as_ref().map(|_| self.menu.titulos.len())
+    }
+
+    /// A caixa do menu de sistema está realçada (menu aberto ou escolhida pelo teclado).
+    pub fn sistema_realcado(&self) -> bool {
+        let Some(s) = self.indice_sistema() else { return false };
+        matches!(self.estado, Estado::Barra(m) | Estado::Aberto { menu: m, .. } if m == s)
+    }
+
+    fn itens_de(&self, m: usize) -> &[String] {
+        match (&self.sistema, self.indice_sistema()) {
+            (Some(s), Some(k)) if k == m => &s.itens,
+            _ => &self.menu.itens[m],
+        }
+    }
+
+    /// O item pode ser escolhido (os do menu de sistema podem vir acinzentados).
+    pub fn habilitado(&self, m: usize, i: usize) -> bool {
+        match (&self.sistema, self.indice_sistema()) {
+            (Some(s), Some(k)) if k == m => s.habilitados.get(i).copied().unwrap_or(false),
+            _ => true,
+        }
+    }
+
+    /// Ordem do percurso pelas setas: o menu de sistema antes do File.
+    fn ordem(&self) -> Vec<usize> {
+        let n = self.menu.titulos.len();
+        self.indice_sistema().into_iter().chain(0..n).collect()
+    }
+
+    fn vizinho(&self, m: usize, passo: isize) -> usize {
+        let o = self.ordem();
+        let k = o.len() as isize;
+        let p = o.iter().position(|&v| v == m).unwrap_or(0) as isize;
+        o[(p + passo).rem_euclid(k) as usize]
+    }
+
+    /// Linhas ocupadas em cima da área cliente: a barra de título (se houver), a barra e a linha preta.
     pub fn altura_total(&self) -> i16 {
-        self.cfg.altura_barra + 1
+        self.topo + self.cfg.altura_barra + 1
     }
 
     pub fn ativa(&self) -> bool {
@@ -214,7 +297,10 @@ impl BarraMenus {
 
     /// Texto do item (o Pause muda com o jogo pausado).
     pub fn texto_item(&self, m: usize, i: usize, e: &EstadoMenus) -> String {
-        let t = self.menu.itens[m][i].clone();
+        let t = self.itens_de(m)[i].clone();
+        if Some(m) == self.indice_sistema() {
+            return t;
+        }
         if self.cfg.comando(comando(m, i)) == Some(ComandoMenu::Pausa) {
             return self.cfg.texto_pausa[usize::from(e.pausado)].clone();
         }
@@ -222,11 +308,14 @@ impl BarraMenus {
     }
 
     fn separador(&self, m: usize, i: usize) -> bool {
-        self.menu.itens[m][i] == SEPARADOR
+        self.itens_de(m)[i] == SEPARADOR
     }
 
     /// O item tem marca de seleção.
     pub fn marcado(&self, m: usize, i: usize, e: &EstadoMenus) -> bool {
+        if Some(m) == self.indice_sistema() {
+            return false;
+        }
         match self.cfg.comando(comando(m, i)) {
             Some(c) => c.opcao().map(|k| e.opcoes[k]).or(c.velocidade().map(|v| v == e.velocidade)).unwrap_or(false),
             None => false,
@@ -241,7 +330,7 @@ impl BarraMenus {
             .iter()
             .map(|t| {
                 let w = f.largura_texto(&sem_e(t)) as i16 + 2 * self.cfg.margem_titulo;
-                let r = Retangulo { esq: x, topo: 0, dir: x + w, base: self.cfg.altura_barra };
+                let r = Retangulo { esq: x, topo: self.topo, dir: x + w, base: self.topo + self.cfg.altura_barra };
                 x += w;
                 r
             })
@@ -251,7 +340,7 @@ impl BarraMenus {
     /// Larguras do texto antes e depois do tab dos itens do menu `m`.
     fn colunas(&self, m: usize, f: &Fonte, e: &EstadoMenus) -> (i16, i16) {
         let (mut l, mut r) = (0, 0);
-        for i in 0..self.menu.itens[m].len() {
+        for i in 0..self.itens_de(m).len() {
             if self.separador(m, i) {
                 continue;
             }
@@ -267,24 +356,27 @@ impl BarraMenus {
     /// topo de cada item (relativo ao topo do contorno).
     pub fn geometria_menu(&self, m: usize, f: &Fonte, e: &EstadoMenus) -> (Retangulo, i16, Vec<(i16, i16)>) {
         let c = &self.cfg;
-        let titulo = self.titulos(f)[m];
         let (l, r) = self.colunas(m, f, e);
         let coluna = c.margem_texto + l + c.espaco_atalho;
         let largura = if r > 0 { coluna + r + c.margem_direita } else { c.margem_texto + l + c.margem_direita };
         let mut y = 1;
         let mut itens = Vec::new();
-        for i in 0..self.menu.itens[m].len() {
+        for i in 0..self.itens_de(m).len() {
             let h = if self.separador(m, i) { c.altura_separador } else { c.altura_item };
             itens.push((y, h));
             y += h;
         }
-        let topo = c.altura_barra;
-        let ret = Retangulo { esq: titulo.esq, topo, dir: titulo.esq + largura, base: topo + y + 1 };
+        // O menu de sistema desce da caixa, com o contorno de cima na linha preta do título (m05b).
+        let (esq, topo) = match (&self.sistema, self.indice_sistema()) {
+            (Some(s), Some(k)) if k == m => (s.caixa.esq, s.caixa.base),
+            _ => (self.titulos(f)[m].esq, self.topo + c.altura_barra),
+        };
+        let ret = Retangulo { esq, topo, dir: esq + largura, base: topo + y + 1 };
         (ret, coluna, itens)
     }
 
     fn primeiro_item(&self, m: usize) -> Option<usize> {
-        (0..self.menu.itens[m].len()).find(|&i| !self.separador(m, i))
+        (0..self.itens_de(m).len()).find(|&i| !self.separador(m, i))
     }
 
     fn abrir(&mut self, m: usize, realcar: bool) {
@@ -292,12 +384,18 @@ impl BarraMenus {
         self.estado = Estado::Aberto { menu: m, item };
     }
 
-    fn fechar(&mut self) {
+    pub fn fechar(&mut self) {
         self.estado = Estado::Fechado;
         self.arrastando = false;
     }
 
+    /// Título (ou a caixa do menu de sistema) sob (x, y).
     fn titulo_em(&self, f: &Fonte, x: i32, y: i32) -> Option<usize> {
+        if let (Some(s), Some(k)) = (&self.sistema, self.indice_sistema()) {
+            if contem(s.caixa, x, y) {
+                return Some(k);
+            }
+        }
         self.titulos(f).iter().position(|r| contem(*r, x, y))
     }
 
@@ -381,6 +479,17 @@ impl BarraMenus {
 
     fn escolher(&mut self, i: usize) -> Resposta {
         let Estado::Aberto { menu, .. } = self.estado else { return Resposta::Tratada(false) };
+        if !self.habilitado(menu, i) {
+            // Item acinzentado: o menu fica aberto.
+            return Resposta::Tratada(false);
+        }
+        if let (Some(s), Some(k)) = (&self.sistema, self.indice_sistema()) {
+            if k == menu {
+                let c = s.comandos.get(i).copied().flatten();
+                self.fechar();
+                return c.map_or(Resposta::Tratada(true), Resposta::Sistema);
+            }
+        }
         self.fechar();
         match self.cfg.comando(comando(menu, i)) {
             Some(c) => Resposta::Comando(c),
@@ -411,6 +520,13 @@ impl BarraMenus {
             return Resposta::Ignorada;
         }
         let lower = nome.to_ascii_lowercase();
+        if alt && lower == "space" {
+            // Alt+Espaço: o menu de sistema da janela principal, com o primeiro item realçado (s03).
+            if let Some(k) = self.indice_sistema() {
+                self.abrir(k, true);
+                return Resposta::Tratada(true);
+            }
+        }
         if alt && !matches!(lower.as_str(), "left alt" | "right alt") {
             // Alt+letra abre o menu com o primeiro item realçado; outras combinações com Alt não são da barra.
             return match self.menu_da_letra(nome) {
@@ -436,8 +552,8 @@ impl BarraMenus {
             }
             Estado::Barra(t) => {
                 match lower.as_str() {
-                    "left" => self.estado = Estado::Barra((t + n - 1) % n),
-                    "right" => self.estado = Estado::Barra((t + 1) % n),
+                    "left" => self.estado = Estado::Barra(self.vizinho(t, -1)),
+                    "right" => self.estado = Estado::Barra(self.vizinho(t, 1)),
                     "down" | "up" | "return" | "keypad enter" => self.abrir(t, true),
                     "escape" | "f10" => self.fechar(),
                     _ => {
@@ -449,7 +565,7 @@ impl BarraMenus {
                 Resposta::Tratada(true)
             }
             Estado::Aberto { menu, item } => {
-                let validos: Vec<usize> = (0..self.menu.itens[menu].len()).filter(|&i| !self.separador(menu, i)).collect();
+                let validos: Vec<usize> = (0..self.itens_de(menu).len()).filter(|&i| !self.separador(menu, i)).collect();
                 let k = validos.len();
                 let atual = item.and_then(|i| validos.iter().position(|&v| v == i));
                 match lower.as_str() {
@@ -462,8 +578,8 @@ impl BarraMenus {
                         };
                         self.estado = Estado::Aberto { menu, item: Some(validos[novo]) };
                     }
-                    "left" => self.abrir((menu + n - 1) % n, true),
-                    "right" => self.abrir((menu + 1) % n, true),
+                    "left" => self.abrir(self.vizinho(menu, -1), true),
+                    "right" => self.abrir(self.vizinho(menu, 1), true),
                     "return" | "keypad enter" => {
                         if let Some(i) = item {
                             return self.escolher(i);
@@ -473,8 +589,8 @@ impl BarraMenus {
                     "f10" => self.fechar(),
                     _ => {
                         let l = lower.clone();
-                        let achado = (0..self.menu.itens[menu].len())
-                            .find(|&i| !self.separador(menu, i) && mnemonico(&self.menu.itens[menu][i]).is_some_and(|c| l.len() == 1 && l.starts_with(c)));
+                        let achado = (0..self.itens_de(menu).len())
+                            .find(|&i| !self.separador(menu, i) && mnemonico(&self.itens_de(menu)[i]).is_some_and(|c| l.len() == 1 && l.starts_with(c)));
                         if let Some(i) = achado {
                             return self.escolher(i);
                         }
@@ -485,13 +601,13 @@ impl BarraMenus {
         }
     }
 
-    /// Desenha a barra (linhas 0..`altura_total`) e o menu aberto, por cima do que já está no quadro
-    /// (a área cliente começa em `altura_total`).
+    /// Desenha a barra (linhas `topo`..`altura_total`) e o menu aberto, por cima do que já está no
+    /// quadro (a área cliente começa em `altura_total`; a barra de título, se houver, é da moldura).
     pub fn desenhar(&self, q: &mut Quadro, f: Option<&Fonte>, e: &EstadoMenus) {
         let c = &self.cfg;
         let largura = q.largura as i16;
-        let h = c.altura_barra;
-        q.preencher(Retangulo { esq: 0, topo: 0, dir: largura, base: h }, c.cores.fundo, c.cores.fundo);
+        let (t0, h) = (self.topo, self.topo + c.altura_barra);
+        q.preencher(Retangulo { esq: 0, topo: t0, dir: largura, base: h }, c.cores.fundo, c.cores.fundo);
         q.preencher(Retangulo { esq: 0, topo: h, dir: largura, base: h + 1 }, c.cores.borda, c.cores.borda);
         let Some(f) = f else { return };
         let realce = match self.estado {
@@ -517,6 +633,12 @@ impl BarraMenus {
         let (r, coluna, itens) = self.geometria_menu(m, f, e);
         q.preencher(r, c.cores.fundo, c.cores.fundo);
         q.contorno(Retangulo { dir: r.dir - 1, base: r.base - 1, ..r }, c.cores.borda);
+        // Coluna à direita e linha embaixo, deslocadas 1 pixel, na cor da sombra [medido em m01 e
+        // m05b; invisível sobre a faixa, que tem a mesma cor].
+        if let Some(s) = c.cores.sombra {
+            q.preencher(Retangulo { esq: r.dir, topo: r.topo + 1, dir: r.dir + 1, base: r.base + 1 }, s, s);
+            q.preencher(Retangulo { esq: r.esq + 1, topo: r.base, dir: r.dir + 1, base: r.base + 1 }, s, s);
+        }
         for (i, &(t, h)) in itens.iter().enumerate() {
             let topo = r.topo + t;
             if self.separador(m, i) {
@@ -525,7 +647,12 @@ impl BarraMenus {
                 continue;
             }
             let ativo = realcado == Some(i);
-            let (frente, fundo) = if ativo { (c.cores.texto_realce, c.cores.realce) } else { (c.cores.texto, c.cores.fundo) };
+            let habilitado = self.habilitado(m, i);
+            let (frente, fundo) = match (ativo, habilitado) {
+                (true, _) => (c.cores.texto_realce, c.cores.realce),
+                (false, true) => (c.cores.texto, c.cores.fundo),
+                (false, false) => (c.cores.desabilitado, c.cores.fundo),
+            };
             let faixa = Retangulo { esq: r.esq + 1, topo, dir: r.dir - 1, base: topo + h };
             if ativo {
                 q.preencher(faixa, fundo, fundo);
@@ -533,9 +660,11 @@ impl BarraMenus {
             let antes = q.recorte.replace(faixa);
             let texto = self.texto_item(m, i, e);
             let (a, b) = texto.split_once('\t').unwrap_or((&texto, ""));
-            texto_a_esquerda(q, f, a, r.esq + c.margem_texto, topo, frente, fundo);
+            // Acinzentado e realçado: o `GrayString` do Windows (pixels alternados) [medido em s04 e w04].
+            let escrever = if ativo && !habilitado { texto_acinzentado } else { texto_a_esquerda };
+            escrever(q, f, a, r.esq + c.margem_texto, topo, frente, fundo);
             if !b.is_empty() {
-                texto_a_esquerda(q, f, b, r.esq + coluna, topo, frente, fundo);
+                escrever(q, f, b, r.esq + coluna, topo, frente, fundo);
             }
             if self.marcado(m, i, e) {
                 for (dy, linha) in c.marca.iter().enumerate() {
