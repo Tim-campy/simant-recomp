@@ -177,17 +177,17 @@ fn botao_ferramentas(s: &mut Sessao) {
     let Some(r) = s.tela.retangulo_da_faixa(&s.modos.menu.cfg.botao) else { return };
     match s.partida.estado.partida.tipo_jogo {
         1 => {
-            if s.modos.menu.abrir_por_tipo(QualMenu::Quick, r) {
+            if s.modos.menu.abrir_por_tipo(QualMenu::Quick, r, &s.interface.driver) {
                 s.modos.menu_aberto = true;
             } else {
                 // Sem a janela 10 nos dados: vira Experimental direto (o comportamento antigo).
                 quick_para_experimental(s);
             }
         }
-        2 => s.modos.menu_aberto = s.modos.menu.abrir_por_tipo(QualMenu::Completo, r),
+        2 => s.modos.menu_aberto = s.modos.menu.abrir_por_tipo(QualMenu::Completo, r, &s.interface.driver),
         3 => {
             let atual = Ferramenta::de_i16(s.partida.estado.partida.ferramenta_experimental);
-            s.modos.menu.abrir(r, atual);
+            s.modos.menu.abrir(r, atual, &s.interface.driver);
             s.modos.menu_aberto = true;
         }
         _ => println!("ferramentas: nada neste tipo de jogo"),

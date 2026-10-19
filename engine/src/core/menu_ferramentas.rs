@@ -9,6 +9,7 @@
 use serde::Deserialize;
 
 use super::quadro::Quadro;
+use super::resolucao::PerfilDriver;
 use super::telas::{carregar_janela, desenhar_objetos, Interface};
 use crate::formats::janela::{Janela, Retangulo};
 use crate::recursos::Recursos;
@@ -68,7 +69,8 @@ pub enum QualMenu {
 pub struct MolduraMenu {
     /// Linha do contorno na área cliente.
     pub topo: i16,
-    /// Soma à coluna calculada pela conta do original.
+    /// Soma à coluna calculada pela conta do original depois do alinhamento ao byte (0: o +1 medido
+    /// antes na janela 9 era o alinhamento do driver VGA).
     pub ajuste_x: i16,
     pub largura_borda: i16,
     pub cor_borda: u8,
@@ -154,7 +156,7 @@ impl MenuFerramentas {
     /// conta de `_RibbonToolsMenu` e com a mesma moldura da janela 9 (as três têm os mesmos bits de
     /// estilo, 0x41/0x18). Devolve false se a janela não está no `cfg` (ou com `Experimental`, que
     /// abre por [`MenuFerramentas::abrir`]).
-    pub fn abrir_por_tipo(&mut self, qual: QualMenu, botao: Retangulo) -> bool {
+    pub fn abrir_por_tipo(&mut self, qual: QualMenu, botao: Retangulo, driver: &PerfilDriver) -> bool {
         let existe = match qual {
             QualMenu::Experimental => false,
             QualMenu::Quick => self.quick.is_some(),
@@ -167,27 +169,29 @@ impl MenuFerramentas {
         self.submenu = None;
         self.realce = None;
         self.realce_quick = false;
-        self.posicionar(botao);
+        self.posicionar(botao, driver);
         true
     }
 
     /// Abre o menu junto ao botão (retângulo na área cliente), com o item da ferramenta `atual`
     /// realçado.
-    pub fn abrir(&mut self, botao: Retangulo, atual: Option<Ferramenta>) {
+    pub fn abrir(&mut self, botao: Retangulo, atual: Option<Ferramenta>, driver: &PerfilDriver) {
         self.qual = QualMenu::Experimental;
         self.submenu = None;
         self.realce = atual;
-        self.posicionar(botao);
+        self.posicionar(botao, driver);
     }
 
-    /// `_RibbonToolsMenu`: x = (direita do botão − largura + esquerda) / 2 (com a moldura medida).
-    fn posicionar(&mut self, botao: Retangulo) {
+    /// `_RibbonToolsMenu`: x = (direita do botão − largura + esquerda) / 2, com a área de dentro da
+    /// moldura no byte mais próximo pelo perfil de driver (telas/resolucao.md §7): medido nas janelas
+    /// 9, 10 e 11 (i05, q01, f01: o objeto 0 começa em 312, 296 e 304 na VGA de 16 cores).
+    fn posicionar(&mut self, botao: Retangulo, driver: &PerfilDriver) {
         match &self.cfg.moldura {
             Some(m) => {
                 let r = self.janela().objetos[0].retangulo;
                 let (w, h) = (r.dir - r.esq, r.base - r.topo);
                 let b = m.largura_borda;
-                let esq = (botao.dir - w + botao.esq) / 2 + m.ajuste_x;
+                let esq = driver.alinhar_janela((botao.dir - w + botao.esq) / 2, b) + m.ajuste_x;
                 let ext = Retangulo { esq, topo: m.topo, dir: esq + w + 2 * b, base: m.topo + h + 2 * b };
                 self.externo = Some(ext);
                 self.origem = (ext.esq + b + m.ajuste_conteudo[0], ext.topo + b + m.ajuste_conteudo[1]);
