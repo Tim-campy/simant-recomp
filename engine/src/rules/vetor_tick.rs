@@ -768,17 +768,21 @@ pub fn aplicar_acao(
     }
     if let Some((x, y)) = par("special") {
         // Um tick em que a amarela morre sem corpo no Jogo Completo com mais de uma colônia preta: o
-        // original chama `_SpecialXfer` (`1000:7eb6`) DENTRO do tick e o jogador escolhe a colônia.
-        // Aqui: o tick do port (que só pede a escolha) e depois o efeito de `_SpecialXfer` com o patch
-        // escolhido na bancada. Ver testes-tick.md (o que difere é a ordem: no original o resto do tick
-        // já roda no patch novo).
+        // original chama `_SpecialXfer` (`1000:7eb6`) DENTRO do tick e o jogador escolhe a colônia
+        // (o patch escolhido na bancada); o resto do tick roda no patch novo (testes-tick.md).
+        e.transferencia_no_tick = Some(Box::new(super::troca_patch::TransferenciaNoTick {
+            patch: (x, y),
+            geracao: std::sync::Arc::new(tab.clone()),
+            cfg: cfg.clone(),
+            resultado: None,
+        }));
         let mut regras = super::tick::RegrasOriginais::default();
         tick(e, &mut regras);
-        transferencia_especial(e, x, y);
-        // A janela do quintal aparece (desenho com o patch ainda antigo) e vira a Strategic View.
-        super::desenho::desenhar_enxame(e);
-        super::desenho::desenhar_colonias(e);
-        return Ok(format!("{:?}", super::troca_patch::trocar_patch(e, tab, cfg)?));
+        let r = e.transferencia_no_tick.take().and_then(|t| t.resultado);
+        return match r {
+            Some(r) => Ok(format!("{:?}", r?)),
+            None => Err("o tick não chamou _SpecialXfer".into()),
+        };
     }
     if acao.get("misterio").is_some() {
         // Botão Mystery com o jogo pausado: o efeito vem do `_RRand(15)` com o R do vetor.
@@ -854,15 +858,6 @@ pub fn aplicar_acao(
         return Ok(format!("{efeitos:?}"));
     }
     Err(format!("ação desconhecida: {acao}"))
-}
-
-/// O que `_SpecialXfer` (`1000:7eb6`) faz no estado antes do `_XferPatch` do patch escolhido:
-/// zera a colônia preta do patch atual no mapa do quintal, abre a Strategic View (`_YardMode = 2`,
-/// `_ColonyUpdateFlag = 1`), `_SetMapPlane(0)` (`_OldMapPlane`, `_MapPlane = 0`, `_YMapPnt` = patch
-/// atual) e grava `_YMapPnt` = escolhido.
-pub fn transferencia_especial(e: &mut Estado, x: i16, y: i16) {
-    super::troca_patch::iniciar_transferencia_especial(e);
-    e.vistas.ponto_quintal = (x, y);
 }
 
 /// `extras.json["acao"]` de um vetor de ação.

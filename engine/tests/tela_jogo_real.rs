@@ -175,7 +175,9 @@ fn camada_de_cheiro_na_janela_de_edicao() {
 // (mensagens.md §9); o resto da tela não mudou.
 // 2026-10-18: setas e polegares das barras de rolagem (gerenciador de janelas, janelas.md §8);
 // a região da janela de edição dá 99,59% contra j00 (resta o texto do título).
-const HASH_TELA_JOGO: &str = "1274ad6e2390bd2b28b41185e66c8d0d39f8d1fb4fdfe150516a6d6fbd3a1f8e";
+// 2026-10-19: o título da janela de edição passou aos índices das cores do sistema (16 título
+// ativo, 18 texto do título; resolucao.md §7): na VGA o RGB é o mesmo de antes (4 e 15).
+const HASH_TELA_JOGO: &str = "a9b5234a4717862bb997249233aa2324462d6b04b0603f5605c75cb191649710";
 
 /// Janelas de controle (janelas.md): o clique no triângulo do Caste Control (na frente) muda
 /// `_casteLevels`, passa para Manual e recalcula `_IdealCaste`; Auto e os conjuntos.

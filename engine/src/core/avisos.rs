@@ -251,6 +251,14 @@ pub struct Avisos {
     residual: Option<Animado>,
     /// Driver imitado (alinhamento da janela 26); o padrão não alinha.
     pub driver: super::resolucao::PerfilDriver,
+    /// A janela 26 já foi criada nesta sessão (`_win_Open` com `_win_hwnd` ≠ 0): só a criação alinha
+    /// a área cliente ao byte; depois de `_win_Close` (que só esconde), ela reabre no x pedido.
+    janela_imagem_criada: bool,
+    /// O aviso da frente (janela 26) foi aberto criando a janela (alinhado); `None` = ainda não
+    /// decidido ou a frente não é da janela 26.
+    alinhar_frente: Option<bool>,
+    /// O mesmo para a janela que a aranha deixou na tela.
+    alinhar_residual: bool,
 }
 
 impl Avisos {
@@ -266,6 +274,9 @@ impl Avisos {
             animado: None,
             residual: None,
             driver: Default::default(),
+            janela_imagem_criada: false,
+            alinhar_frente: None,
+            alinhar_residual: true,
         }
     }
 
@@ -364,6 +375,7 @@ impl Avisos {
         let tem = self.cfg.quadro_amarela.as_ref().is_some_and(|c| c.sequencias.contains_key(&imagem.to_string()));
         if tem {
             self.modais.push_back(Modal::Amarela { imagem, indice });
+            self.abrir_frente();
         }
         tem
     }
@@ -375,6 +387,7 @@ impl Avisos {
         let tem = self.cfg.quadro_amarela.is_some() && self.cfg.quadros_animados.as_ref().is_some_and(|c| c.de(tipo).is_some());
         if tem {
             self.modais.push_back(Modal::Animado(tipo));
+            self.abrir_frente();
             if let Some(texto) = texto {
                 self.modais.push_back(Modal::Quadro { texto, imagem: None });
             }
@@ -493,6 +506,7 @@ impl Avisos {
         self.aberto_em = None;
         self.sobreposta_visivel = false;
         let m = self.modais.pop_front();
+        let alinhada = self.alinhar_frente.take().unwrap_or(false);
         match &m {
             // _YellowDialog termina com _win_Close: some também a janela que a aranha deixou.
             Some(Modal::Amarela { .. }) => self.residual = None,
@@ -502,23 +516,44 @@ impl Avisos {
                     let fica = self.cfg.quadros_animados.as_ref().and_then(|c| c.de(a.tipo)).is_some_and(|c| c.fica_aberta);
                     if fica {
                         self.residual = Some(a);
+                        self.alinhar_residual = alinhada;
                     }
                 }
             }
             _ => {}
         }
+        self.abrir_frente();
         m
     }
 
-    /// `ajuste` da janela 26 com o alinhamento ao byte do driver, se `alinhar_ao_criar`.
-    pub fn ajuste_janela_imagem(&self, c: &ConfigQuadroAmarela, ajuste: [i16; 2]) -> [i16; 2] {
-        if !c.alinhar_ao_criar {
+    /// `ajuste` da janela 26 com o alinhamento ao byte do driver, se `alinhar_ao_criar` e se esta
+    /// abertura criou a janela (`criada`; ver [`Avisos::alinhar_frente`]).
+    pub fn ajuste_janela_imagem(&self, c: &ConfigQuadroAmarela, ajuste: [i16; 2], criada: bool) -> [i16; 2] {
+        if !c.alinhar_ao_criar || !criada {
             return ajuste;
         }
-        // O alinhamento é o da janela criada no lugar de `imagem_em`; o `ajuste` da sequência (9100 e
-        // 9101, causa em aberto) vem depois.
+        // O alinhamento é o da janela criada no lugar de `imagem_em`; o `ajuste` da sequência vem depois.
         let x = c.imagem_em[0];
         [ajuste[0] + self.driver.alinhar(x) - x, ajuste[1]]
+    }
+
+    /// O aviso da frente (janela 26) foi aberto criando a janela (telas/mensagens.md §10: a primeira
+    /// abertura da sessão é alinhada ao byte; as seguintes, não). Sem decisão ainda, como a primeira.
+    pub fn alinhar_frente(&self) -> bool {
+        self.alinhar_frente.unwrap_or(!self.janela_imagem_criada)
+    }
+
+    /// A janela que a aranha deixou foi aberta criando a janela.
+    pub fn alinhar_residual(&self) -> bool {
+        self.alinhar_residual
+    }
+
+    /// O aviso da frente acabou de aparecer: se usa a janela 26, decide se esta abertura a cria.
+    fn abrir_frente(&mut self) {
+        if self.alinhar_frente.is_none() && matches!(self.modais.front(), Some(Modal::Amarela { .. } | Modal::Animado(_))) {
+            self.alinhar_frente = Some(!self.janela_imagem_criada);
+            self.janela_imagem_criada = true;
+        }
     }
 
     /// A partida acabou ou foi trocada: some a janela que a aranha deixou.
@@ -844,9 +879,9 @@ pub fn desenhar_modal(q: &mut Quadro, recursos: &Recursos, interface: &Interface
         Some(Modal::Amarela { imagem, indice }) => {
             let (c, s) = avisos.sequencia_amarela().ok_or("quadro da amarela sem configuração")?;
             let sobreposta = if avisos.sobreposta_visivel { s.sobreposta.map(|id| (id, s.deslocamento)) } else { None };
-            let externo = desenhar_quadro_amarela(q, recursos, c, *imagem, avisos.ajuste_janela_imagem(c, s.ajuste), sobreposta)?;
+            let externo = desenhar_quadro_amarela(q, recursos, c, *imagem, avisos.ajuste_janela_imagem(c, s.ajuste, avisos.alinhar_frente()), sobreposta)?;
             if let Some(t) = &s.texto {
-                desenhar_texto_amarela(q, recursos, interface, c, avisos.ajuste_janela_imagem(c, s.ajuste), t, *indice);
+                desenhar_texto_amarela(q, recursos, interface, c, avisos.ajuste_janela_imagem(c, s.ajuste, avisos.alinhar_frente()), t, *indice);
             }
             Ok((Some(externo), Vec::new()))
         }
@@ -856,7 +891,7 @@ pub fn desenhar_modal(q: &mut Quadro, recursos: &Recursos, interface: &Interface
                 // _DrawSimPayoff antes de abrir a janela: só o quintal; um clique encerra a espera.
                 return Ok((Some(tela_inteira(q)), Vec::new()));
             }
-            desenhar_animado(q, recursos, avisos, a, true)?;
+            desenhar_animado(q, recursos, avisos, a, true, avisos.alinhar_frente())?;
             // _win_Events: qualquer clique encerra a espera da vez.
             Ok((Some(tela_inteira(q)), Vec::new()))
         }
@@ -869,10 +904,10 @@ fn tela_inteira(q: &Quadro) -> Retangulo {
 
 /// A janela 26 de um quadro animado com o último quadro desenhado. `ativa` = nenhuma janela por
 /// cima (a borda muda de cor quando outra fica na frente).
-fn desenhar_animado(q: &mut Quadro, recursos: &Recursos, avisos: &Avisos, a: &Animado, ativa: bool) -> Result<(), String> {
+fn desenhar_animado(q: &mut Quadro, recursos: &Recursos, avisos: &Avisos, a: &Animado, ativa: bool, criada: bool) -> Result<(), String> {
     let (Some(ca), Some(cq)) = (avisos.cfg.quadros_animados.as_ref(), avisos.cfg.quadro_amarela.as_ref()) else { return Ok(()) };
     let Some(c) = ca.de(a.tipo) else { return Ok(()) };
-    let (_, area) = desenhar_janela_imagem(q, recursos, cq, c.bitmap, avisos.ajuste_janela_imagem(cq, [0, 0]), ativa)?;
+    let (_, area) = desenhar_janela_imagem(q, recursos, cq, c.bitmap, avisos.ajuste_janela_imagem(cq, [0, 0], criada), ativa)?;
     if let Some(id) = a.quadro {
         let bm = recursos.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d))?;
         let antes = q.recorte.replace(area);
@@ -888,7 +923,7 @@ fn desenhar_animado(q: &mut Quadro, recursos: &Recursos, avisos: &Avisos, a: &An
 /// janela inativa) ou sozinha, durante a luta.
 pub fn desenhar_residual(q: &mut Quadro, recursos: &Recursos, avisos: &Avisos) -> Result<(), String> {
     match avisos.residual() {
-        Some(a) => desenhar_animado(q, recursos, avisos, a, !avisos.tem_modal()),
+        Some(a) => desenhar_animado(q, recursos, avisos, a, !avisos.tem_modal(), avisos.alinhar_residual()),
         None => Ok(()),
     }
 }

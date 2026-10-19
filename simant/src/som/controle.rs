@@ -32,6 +32,9 @@ pub struct ControleSom {
     cursor_ms: u64,
     /// Efeitos agendados, em ordem de instante.
     fila: VecDeque<(u64, u16)>,
+    /// Instante em que começou (ou começará, se agendado) o último efeito aceito: um pedido no
+    /// mesmo milissegundo é descartado (`_myBeginSound`, regras/som.md "Um efeito por vez").
+    ultimo_inicio: Option<u64>,
 }
 
 impl Default for ControleSom {
@@ -44,6 +47,7 @@ impl Default for ControleSom {
             ja_teve_foco: false,
             cursor_ms: 0,
             fila: VecDeque::new(),
+            ultimo_inicio: None,
         }
     }
 }
@@ -79,6 +83,7 @@ impl ControleSom {
         if self.efeitos_ligados && !efeitos {
             c.push(Comando::PararEfeito);
             self.fila.clear();
+            self.ultimo_inicio = None;
         }
         self.musica_ligada = musica;
         self.efeitos_ligados = efeitos;
@@ -93,6 +98,7 @@ impl ControleSom {
             c.push(Comando::PararMusica);
             c.push(Comando::PararEfeito);
             self.fila.clear();
+            self.ultimo_inicio = None;
             self.cursor_ms = agora_ms;
         }
         self.foco = ativo;
@@ -106,7 +112,9 @@ impl ControleSom {
     }
 
     /// Pedidos das regras de um quadro, na ordem. Os efeitos sem espera antes deles saem já (um
-    /// corta o anterior, como no `waveOut` único do original); `Evento::Espera` empurra os
+    /// corta o anterior, como no `waveOut` único do original), mas um efeito pedido no mesmo
+    /// milissegundo em que outro começou é descartado (`_myBeginSound`: `GetTickCount() ≤` início do
+    /// anterior + posição dele, ~0); `Evento::Espera` empurra os
     /// seguintes para mais tarde, e a fila do quadro seguinte começa depois das esperas
     /// agendadas (no original nada roda durante a animação). Devolve o que tocar agora.
     pub fn receber(&mut self, eventos: &[Evento], agora_ms: u64) -> Vec<Comando> {
@@ -117,6 +125,10 @@ impl ControleSom {
                 Evento::Musica(id) => c.extend(self.musica(*id)),
                 Evento::Espera(ms) => t += u64::from(*ms),
                 Evento::Som(id) if self.efeitos_ligados && self.foco => {
+                    if self.ultimo_inicio == Some(t) {
+                        continue;
+                    }
+                    self.ultimo_inicio = Some(t);
                     if t <= agora_ms {
                         c.push(Comando::TocarEfeito(*id));
                     } else {
@@ -206,19 +218,35 @@ mod testes {
         // no mesmo tick, a escavação (0x11).
         let mut c = ativo();
         const E: Evento = Evento::Espera(165);
+        // A escavação é pedida no mesmo milissegundo do último 0x25: descartada (`_myBeginSound`).
         let ev = [Evento::Som(37), E, E, Evento::Som(37), E, E, E, Evento::Som(37), Evento::Som(17)];
         assert_eq!(c.receber(&ev, 1000), vec![TocarEfeito(37)]);
         assert!(c.vencidos(1329).is_empty());
         assert_eq!(c.vencidos(1330), vec![TocarEfeito(37)]);
         assert_eq!(c.vencidos(1824), vec![]);
-        assert_eq!(c.vencidos(1825), vec![TocarEfeito(37), TocarEfeito(17)]);
+        assert_eq!(c.vencidos(1825), vec![TocarEfeito(37)]);
         // Um tick seguinte (165 ms depois do primeiro) só sai depois da animação inteira.
         let mut c = ativo();
         c.receber(&ev, 1000);
         assert!(c.receber(&[Evento::Som(30)], 1165).is_empty());
         assert_eq!(c.vencidos(1824), vec![TocarEfeito(37)], "o do quadro 2");
-        assert_eq!(c.vencidos(1825), vec![TocarEfeito(37), TocarEfeito(17), TocarEfeito(30)]);
+        // O do tick seguinte começaria no mesmo instante do último da luta: descartado também.
+        assert_eq!(c.vencidos(1825), vec![TocarEfeito(37)]);
         // Sem esperas pendentes, o efeito sai na hora.
         assert_eq!(c.receber(&[Evento::Som(30)], 5000), vec![TocarEfeito(30)]);
+    }
+
+    #[test]
+    fn efeito_no_mesmo_milissegundo_e_descartado() {
+        let mut c = ativo();
+        // Dois pedidos no mesmo instante: só o primeiro toca (o original descarta o segundo).
+        assert_eq!(c.receber(&[Evento::Som(19), Evento::Som(28)], 100), vec![TocarEfeito(19)]);
+        assert!(c.receber(&[Evento::Som(28)], 100).is_empty(), "outro quadro, mesmo milissegundo");
+        // Um milissegundo depois, o novo corta o anterior.
+        assert_eq!(c.receber(&[Evento::Som(28)], 101), vec![TocarEfeito(28)]);
+        // Depois de parar (opção desligada), nada a descartar.
+        c.opcoes(true, false);
+        c.opcoes(true, true);
+        assert_eq!(c.receber(&[Evento::Som(5)], 101), vec![TocarEfeito(5)]);
     }
 }

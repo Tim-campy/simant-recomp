@@ -455,7 +455,10 @@ mod testes {
                 f => panic!("{f:?}"),
             }
             assert!(s.menus.status && !s.menus.prende_simulacao());
-            s.quadro_rgb().unwrap();
+            let rgb = s.quadro_rgb().unwrap();
+            if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+                crate::salvar_png(&std::path::PathBuf::from(saida).join("status.png"), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
+            }
             assert!(matches!(evento(s, clique(10, 300), false), Filtro::Tratada(true)));
             assert!(!s.menus.status);
             s.partida.definir_pausa(false);

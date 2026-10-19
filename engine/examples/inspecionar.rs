@@ -1,4 +1,4 @@
-//! Ferramenta de inspeção: lista os objetos de uma janela (tipo 0 + nomes do tipo 1) ou as strings
+﻿//! Ferramenta de inspeção: lista os objetos de uma janela (tipo 0 + nomes do tipo 1) ou as strings
 //! de uma lista tipo 4, lidas dos bancos do jogo (com os mods aplicados).
 //! Uso: cargo run -p engine --example inspecionar -- <pasta do jogo> janela <id> | strings <id> | bitmap <id>
 use engine::core::telas::carregar_janela;
@@ -15,6 +15,7 @@ fn main() {
     match a[2].as_str() {
         "janela" => {
             let j = carregar_janela(&r, id).unwrap();
+            println!("flags da janela (0x1C, 0x1D): {:02x} {:02x}", j.flags[0], j.flags[1]);
             for (i, o) in j.objetos.iter().enumerate() {
                 let rt = o.retangulo;
                 println!(

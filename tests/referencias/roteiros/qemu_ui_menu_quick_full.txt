@@ -1,0 +1,36 @@
+# Botão de ferramentas da faixa (ribTools, _RibbonToolsMenu) no Quick Game (janela 10 editToExp) e
+# no Jogo Completo (janela 11 editNoExpMenu), segurando o botão.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_menu_quick_full.txt --overlay re_trabalho/qemu/ov_ag4_menus.qcow2
+# (ov_ag4_menus.qcow2 = cópia do ov_full.qcow2, com os snapshots "quick" e "full"; apagar depois.)
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+ir_para 354 70
+apertar
+esperar 2
+capturar re_trabalho/agente_itens4/q01_menu_quick.png
+# Mouse sobre o item (realce) com o botão apertado
+ir_para 360 85
+esperar 2
+capturar re_trabalho/agente_itens4/q02_menu_quick_item.png
+# Soltar fora do item (no botão): nada muda
+ir_para 354 70
+esperar 1
+soltar
+esperar 2
+capturar re_trabalho/agente_itens4/q03_solto_fora.png
+ler_variavel CurGameType re_trabalho/agente_itens4/q03_tipo.bin
+snapshot_carregar full
+esperar 3
+teclas shift+0
+esperar 2
+ir_para 354 70
+apertar
+esperar 2
+capturar re_trabalho/agente_itens4/f01_menu_full.png
+soltar
+esperar 2
+capturar re_trabalho/agente_itens4/f02_solto.png
+ler_variavel CurGameType re_trabalho/agente_itens4/f02_tipo.bin
+fim

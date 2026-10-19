@@ -5,7 +5,7 @@
 //!
 //! Especificação: docs/spec/telas/abertura.md ("Escolha do jogo") e docs/spec/telas/quintal.md.
 
-use engine::core::menu_ferramentas::{ItemMenu, MenuFerramentas};
+use engine::core::menu_ferramentas::{ItemMenu, MenuFerramentas, QualMenu};
 use engine::core::navegacao::Evento as EventoNav;
 use engine::core::popup_castas::{CliqueBarras, PopupCastas};
 use engine::core::quadro::Quadro;
@@ -72,7 +72,8 @@ pub fn selecao_da_abertura(recursos: &Recursos, interface: &Interface) -> Result
 pub fn desenhar_faixa(s: &Sessao, q: &mut Quadro) -> Vec<String> {
     let m = &s.modos;
     if m.janela.na_frente {
-        return m.quintal.desenhar_faixa(q, s.recursos, &s.interface, &s.partida.estado, &s.partida.estado_dos_botoes());
+        let com_dados = m.janela.dados_da_faixa(s.partida.estado.partida.tempo);
+        return m.quintal.desenhar_faixa(q, s.recursos, &s.interface, &s.partida.estado, &s.partida.estado_dos_botoes(), com_dados);
     }
     // _NewGame: no Experimental o botão de ferramentas da faixa usa outros bitmaps.
     if s.partida.estado.partida.tipo_jogo == 3 {
@@ -170,26 +171,37 @@ fn tratar_efeitos(s: &mut Sessao, efeitos: Vec<Efeito>) {
     s.partida.processar_eventos_do_estado();
 }
 
-/// Botão de ferramentas (`_RibbonToolsMenu`): Quick Game → Experimental; no Experimental abre o
-/// menu; no Full Game e no Tutorial, nada (o original mostra só uma figura no Full Game).
+/// Botão de ferramentas (`_RibbonToolsMenu`): no Quick Game abre o menu de um item (janela 10) e,
+/// escolhido o item, vira Experimental; no Jogo Completo abre a figura da janela 11, que não faz nada;
+/// no Experimental abre o menu de ferramentas; no Tutorial, nada.
 fn botao_ferramentas(s: &mut Sessao) {
+    let Some(r) = s.tela.retangulo_da_faixa(&s.modos.menu.cfg.botao) else { return };
     match s.partida.estado.partida.tipo_jogo {
         1 => {
-            let c = Contexto { tabelas: &s.modos.tabelas_exp, amarela: &s.partida.tabelas_amarela, inimigos: &s.partida.regras.inimigos };
-            let e = &mut s.partida.estado;
-            let efeitos = experimental::quick_para_experimental(e, c);
-            println!("Quick Game -> Experimental");
-            tratar_efeitos(s, efeitos);
-        }
-        3 => {
-            if let Some(r) = s.tela.retangulo_da_faixa(&s.modos.menu.cfg.botao) {
-                let atual = Ferramenta::de_i16(s.partida.estado.partida.ferramenta_experimental);
-                s.modos.menu.abrir(r, atual);
+            if s.modos.menu.abrir_por_tipo(QualMenu::Quick, r, &s.interface.driver) {
                 s.modos.menu_aberto = true;
+            } else {
+                // Sem a janela 10 nos dados: vira Experimental direto (o comportamento antigo).
+                quick_para_experimental(s);
             }
+        }
+        2 => s.modos.menu_aberto = s.modos.menu.abrir_por_tipo(QualMenu::Completo, r, &s.interface.driver),
+        3 => {
+            let atual = Ferramenta::de_i16(s.partida.estado.partida.ferramenta_experimental);
+            s.modos.menu.abrir(r, atual, &s.interface.driver);
+            s.modos.menu_aberto = true;
         }
         _ => println!("ferramentas: nada neste tipo de jogo"),
     }
+}
+
+/// O item da janela 10: o Quick Game vira Experimental (`_RibbonToolsMenu`, seção 5 da spec).
+fn quick_para_experimental(s: &mut Sessao) {
+    let c = Contexto { tabelas: &s.modos.tabelas_exp, amarela: &s.partida.tabelas_amarela, inimigos: &s.partida.regras.inimigos };
+    let e = &mut s.partida.estado;
+    let efeitos = experimental::quick_para_experimental(e, c);
+    println!("Quick Game -> Experimental");
+    tratar_efeitos(s, efeitos);
 }
 
 fn clique_no_menu(s: &mut Sessao, x: i32, y: i32) {
@@ -202,6 +214,11 @@ fn clique_no_menu(s: &mut Sessao, x: i32, y: i32) {
     let (f, sub, fecha) = match item {
         ItemMenu::Ferramenta(f) => (f, None, s.modos.menu.submenu.is_none()),
         ItemMenu::Subopcao(f, i) => (f, Some(i), true),
+        ItemMenu::ParaExperimental => {
+            s.modos.menu_aberto = false;
+            quick_para_experimental(s);
+            return;
+        }
     };
     let mut ctl = s.modos.controle_exp.clone();
     let c = Contexto { tabelas: &s.modos.tabelas_exp, amarela: &s.partida.tabelas_amarela, inimigos: &s.partida.regras.inimigos };
@@ -571,6 +588,56 @@ mod testes {
         assert!(!s.modos.menu_aberto);
     }
 
+    /// Botão de ferramentas no Quick Game (`_RibbonToolsMenu`, janela 10): apertar abre o menu de um
+    /// item; soltar no próprio botão fecha sem mudar nada; soltar no item vira Experimental. No Jogo
+    /// Completo abre a figura da janela 11 e soltar não faz nada.
+    #[test]
+    fn botao_de_ferramentas_no_quick_e_no_completo() {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
+        let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
+        let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores.clone()).unwrap();
+        assert_eq!(s.partida.estado.partida.tipo_jogo, 1);
+        let (bx, by) = (354, 70 - 37);
+        clique_na_faixa(&mut s, bx, by);
+        assert!(s.modos.menu_aberto && s.modos.menu.qual == QualMenu::Quick);
+        let rgb = s.quadro_rgb().unwrap();
+        if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+            crate::salvar_png(&PathBuf::from(saida).join("menu_quick.png"), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
+        }
+        assert!(soltar_no_menu(&mut s, bx, by));
+        assert!(!s.modos.menu_aberto);
+        assert_eq!(s.partida.estado.partida.tipo_jogo, 1, "soltar fora do item não muda nada");
+        clique_na_faixa(&mut s, bx, by);
+        let o = s.modos.menu.origem;
+        let (ix, iy) = (i32::from(o.0) + 40, i32::from(o.1) + 10);
+        assert!(mover_no_menu(&mut s, ix, iy));
+        assert!(s.modos.menu.realce_quick);
+        assert!(soltar_no_menu(&mut s, ix, iy));
+        assert!(!s.modos.menu_aberto);
+        assert_eq!(s.partida.estado.partida.tipo_jogo, 3, "o item vira Experimental");
+
+        let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
+        s.partida.estado.partida.tipo_jogo = 2;
+        clique_na_faixa(&mut s, bx, by);
+        assert!(s.modos.menu_aberto && s.modos.menu.qual == QualMenu::Completo);
+        let rgb = s.quadro_rgb().unwrap();
+        if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+            crate::salvar_png(&PathBuf::from(saida).join("menu_completo.png"), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
+        }
+        let o = s.modos.menu.origem;
+        assert!(soltar_no_menu(&mut s, i32::from(o.0) + 40, i32::from(o.1) + 10));
+        assert!(!s.modos.menu_aberto);
+        assert_eq!(s.partida.estado.partida.tipo_jogo, 2);
+    }
+
     /// Bancada (qemu_ui_barras_direito.txt, 2026-10-18): segurar o botão no número da população preta
     /// abre o quadro das castas (b01); o clique na barra de saúde da colônia em x = 580 dá
     /// `_BlkWarnHealth` 20 e na da amarela em x = 620 dá `_MeWarnHealth` 82 (tela − 37 linhas = área
@@ -715,7 +782,8 @@ mod testes {
 
     /// Bancada (cenários `morte_aranha` e `morte_leao`, 2026-10-18): a janela 26 com os bitmaps da
     /// aranha (12000), da formiga-leão (9200), da vitória (16200), e os quadros 9100 e 9101 (2 pixels
-    /// à esquerda; o 9101 com "You have been reborn!" em amarelo no alto). Com `SIMANT_SAIDA_TESTE`,
+    /// à esquerda: a janela 26 só se alinha ao byte na criação, e a formiga-leão a criou antes; o 9101
+    /// com "You have been reborn!" em amarelo no alto). Com `SIMANT_SAIDA_TESTE`,
     /// grava as telas para `tools/comparar_captura.py --mapear --regiao` contra as capturas.
     #[test]
     fn janela_26_como_no_original() {
@@ -734,7 +802,7 @@ mod testes {
         let leao1 = s.quadro_rgb().unwrap();
         gravar_teste(&s, "janela26_leao_9201", &leao1);
         assert_eq!(s.partida.avisos.passar_tempo(1113), Some(Modal::Animado(TipoAnimado::FormigaLeao)));
-        // 9100 e 9101: 2 pixels à esquerda.
+        // 9100 e 9101: a janela já existe (criada pela formiga-leão) e reabre sem alinhar, em 158.
         assert!(s.partida.avisos.receber_quadro_amarela(9100, 0));
         s.partida.avisos.passar_tempo(2000);
         let morte = s.quadro_rgb().unwrap();
@@ -754,7 +822,9 @@ mod testes {
         s.partida.avisos.passar_tempo(4000);
         let aranha = s.quadro_rgb().unwrap();
         gravar_teste(&s, "janela26_aranha", &aranha);
-        assert_eq!(pixel(&aranha, w, 350, 300), [0, 0, 128], "189 pixels de largura: contorno até 351");
+        // A janela 26 já foi criada (formiga-leão): reabre sem o alinhamento, 2 pixels à esquerda.
+        assert_eq!(pixel(&aranha, w, 348, 300), [0, 0, 128], "189 pixels de largura: contorno até 349");
+        assert_eq!(pixel(&aranha, w, 350, 300), [0, 0, 0], "linha preta por fora");
         s.partida.avisos.passar_tempo(4003);
         let aranha1 = s.quadro_rgb().unwrap();
         gravar_teste(&s, "janela26_aranha_12002", &aranha1);
@@ -765,13 +835,13 @@ mod testes {
         gravar_teste(&s, "janela26_aranha_texto", &texto);
         assert_eq!(pixel(&texto, w, 157, 300), [255, 255, 255], "contorno branco com o texto por cima");
         s.partida.avisos.fechar_modal();
-        // Vitória: 254 × 199, os olhos em seis lugares.
+        // Vitória: 254 × 199, os olhos em seis lugares (janela já criada: sem alinhar, 2 à esquerda).
         assert!(s.partida.avisos.receber_animado(TipoAnimado::Vitoria, None));
         for (t, nome) in [(5000, "janela26_vitoria"), (5003, "janela26_vitoria_16211"), (5006, "janela26_vitoria_16212"), (5009, "janela26_vitoria_16210")] {
             s.partida.avisos.passar_tempo(t);
             let rgb = s.quadro_rgb().unwrap();
             gravar_teste(&s, nome, &rgb);
-            assert_eq!(pixel(&rgb, w, 415, 300), [0, 0, 128], "contorno até 416");
+            assert_eq!(pixel(&rgb, w, 413, 300), [0, 0, 128], "contorno até 414");
         }
     }
 }

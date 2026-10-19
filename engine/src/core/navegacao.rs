@@ -264,6 +264,11 @@ impl Repeticao {
         self.ativa = None;
     }
 
+    /// Há uma repetição em andamento (botão ou tecla ainda apertados).
+    pub fn ativa(&self) -> bool {
+        self.ativa.is_some()
+    }
+
     /// Avança o tempo e devolve quantas vezes a ação deve ser aplicada de novo.
     pub fn passar_tempo(&mut self, ms: u64, cfg: &ConfigRepeticao) -> Option<(Acao, u32)> {
         let (a, decorrido) = self.ativa.as_mut()?;
@@ -405,7 +410,7 @@ mod testes {
                 "teclas": [{"tecla": "Up", "ctrl": true, "acao": "linha_acima"},
                            {"tecla": "9", "ctrl": true, "acao": "ninho_preto"}],
                 "botoes_faixa": {"ribToBNest": "ninho_preto"},
-                "repeticao": {"atraso_ms": 300, "intervalo_ms": 50}}"#,
+                "repeticao": {"atraso_ms": 43, "intervalo_ms": 43}}"#,
         )
         .unwrap()
     }
@@ -428,11 +433,14 @@ mod testes {
         r.pressionar(Acao::PaginaAbaixo);
         assert_eq!(r.passar_tempo(1000, &cfg), None);
         r.pressionar(Acao::LinhaAbaixo);
-        assert_eq!(r.passar_tempo(299, &cfg), None);
+        assert!(r.ativa());
+        assert_eq!(r.passar_tempo(42, &cfg), None);
         assert_eq!(r.passar_tempo(1, &cfg), Some((Acao::LinhaAbaixo, 1)));
-        assert_eq!(r.passar_tempo(49, &cfg), None);
-        assert_eq!(r.passar_tempo(101, &cfg), Some((Acao::LinhaAbaixo, 3)));
+        assert_eq!(r.passar_tempo(42, &cfg), None);
+        // ~23 passos por segundo, como a bancada (qemu_ritmo_rolagem.txt).
+        assert_eq!(r.passar_tempo(87, &cfg), Some((Acao::LinhaAbaixo, 3)));
         r.soltar();
+        assert!(!r.ativa());
         assert_eq!(r.passar_tempo(1000, &cfg), None);
     }
 }

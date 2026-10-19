@@ -388,7 +388,8 @@ pub struct ConfigGerenciador {
     /// Menor contorno externo de uma janela com moldura grossa (`WM_GETMINMAXINFO`,
     /// `_AdjustWndMinMax`).
     pub tamanho_minimo: [i16; 2],
-    /// Cor do contorno pontilhado do arrasto (mover, redimensionar, polegar).
+    /// Máscara XOR do contorno pontilhado do arrasto (mover, redimensionar, polegar): 15 = a cor
+    /// complementar (desde 2026-10-19; antes, uma cor pintada por cima).
     pub cor_contorno_arrasto: u8,
     pub cor_seta: u8,
     pub menu_sistema: ConfigMenuSistema,
@@ -1105,24 +1106,31 @@ pub(crate) fn mnemonico(texto: &str) -> Option<char> {
     texto[i + 1..].chars().next().map(|c| c.to_ascii_lowercase())
 }
 
-/// Contorno de 1 pixel com um ponto sim, outro não (o retângulo de arrasto do Windows 3.1, desenhado
-/// em XOR com um padrão cinza: o port pinta os pontos com a cor dada) [medido em w02 e v05].
-pub fn contorno_pontilhado(q: &mut Quadro, r: Retangulo, cor: u8) {
+/// Contorno de 1 pixel com um ponto sim, outro não: o retângulo de arrasto do Windows 3.1, desenhado
+/// em XOR com o pincel cinza (meio-tom): nos pontos com x + y ímpar o índice da cor de baixo vira
+/// `índice XOR mascara` (15 = a cor complementar na paleta de 16 cores: preto → branco, azul-escuro
+/// → amarelo); os outros ficam como estão [medido em w02: 85 de 170 pontos da borda invertidos, todos
+/// com x + y ímpar na tela, e a tela começa numa linha par da área cliente].
+pub fn contorno_pontilhado(q: &mut Quadro, r: Retangulo, mascara: u8) {
     let (e, t, d, b) = (i32::from(r.esq), i32::from(r.topo), i32::from(r.dir), i32::from(r.base));
-    for x in e..=d {
-        if (x + t) % 2 == 0 {
-            q.ponto(x, t, cor);
+    let mut inverter = |x: i32, y: i32| {
+        if (x + y).rem_euclid(2) == 1 && x >= 0 && y >= 0 && (x as usize) < q.largura && (y as usize) < q.altura {
+            let c = q.pixels[y as usize * q.largura + x as usize];
+            if c < 16 {
+                q.ponto(x, y, (c ^ mascara) & 15);
+            }
         }
-        if (x + b) % 2 == 0 {
-            q.ponto(x, b, cor);
+    };
+    for x in e..=d {
+        inverter(x, t);
+        if b != t {
+            inverter(x, b);
         }
     }
-    for y in t..=b {
-        if (e + y) % 2 == 0 {
-            q.ponto(e, y, cor);
-        }
-        if (d + y) % 2 == 0 {
-            q.ponto(d, y, cor);
+    for y in t + 1..b {
+        inverter(e, y);
+        if d != e {
+            inverter(d, y);
         }
     }
 }
@@ -1203,7 +1211,7 @@ mod testes {
     fn cfg() -> ConfigGerenciador {
         ConfigGerenciador {
             tamanho_minimo: [317, 150],
-            cor_contorno_arrasto: 7,
+            cor_contorno_arrasto: 15,
             cor_seta: 0,
             menu_sistema: ConfigMenuSistema {
                 itens: [
@@ -1246,6 +1254,25 @@ mod testes {
         g.abrir(0, r(20, 97, 444, 444), edicao(), GROSSA);
         g.abrir(19, r(344, 234, 554, 424), controle(), FINA);
         g
+    }
+
+    #[test]
+    fn contorno_de_arrasto_em_xor_como_w02() {
+        // Sobre preto (0) e azul-escuro (4): nos pontos com x + y ímpar, branco (15) e amarelo (11).
+        let mut q = Quadro::new(20, 20, 0);
+        for x in 0..20 {
+            q.ponto(x, 10, 4);
+        }
+        contorno_pontilhado(&mut q, r(2, 2, 12, 12), 15);
+        let px = |x: usize, y: usize| q.pixels[y * 20 + x];
+        assert_eq!((px(3, 2), px(4, 2)), (15, 0));
+        assert_eq!((px(2, 3), px(2, 4)), (15, 0));
+        assert_eq!((px(2, 9), px(12, 9), px(12, 10)), (15, 15, 4));
+        assert_eq!(px(2, 10), 4, "x + y par: fica");
+        assert_eq!((px(3, 10), px(5, 5)), (4, 0), "dentro do contorno nada muda");
+        // Desenhar duas vezes desfaz (XOR).
+        contorno_pontilhado(&mut q, r(2, 2, 12, 12), 15);
+        assert!(q.pixels.iter().enumerate().all(|(i, &c)| c == if i / 20 == 10 { 4 } else { 0 }));
     }
 
     #[test]

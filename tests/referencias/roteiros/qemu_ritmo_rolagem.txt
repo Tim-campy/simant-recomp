@@ -1,0 +1,60 @@
+# Ritmo da repetição da rolagem (MAINWNDPROC, casos 0x114/0x115 e 0xFDA6–0xFDA9): a seta da barra da
+# janela de edição segurada por um tempo conhecido; _MapPnt (x no word baixo, y no alto) antes e depois
+# dá os passos. Snapshot "quick" (edição no ninho preto), jogo pausado (Shift+0) ou não.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ritmo_rolagem.txt --overlay re_trabalho/qemu/ov_ag4_menus.qcow2
+# Seta esquerda da barra horizontal em (32, 470) da tela; seta de baixo da vertical em (432, 455).
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+ler_variavel MapPnt re_trabalho/agente_itens4/r00.bin 4
+ir_para 32 470
+apertar
+esperar 0.5
+soltar
+esperar 1
+ler_variavel MapPnt re_trabalho/agente_itens4/r01.bin 4
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+ir_para 32 470
+apertar
+esperar 1
+soltar
+esperar 1
+ler_variavel MapPnt re_trabalho/agente_itens4/r02.bin 4
+# vertical, pausado, 2 s (duas vezes)
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+ir_para 432 455
+apertar
+esperar 2
+soltar
+esperar 1
+ler_variavel MapPnt re_trabalho/agente_itens4/r04.bin 4
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+ir_para 432 455
+apertar
+esperar 2
+soltar
+esperar 1
+ler_variavel MapPnt re_trabalho/agente_itens4/r05.bin 4
+# vertical, rodando (normal), 2 s: a simulação anda durante o laço?
+snapshot_carregar quick
+esperar 3
+ir_para 432 455
+ler_variavel GameTime re_trabalho/agente_itens4/r06_t0.bin
+apertar
+esperar 2
+ler_variavel GameTime re_trabalho/agente_itens4/r06_t1.bin
+soltar
+ler_variavel MapPnt re_trabalho/agente_itens4/r06.bin 4
+esperar 2
+ler_variavel GameTime re_trabalho/agente_itens4/r06_t2.bin
+fim

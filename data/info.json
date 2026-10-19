@@ -21,7 +21,7 @@
     "altura_extra": 5,
     "deslocamento_area": [-1, 0],
     "ajuste_area": [-1, -1],
-    "cores_moldura": [0, 4, 4, 4, 4],
+    "cores_moldura": [0, 16, 16, 16, 16],
     "cor_fundo": 15
   }
 }
