@@ -2,6 +2,13 @@
 
 Formato: data, decisão, motivo, alternativas descartadas.
 
+## 2026-10-19: Tela virtual (`resolucao_virtual` em `data/video.json`)
+
+- **Decisão:** o port imita uma tela do Windows 3.1 de 640×480 (padrão), 800×600 ou 1024×768. A resolução escolhe, pela regra do original guardada em `data/resolucao.json` (área cliente = tela − 38 linhas; tabela de posições 9/0 até 480 linhas, 9/8 acima), o tamanho da área cliente e a tabela de posições da abertura e da partida. A ampliação continua a da decisão "Escala 1" (inteira, nítida), aplicada sobre a tela virtual. Linha de comando: `--resolucao LxA`. Especificação: `docs/spec/telas/resolucao.md`.
+- **Motivo:** pedido do coordenador; o original muda de layout com a resolução (as janelas de controle descem para baixo da janela de edição em telas maiores), e o port misturava as duas: a abertura em 800×562 (DOSBox-X) e a partida em 640×442 (bancada).
+- **Consequências:** a abertura padrão passa a 640×442 com a tabela 9/0 (como na bancada); `jogo.json` → `tabela_posicoes` e `tela_jogo.json` → `largura`/`altura`/`tabela_posicoes` deixam de valer no executável (API 0.26) e ficam para os testes e exemplos, que não mudam.
+- **Descartado:** escalar o jogo para preencher uma tela maior (o original não faz; seria escala fracionária); aceitar qualquer resolução (só as três têm comportamento conhecido e a regra do original só tem duas tabelas); tabelas e tamanhos por resolução escritos à mão em cada arquivo de dados (a regra do original é uma só e cabe num arquivo).
+
 ## 2026-10-18: Tabelas comuns das regras em `data/comum.json`; `jogo.json` sobrescrevível
 
 - **Decisão:** as 14 tabelas que o original tem uma vez só e várias partes das regras usam (`_Dx8`/`_Dy8`, `_Dx9`/`_Dy9`, `_TurnTab`, `_UnCarryCaste`, `_ModeTabWB`/`_ModeTabSB`/`_CasteModeTabB`, `_SowTab`, classe e matriz de luta, borda do buraco e da formiga-leão) saem dos `data/<parte>.json` e ficam em `data/comum.json`, com o endereço de cada uma (`_enderecos`) e as partes que a usam (`_usado_por`). Cada parte completa o seu JSON com elas ao carregar (`rules/comum.rs`, `completar_com_comuns`); os structs das partes não mudaram. `tools/extrair_comum.py` gera o arquivo; os outros extratores deixaram de gravar as cópias, e `tools/conferir_extracoes.py` confere que todos reproduzem os `data/*.json`. API de mods 0.20.
