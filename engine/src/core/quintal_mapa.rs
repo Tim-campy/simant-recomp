@@ -365,6 +365,26 @@ pub struct JanelaQuintal {
     pub colocando_rainha: bool,
     /// Esperando o clique numa colônia preta (`_SpecialXfer`).
     pub escolhendo_colonia: bool,
+    /// `GameTime` de quando a faixa 35 tomou o lugar da 34 (`None` = a 34 na tela). Os números de
+    /// `_DrawYardData` só aparecem depois de um tick: a troca da faixa vem depois do desenho dos
+    /// dados e, com a simulação parada, nada os redesenha (bancada, `qemu_faixa35_botoes.txt`).
+    pub tempo_faixa: Option<u32>,
+}
+
+impl JanelaQuintal {
+    /// A interface viu a faixa do momento: guarda o `GameTime` em que a 35 entrou no lugar da 34.
+    pub fn acompanhar_faixa(&mut self, tempo: u32) {
+        match (self.na_frente, self.tempo_faixa) {
+            (true, None) => self.tempo_faixa = Some(tempo),
+            (false, Some(_)) => self.tempo_faixa = None,
+            _ => {}
+        }
+    }
+
+    /// Os números da faixa 35 já foram desenhados (passou um tick desde a troca da faixa).
+    pub fn dados_da_faixa(&self, tempo: u32) -> bool {
+        self.tempo_faixa.is_none_or(|t| t != tempo)
+    }
 }
 
 /// O que um clique na janela do quintal causou (para o terminal/registro).
@@ -794,7 +814,9 @@ impl DesenhoQuintal {
     /// Desenha a faixa 35 no lugar da 34, com o botão do modo e Automatic/Manual selecionados e os
     /// botões configuráveis (`botoes`: nome, bitmaps selecionado/normal e se está ligado, de
     /// `Partida::estado_dos_botoes`).
-    pub fn desenhar_faixa(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, e: &Estado, botoes: &[(String, u16, u16, Option<bool>)]) -> Vec<String> {
+    /// `com_dados`: os números de `_DrawYardData` (rainhas, colônias); sem eles, os campos ficam vazios
+    /// (fundo do objeto), como no original logo depois da troca de faixa com o jogo parado.
+    pub fn desenhar_faixa(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, e: &Estado, botoes: &[(String, u16, u16, Option<bool>)], com_dados: bool) -> Vec<String> {
         let c = &self.cfg;
         let f = &interface.moldura.faixa;
         q.preencher(Retangulo { esq: 0, topo: 0, dir: q.largura as i16, base: f.altura }, f.fundo, f.fundo);
@@ -840,7 +862,9 @@ impl DesenhoQuintal {
                 let cor = interface.cores.get(usize::from(ob.cor)).copied();
                 let (frente, fundo) = cor.map(|k| (k.frente, k.fundo)).unwrap_or((0, 15));
                 q.preencher(r, fundo, fundo);
-                q.texto(r, fonte, v.to_string().as_bytes(), 0, frente, fundo);
+                if com_dados {
+                    q.texto(r, fonte, v.to_string().as_bytes(), 0, frente, fundo);
+                }
             }
         }
         pendentes
@@ -948,6 +972,25 @@ mod testes {
 
     fn cfg() -> ConfigQuintalMapa {
         ConfigQuintalMapa::de_json(include_str!("../../../data/quintal_mapa.json")).unwrap()
+    }
+
+    #[test]
+    fn numeros_da_faixa_35_so_depois_de_um_tick() {
+        // qemu_faixa35_botoes.txt: pausado antes do Ctrl+Y, a faixa 35 fica sem os números; com um
+        // tick depois da troca, eles aparecem; voltar à 34 e de novo à 35 os apaga outra vez.
+        let mut j = JanelaQuintal::default();
+        j.acompanhar_faixa(100);
+        assert!(j.dados_da_faixa(100), "faixa 34: nada a esconder");
+        j.na_frente = true;
+        j.acompanhar_faixa(100);
+        assert!(!j.dados_da_faixa(100));
+        j.acompanhar_faixa(101);
+        assert!(j.dados_da_faixa(101));
+        j.na_frente = false;
+        j.acompanhar_faixa(101);
+        j.na_frente = true;
+        j.acompanhar_faixa(101);
+        assert!(!j.dados_da_faixa(101));
     }
 
     #[test]

@@ -271,7 +271,7 @@ fn clique_do_place_tambem_grava_o_patch_escolhido() {
         .find(|&(x, y)| cfg.patch_em(x, y) == Some((5, 8)))
         .unwrap();
     let mut p = partida();
-    let mut j = JanelaQuintal { aberta: true, na_frente: true, colocando_rainha: true, escolhendo_colonia: false };
+    let mut j = JanelaQuintal { aberta: true, na_frente: true, colocando_rainha: true, ..Default::default() };
     clicar(&mut j, &cfg, &mut p, ponto.0, ponto.1, false, false).unwrap();
     assert!(!j.colocando_rainha);
     assert_eq!(p.estado.vistas.ponto_quintal, (5, 8));

@@ -72,7 +72,8 @@ pub fn selecao_da_abertura(recursos: &Recursos, interface: &Interface) -> Result
 pub fn desenhar_faixa(s: &Sessao, q: &mut Quadro) -> Vec<String> {
     let m = &s.modos;
     if m.janela.na_frente {
-        return m.quintal.desenhar_faixa(q, s.recursos, &s.interface, &s.partida.estado, &s.partida.estado_dos_botoes());
+        let com_dados = m.janela.dados_da_faixa(s.partida.estado.partida.tempo);
+        return m.quintal.desenhar_faixa(q, s.recursos, &s.interface, &s.partida.estado, &s.partida.estado_dos_botoes(), com_dados);
     }
     // _NewGame: no Experimental o botão de ferramentas da faixa usa outros bitmaps.
     if s.partida.estado.partida.tipo_jogo == 3 {

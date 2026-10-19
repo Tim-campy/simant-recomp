@@ -279,6 +279,8 @@ impl Sessao<'_> {
             self.tela.selecao_da_faixa.push((nome.clone(), n == modo));
         }
         self.sincronizar_janelas();
+        let tempo = self.partida.estado.partida.tempo;
+        self.modos.janela.acompanhar_faixa(tempo);
         if self.janelas.aberta(Controle::Info) {
             self.info.carregar(self.recursos);
         }

@@ -227,7 +227,9 @@ impl JanelaMapa {
         };
         let acumula = trilhas && self.ultimo_modo == Some(modo);
         gerar_celulas(&self.cfg, e, modo, acumula, &mut self.celulas);
-        let fora_do_tick = self.ultimo_tempo == Some(tempo);
+        // A primeira geração (janela aberta, jogo novo ou Load: `_SetDefaultWindows` abre o mapa e
+        // `_DrawMap` o desenha) vai para a tela mesmo atrás da edição (bancada, a4_carregado).
+        let fora_do_tick = self.ultimo_tempo.is_none_or(|t| t == tempo);
         self.ultimo_modo = Some(modo);
         self.ultimo_plano = Some(plano);
         self.ultimo_tempo = Some(tempo);
