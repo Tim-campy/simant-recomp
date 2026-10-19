@@ -49,8 +49,8 @@ fn aplicar(s: &mut Sessao, a: AcaoMini) -> bool {
 }
 
 /// Com o mini mapa aberto, o evento vai para ele (o laço modal de `_OpenMiniMapWin` só trata o
-/// mouse; as teclas ficam sem efeito no port [hipótese: no original o Windows ainda despacha as
-/// mensagens de teclado]). Devolve `None` com ele fechado; senão, se é preciso redesenhar.
+/// mouse; as teclas são descartadas, como no original: bancada `mini_teclas`, telas/mapa.md §7).
+/// Devolve `None` com ele fechado; senão, se é preciso redesenhar.
 pub(crate) fn evento(s: &mut Sessao, ev: &Event) -> Option<bool> {
     if !s.mini.aberto() {
         return None;

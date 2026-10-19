@@ -1078,6 +1078,56 @@ def cenario_morte_aranha_silly(c: Sessao, saida, n):
     return gravar_relogio(c, saida, n)
 
 
+# ------------------------------------------------------------------------------------------------
+# Mini mapa aberto: as teclas chegam ao jogo? (telas/mapa.md §7)
+# ------------------------------------------------------------------------------------------------
+
+
+
+def cenario_mini_teclas(c: Sessao, saida, n):
+    """Abre o mini mapa (clique no ribToYellow, solto no botão: fica aberto) e aperta, com ele aberto,
+    Shift+3 (velocidade), Ctrl+G (AutoTrack), Ctrl+Down (rolagem da janela de edição), Ctrl+9 (ninho
+    preto) e Shift+0 (pausa); depois fecha com um clique fora. Em cada passo lê _GameSpeed,
+    _GamePaused, _OptionStates[0], _MapPnt e _MapPlane e captura a tela. Grava mini_teclas.json."""
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    c.teclas("ctrl+8")
+    time.sleep(1.5)
+    reg = []
+
+    def anotar(rotulo):
+        v = {"passo": rotulo, "GameSpeed": c.ler("GameSpeed"), "GamePaused": c.ler("GamePaused"),
+             "AutoTrack": int.from_bytes(c.mj.ler_variavel("OptionStates", 12)[:2], "little"),
+             "MapPnt": [c.ler("MapPnt", None) & 0xFFFF, c.ler("MapPnt", None) >> 16], "MapPlane": c.ler("MapPlane"),
+             "GameTime": c.ler("GameTime")}
+        reg.append(v)
+        ct.tela(c, saida, rotulo)
+        c.log(str(v))
+
+    import bancada_mapa as bm
+    c.dep.retomar()
+    time.sleep(0.5)
+    anotar("antes")
+    m = bm.Mapa(c, saida)
+    bm.abrir_mini(m)
+    time.sleep(2)
+    anotar("mini_aberto")
+    for tecla in ("shift+3", "ctrl+g", "ctrl+down", "ctrl+9", "shift+0"):
+        c.teclas(tecla)
+        time.sleep(1.5)
+        anotar(tecla.replace("+", "_"))
+    m.c.dep.retomar()
+    m.ir(560, 420)
+    m.botao(True)
+    m.botao(False)
+    time.sleep(2)
+    anotar("fechado")
+    time.sleep(2)
+    anotar("fechado_2s")
+    (pasta / "mini_teclas.json").write_text(json.dumps(reg, indent=1) + chr(10), encoding="utf-8")
+    return []
+
+
 VIDA_RICO = ("vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução "
              "de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a "
              "preparação também escreve marcas no mapa de vida")

@@ -252,6 +252,8 @@ se _MeCmd == 0 ou dist < 3: anda 1   senão: corre (×5)
 _MeLoc = (_SpidX >> 4, _SpidY >> 4) ; centraliza se AutoTrack
 ```
 
+Com AutoTrack (`_OptionStates[0]`, `8:85f2`), `_MoveSpider` chama `_GotoMyAnt` em quatro pontos, sempre depois de pôr `_MeLoc` na célula da aranha [código, `1020:4704`]: depois do passo do controle do jogador (acima; não quando chegou ou não achou direção), na perseguição quando o alvo mudou (estado 2, "o alvo mudou"), a cada passo da perseguição (estado 2, dist > 1) e no começo do estado 3. Dentro do tick, o `_CenterEdit` que move a vista redesenha a janela de edição, e com `_SMode` ≥ 2 ou `_MeSMode` ≥ 6 os palpos sorteiam `S1(4)` ([rng.md](rng.md), "Desenho dentro do tick"). **Port:** `rules::inimigos::autotrack` → `amarela::centralizar` (o mesmo `_GotoMyAnt` das regras). **Verificado (2026-10-19):** vetores `ticks/aranha_jogador_autotrack` (11 ticks: anda com a vista atrás da aranha; persegue no modo alvo com os palpos no meio do tick; come), 307/307 com S, R e vida; sem a correção, 10 ticks erram `_MapPnt` e os da perseguição erram S, R, listas e vida.
+
 `_MeLoc` acompanha a célula da aranha. O destino e `_MeCmd` vêm do clique (`_processSpider`, ver [formiga-amarela.md](formiga-amarela.md#11-controles-do-jogador)). Quando a aranha do jogador sai do mapa (`_YellowDeath(4)`, mensagem 10028) ou é cercada (`_YellowDeath(3)`, mensagem 10026), o jogador reencarna numa formiga.
 
 ### 2.8 Outras mortes da aranha: `_KillSpider` (`1020:53d4`)
