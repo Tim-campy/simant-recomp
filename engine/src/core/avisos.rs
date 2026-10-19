@@ -120,11 +120,11 @@ pub struct SequenciaAmarela {
     pub som_sobreposta: Option<u16>,
     pub espera_sobreposta_tickcount: u64,
     /// Texto escrito no objeto `dialogText` (9101: `_win_PrintfAtObj` com a fonte 4). Opcional
-    /// (API 0.23).
+    /// (API 0.24).
     #[serde(default)]
     pub texto: Option<TextoQuadroAmarela>,
     /// Deslocamento da janela medido na bancada (9100 e 9101 ficam 2 pixels à esquerda dos outros
-    /// bitmaps do mesmo tamanho) [causa em aberto]. Opcional (API 0.23).
+    /// bitmaps do mesmo tamanho) [causa em aberto]. Opcional (API 0.24).
     #[serde(default)]
     pub ajuste: [i16; 2],
 }
@@ -145,16 +145,16 @@ pub struct TextoQuadroAmarela {
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigQuadroAmarela {
     /// Contorno externo na área cliente medido na bancada com o bitmap 9110. Só documentação desde a
-    /// API 0.23: o contorno sai do tamanho do bitmap ([`geometria_janela_imagem`]).
+    /// API 0.24: o contorno sai do tamanho do bitmap ([`geometria_janela_imagem`]).
     #[serde(default)]
     pub externo: Option<[i16; 4]>,
     pub borda: i16,
     pub cor_borda: u8,
-    /// Linha de 1 pixel por fora da borda (preta na bancada). Opcional (API 0.23).
+    /// Linha de 1 pixel por fora da borda (preta na bancada). Opcional (API 0.24).
     #[serde(default)]
     pub cor_externa: Option<u8>,
     /// Cor da borda com outra janela por cima (a da aranha embaixo do quadro de texto: branca na
-    /// bancada). Opcional (API 0.23); sem ela, a de sempre.
+    /// bancada). Opcional (API 0.24); sem ela, a de sempre.
     #[serde(default)]
     pub cor_borda_inativa: Option<u8>,
     /// Canto do bitmap; a área que o mostra tem o tamanho dele menos 1 pixel em cada eixo (o resto é
@@ -179,7 +179,7 @@ pub struct ConfigAvisos {
     /// Opcional (API 0.22): sem ele, `_YellowDialog` não aparece.
     #[serde(default)]
     pub quadro_amarela: Option<ConfigQuadroAmarela>,
-    /// Opcional (API 0.23): `_SpiderDialog`, `_LionDialog` e `_DrawSimPayoff`; sem ele (ou sem
+    /// Opcional (API 0.24): `_SpiderDialog`, `_LionDialog` e `_DrawSimPayoff`; sem ele (ou sem
     /// `quadro_amarela`, que dá a geometria da janela), não aparecem.
     #[serde(default)]
     pub quadros_animados: Option<ConfigQuadrosAnimados>,

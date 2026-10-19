@@ -191,7 +191,7 @@ pub struct TabelasAmarela {
     #[serde(default = "imagem_trofalaxia_padrao")]
     pub imagem_trofalaxia: u16,
     /// Quadros de `_YellowDeath` e `_YellowBirth` (`_YellowDialog` 9100/9101, `_SpiderDialog`).
-    /// Opcional (API 0.23); o padrão é o do original.
+    /// Opcional (API 0.24); o padrão é o do original.
     #[serde(default)]
     pub quadros: QuadrosAmarela,
 }
