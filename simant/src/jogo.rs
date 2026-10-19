@@ -174,7 +174,10 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 || s.exame.is_some()
                 || s.mini.aberto()
                 || modos::segurando(s);
-            let ev = match menus_ui::evento(s, ev, modal) {
+            // Com a ajuda (outra janela no original) com o foco, as teclas são do WinHelp: Alt+letra
+            // abre os menus dele, não os do SimAnt.
+            let teclas_da_ajuda = s.ajuda.aberto && s.ajuda.foco && matches!(ev, Event::KeyDown { .. } | Event::KeyUp { .. });
+            let ev = match if teclas_da_ajuda { menus_ui::Filtro::Passar(ev) } else { menus_ui::evento(s, ev, modal) } {
                 menus_ui::Filtro::Passar(ev) => ev,
                 menus_ui::Filtro::Tratada(r) => {
                     redesenhar |= r;
@@ -263,7 +266,12 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 // A janela de ajuda com o foco recebe as teclas; depois, _HelpKeyDown: F1 (índice),
                 // Shift+F1 e Delete (modo de ajuda), Esc (sai do modo).
                 Event::KeyDown { keycode: Some(k), keymod, .. }
-                    if ajuda_ui::tecla_no_visor(s, &k.name()) || ajuda_ui::tecla(s, &evento_de_tecla(k, keymod)) =>
+                    if ajuda_ui::tecla_no_visor_com(
+                        s,
+                        &k.name(),
+                        keymod.intersects(sdl2::keyboard::Mod::LALTMOD | sdl2::keyboard::Mod::RALTMOD),
+                        keymod.intersects(sdl2::keyboard::Mod::LSHIFTMOD | sdl2::keyboard::Mod::RSHIFTMOD),
+                    ) || ajuda_ui::tecla(s, &evento_de_tecla(k, keymod)) =>
                 {
                     redesenhar = true
                 }

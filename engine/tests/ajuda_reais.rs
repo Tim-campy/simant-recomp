@@ -135,3 +135,65 @@ fn visor_navega_por_saltos_e_botoes() {
     }
     assert!(rolou, "nenhum tópico rolou");
 }
+
+#[test]
+fn palavras_chave_do_search() {
+    let Some(a) = ajuda() else { return };
+    let k = a.palavras_chave().unwrap();
+    assert_eq!(k.len(), 128);
+    assert_eq!(k[0].palavra, "About");
+    let q = k.iter().find(|p| p.palavra == "Queen").unwrap();
+    let t: Vec<&str> = q.topicos.iter().map(|&p| a.topicos[a.topico_da_posicao(p).unwrap()].titulo_bruto.as_str()).collect();
+    // Bancada s03: "Queen" → "Queens (id=0x19b)".
+    assert_eq!(t, ["Queens (id=0x19b)"]);
+}
+
+/// Search, History, menus e popup como na bancada (re_trabalho/agente_ui/winhelp, medidas.md).
+#[test]
+fn janelas_do_winhelp_como_na_bancada() {
+    use engine::core::ajuda::RespostaAjuda;
+    use engine::core::ajuda_janelas::Sobreposta;
+    use engine::formats::janela::Retangulo;
+    let Some((mut v, i)) = visor() else { return };
+    // Alt+F abre o File com o primeiro item; seta para baixo pula o separador; Exit fecha a ajuda.
+    v.tecla_com(&i, "F", true, false);
+    assert_eq!(v.sobreposta(), Some(&Sobreposta::Menu { menu: 0, item: Some(0) }));
+    v.tecla_com(&i, "Down", false, false);
+    assert_eq!(v.sobreposta(), Some(&Sobreposta::Menu { menu: 0, item: Some(2) }));
+    assert_eq!(v.tecla_com(&i, "X", false, false), RespostaAjuda::Fechar);
+    // Search: "queen" seleciona Queen; Enter = Show Topics; Enter = Go To abre "Queens".
+    v.tecla(&i, "S");
+    assert!(!v.janela_ativa(), "o diálogo deixa a janela de ajuda inativa");
+    for c in ["Q", "U", "E", "E", "N"] {
+        v.tecla(&i, c);
+    }
+    v.tecla(&i, "Return");
+    match v.sobreposta() {
+        Some(Sobreposta::Busca(b)) => assert_eq!((b.texto.as_str(), b.topicos.as_ref().map(Vec::len)), ("Queen", Some(1))),
+        outro => panic!("{outro:?}"),
+    }
+    v.tecla(&i, "Return");
+    assert_eq!(v.topico_atual().titulo, "Queens");
+    assert!(v.sobreposta().is_none());
+    // Popup da figura (0xE0): "Queen Info", 238 de largura, centrado na figura (bancada p03: x 125–362).
+    v.clicar(&i, 250, 283, false);
+    match v.sobreposta() {
+        Some(Sobreposta::Popup { topico, caixa }) => {
+            assert_eq!(v.arquivo.topicos[*topico].titulo, "Queen Info");
+            assert_eq!((caixa.esq, caixa.dir), (125, 363));
+            let _: Retangulo = *caixa;
+        }
+        outro => panic!("{outro:?}"),
+    }
+    v.clicar(&i, 400, 400, false);
+    assert!(v.sobreposta().is_none(), "qualquer clique fecha o popup sem seguir");
+    assert_eq!(v.topico_atual().titulo, "Queens");
+    // History: o mais recente em cima, com o anterior selecionado.
+    v.tecla(&i, "T");
+    let h = v.itens_historico();
+    let titulos: Vec<&str> = h.iter().map(|&k| v.arquivo.topicos[k].titulo.as_str()).collect();
+    assert_eq!(titulos, ["Queens", "SimAnt"]);
+    assert_eq!(v.janela_historico().map(|h| h.sel), Some(1));
+    v.tecla(&i, "Return");
+    assert_eq!(v.topico_atual().titulo, "SimAnt");
+}
