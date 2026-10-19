@@ -9,6 +9,9 @@
 //!          [--ticks N] [--avancar-ms MS] [--botoes F,F,...] [--historico B,B,...] [--fechar-avisos N] [--exportar-tela-jogo ARQ.png]
 //!          [--salvar ARQ.ANT]
 //!   opções da janela: [--resolucao LxA] [--escala N] [--janela LxA] [--moldura | --sem-moldura]
+//!     [--moldura-do-sistema | --sem-moldura-do-sistema] (com --moldura: manter a borda do sistema ou
+//!     trocá-la pela do Windows 3.1, o padrão; simant/src/moldura_janela.rs)
+//!   ritmo (data/partida.json): [--velocidades proporcional|original] [--sem-foco lenta|original]
 //!     [--perfil-driver vga|svga256|s3_dosbox] [--sair-apos-ms N [--capturar-janela ARQ.png]]
 //!   (padrões em data/video.json: tela virtual 640×480 em escala 1, como a bancada; simant/src/video.rs;
 //!   --resolucao 800x600 ou 1024x768 muda o layout como o original, docs/spec/telas/resolucao.md)
@@ -37,6 +40,7 @@ mod arquivos;
 mod config_launcher;
 mod jogo;
 mod launcher;
+mod moldura_janela;
 mod opcoes;
 mod pastas;
 mod preferencias;
@@ -138,9 +142,20 @@ fn exportar(seq: &Sequencia, recursos: &Recursos, interface: &Interface, cores: 
 struct Janela {
     sdl: sdl2::Sdl,
     canvas: sdl2::render::WindowCanvas,
+    /// A moldura do Windows 3.1 no lugar da do sistema (ou desligada).
+    moldura: moldura_janela::MolduraJanela,
 }
 
-fn abrir_janela(titulo: &str, largura: u32, altura: u32, cfg: &video::ConfigVideo) -> Result<Janela, String> {
+/// `moldura`: a barra de título do Windows 3.1 ligada; com `substituir_moldura_do_sistema`, a
+/// janela abre sem a borda do sistema e com a moldura grossa em volta (moldura_janela.rs).
+fn abrir_janela(
+    titulo: &str,
+    largura: u32,
+    altura: u32,
+    cfg: &video::ConfigVideo,
+    moldura: Option<&engine::core::moldura_principal::ConfigMolduraPrincipal>,
+    cores: &[[u8; 3]],
+) -> Result<Janela, String> {
     // Nitidez: sem ciência de DPI, o Windows com escala de tela (125%, 150%) amplia a janela inteira
     // com filtro bilinear e o jogo fica borrado. Com "permonitorv2" a janela e os limites da tela vêm
     // em pixels físicos, e a ampliação é só a do renderizador: por vizinho mais próximo ("0"),
@@ -150,21 +165,38 @@ fn abrir_janela(titulo: &str, largura: u32, altura: u32, cfg: &video::ConfigVide
     let sdl = sdl2::init()?;
     let sistema = sdl.video()?;
     let area = sistema.display_usable_bounds(0).ok().map(|r| (r.width(), r.height()));
-    let (escala, (w, h)) = cfg.tamanho_inicial(largura, altura, area);
+    let sem_borda = moldura.filter(|_| cfg.substituir_moldura_do_sistema);
+    // A janela restaurada tem a moldura grossa do Windows 3.1 em volta do jogo.
+    let b = moldura_janela::MolduraJanela::espessura(sem_borda);
+    let (lw, lh) = (largura + 2 * b, altura + 2 * b);
+    let (escala, (w, h)) = cfg.tamanho_inicial(lw, lh, area);
     let mut construtor = sistema.window(titulo, w, h);
     construtor.position_centered();
     if cfg.redimensionavel {
         construtor.resizable();
     }
+    if sem_borda.is_some() {
+        construtor.borderless();
+        // No Windows, com o estilo de janela redimensionável (`WS_THICKFRAME | WS_MAXIMIZEBOX`) e
+        // de título (`WS_CAPTION | WS_SYSMENU`), que o SDL esconde (`WM_NCCALCSIZE`): o sistema
+        // maximiza pelo duplo clique na faixa, por Win+↑ e ao arrastar até o alto da tela.
+        sdl2::hint::set("SDL_BORDERLESS_RESIZABLE_STYLE", "1");
+        sdl2::hint::set("SDL_BORDERLESS_WINDOWED_STYLE", "1");
+    }
     let mut janela = construtor.build().map_err(|e| e.to_string())?;
     // Menor que a resolução do jogo, a escala inteira cairia para zero.
-    janela.set_minimum_size(largura, altura).map_err(|e| e.to_string())?;
+    janela.set_minimum_size(lw, lh).map_err(|e| e.to_string())?;
     let mut canvas = janela.into_canvas().present_vsync().build().map_err(|e| e.to_string())?;
-    canvas.set_logical_size(largura, altura).map_err(|e| e.to_string())?;
+    canvas.set_logical_size(lw, lh).map_err(|e| e.to_string())?;
     canvas.set_integer_scale(cfg.escala_inteira)?;
+    let moldura = match sem_borda {
+        Some(m) => moldura_janela::MolduraJanela::ligar(&mut canvas, m, largura, altura, cfg.redimensionavel, cfg.escala_inteira, cores),
+        None => moldura_janela::MolduraJanela::desligada(),
+    };
     let (pw, ph) = canvas.output_size()?;
-    println!("janela: {largura}x{altura} em escala {escala} ({pw}x{ph} pixels)");
-    Ok(Janela { sdl, canvas })
+    let tipo = if moldura.ligada() { ", moldura do Windows 3.1 no lugar da do sistema" } else { "" };
+    println!("janela: {largura}x{altura} em escala {escala} ({pw}x{ph} pixels{tipo})");
+    Ok(Janela { sdl, canvas, moldura })
 }
 
 /// O que a abertura decidiu.
@@ -191,7 +223,7 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
         menus.ligar_moldura(recursos, lw)?;
     }
     let barras = menus.altura();
-    let Janela { sdl, mut canvas } = abrir_janela("SimAnt", lw, lh + barras as u32, &o.video)?;
+    let Janela { sdl, mut canvas, mut moldura } = abrir_janela("SimAnt", lw, lh + barras as u32, &o.video, menus.moldura.as_ref(), cores)?;
     let criador = canvas.texture_creator();
     let mut eventos = sdl.event_pump()?;
     let selecao = modos::selecao_da_abertura(recursos, interface)?;
@@ -201,6 +233,7 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
     let mut rep = Reprodutor::new(seq);
     let mut desenhada: Option<String> = None;
     let mut ativa_desenhada = true;
+    let mut restaurada_desenhada = false;
     let mut textura = None;
     let inicio = Instant::now();
     let mut antes = inicio;
@@ -221,8 +254,8 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
         let escolhendo = rep.atual().is_some_and(|t| t.nome == selecao.cfg.tela);
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
-            // Coordenadas da janela → área cliente (as barras ficam em cima e não respondem).
-            let ev = menus_ui::deslocar(ev, barras);
+            // Coordenadas da janela → área cliente (a moldura em volta e as barras em cima não respondem).
+            let ev = menus_ui::deslocar(moldura.deslocar(ev), barras);
             // Clique nas barras: nada (medido no "Select a Game"; no título, [hipótese] o mesmo).
             if let Event::MouseButtonDown { y, .. } | Event::MouseButtonUp { y, .. } = ev {
                 if y < 0 {
@@ -274,6 +307,12 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
         let Some(tela) = rep.atual() else { break };
         // O título fica inativo sem o foco do sistema ou com o "Load Ant Hill" (diálogo) por cima.
         let ativa = janela_ativa(canvas.window()) && load.is_none();
+        // Sem a borda do sistema: maximizada ou restaurada (com a moldura grossa e o botão de maximizar).
+        moldura.atualizar(&mut canvas);
+        if moldura.restaurada() != restaurada_desenhada {
+            restaurada_desenhada = moldura.restaurada();
+            desenhada = None;
+        }
         if desenhada.as_deref() != Some(tela.nome.as_str()) || ativa != ativa_desenhada {
             let rgb = match &load {
                 Some(l) => {
@@ -287,20 +326,23 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
                 }
                 None => compor_rgb(tela, recursos, interface, cores)?,
             };
-            let titulo = engine::core::moldura_principal::EstadoTitulo { ativa, ..Default::default() };
+            let titulo = engine::core::moldura_principal::EstadoTitulo { ativa, restaurada: moldura.restaurada(), ..Default::default() };
             let estado = engine::core::barra_menus::EstadoMenus::default();
             let rgb = menus_ui::compor_barras(&menus, interface, cores, &titulo, &estado, &rgb, tela.largura as usize, tela.altura as usize);
             let altura = tela.altura + barras as u32;
             let mut t = criador.create_texture_static(PixelFormatEnum::RGB24, tela.largura, altura).map_err(|e| e.to_string())?;
             t.update(None, &rgb, tela.largura as usize * 3).map_err(|e| e.to_string())?;
-            canvas.set_logical_size(tela.largura, altura).map_err(|e| e.to_string())?;
+            if !moldura.ligada() {
+                // Com a moldura no lugar da do sistema, a tela lógica é dela (com a moldura grossa).
+                canvas.set_logical_size(tela.largura, altura).map_err(|e| e.to_string())?;
+            }
             textura = Some(t);
             desenhada = Some(tela.nome.clone());
             ativa_desenhada = ativa;
         }
         canvas.clear();
         if let Some(t) = &textura {
-            canvas.copy(t, None, None)?;
+            moldura.copiar(&mut canvas, t)?;
         }
         if o.sair_apos_ms.is_some_and(|ms| (agora - inicio).as_millis() as u64 >= ms) {
             // Como na partida (jogo.rs): o quadro da abertura lido antes do present.
@@ -327,6 +369,10 @@ fn principal(o: Opcoes) -> Result<(), String> {
         recursos.sobrepor_dados(engine::core::resolucao::ARQUIVO, serde_json::json!({ "perfil_driver": p }));
         recursos.dados::<engine::core::resolucao::ConfigResolucao>(engine::core::resolucao::ARQUIVO)?.perfil(None)?;
     }
+    if let Some(v) = sobreposicao_partida(o.velocidades.as_deref(), o.sem_foco.as_deref()) {
+        // --velocidades e --sem-foco: por cima de data/partida.json (e dos mods).
+        recursos.sobrepor_dados(engine::core::partida::ARQUIVO_CONFIG, v);
+    }
     for m in recursos.mods() {
         println!("mod carregado: {} {}", m.manifesto.nome, m.manifesto.versao);
     }
@@ -341,6 +387,9 @@ fn principal(o: Opcoes) -> Result<(), String> {
     o.video = arquivo_video.com_linha_de_comando(o.resolucao, o.escala, o.janela);
     if let Some(m) = o.moldura {
         o.video.moldura_windows31 = m;
+    }
+    if let Some(m) = o.substituir_moldura {
+        o.video.substituir_moldura_do_sistema = m;
     }
     // Tela virtual: tamanho da área cliente e tabela de posições da resolução imitada, pela regra
     // do original em data/resolucao.json (docs/spec/telas/resolucao.md).

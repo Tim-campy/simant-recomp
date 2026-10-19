@@ -303,10 +303,16 @@ impl Relogio {
     /// Velocidade (§3): `limite = atrasos_velocidade[_GameSpeed]`; roda se `limite ≤ 0` ou
     /// `limite ≤ atraso`, e zera o atraso. Índice fora da tabela conta como "todo laço".
     pub fn liberar_tick(&mut self, e: &Estado, cfg: &ConfigSimulacao) -> bool {
+        self.liberar_tick_na_velocidade(e, cfg, e.partida.velocidade)
+    }
+
+    /// Como [`Relogio::liberar_tick`], com a velocidade da cadência dada no lugar de `_GameSpeed`
+    /// (o port, sem foco, pode andar na lenta sem mudar a velocidade escolhida; core/partida.rs).
+    pub fn liberar_tick_na_velocidade(&mut self, e: &Estado, cfg: &ConfigSimulacao, velocidade: i16) -> bool {
         if !simulacao_liberada(e) {
             return false;
         }
-        let limite = usize::try_from(e.partida.velocidade)
+        let limite = usize::try_from(velocidade)
             .ok()
             .and_then(|v| cfg.atrasos_velocidade.get(v).copied())
             .unwrap_or(0) as i32;

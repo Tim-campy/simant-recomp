@@ -37,8 +37,35 @@ use crate::scripts::{Gancho, PedidoMod, RegrasComScripts, Scripts};
 /// Nome do arquivo de dados (sobrescrevível por mod).
 pub const ARQUIVO_CONFIG: &str = "partida.json";
 
+/// Como Fast e Ultra viram ritmo (data/partida.json, `relogio.ritmo_velocidades`).
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ModoRitmo {
+    /// O laço ocupado de `MYTIMERFUNC` com `voltas_por_periodo` (o 486 da bancada: ~66,7 e ~90,9
+    /// ticks/s). É o original.
+    #[default]
+    Original,
+    /// Extensão do port (escolha do usuário, 2026-10-19): as velocidades com multiplicador andam a
+    /// `multiplicador × ticks_por_segundo_normal`, como num processador mais lento; o tick é o mesmo.
+    Proporcional,
+}
+
+/// Ritmo das velocidades (extensão do port; docs/decisoes.md, 2026-10-19, "Ritmo das velocidades").
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct RitmoVelocidades {
+    #[serde(default)]
+    pub modo: ModoRitmo,
+    /// Ticks por segundo da Normal no original (1 a cada 3 mensagens de 55 ms: 6,06).
+    #[serde(default)]
+    pub ticks_por_segundo_normal: f64,
+    /// Por `_GameSpeed` (slow, normal, fast, ultra): múltiplo de `ticks_por_segundo_normal`, ou
+    /// `null` = a regra do original para essa velocidade.
+    #[serde(default)]
+    pub multiplicadores: Vec<Option<f64>>,
+}
+
 /// Ritmo das mensagens de temporizador e do redesenho (data/partida.json, "relogio").
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct ConfigRelogio {
     /// Intervalo pedido ao `SetTimer` com o aplicativo em foco (17 ms).
     pub intervalo_mensagem_ms: u32,
@@ -57,6 +84,15 @@ pub struct ConfigRelogio {
     pub redesenho_mapa_a_cada: Vec<u32>,
     /// Sem foco, redesenha só a cada N ticks (`quadros & 7 == 0`).
     pub redesenho_sem_foco_a_cada: u32,
+    /// Ritmo de Fast/Ultra (ausente = o original).
+    #[serde(default)]
+    pub ritmo_velocidades: RitmoVelocidades,
+    /// Extensão do port (escolha do usuário, 2026-10-19): sem o foco do sistema, a cadência é a
+    /// desta velocidade (0 = Slow), ou a escolhida se for mais lenta; volta sozinha com o foco. Só
+    /// a cadência: `_GameSpeed` (o save, a marca do menu Speed, o desenho) não muda. `null`/ausente
+    /// = o original (o ritmo não muda sem foco).
+    #[serde(default)]
+    pub sem_foco_velocidade: Option<i16>,
 }
 
 /// Estado de uma chamada de `MYTIMERFUNC` em andamento (simulacao-visao-geral.md §2): o laço só
@@ -154,7 +190,7 @@ pub enum BotaoTeclado {
 }
 
 /// Conteúdo de data/partida.json.
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct ConfigPartida {
     pub relogio: ConfigRelogio,
     pub teclas: Vec<AtalhoPartida>,
@@ -203,6 +239,11 @@ impl ConfigPartida {
     pub fn botao_da_tecla(&self, nome: &str) -> Option<BotaoTeclado> {
         self.teclas_clique.iter().find(|(k, _)| k.eq_ignore_ascii_case(nome)).map(|(_, &v)| v)
     }
+}
+
+/// Valor de uma tabela por `_GameSpeed` (0 slow … 3 ultra; fora disso, o último).
+fn na_velocidade<T: Copy>(tabela: &[T], v: i16, padrao: T) -> T {
+    usize::try_from(v).ok().and_then(|i| tabela.get(i).copied()).or(tabela.last().copied()).unwrap_or(padrao)
 }
 
 /// `_ELayerMode` que o botão de cheiro da faixa (`_MapMode` n) liga: 4 ninho preto → 1, 5 trilha preta
@@ -337,6 +378,9 @@ pub struct Partida {
     quadro_mostrado: Option<(usize, usize)>,
     /// Rodando os ticks pedidos pelos mods de uma vez: as animações não param nada.
     avanco_rapido: bool,
+    /// Ritmo proporcional (`ritmo_velocidades`): voltas do laço de `MYTIMERFUNC` ainda por dar,
+    /// acumuladas a cada mensagem (a fração de volta fica guardada).
+    credito_voltas: f64,
 }
 
 impl Partida {
@@ -400,6 +444,7 @@ impl Partida {
             quadro_congelado: None,
             quadro_mostrado: None,
             avanco_rapido: false,
+            credito_voltas: 0.0,
         };
         p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
         p.funcoes_botoes_quintal = p.cfg.botoes_usuario_quintal.as_ref().map(|b| b.funcoes.clone()).unwrap_or_default();
@@ -411,11 +456,33 @@ impl Partida {
 
     /// `_GameSpeed` como índice das tabelas (0 slow … 3 ultra; fora disso, o último).
     fn indice_velocidade<T: Copy>(&self, tabela: &[T], padrao: T) -> T {
-        usize::try_from(self.estado.partida.velocidade)
-            .ok()
-            .and_then(|v| tabela.get(v).copied())
-            .or(tabela.last().copied())
-            .unwrap_or(padrao)
+        na_velocidade(tabela, self.estado.partida.velocidade, padrao)
+    }
+
+    /// Velocidade da cadência: `_GameSpeed`, ou, sem foco e com `sem_foco_velocidade`, a mais lenta
+    /// das duas (extensão do port). Só decide o ritmo dos ticks (voltas e atraso), nunca o estado.
+    pub fn velocidade_efetiva(&self) -> i16 {
+        let v = self.estado.partida.velocidade;
+        match self.cfg.relogio.sem_foco_velocidade {
+            Some(lenta) if !self.ativo => v.min(lenta),
+            _ => v,
+        }
+    }
+
+    /// Ritmo proporcional: voltas (= ticks em Fast/Ultra) por mensagem de temporizador na velocidade
+    /// `v`, ou `None` se ela segue o laço do original.
+    fn voltas_por_mensagem(&self, v: i16) -> Option<f64> {
+        let ritmo = &self.cfg.relogio.ritmo_velocidades;
+        if ritmo.modo != ModoRitmo::Proporcional {
+            return None;
+        }
+        let m = usize::try_from(v).ok().and_then(|i| ritmo.multiplicadores.get(i).copied().flatten())?;
+        Some(m * ritmo.ticks_por_segundo_normal * self.intervalo_ms() as f64 / 1000.0)
+    }
+
+    /// Ticks por segundo da velocidade `v` no ritmo proporcional (`None` = a do laço do original).
+    pub fn ticks_por_segundo(&self, v: i16) -> Option<f64> {
+        self.voltas_por_mensagem(v).map(|n| n * 1000.0 / self.intervalo_ms() as f64)
     }
 
     /// Intervalo atual entre mensagens de temporizador (ms): o pedido ao `SetTimer` (17 ms, ou
@@ -428,7 +495,8 @@ impl Partida {
     }
 
     /// Foco do aplicativo (`WM_ACTIVATEAPP`): sem foco, o código pede 170 ms, mas o ritmo medido não
-    /// muda (`data/partida.json`, `intervalo_sem_foco_ms` = 17); só o redesenho fica mais raro.
+    /// muda (`data/partida.json`, `intervalo_sem_foco_ms` = 17); só o redesenho fica mais raro. Com
+    /// `sem_foco_velocidade` (extensão do port), a cadência cai para a lenta até o foco voltar.
     pub fn definir_foco(&mut self, ativo: bool) {
         self.ativo = ativo;
     }
@@ -534,14 +602,31 @@ impl Partida {
             self.relogio.contar_mensagem();
             self.laco = LacoTimer { dentro: true, ..LacoTimer::default() };
         }
-        let voltas = self.indice_velocidade(&self.cfg.relogio.voltas_por_periodo.clone(), 1).max(1);
+        let velocidade = self.velocidade_efetiva();
+        let por_mensagem = self.voltas_por_mensagem(velocidade);
+        let voltas = match por_mensagem {
+            // Ritmo proporcional: as voltas que couberem no crédito (pode ser nenhuma, como num
+            // processador em que uma volta leva mais que uma mensagem: as mensagens se acumulam e
+            // são drenadas juntas). O teto evita uma rajada depois de uma parada.
+            Some(n) => {
+                self.credito_voltas = (self.credito_voltas + n).min(3.0 * n + 1.0);
+                self.credito_voltas.floor() as u32
+            }
+            None => {
+                self.credito_voltas = 0.0;
+                na_velocidade(&self.cfg.relogio.voltas_por_periodo, velocidade, 1).max(1)
+            }
+        };
         let mut ticks = 0;
         let havia_modal = self.avisos.tem_modal();
         for _ in 0..voltas {
             // `_gameCycles` (9:9b2c) conta as voltas do laço, rode ou não o tick. Zero significa
             // "sem relógio do laço" para `quintal::Relogios`: pula o 0 na volta.
             self.estado.ciclos_jogo = self.estado.ciclos_jogo.wrapping_add(1).max(1);
-            if self.relogio.liberar_tick(&self.estado, &self.cfg_simulacao) {
+            if por_mensagem.is_some() {
+                self.credito_voltas -= 1.0;
+            }
+            if self.relogio.liberar_tick_na_velocidade(&self.estado, &self.cfg_simulacao, velocidade) {
                 self.rodar_tick();
                 ticks += 1;
                 if self.bloqueio_ms > 0 {
@@ -1592,6 +1677,15 @@ mod testes {
         Partida::nova(e, nav(), RegrasOriginais::default(), TabelasAmarela::padrao().clone(), cfg_sim(), cfg(), cfg_avisos())
     }
 
+    /// Partida com o ritmo do original (o laço de `MYTIMERFUNC` do 486 da bancada, sem a lenta sem
+    /// foco): as extensões do port desligadas.
+    fn partida_original(velocidade: i16) -> Partida {
+        let mut p = partida(velocidade);
+        p.cfg.relogio.ritmo_velocidades.modo = ModoRitmo::Original;
+        p.cfg.relogio.sem_foco_velocidade = None;
+        p
+    }
+
     #[test]
     fn sorteios_do_desenho_depois_do_tick_seguem_as_janelas() {
         // Chuva com o quintal (Yard) aberto na frente: depois do tick, 14 gotas = 28 sorteios de S
@@ -1775,9 +1869,9 @@ mod testes {
     fn clique_esquerdo_encerra_o_laco_de_mytimerfunc() {
         // Fast: sem clique a primeira mensagem roda as 5 voltas (5 ticks); com o botão esquerdo
         // apertado antes, o teste de saída da primeira volta consulta o botão e devolve o controle.
-        let mut sem = partida(2);
+        let mut sem = partida_original(2);
         assert_eq!(sem.mensagem_de_timer(), 5);
-        let mut com = partida(2);
+        let mut com = partida_original(2);
         com.botao_esquerdo_apertado();
         assert_eq!(com.mensagem_de_timer(), 1);
         // O bit foi consumido: a mensagem seguinte abre outra chamada com as 5 voltas.
@@ -1792,8 +1886,8 @@ mod testes {
         // tick 128, por isso a conta para antes).
         assert_eq!(ticks_em(&mut partida(0), 18), 2, "slow: 1 tick a cada 6 mensagens (330 ms)");
         assert_eq!(ticks_em(&mut partida(1), 18), 6, "normal: 1 tick a cada 3 mensagens (165 ms)");
-        assert_eq!(ticks_em(&mut partida(2), 18), 66, "fast: 2 × 5 + 1 por chamada");
-        assert_eq!(ticks_em(&mut partida(3), 18), 90, "ultra: 2 × 7 + 1 por chamada");
+        assert_eq!(ticks_em(&mut partida_original(2), 18), 66, "fast: 2 × 5 + 1 por chamada");
+        assert_eq!(ticks_em(&mut partida_original(3), 18), 90, "ultra: 2 × 7 + 1 por chamada");
         let mut p = partida(0);
         assert_eq!(ticks_em(&mut p, 6), 0);
         assert_eq!(ticks_em(&mut p, 1), 1, "a sétima mensagem abre a terceira chamada com atraso 7");
@@ -1805,9 +1899,82 @@ mod testes {
         let antes = p.estado.ciclos_jogo;
         assert_eq!(ticks_em(&mut p, 3), 1);
         assert!(p.estado.ciclos_jogo - antes > 20);
-        let mut p = partida(3);
+        let mut p = partida_original(3);
         let t = ticks_em(&mut p, 30);
         assert_eq!(p.estado.ciclos_jogo, t);
+    }
+
+    /// Ticks em `ms` de tempo real, em avanços de 16 ms (um quadro a 60 Hz).
+    fn ticks_em_ms(p: &mut Partida, ms: u64) -> u32 {
+        (0..ms / 16).map(|_| p.avancar(16).ticks).sum()
+    }
+
+    #[test]
+    fn ritmo_proporcional_de_fast_e_ultra() {
+        // Escolha do usuário (2026-10-19): Fast ≈ 2,5 × Normal e Ultra ≈ 5 × Normal (data/partida.json).
+        let p = partida(1);
+        assert_eq!(p.cfg.relogio.ritmo_velocidades.modo, ModoRitmo::Proporcional, "padrão de data/partida.json");
+        assert_eq!(p.ticks_por_segundo(1), None, "Normal segue o laço do original");
+        let fast = p.ticks_por_segundo(2).unwrap();
+        let ultra = p.ticks_por_segundo(3).unwrap();
+        assert!((fast - 15.15).abs() < 0.01 && (ultra - 30.3).abs() < 0.01, "{fast} {ultra}");
+        // ~90 ticks de cada (o estado vazio abre um quadro no tick 100, que para a simulação).
+        let normal = ticks_em_ms(&mut partida(1), 15_000);
+        let fast = ticks_em_ms(&mut partida(2), 6_000);
+        let ultra = ticks_em_ms(&mut partida(3), 3_000);
+        assert!((89..=92).contains(&normal), "normal: {normal} em 15 s");
+        assert!((89..=92).contains(&fast), "fast: {fast} em 6 s (15,15/s)");
+        assert!((89..=92).contains(&ultra), "ultra: {ultra} em 3 s (30,3/s)");
+        // Como no original em Fast/Ultra, cada volta do laço roda um tick: _gameCycles = ticks.
+        let mut p = partida(3);
+        let t = ticks_em_ms(&mut p, 2_000);
+        assert_eq!(p.estado.ciclos_jogo, t);
+        // Pausado, o crédito não se acumula numa rajada: ao despausar, o ritmo segue o mesmo.
+        let mut p = partida(3);
+        p.aplicar(AcaoPartida::Pausa);
+        assert_eq!(ticks_em_ms(&mut p, 5_000), 0);
+        p.aplicar(AcaoPartida::Pausa);
+        assert!(ticks_em(&mut p, 1) <= 2, "sem rajada depois da pausa");
+    }
+
+    #[test]
+    fn os_ticks_sao_os_mesmos_em_qualquer_ritmo() {
+        // O ritmo só muda quando os ticks rodam: a sequência de estados é a mesma nos dois modos.
+        let mut orig = partida_original(2);
+        let mut prop = partida(2);
+        let n = 60;
+        while orig.estado.partida.tempo < n {
+            orig.mensagem_de_timer();
+        }
+        while prop.estado.partida.tempo < n {
+            prop.mensagem_de_timer();
+        }
+        assert_eq!(orig.estado.partida.tempo, prop.estado.partida.tempo);
+        assert_eq!(orig.estado.s, prop.estado.s);
+        assert_eq!(orig.estado.ciclos_jogo, prop.estado.ciclos_jogo);
+    }
+
+    #[test]
+    fn sem_foco_a_cadencia_cai_para_a_lenta_e_volta() {
+        // Escolha do usuário (2026-10-19): sem foco, a Slow; com o foco, a escolhida. _GameSpeed
+        // (save, menu Speed) não muda.
+        let mut p = partida(3);
+        p.definir_foco(false);
+        assert_eq!((p.velocidade_efetiva(), p.estado.partida.velocidade), (0, 3));
+        let lenta = ticks_em_ms(&mut p, 10_000);
+        assert!((29..=32).contains(&lenta), "slow: {lenta} em 10 s");
+        assert_eq!(p.estado.partida.velocidade, 3, "o _GameSpeed fica");
+        p.definir_foco(true);
+        assert_eq!(p.velocidade_efetiva(), 3);
+        assert!(ticks_em_ms(&mut p, 1_000) >= 28, "de volta à Ultra");
+        // Já na Slow, nada muda; sem a opção, o ritmo do original (o mesmo sem foco).
+        let mut p = partida(0);
+        p.definir_foco(false);
+        assert_eq!(p.velocidade_efetiva(), 0);
+        let mut p = partida_original(1);
+        p.definir_foco(false);
+        assert_eq!(p.velocidade_efetiva(), 1);
+        assert_eq!(ticks_em(&mut p, 18), 6, "normal sem foco no original");
     }
 
     #[test]

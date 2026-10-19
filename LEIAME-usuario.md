@@ -59,11 +59,17 @@ O `simant` aberto **sem opções** (dois cliques, atalho, menu) mostra o launche
   Completo, Experimental ou Tutorial) ou num **jogo salvo** (`.ANT`, com *Procurar...*).
 - **Vídeo:** resolução imitada (640×480, 800×600, 1024×768), escala da janela (1x a 4x ou a máxima que
   cabe), tamanho inicial da janela (`LxA`), a barra de título do Windows 3.1 e o perfil de driver (as
-  cores do Windows 3.1 em VGA de 16 cores, SVGA de 256 ou o S3 do DOSBox-X).
-- **Som:** ligado ou não, e o sintetizador das músicas (FM, simples ou SoundFont, com o arquivo `.sf2`).
+  cores do Windows 3.1 em VGA de 16 cores, SVGA de 256 ou o S3 do DOSBox-X). Com a "Moldura Win 3.1",
+  a janela fica sem a borda do sistema e se comporta como uma janela do Windows 3.1: arraste pelo
+  título, duplo clique nele (ou o botão da direita) maximiza ou restaura, a moldura cinza redimensiona,
+  Alt+F4 pergunta se quer salvar.
+- **Som:** ligado ou não, e o sintetizador das músicas (simples — o padrão —, FM ou SoundFont, com o
+  arquivo `.sf2`).
 - **Mods:** a pasta (`mods`, `exemplos/mods` ou outra) e uma caixa para ligar ou desligar cada mod dela.
 - **Preferências do jogador:** guardar as opções entre partidas e o `WIN.INI` de onde ler as opções do
-  original na primeira vez (o automático é o `WINDOWS\WIN.INI` perto da pasta do jogo).
+  original na primeira vez (o automático é o `WINDOWS\WIN.INI` perto da pasta do jogo). "Fast/Ultra do
+  486" volta as velocidades rápida e ultra ao ritmo do original (bem mais rápidas que o padrão do port,
+  2,5× e 5× a normal); "Lenta sem foco" põe a simulação na lenta enquanto a janela está sem foco.
 - **Linha de comando equivalente:** as opções `--` que correspondem às escolhas (as mesmas da seção 5).
   Dá para editá-la e apertar Enter: as escolhas acima mudam junto, e opções que a tela não tem (como
   `--semente 42`) ficam guardadas.
@@ -111,7 +117,8 @@ Você é a **formiga amarela** de uma colônia preta, contra as vermelhas, no qu
   cava); segurar o botão sobre a amarela abre o menu dela.
 - **Amarela:** **1**/**2** recrutam 5/10 operárias, **3**/**4** liberam metade/todas, **0** alarme,
   **X** troca de corpo, **Home** centraliza.
-- **Velocidade e partida:** **Shift+0** pausa, **Shift+1..4** velocidades, **Ctrl+S** salva,
+- **Velocidade e partida:** **Shift+0** pausa, **Shift+1..4** velocidades (sem o foco da janela, a
+  simulação anda na lenta e volta sozinha), **Ctrl+S** salva,
   **Ctrl+A** salva como, **Ctrl+L** carrega, **Ctrl+N** jogo novo.
 - **Janelas:** **Ctrl+E** edição, **Ctrl+B** Behavior, **Ctrl+C** Caste, **Ctrl+H** History,
   **Ctrl+I** Info, **Ctrl+M** mapa; **Ctrl + setas** rolam a vista.
@@ -131,10 +138,12 @@ Todas as teclas podem ser trocadas em `data/partida.json`, `data/navegacao.json`
 | `--save ARQ.ANT` | abre um save |
 | `--resolucao LxA` | tela do Windows 3.1 imitada: `640x480` (padrão), `800x600` ou `1024x768` |
 | `--escala N`, `--janela LxA` | ampliação inteira e tamanho inicial da janela |
-| `--moldura`, `--sem-moldura` | barra de título do Windows 3.1 dentro da janela |
+| `--moldura`, `--sem-moldura` | barra de título do Windows 3.1 no lugar da moldura do sistema (`--moldura-do-sistema`: dentro dela) |
+| `--velocidades proporcional\|original` | rápida e ultra a 2,5× e 5× a normal (padrão) ou no ritmo do original |
+| `--sem-foco lenta\|original` | sem foco, a lenta (padrão) ou o ritmo de sempre, como o original |
 | `--perfil-driver vga\|svga256\|s3_dosbox` | cores e alinhamentos do driver de vídeo do Windows 3.1 imitado (padrão: `vga`) |
 | `--sem-som`, `--com-som` | sem áudio (ou com, vencendo o launcher) |
-| `--sintetizador fm\|soundfont\|simples`, `--soundfont ARQ.sf2` | como as músicas são tocadas (padrão: FM no estilo da Sound Blaster); com `soundfont`, um SoundFont General MIDI seu |
+| `--sintetizador simples\|fm\|soundfont`, `--soundfont ARQ.sf2` | como as músicas são tocadas (padrão: o simples; `fm` no estilo da Sound Blaster); com `soundfont`, um SoundFont General MIDI seu |
 | `--preferencias ARQ`, `--sem-preferencias`, `--win-ini ARQ` | arquivo das opções guardadas entre partidas; `WIN.INI` lido na primeira vez |
 | `--launcher` | abre o launcher mesmo com outras opções ou com ele desligado |
 | `--config ARQ`, `--sem-config` | outro arquivo de configuração do launcher, ou nenhum |

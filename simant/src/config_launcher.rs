@@ -28,8 +28,8 @@ pub enum Inicio {
 
 /// Tipos de jogo novo (`--tipo`), na ordem da tela, com o nome mostrado.
 pub const TIPOS: [(&str, &str); 4] = [("rapido", "Rápido"), ("completo", "Completo"), ("experimental", "Experimental"), ("tutorial", "Tutorial")];
-/// Sintetizadores das músicas (`--sintetizador`).
-pub const SINTETIZADORES: [(&str, &str); 3] = [("fm", "FM"), ("simples", "Simples"), ("soundfont", "SoundFont")];
+/// Sintetizadores das músicas (`--sintetizador`); "Padrão" no launcher = o de `data/som.json` (o simples).
+pub const SINTETIZADORES: [(&str, &str); 3] = [("simples", "Simples"), ("fm", "FM"), ("soundfont", "SoundFont")];
 /// Resoluções da tela virtual (`--resolucao`).
 pub const RESOLUCOES: [[u32; 2]; 3] = [[640, 480], [800, 600], [1024, 768]];
 
@@ -55,6 +55,10 @@ pub struct ConfigLauncher {
     pub moldura: Option<bool>,
     /// `--perfil-driver` (chave de `data/resolucao.json` → `perfis_driver`).
     pub perfil_driver: Option<String>,
+    /// `--velocidades` (`proporcional` ou `original`; ausente = `data/partida.json`, proporcional).
+    pub velocidades: Option<String>,
+    /// `--sem-foco` (`lenta` ou `original`; ausente = `data/partida.json`, lenta).
+    pub sem_foco: Option<String>,
     /// `false` = `--sem-som`.
     pub som: bool,
     /// `--sintetizador`.
@@ -87,6 +91,8 @@ impl Default for ConfigLauncher {
             janela: None,
             moldura: None,
             perfil_driver: None,
+            velocidades: None,
+            sem_foco: None,
             som: true,
             sintetizador: None,
             soundfont: None,
@@ -166,6 +172,12 @@ impl ConfigLauncher {
         if let Some(p) = &self.perfil_driver {
             par("--perfil-driver", p.clone());
         }
+        if let Some(v) = &self.velocidades {
+            par("--velocidades", v.clone());
+        }
+        if let Some(s) = &self.sem_foco {
+            par("--sem-foco", s.clone());
+        }
         if let Some(s) = &self.sintetizador {
             par("--sintetizador", s.clone());
         }
@@ -236,6 +248,8 @@ impl ConfigLauncher {
                     c.janela = Some([l, h]);
                 }
                 "--perfil-driver" => c.perfil_driver = Some(valor()?),
+                "--velocidades" => c.velocidades = Some(valor()?),
+                "--sem-foco" => c.sem_foco = Some(valor()?),
                 "--sintetizador" => c.sintetizador = Some(valor()?),
                 "--soundfont" => c.soundfont = Some(valor()?),
                 "--mods" => c.mods = Some(valor()?),
@@ -417,6 +431,8 @@ mod testes {
             janela: Some([1300, 1000]),
             moldura: Some(true),
             perfil_driver: Some("svga256".into()),
+            velocidades: Some("original".into()),
+            sem_foco: Some("original".into()),
             som: false,
             sintetizador: Some("soundfont".into()),
             soundfont: Some("/home/eu/GM.sf2".into()),
@@ -445,7 +461,7 @@ mod testes {
             c.argumentos(),
             s(&[
                 "--jogo", r"C:\Jogos\MAXIS\ANTWIN", "--resolucao", "800x600", "--escala", "2", "--janela", "1300x1000",
-                "--perfil-driver", "svga256", "--sintetizador", "soundfont", "--soundfont", "/home/eu/GM.sf2", "--mods",
+                "--perfil-driver", "svga256", "--velocidades", "original", "--sem-foco", "original", "--sintetizador", "soundfont", "--soundfont", "/home/eu/GM.sf2", "--mods",
                 "exemplos/mods", "--desligar-mods", "trapacas", "--win-ini", r"C:\WINDOWS\WIN.INI", "--moldura", "--sem-som",
                 "--sem-preferencias", "--novo-jogo", "--tipo", "completo", "--semente", "42",
             ])
