@@ -537,6 +537,9 @@ fn principal(o: Opcoes) -> Result<(), String> {
             Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como, salvo, sair, sobre ou status")),
             None => {}
         }
+        for &(x, y, duplo) in &o.cliques_dialogo {
+            s.clicar_no_dialogo(x, y, duplo);
+        }
         if let Some((x, y)) = o.examinar {
             s.janela_exame.ja_aberta = o.exame_ja_aberto;
             let plano = i32::from(s.partida.nav.plano_mapa);

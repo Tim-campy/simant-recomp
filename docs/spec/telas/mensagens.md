@@ -138,6 +138,20 @@ Oito parciais `p[0..7]` (0 a 100) [código]:
 
 `soma = _MeHealth + Σ peso[i] × p[i] × 51`, com os pesos do DGROUP `1048:0948` = 13, 17, 19, 23, 29, 31, 37, 41. Full Game: se `_GameTime` < 8100, `soma = max(1, _GameTime / 100) × soma / 81`; depois `soma × 5`. Outros tipos: `soma = soma × 29 / 10`; se `_GameTime` < 4100, `soma = max(1, _GameTime / 100) × soma / 41`. **Pontos = `_GameTime` + soma** [código; contas em 32 bits com sinal: o pseudocódigo mostra algumas só na palavra baixa, hipótese do port].
 
+**Retorno e nota 3 conferidos (bancada, 2026-10-19, `tools/cenarios_fecha.py gravar pontuacao`, snapshots `rico` e `full`):** sete fins de jogo provocados escrevendo `_GameTime`, `_BlackLost`, `_RedLost`, `_MeHealth` e `_IsGameOver` = 1 na entrada de um tick (o fim de `_DoAntSim` abre o GAME OVER); o estado lido com a caixa aberta dá no port exatamente os pontos e a avaliação da tela (`engine/tests/pontuacao_original.rs`, estados `FIM_*.ANT`):
+
+| Caso | Tipo | `_GameTime` | Pretas/vermelhas perdidas (nota 3) | `_MeHealth` | Pontos | Avaliação |
+|---|---|---|---|---|---|---|
+| `q_tempo_longo` | Quick | 5001 | 30/10 (75) | 50 | 902307 | Llama Repair Specialist |
+| `q_tempo_curto` | Quick | 2001 (< 4100) | 5/45 (10) | 80 | 331894 | Weak Link in the Food Chain |
+| `q_sem_baixas_pretas` | Quick | 4101 | 0/25 (0) | 100 | 646424 | Aphid Herder |
+| `q_32bits` | Quick | 30001 | 3/1 (75) | 1 | 927165 | Llama Repair Specialist |
+| `f_tempo_longo` | Full | 9001 | 12/36 (25) | 70 | 1800726 | Weak Link in the Food Chain |
+| `f_tempo_curto` | Full | 3001 (< 8100) | 40/0 (100) | 100 | 829571 | Aardvark Fodder |
+| `f_8100` | Full | 8100 | 7/7 (50) | 33 | 1946265 | Weak Link in the Food Chain |
+
+Ficam confirmados: o **retorno é `_GameTime` + soma em 32 bits** (pontos bem acima de 65535; o "`_GameTime` + total" do Ghidra estava certo); os dois ramos de tempo (Quick × 29 / 10 e, abaixo de 4100, × max(1, t/100) / 41; Full × max(1, t/100) / 81 abaixo de 8100, depois × 5); e o **sentido da nota 3**: `_BlackLost` × 100 / (`_BlackLost` + `_RedLost`), de modo que sem nenhuma preta perdida a nota é 0 e perder mais pretas a aumenta (a coluna "Fights Won" do Status mostra essa conta; [hipótese] defeito do original, que o port segue). A avaliação no GAME OVER é a faixa dos pontos (÷ 5 no Full) mais 5 (as pretas não venceram).
+
 **Bancada:** o C-10 deu "Quick Game", **19785**, "Aardvark Fodder" (`m8`). O port, com o estado do C-10 e `_GameTime` = 79 (um tick depois do Load, o da ordem do clique), dá exatamente 19785 (`cargo run -p engine --example pontuacao -- C10.ANT 79`) [bancada].
 
 ## 5. Botões configuráveis da faixa (`_DoUserButton`, `1000:04c4`)

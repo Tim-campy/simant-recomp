@@ -68,13 +68,39 @@ pub fn jogo_novo_com_geradores(
     let m = Mundo::novo_jogo(tipo, &mut r, &mut s, tab)?;
     let mut e = Estado::de_mundo(&m, s, r, cfg)?;
     iniciar_quintal(&mut e, quintal);
+    // O que `_NewGame` reescreve e o Load do tutorial não: `_CurEditMode` (pelo `_SetMapPlane`) e
+    // `_MeGoalPlane` (`_ResetYellowVars`). Conferido na bancada (2026-10-19, `qemu_novo_na_partida.txt`).
+    let (modo_edicao, alvo_plano) = (e.partida.modo_edicao, e.amarela.alvo_plano);
     manter_do_anterior(&mut e, anterior);
-    // _NewGame: a lição só recomeça no Tutorial (tipo 0); `_GotoMyAnt` põe `_LessonTemp = 1`.
+    e.partida.modo_edicao = modo_edicao;
+    e.amarela.alvo_plano = alvo_plano;
+    // Vagas além do fim da lista A: X e Y ficam os de antes, como nas dos ninhos.
+    let (n, v) = (&mut e.superficie.lista, &anterior.superficie.lista);
+    for i in n.usadas()..n.vagas.len().min(v.vagas.len()) {
+        n.vagas[i].x = v.vagas[i].x;
+        n.vagas[i].y = v.vagas[i].y;
+    }
+    // Sem colônia preta (Full Game), `_MakeNewHoleB`, `_DigOutBNest` e `_InitYelloAnt` no ninho
+    // não rodam: o último buraco, a última saída e o ponto de renascer ficam os da partida anterior.
+    if tipo == TipoJogo::Completo {
+        e.preta.ultimo_buraco = anterior.preta.ultimo_buraco;
+        e.preta.ultima_saida = anterior.preta.ultima_saida;
+        e.amarela.renascer_x = anterior.amarela.renascer_x;
+        e.amarela.renascer_y = anterior.amarela.renascer_y;
+    }
+    // No Experimental `_AddFood` não roda e a operária posta em (0x40, 0x20) não ganha direção:
+    // `_LastFoodDrop` e `_MeDir` ficam os da partida anterior (bancada, Quick → Experimental).
+    if tipo == TipoJogo::Experimental {
+        e.ambiente.ultima_comida = anterior.ambiente.ultima_comida;
+        e.amarela.dir = anterior.amarela.dir;
+    }
+    // _NewGame: a lição só recomeça no Tutorial (tipo 0). `_LessonTemp` não muda antes do primeiro
+    // tick (0 na bancada; o `_GotoMyAnt` que o põe em 1 não roda aqui).
     if tipo != TipoJogo::Tutorial {
         e.tutorial.licao = anterior.tutorial.licao;
         e.tutorial.dada = anterior.tutorial.dada;
     }
-    e.tutorial.temporario = 1;
+    e.tutorial.temporario = anterior.tutorial.temporario;
     centrar_na_amarela(&mut e, vista);
     Ok(e)
 }

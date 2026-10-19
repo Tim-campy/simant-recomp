@@ -1,0 +1,53 @@
+# Patch 8 da casa (clipe e mesa) e dois patches do quintal com várias colônias (_DigOutBNest/_DigOutRNest fora da casa).
+# Completo, colônias preta e vermelha escritas em _YMapPopB/_YMapPopR[n] (20 cada), duplo clique na Yard View;
+# estado logo depois de _XferPatch. Ver docs/spec/regras/geracao-mundo.md §5.3 (mesma rota de qemu_casa_restantes2.txt).
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_xfer_8_quintal.txt --overlay <cópia do c_overlay.qcow2>
+snapshot_carregar quick
+esperar 2
+escrever_variavel CurGameType 2
+escrever_variavel 8:00ac 20 1
+escrever_variavel 8:016c 20 1
+clicar_em 37 55
+esperar 4
+capturar re_trabalho/ag_fecha/casa_0_8_antes.png
+clicar_em 218 307
+clicar
+esperar 6
+capturar re_trabalho/ag_fecha/casa_0_8_depois.png
+pausar
+estado re_trabalho/ag_fecha/casa_0_8.ANT
+extras re_trabalho/ag_fecha/casa_0_8_extras.json
+continuar
+snapshot_carregar quick
+esperar 2
+escrever_variavel CurGameType 2
+escrever_variavel 8:00d8 20 1
+escrever_variavel 8:0198 20 1
+clicar_em 37 55
+esperar 4
+capturar re_trabalho/ag_fecha/quintal_3_4_antes.png
+clicar_em 342 267
+clicar
+esperar 6
+capturar re_trabalho/ag_fecha/quintal_3_4_depois.png
+pausar
+estado re_trabalho/ag_fecha/quintal_3_4.ANT
+extras re_trabalho/ag_fecha/quintal_3_4_extras.json
+continuar
+snapshot_carregar quick
+esperar 2
+escrever_variavel CurGameType 2
+escrever_variavel 8:010e 20 1
+escrever_variavel 8:01ce 20 1
+clicar_em 37 55
+esperar 4
+capturar re_trabalho/ag_fecha/quintal_6_10_antes.png
+clicar_em 366 327
+clicar
+esperar 6
+capturar re_trabalho/ag_fecha/quintal_6_10_depois.png
+pausar
+estado re_trabalho/ag_fecha/quintal_6_10.ANT
+extras re_trabalho/ag_fecha/quintal_6_10_extras.json
+continuar
+fim

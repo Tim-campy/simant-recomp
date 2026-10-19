@@ -1,0 +1,41 @@
+# Bancada SVGA 640x480 em 256 cores: mini mapa aberto três vezes no mesmo boot (a primeira cria a janela), para
+# separar o deslocamento da primeira abertura do alinhamento ao byte (telas/mapa.md §7, telas/resolucao.md §7).
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_svga640_mini.txt --disco re_trabalho/qemu/svga_c_640x480.img --overlay <overlay novo>
+esperar 70
+teclas spc
+esperar 4
+teclas spc
+esperar 6
+clicar_em 345 228
+esperar 20
+teclas shift+0
+esperar 3
+ir_para 219 71
+apertar
+esperar 1
+ir_para 219 440
+soltar
+esperar 2
+capturar re_trabalho/ag_fecha/svga/m1_mini.png
+clicar_em 600 460
+esperar 2
+capturar re_trabalho/ag_fecha/svga/m1_fechado.png
+ir_para 219 71
+apertar
+esperar 1
+ir_para 219 440
+soltar
+esperar 2
+capturar re_trabalho/ag_fecha/svga/m2_mini.png
+clicar_em 600 460
+esperar 2
+ir_para 219 71
+apertar
+esperar 1
+ir_para 219 440
+soltar
+esperar 2
+capturar re_trabalho/ag_fecha/svga/m3_mini.png
+pausar
+estado re_trabalho/ag_fecha/svga/m_estado.ANT
+fim

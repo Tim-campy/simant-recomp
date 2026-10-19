@@ -479,7 +479,7 @@ fn adicionar_comida_sorteia_centro_e_espalha() {
     let g = tabelas_geracao();
     let mut e = quintal();
     let mut s = e.s;
-    adicionar_comida(&mut e, &g, 150, true);
+    adicionar_comida(&mut e, Some(&g), 150, true);
     let (cx, cy) = (s.mascara(128), s.mascara(64));
     assert_eq!(e.ambiente.ultima_comida, (cx as i16, cy as i16));
     let mut unidades = 0;

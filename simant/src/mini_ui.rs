@@ -17,6 +17,7 @@ pub(crate) fn abrir_pelo_botao(s: &mut Sessao, x: i32, y: i32) -> bool {
     let pausado = s.partida.estado.partida.pausado != 0;
     s.mini.abrir(botao, &s.partida.estado, &s.mapa, s.partida.mostrar_trilhas, true, pausado);
     s.partida.definir_pausa(true);
+    s.sincronizar_janelas();
     println!("mini mapa aberto (plano {})", s.partida.nav.plano_mapa);
     true
 }
@@ -24,6 +25,7 @@ pub(crate) fn abrir_pelo_botao(s: &mut Sessao, x: i32, y: i32) -> bool {
 /// Fecha e volta à pausa de antes (`_SetPause(local_8)`).
 fn fechar(s: &mut Sessao) {
     s.mini.fechar();
+    s.sincronizar_janelas();
     let antes = s.mini.pausa_antes;
     s.partida.definir_pausa(antes);
     println!("mini mapa fechado");

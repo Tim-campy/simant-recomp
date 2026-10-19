@@ -189,15 +189,12 @@ impl RegrasSuperficie for RegrasOriginais {
     }
 
     fn adicionar_comida(&mut self, e: &mut Estado, quantidade: i32, som: bool) {
-        // Sem a tabela de seno (que vem do banco do jogo), não há como espalhar a comida.
-        // [decisão do port] nada acontece; com os arquivos do jogo, `geracao` está preenchido.
-        // O som (0x20) vem antes, como no original.
+        // Sem as tabelas do banco (testes), o seno é o calculado, que coincide com o objeto 9/1000
+        // (`inimigos::seno_calculado`). O som (0x20) vem antes, como no original.
         if som {
             e.pedir_som(self.superficie.sons.comida_nova);
         }
-        if let Some(g) = &self.geracao {
-            adicionar_comida(e, g, quantidade, som);
-        }
+        adicionar_comida(e, self.geracao.as_ref(), quantidade, som);
     }
 
     fn escolher_estrategia(&mut self, e: &mut Estado) {
@@ -305,7 +302,8 @@ fn pegar_comida(e: &mut Estado, x: i32, y: i32) {
 ///
 /// `som = true` toca o efeito 0x20: o pedido (`Evento::Som`) é feito por `RegrasSuperficie::adicionar_comida`,
 /// que tem as tabelas da superfície.
-pub fn adicionar_comida(e: &mut Estado, g: &TabelasGeracao, quantidade: i32, _som: bool) {
+pub fn adicionar_comida(e: &mut Estado, g: Option<&TabelasGeracao>, quantidade: i32, _som: bool) {
+    let seno = super::inimigos::Seno(g);
     let (cx, cy, n) = if quantidade < 0 {
         (0x40, e.s.rand1(0x30) + 8, 200)
     } else {
@@ -318,8 +316,8 @@ pub fn adicionar_comida(e: &mut Estado, g: &TabelasGeracao, quantidade: i32, _so
     for _ in 0..n {
         let a = e.s.mascara(256);
         let r = e.s.rand1(raio);
-        let x = cx + g.cosseno(a) * r / 0x7FFF;
-        let y = cy + g.seno(a) * r / 0x7FFF;
+        let x = cx + seno.cos(a) * r / 0x7FFF;
+        let y = cy + seno.sen(a) * r / 0x7FFF;
         if !(0..128).contains(&x) || !(0..64).contains(&y) || vida(e, x, y) != 0 {
             continue;
         }

@@ -4,7 +4,7 @@
 //!
 //! Uso: cargo run -p engine --example barra_menus -- <pasta do jogo> <saída.png> [estado] [opções]
 //!   estado: "fechado", "barra N" (título N realçado) ou "menu N [ITEM]" (menu N aberto, item realçado)
-//!   --opcoes 0,1,1,1,1,0 (marcas do Options), --velocidade V, --pausado
+//!   --opcoes 0,1,1,1,1,0 (marcas do Options), --velocidade V, --pausado, --mods DIR (pasta de mods)
 //!   --moldura: desenha também a barra de título da janela principal (engine::core::moldura_principal),
 //!   com o menu de sistema como o menu 5; --inativa (título inativo), --apertado min|rest (botão apertado)
 
@@ -25,7 +25,15 @@ fn main() {
         std::process::exit(2);
     }
     let bancos = ["SHARED", "WINGANT", "SOUND"].map(String::from);
-    let r = Recursos::abrir(Path::new(&a[1]), &bancos, Path::new("data"), None).unwrap();
+    // --mods DIR (em qualquer posição): pasta de mods, por exemplo um com {"perfil_driver": "svga256"}
+    // em data/resolucao.json para as cores do sistema de 256 cores.
+    let mut a = a;
+    let mods = a.iter().position(|s| s == "--mods").map(|k| {
+        let d = a.remove(k + 1);
+        a.remove(k);
+        d
+    });
+    let r = Recursos::abrir(Path::new(&a[1]), &bancos, Path::new("data"), mods.as_deref().map(Path::new)).unwrap();
     let interface = Interface::carregar(&r, 0).unwrap();
     let cores = engine::paleta::carregar_rgb(&r).unwrap();
     let cfg: ConfigBarraMenus = r.dados(engine::core::barra_menus::ARQUIVO_CONFIG).unwrap();
