@@ -16,6 +16,7 @@
 //! os conselhos de `_Feedback` e o botão de velocidade.
 
 use std::collections::{HashMap, VecDeque};
+use std::path::Path;
 
 use serde::Deserialize;
 
@@ -30,7 +31,7 @@ use crate::rules::desenho::{self, ContadoresRedesenho, JanelasDesenho};
 use crate::rules::estado::{AnimacaoDaAmarela, ConfigSimulacao, Estado, Evento, QuadroAnimacao};
 use crate::rules::tick::{tick, Regras, RegrasOriginais, Relogio};
 use crate::rules::trapacas::{self, letra_da_tecla, AnelTrapaca, EfeitoTrapaca, TabelasTrapaca};
-use crate::scripts::{Gancho, PedidoMod, Scripts};
+use crate::scripts::{Gancho, PedidoMod, RegrasComScripts, Scripts};
 
 /// Nome do arquivo de dados (sobrescrevível por mod).
 pub const ARQUIVO_CONFIG: &str = "partida.json";
@@ -537,7 +538,16 @@ impl Partida {
             self.aplicar_pedidos_dos_mods();
         }
         self.preparar_edicao_no_tick();
-        tick(&mut self.estado, &mut self.regras as &mut dyn Regras);
+        match self.scripts.as_mut().filter(|s| s.tem_ganchos_do_tick()) {
+            // Ganchos de parte (API 0.26): as mesmas regras, com os ganchos entre as partes; as
+            // ações pedidas neles rodam logo depois do tick.
+            Some(s) => {
+                let mut r = RegrasComScripts { regras: &mut self.regras, scripts: s };
+                tick(&mut self.estado, &mut r as &mut dyn Regras);
+                self.aplicar_pedidos_dos_mods();
+            }
+            None => tick(&mut self.estado, &mut self.regras as &mut dyn Regras),
+        }
         if let Some(s) = self.scripts.as_mut().filter(|s| s.tem_gancho(Gancho::DepoisDoTick)) {
             s.depois_do_tick(&mut self.estado);
             self.aplicar_pedidos_dos_mods();
@@ -833,6 +843,69 @@ impl Partida {
         s.ao_menu(nome, indice, &mut self.estado);
         self.aplicar_pedidos_dos_mods();
         self.processar_eventos_do_estado();
+    }
+
+    /// Depois de gravar o `.ANT` em `save`: `ao_salvar` dos scripts e o arquivo lateral
+    /// `save.mods.json` (API 0.26, `scripts::arquivo_lateral`). O `.ANT` não muda. Sem nenhum dado de
+    /// mod, um arquivo lateral antigo com esse nome é apagado (ele seria de outra gravação).
+    pub fn gravar_estado_dos_mods(&mut self, save: &Path) -> Result<(), String> {
+        let lateral = crate::scripts::arquivo_lateral(save);
+        let dados = match self.scripts.as_mut() {
+            Some(s) => s.ao_salvar(&mut self.estado),
+            None => Vec::new(),
+        };
+        self.saidas_dos_scripts();
+        if dados.is_empty() {
+            if lateral.is_file() {
+                std::fs::remove_file(&lateral).map_err(|e| format!("{}: {e}", lateral.display()))?;
+            }
+            return Ok(());
+        }
+        let json = serde_json::json!({
+            "formato": crate::scripts::FORMATO_ARQUIVO_LATERAL,
+            "api": crate::scripts::VERSAO_API,
+            "tempo": self.estado.partida.tempo,
+            "mods": dados.into_iter().collect::<serde_json::Map<_, _>>(),
+        });
+        let texto = serde_json::to_string_pretty(&json).map_err(|e| e.to_string())?;
+        std::fs::write(&lateral, texto).map_err(|e| format!("{}: {e}", lateral.display()))
+    }
+
+    /// Depois do Load de `save` (com os scripts já ligados): lê `save.mods.json`, se existir, e chama
+    /// `ao_carregar` dos mods que têm dados nele (API 0.26). Um arquivo lateral inválido, ou de outra
+    /// gravação (o `tempo` não bate com o `_GameTime` do `.ANT`, por exemplo porque o original gravou
+    /// por cima), é ignorado com uma linha no registro dos scripts.
+    pub fn ler_estado_dos_mods(&mut self, save: &Path) {
+        let lateral = crate::scripts::arquivo_lateral(save);
+        if !lateral.is_file() {
+            return;
+        }
+        let Some(s) = self.scripts.as_mut() else { return };
+        let lido = std::fs::read_to_string(&lateral)
+            .map_err(|e| e.to_string())
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).map_err(|e| e.to_string()));
+        let aviso = |m: String| format!("[mods] {}: {m}; estado dos mods ignorado", lateral.display());
+        let v = match lido {
+            Ok(v) => v,
+            Err(e) => return self.registro_scripts.push(aviso(e)),
+        };
+        if v.get("formato").and_then(|f| f.as_str()) != Some(crate::scripts::FORMATO_ARQUIVO_LATERAL) {
+            return self.registro_scripts.push(aviso("formato desconhecido".into()));
+        }
+        let tempo = v.get("tempo").and_then(|t| t.as_u64());
+        if tempo != Some(u64::from(self.estado.partida.tempo)) {
+            return self.registro_scripts.push(aviso(format!(
+                "é de outra gravação (tempo {tempo:?}, o save tem {})",
+                self.estado.partida.tempo
+            )));
+        }
+        let Some(por_mod) = v.get("mods").and_then(|m| m.as_object()) else {
+            return self.registro_scripts.push(aviso("sem \"mods\"".into()));
+        };
+        s.ao_carregar(por_mod, &mut self.estado);
+        self.aplicar_pedidos_dos_mods();
+        self.saidas_dos_scripts();
+        self.redesenhar = true;
     }
 
     /// Ticks ainda pedidos por `avancar_ticks` (API 0.17).

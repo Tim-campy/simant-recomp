@@ -238,6 +238,38 @@ fn luta_e_formiga_leao_na_superficie() {
     assert!(p.estado.formigas_leao.quantidade == leoes + 1 || !recusas(&mut p).is_empty());
 }
 
+/// API 0.26: castas, comportamento, alarme e soldados no ninho; a contagem de trapaças vai para o
+/// arquivo lateral do save e volta no Load.
+#[test]
+fn colonia_e_estado_no_save() {
+    let mut p = partida();
+    usar(&mut p, "Castas: só soldados");
+    assert_eq!(p.estado.controles.castas, [0, 0, 65535]);
+    usar(&mut p, "Comportamento: só forragear");
+    assert_eq!(p.estado.controles.tarefas, [65535, 0, 0]);
+    let n0 = p.estado.ninho_b.lista.ativas().count();
+    usar(&mut p, "5 soldados pretos");
+    assert_eq!(p.estado.ninho_b.lista.ativas().count(), n0 + 5);
+    p.estado.amarela.plano = 1;
+    p.estado.amarela.x = 40;
+    p.estado.amarela.y = 30;
+    usar(&mut p, "Alarme em volta");
+    assert!(p.estado.feromonios.alarme.em(20, 15).is_some_and(|v| v > 0));
+
+    let dir = std::env::temp_dir().join(format!("simant_trapacas_save_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let save = dir.join("TRAPACA.ANT");
+    p.gravar_estado_dos_mods(&save).unwrap();
+    let mut q = partida();
+    q.estado.partida.tempo = p.estado.partida.tempo;
+    q.ler_estado_dos_mods(&save);
+    let agora = q.agora();
+    let faixa = q.avisos.texto_da_faixa(agora).map(|t| format!("{t:?}")).unwrap_or_default();
+    assert!(faixa.contains("já teve 4 trapaça"), "{faixa}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn patches_da_casa_no_jogo_completo() {
     let mut p = partida_completa();
