@@ -6,8 +6,9 @@
 //!   simant (--save ARQ.ANT | --novo-jogo [--semente N]) [--acoes a,b,...]
 //!          [--ticks N] [--avancar-ms MS] [--botoes F,F,...] [--historico B,B,...] [--fechar-avisos N] [--exportar-tela-jogo ARQ.png]
 //!          [--salvar ARQ.ANT]
-//!   opções da janela: [--escala N] [--janela LxA] [--sair-apos-ms N [--capturar-janela ARQ.png]]
-//!   (padrões em data/video.json: escala 1 = 640×480 como o original; simant/src/video.rs)
+//!   opções da janela: [--resolucao LxA] [--escala N] [--janela LxA] [--sair-apos-ms N [--capturar-janela ARQ.png]]
+//!   (padrões em data/video.json: tela virtual 640×480 em escala 1, como a bancada; simant/src/video.rs;
+//!   --resolucao 800x600 ou 1024x768 muda o layout como o original, docs/spec/telas/resolucao.md)
 //!   som (simant/src/som): [--sem-som] [--soundfont ARQ.sf2] [--exportar-som DIR]
 //!   preferências do jogador (simant/src/preferencias.rs): [--preferencias ARQ] [--sem-preferencias]
 //!
@@ -63,8 +64,8 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 struct ConfigJogo {
     bancos: Vec<String>,
-    /// Id do objeto tipo 9 com as posições das janelas (docs/spec/formatos/janela.md).
-    tabela_posicoes: u16,
+    // `tabela_posicoes` (id do objeto tipo 9) não é mais lida pelo executável: a tabela vem da tela
+    // virtual (data/resolucao.json). Fica no arquivo para os testes e exemplos.
 }
 
 fn para_rgb(indices: &[u8], cores: &[[u8; 3]]) -> Vec<u8> {
@@ -271,11 +272,17 @@ fn principal() -> Result<(), String> {
     let mut o = o;
     // data/video.json (opcional; um mod pode trocá-lo) e, por cima, --escala e --janela.
     let arquivo_video = if recursos.existe_dado(video::ARQUIVO) { recursos.dados(video::ARQUIVO)? } else { video::ConfigVideo::default() };
-    o.video = arquivo_video.com_linha_de_comando(o.escala, o.janela);
+    o.video = arquivo_video.com_linha_de_comando(o.resolucao, o.escala, o.janela);
+    // Tela virtual: tamanho da área cliente e tabela de posições da resolução imitada, pela regra
+    // do original em data/resolucao.json (docs/spec/telas/resolucao.md).
+    let regra: engine::core::resolucao::ConfigResolucao = recursos.dados(engine::core::resolucao::ARQUIVO)?;
+    let tela_virtual = regra.tela(o.video.resolucao_virtual)?;
+    o.tela_virtual = Some(tela_virtual);
     if !o.novo_jogo && o.save.is_none() && o.exportar.is_none() {
         // Abertura até o "Select a Game"; a escolha vira o jogo novo.
-        let seq: Sequencia = recursos.dados("telas.json")?;
-        let interface = Interface::carregar(&recursos, config.tabela_posicoes)?;
+        let mut seq: Sequencia = recursos.dados("telas.json")?;
+        tela_virtual.aplicar_sequencia(&mut seq);
+        let interface = Interface::carregar(&recursos, tela_virtual.tabela_posicoes)?;
         match executar(seq, &recursos, &interface, &cores, &o)? {
             Some(SaidaAbertura::Carregar(p)) => {
                 // Load Game na abertura: o Load do começo do programa (como --save).
@@ -329,7 +336,7 @@ fn principal() -> Result<(), String> {
             Origem::Tutorial(..) => "Tutorial Game".into(),
             Origem::NovoNaPartida(_, tipo) => format!("{tipo:?}"),
         };
-        let mut s = Sessao::abrir(&recursos, &o.dados, origem, cores)?;
+        let mut s = Sessao::abrir_na_tela(&recursos, &o.dados, origem, cores, o.tela_virtual)?;
         for &a in &o.acoes {
             s.partida.navegar(a);
         }
@@ -494,8 +501,9 @@ fn principal() -> Result<(), String> {
         return executar_partida(s, &format!("SimAnt - {nome}"), &o, jogo_novo, de_save);
     }
 
-    let seq: Sequencia = recursos.dados("telas.json")?;
-    let interface = Interface::carregar(&recursos, config.tabela_posicoes)?;
+    let mut seq: Sequencia = recursos.dados("telas.json")?;
+    tela_virtual.aplicar_sequencia(&mut seq);
+    let interface = Interface::carregar(&recursos, tela_virtual.tabela_posicoes)?;
     match &o.exportar {
         Some(dir) => exportar(&seq, &recursos, &interface, &cores, dir),
         None => Ok(()),

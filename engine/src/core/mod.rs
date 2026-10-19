@@ -29,6 +29,7 @@ pub mod quadro;
 pub mod quadros_animados;
 pub mod menu_ferramentas;
 pub mod quintal_mapa;
+pub mod resolucao;
 pub mod selecao;
 pub mod sobre;
 pub mod status;

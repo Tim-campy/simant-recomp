@@ -253,12 +253,12 @@ pub(crate) fn carregar<'a>(s: &Sessao<'a>, arquivo: &Path, o: &Opcoes) -> Result
         // _LoadGame com o nome do tutorial: não lê o arquivo, gera o tutorial (_SeedSRand pelo relógio).
         let semente = semente(&Opcoes { semente: None, ..o.clone() }) as u16;
         println!("Load: {} é o tutorial: _GenerateTutorial", arquivo.display());
-        let mut nova = Sessao::abrir(s.recursos, &o.dados, Origem::Tutorial(&s.partida.estado, semente), s.cores.clone())?;
+        let mut nova = Sessao::abrir_na_tela(s.recursos, &o.dados, Origem::Tutorial(&s.partida.estado, semente), s.cores.clone(), o.tela_virtual)?;
         nova.herdar_janelas(s);
         nova.herdar_opcoes(s, false);
         return Ok(nova);
     }
-    let mut nova = Sessao::abrir(s.recursos, &o.dados, Origem::Save(arquivo, r, tipo), s.cores.clone())?;
+    let mut nova = Sessao::abrir_na_tela(s.recursos, &o.dados, Origem::Save(arquivo, r, tipo), s.cores.clone(), o.tela_virtual)?;
     // As janelas da partida anterior ficam (o Load não as fecha); as opções vêm do arquivo.
     nova.herdar_janelas(s);
     nova.herdar_opcoes(s, true);

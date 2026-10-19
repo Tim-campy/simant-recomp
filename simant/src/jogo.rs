@@ -613,7 +613,7 @@ pub(crate) fn novo_jogo<'a>(s: &Sessao<'a>, e: engine::core::selecao::Escolha, o
     // _NewGame não ressemeia: o mundo sai do R da partida aberta (geracao-mundo.md §1; conferido no
     // vetor inseticida_morte/21, engine/tests/fim_de_jogo_interface.rs).
     println!("novo jogo {e:?} com R = {:#010x}", s.partida.estado.r.estado());
-    let mut nova = Sessao::abrir(s.recursos, &o.dados, Origem::NovoNaPartida(&s.partida.estado, tipo), s.cores.clone())?;
+    let mut nova = Sessao::abrir_na_tela(s.recursos, &o.dados, Origem::NovoNaPartida(&s.partida.estado, tipo), s.cores.clone(), o.tela_virtual)?;
     nova.herdar_janelas(s);
     nova.herdar_opcoes(s, false);
     Ok(nova)

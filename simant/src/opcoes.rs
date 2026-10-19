@@ -18,6 +18,10 @@ pub(crate) struct Opcoes {
     pub(crate) capturar_janela: Option<PathBuf>,
     /// Escala inteira da janela (`--escala`; 0 = a maior que cabe); vence `data/video.json`.
     pub(crate) escala: Option<u32>,
+    /// Tela virtual (`--resolucao LxA`: 640x480, 800x600 ou 1024x768); vence `data/video.json`.
+    pub(crate) resolucao: Option<(u32, u32)>,
+    /// Layout da tela virtual (data/resolucao.json), resolvido em `principal`.
+    pub(crate) tela_virtual: Option<engine::core::resolucao::TelaVirtual>,
     /// Tamanho inicial da janela (`--janela LxA`); vence `data/video.json`.
     pub(crate) janela: Option<(u32, u32)>,
     /// Opções de vídeo resolvidas (`data/video.json` + linha de comando), preenchidas em `principal`.
@@ -88,6 +92,8 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         sair_apos_ms: None,
         capturar_janela: None,
         escala: None,
+        resolucao: None,
+        tela_virtual: None,
         janela: None,
         video: video::ConfigVideo::default(),
         preferencias: None,
@@ -125,7 +131,8 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
             "--acoes" => o.acoes = ler_acoes(&valor()?)?,
             "--sair-apos-ms" => o.sair_apos_ms = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
             "--escala" => o.escala = Some(valor()?.parse().map_err(|_| format!("{a}: inteiro (0 = a maior que cabe)"))?),
-            "--janela" => o.janela = Some(video::ler_tamanho(&valor()?)?),
+            "--janela" => o.janela = Some(video::ler_tamanho("--janela", &valor()?)?),
+            "--resolucao" => o.resolucao = Some(video::ler_tamanho("--resolucao", &valor()?)?),
             "--preferencias" => o.preferencias = Some(valor()?.into()),
             "--sem-preferencias" => o.sem_preferencias = true,
             "--capturar-janela" => o.capturar_janela = Some(valor()?.into()),
