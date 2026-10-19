@@ -174,6 +174,12 @@ pub struct VisorAjuda {
     pub(crate) janela_historico: Option<JanelaHistorico>,
     /// Tópicos mostrados, do mais antigo ao mais recente (a lista do History).
     pub(crate) visitados: Vec<usize>,
+    /// Tamanho da tela imitada (largura, altura com as linhas acima da área cliente), para a posição
+    /// da janela History (`definir_tela`).
+    pub(crate) tela: Option<(i16, i16)>,
+    /// Posição guardada da janela History (`WIN.INI`, `[Windows Help] H_WindowPosition` =
+    /// `[x, y, largura, altura, maximizada]` em pixels da tela).
+    pub(crate) historico_guardado: Option<[i16; 4]>,
 }
 
 pub(crate) fn ret(e: i16, t: i16, d: i16, b: i16) -> Retangulo {
@@ -273,6 +279,8 @@ impl VisorAjuda {
             palavras,
             sobreposta: None,
             janela_historico: None,
+            tela: None,
+            historico_guardado: None,
             visitados: vec![indice],
         })
     }
@@ -367,6 +375,13 @@ impl VisorAjuda {
         if let Some(p) = self.cfg.posicao_padrao {
             self.cfg.externo = [largura / p.divisor_x.max(1), 0, largura - p.margem_direita, altura];
         }
+    }
+
+    /// A tela imitada (largura e altura inteiras, com o título e a barra de menus) e a posição da
+    /// janela History guardada no `WIN.INI`, se houver (telas/ajuda.md, "History").
+    pub fn definir_tela(&mut self, largura: i16, altura: i16, historico_guardado: Option<[i16; 4]>) {
+        self.tela = Some((largura, altura));
+        self.historico_guardado = historico_guardado;
     }
 
     pub fn externo(&self) -> Retangulo {

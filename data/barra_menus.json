@@ -93,9 +93,10 @@
     "objeto_continuar": "antEffContStr",
     "lista_continuar": 1010,
     "indice_continuar": 14,
-    "ajuste": [-3, 0],
-    "_moldura": "Moldura de diálogo do Windows dentro do contorno preto: 4 linhas na cor do título ativo (bancada n02 e n09).",
-    "moldura": {"cor": 16, "espessura": 4}
+    "ajuste": [0, 0],
+    "_moldura": "Moldura de diálogo do Windows dentro do contorno preto: 4 linhas na cor do título ativo (bancada n02 e n09). ajuste [0, 0] desde 2026-10-19: os -3 medidos antes eram o alinhamento ao byte da área cliente (150 + 5 -> 152), que a posição já aplica. cor_fundo_janela: o fundo branco da área cliente em volta do bitmap (3 pixels, n02).",
+    "moldura": {"cor": 16, "espessura": 4},
+    "cor_fundo_janela": 15
   },
   "sobre": {
     "_comentario": "File → About: _AboutDialog (1000:cf3a) pausa o jogo (_SetPause(1)), abre a janela 31 e alterna a figura (aboutPic2) com os créditos da lista 4/1700 na fonte 4, centrados, rolando um pixel por passo dentro de aboutPic2; depois da última linha, a figura volta. Um clique (ou Espaço/Insert) com a figura e até passos_para_fechar[0] passos só começa a rolagem; na rolagem, fecha depois de passos_para_fechar[1] passos. Ao fechar, a pausa volta a ser a de antes. Tempos medidos na bancada (n07–n12, m12–m15).",

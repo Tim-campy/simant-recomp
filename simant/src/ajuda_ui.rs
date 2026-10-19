@@ -27,6 +27,9 @@ pub struct AjudaUi {
     /// Visor de ajuda (core/ajuda.rs), carregado na primeira vez; `aberto` = na tela.
     pub visor: Option<VisorAjuda>,
     pub aberto: bool,
+    /// Posição guardada da janela History do WinHelp (`WIN.INI` do usuário, `[Windows Help]
+    /// H_WindowPosition`), lida ao abrir a partida.
+    pub historico_guardado: Option<[i16; 4]>,
     /// O visor recebe as teclas (foi aberto ou clicado por último), como a janela do WinHelp com o
     /// foco.
     pub foco: bool,
@@ -42,7 +45,7 @@ impl AjudaUi {
                 HashMap::new()
             }
         };
-        Ok(AjudaUi { cfg, modo: false, cursores, ultimo_contexto: None, visor: None, aberto: false, foco: false })
+        Ok(AjudaUi { cfg, modo: false, cursores, ultimo_contexto: None, visor: None, aberto: false, historico_guardado: None, foco: false })
     }
 }
 
@@ -54,6 +57,7 @@ pub fn abrir_contexto(s: &mut Sessao, ctx: u32) {
         match VisorAjuda::carregar(s.recursos, &s.cores) {
             Ok(mut v) => {
                 v.na_tela(s.tela.cfg.largura as i16, s.tela.cfg.altura as i16);
+                v.definir_tela(s.tela.cfg.largura as i16, s.tela.cfg.altura as i16 + s.interface.linhas_acima, s.ajuda.historico_guardado);
                 s.ajuda.visor = Some(v)
             }
             Err(e) => {

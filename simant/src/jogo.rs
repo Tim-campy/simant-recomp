@@ -130,6 +130,13 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
         },
         (arq, _) => arq.as_deref().map(preferencias::Preferencias::ler),
     };
+    // O WinHelp guarda no WIN.INI a posição da janela History (não é preferência do SimAnt: lida
+    // sempre que há um WIN.INI, nunca gravada).
+    if let Some(ini) = &o.win_ini {
+        if let Ok(bytes) = std::fs::read(ini) {
+            s.ajuda.historico_guardado = preferencias::posicao_historico_ajuda(&String::from_utf8_lossy(&bytes));
+        }
+    }
     if let Some(p) = &prefs {
         if !de_save {
             p.aplicar_opcoes(&mut s.partida.estado.partida.opcoes);

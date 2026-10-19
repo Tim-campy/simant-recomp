@@ -90,6 +90,8 @@
     },
     "historico": {
       "externo": [0, 158, 212, 317],
+      "divisor_tela": 3,
+      "topo_do_visor_na_tela": 2,
       "titulo": "Windows Help History",
       "maximo": 40
     },

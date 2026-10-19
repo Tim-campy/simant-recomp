@@ -101,6 +101,28 @@ fn visor() -> Option<(engine::core::ajuda::VisorAjuda, engine::core::telas::Inte
     Some((engine::core::ajuda::VisorAjuda::carregar(&r, &cores).unwrap(), interface))
 }
 
+/// Janela History do WinHelp (telas/ajuda.md, "History"): sem `H_WindowPosition`, um terço da tela
+/// (213, 160, 213 × 160 em 640×480: o lugar medido na bancada VGA, igual ao `externo` antigo); com a
+/// chave, o lugar guardado (bancada SVGA, `[100,50,300,250,0]` → 100, 50, 300 × 250). O visor do port
+/// começa na linha 0 da área cliente, 2 acima do WinHelp: a History sobe junto.
+#[test]
+fn janela_history_no_lugar_do_winhelp() {
+    use engine::formats::janela::Retangulo;
+    let Some((mut v, _)) = visor() else { return };
+    v.na_tela(640, 442);
+    assert_eq!(v.retangulo_historico(), Some(Retangulo { esq: 213, topo: 158, dir: 426, base: 318 }), "sem a tela, o externo antigo");
+    v.definir_tela(640, 480, None);
+    assert_eq!(v.retangulo_historico(), Some(Retangulo { esq: 213, topo: 158, dir: 426, base: 318 }));
+    v.definir_tela(640, 480, Some([100, 50, 300, 250]));
+    assert_eq!(v.retangulo_historico(), Some(Retangulo { esq: 100, topo: 48, dir: 400, base: 298 }));
+    // A chave da instalação do usuário (de uma sessão em 800×600) é o próprio lugar padrão de lá.
+    v.na_tela(800, 562);
+    v.definir_tela(800, 600, None);
+    let padrao = v.retangulo_historico();
+    v.definir_tela(800, 600, Some([266, 200, 266, 200]));
+    assert_eq!(v.retangulo_historico(), padrao);
+}
+
 /// Cliques no visor como no WinHelp do original (posições do port: janela de y 0 a 441, 2 linhas
 /// acima da janela do original em a04): salto, Back, Contents, Esc, clique fora.
 #[test]
