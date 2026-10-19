@@ -1095,6 +1095,8 @@ impl Partida {
     pub fn ao_carregar(&mut self) {
         // _LoadGame: _TimeTemp = 300 (fora do save; os geradores já vêm de carregar::geradores_depois_do_load).
         self.regras.memoria_tutor.tempo_limite = super::carregar::TEMPO_TUTOR_DEPOIS_DO_LOAD;
+        // O `_RandYard` de antes da leitura chama `_InitSimYard`: `_LastColonyPopR` = 1 (fora do save).
+        self.estado.ultimas_colonias_vermelhas = Some(1);
         self.vistas_para_estado();
         self.estado.contar_formigas();
         self.tratar_eventos();

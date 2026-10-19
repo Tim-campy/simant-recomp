@@ -39,7 +39,7 @@ Todas no save, exceto as marcadas. Endereços do `.SYM`; campos do port em `rule
 | `_YMapPopB/R` | `8:00a4`, `8:0164` | população de cada colônia do quintal (0 = nenhuma; teto 250) |
 | `_SwarmCntB/R`, `_QueenStorageB/R`, `_SwarmDelayB/R` | `9:807a`, `9:9c26`, `10:ac8c`, `10:ac8e`, `9:99e6`, `9:9b30` | revoada: tamanho, rainhas guardadas, atraso |
 | `_ColonyTotalBlack/Red`, `_HouseColonies`, `_ColonyUpdateFlag` | `10:ac90`, `10:ac92`, `9:9b22`, — | contagens da última passada |
-| `_LastColonyPopB/R` | `9:72c0`, `9:8118` | **fora do save**: `_ColonyTotal*` da passada anterior |
+| `_LastColonyPopB/R` | `9:72c0`, `9:8118` | **fora do save**: 1 depois de `_InitSimYard`; depois, `_ColonyTotal*` da passada anterior **do Jogo Completo** (só esse ramo grava) [código, `_SimColonies`] |
 | `_gameCycles` | `9:9b2c` | **fora do save**: voltas do laço do temporizador (relógio do pássaro) |
 | `_MigrateX/Y` | — | **fora do save**: origem de uma migração (seção 10.4) |
 
@@ -474,5 +474,5 @@ Casos no original (bancada QEMU): Q-01 (chuva e água) e Q-02 (colônias), ambos
 - `_YellowDeath` (causas 5 pisada, 6 cortador, 9 inseticida) chama `matar_amarela` de `rules/amarela.rs` (teste `pisada_mata_a_amarela`). A causa 9 (inseticida) foi conferida contra o original pelo vetor `ticks/inseticida_morte` (tick 21: morte sem corpo e fim de jogo); as causas 5 e 6 não.
 - `_DeadAntHere`, `_FindInAList` e `_KillSpider` são os de `engine/src/rules/comum.rs` (ver [../../decisoes.md](../../decisoes.md), "Módulo comum das regras"); a agonia da aranha vem de `inimigos.json` (`regras.aranha_agonia`), não mais de uma constante do quintal.
 - Textos do balão do menino (lista 4/1200) e dos sons: não conferidos.
-- `_LastColonyPop*` não está no save nem no `Estado`: o port usa o `_ColonyTotal*` da passada anterior, que é o mesmo valor exceto logo depois de `_InitSimYard` (1 no original).
+- `_LastColonyPopR` (fora do save) fica em `Estado::ultimas_colonias_vermelhas` desde 2026-10-19: `Some(1)` em `iniciar_quintal` (`_InitSimYard`) e no Load (`Partida::ao_carregar`, porque o `_RandYard` de antes da leitura chama `_InitSimYard`), gravado só no ramo do Jogo Completo. `None` (estado de um vetor, lido no meio da partida) = o `_ColonyTotalRed` de antes da passada, a aproximação anterior. Efeito visível: no Load de um Jogo Completo já sem vermelhas, a primeira passada mostra a 10052 (e a 10055) de novo, como o original [visto no código; não testado na bancada]. Teste `ultima_populacao_vermelha_comeca_em_1`. `_LastColonyPopB` não é lido.
 - Taxa do relógio do Mac por tick (`mac_por_tick`): na bancada QEMU (TCG lento) são 9 por tick; em máquina real depende de quantos ms cada tick leva (o relógio é tempo real, ver "Relógios") — não medida fora da bancada.
