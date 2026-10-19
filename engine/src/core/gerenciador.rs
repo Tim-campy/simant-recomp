@@ -1032,6 +1032,10 @@ impl Gerenciador {
             _ => {}
         }
         if let Some(m) = self.menu {
+            // A caixa do menu de sistema fica invertida com o menu aberto (w04).
+            if let Some(c) = self.janela(m.id).and_then(|j| j.geometria().caixa_menu) {
+                inverter(q, c);
+            }
             self.desenhar_menu(q, &m, fonte);
         }
     }
@@ -1055,10 +1059,11 @@ impl Gerenciador {
             if realcado {
                 q.preencher(faixa, fundo, fundo);
             }
-            let frente = if !self.habilitado(m.id, it.comando) {
-                c.cor_desabilitado
-            } else if realcado {
+            let habilitado = self.habilitado(m.id, it.comando);
+            let frente = if realcado {
                 c.cor_texto_realce
+            } else if !habilitado {
+                c.cor_desabilitado
             } else {
                 c.cor_texto
             };
@@ -1066,10 +1071,12 @@ impl Gerenciador {
             let antes = q.recorte.replace(faixa);
             let y0 = topo + c.topo_texto;
             // Win 3.1: o texto do item alinhado à esquerda na margem e o do atalho (depois do tab)
-            // alinhado à esquerda numa coluna comum [medido em w04].
-            texto_a_esquerda(q, f, &it.texto, r.esq + c.margem_texto, y0, frente, fundo);
+            // alinhado à esquerda numa coluna comum [medido em w04]. Acinzentado e realçado: o
+            // `GrayString` (pixels alternados na cor do texto realçado; w04 e s04).
+            let escrever = if realcado && !habilitado { texto_acinzentado } else { texto_a_esquerda };
+            escrever(q, f, &it.texto, r.esq + c.margem_texto, y0, frente, fundo);
             if !it.atalho.is_empty() {
-                texto_a_esquerda(q, f, &it.atalho, r.esq + c.coluna_atalho, y0, frente, fundo);
+                escrever(q, f, &it.atalho, r.esq + c.coluna_atalho, y0, frente, fundo);
             }
             q.recorte = antes;
         }
@@ -1091,6 +1098,43 @@ pub(crate) fn texto_a_esquerda(q: &mut Quadro, f: &Fonte, texto: &str, x: i16, t
         let yb = i32::from(topo) + f.ascendente() as i32 + 1;
         let x0 = i32::from(x) + antes;
         q.linha(x0, yb, x0 + lw - 1, yb, frente);
+    }
+}
+
+/// Inverte as cores do retângulo (`DSTINVERT` no VGA de 16 cores: o índice complementar).
+pub fn inverter(q: &mut Quadro, r: Retangulo) {
+    for y in r.topo.max(0)..r.base {
+        for x in r.esq.max(0)..r.dir {
+            if (x as usize) < q.largura {
+                let i = y as usize * q.largura + x as usize;
+                if let Some(p) = q.pixels.get_mut(i) {
+                    *p = super::moldura_principal::complementar(*p);
+                }
+            }
+        }
+    }
+}
+
+/// Texto acinzentado num item realçado: o `GrayString` do Windows 3.1 desenha só os pixels do glifo
+/// (e do sublinhado) com x + y par, na cor `frente`; os outros ficam no fundo [medido em s04, no menu
+/// de sistema da janela principal, e em w04, no Restore das janelas filhas].
+pub(crate) fn texto_acinzentado(q: &mut Quadro, f: &Fonte, texto: &str, x: i16, topo: i16, frente: u8, fundo: u8) {
+    // Marca os pixels do texto com uma cor fora da paleta e depois troca pelo padrão.
+    const MARCA: u8 = 254;
+    texto_a_esquerda(q, f, texto, x, topo, MARCA, fundo);
+    let bytes: Vec<u8> = texto.bytes().filter(|&b| b != b'&').collect();
+    let w = f.largura_texto(&bytes) as i32;
+    let h = f.altura() as i32 + 2;
+    for y in i32::from(topo)..i32::from(topo) + h {
+        for xx in i32::from(x)..i32::from(x) + w {
+            if xx < 0 || y < 0 || xx as usize >= q.largura {
+                continue;
+            }
+            let i = y as usize * q.largura + xx as usize;
+            if q.pixels.get(i) == Some(&MARCA) {
+                q.pixels[i] = if (xx + y) % 2 == 0 { frente } else { fundo };
+            }
+        }
     }
 }
 

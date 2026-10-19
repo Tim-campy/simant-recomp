@@ -2,6 +2,19 @@
 
 Formato: data, decisão, motivo, alternativas descartadas.
 
+## 2026-10-19: Barra de título do Windows 3.1 opcional (`moldura_windows31`), desligada por padrão
+
+- **Decisão:** o port desenha a barra de título e o menu de sistema da janela principal do Windows 3.1 (medidos na bancada, 100% contra as capturas; `telas/menus.md` §8) só com `data/video.json` → `moldura_windows31` = `true` (ou `--moldura`). O padrão é `false`. Com ela: Minimize minimiza a janela do sistema, Close (e o duplo clique na caixa) faz a pergunta do Quit como o `SC_CLOSE` do original, Restore restaura a janela do sistema só se ela estiver maximizada, Switch To… não faz nada; o título fica inativo sem o foco, com um diálogo do Windows aberto ou com o visor da ajuda em foco.
+- **Motivo:** o original roda maximizado e a barra faz parte da tela dele, mas no port a janela do sistema atual já tem título, minimizar e fechar: duas barras de título seguidas gastam 19 linhas e confundem quem joga. Para quem quer a tela do original inteira (comparar com capturas, tela cheia, escala grande), a opção dá 640 × 480 exatos e o percurso das setas pela caixa (← no File, → no Speed).
+- **Descartado:** desenhar sempre (redundante com a moldura do sistema); janela sem moldura do sistema com só a barra do Win 3.1 (perde arrastar e redimensionar pelo sistema atual); Switch To abrindo outra coisa (não há Task List equivalente que faça sentido).
+- **Impacto nos mods:** API 0.33: `moldura_windows31` em `video.json` e o arquivo novo `moldura_principal.json`, ambos opcionais e mesclados por chave.
+
+## 2026-10-19: Sem foco, o ritmo da simulação é o mesmo
+
+- **Decisão:** `data/partida.json` → `intervalo_sem_foco_ms` = 17 (era 170, o valor do código, que o port arredondava para 220 ms por mensagem).
+- **Motivo:** medido na bancada: 61 ticks em 10 s com a janela ativa, com a Task List do Windows na frente e minimizada (`regras/simulacao-visao-geral.md` §1). O original é o oráculo; o mecanismo que anula os 170 ms do código não foi achado.
+- **Descartado:** manter os 170 ms do pseudocódigo (o port ficava ~4 vezes mais lento sem foco).
+
 ## 2026-10-19: Caminho FM: sintetizador OPL próprio e banco GM próprio, padrão das músicas
 
 - **Decisão:** o port ganha um terceiro sintetizador, `"fm"` (`simant/src/som/fm.rs`), escolhido por `data/som.json` → `sintetizador` (ou `--sintetizador`), e ele passa a ser o padrão. É uma implementação própria em Rust de um sintetizador no estilo do OPL2/OPL3 (2 operadores, os campos e as tabelas de tempo do chip, 8 formas de onda, realimentação, LFO; não ciclo a ciclo), com um driver MIDI próprio (18 vozes) e um banco GM próprio (`data/opl_banco.json`, gerado por `tools/gerar_banco_opl.py`, licença do projeto). Um banco `.op2` do usuário pode ser lido em tempo de execução (`fm.banco_op2`), sem ir para o repositório. O `ganho` do banco foi calibrado para a música ficar, em relação aos efeitos, onde a captura do original mostrou (−20 dB de um efeito de ganho 1). `--exportar-som` passa a gravar as músicas com `volume_musica`.

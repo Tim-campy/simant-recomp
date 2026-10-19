@@ -23,6 +23,18 @@ pub struct Retangulo {
     pub base: i16,
 }
 
+impl Retangulo {
+    /// O retângulo de um objeto como o original o guarda depois de `_win_Recalc` (`1030:e6e2`): a
+    /// direita e a base 1 pixel para dentro (as coordenadas viram inclusivas). É o que bate com todas
+    /// as medições que usam o retângulo de um objeto (texto da faixa e do fim de jogo, triângulo e
+    /// níveis das janelas de controle, barras da faixa, Status, as 25 colunas da edição): o +1 que
+    /// `_win_GetObjRect`, `_win_PrintfAtObj` e `_win_DrawHBar` somam com a faixa não aparece em
+    /// nenhuma delas [causa do +1 ausente em aberto]. docs/spec/formatos/janela.md, "Cálculo do layout".
+    pub fn do_recalc(self) -> Retangulo {
+        Retangulo { dir: self.dir - 1, base: self.base - 1, ..self }
+    }
+}
+
 /// Tipo de objeto, conforme o switch de `_win_DrawObjectI`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Conteudo {

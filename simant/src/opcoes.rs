@@ -24,6 +24,8 @@ pub(crate) struct Opcoes {
     pub(crate) tela_virtual: Option<engine::core::resolucao::TelaVirtual>,
     /// Tamanho inicial da janela (`--janela LxA`); vence `data/video.json`.
     pub(crate) janela: Option<(u32, u32)>,
+    /// Barra de título do Windows 3.1 (`--moldura` liga, `--sem-moldura` desliga); vence `data/video.json`.
+    pub(crate) moldura: Option<bool>,
     /// Opções de vídeo resolvidas (`data/video.json` + linha de comando), preenchidas em `principal`.
     pub(crate) video: video::ConfigVideo,
     /// Arquivo de preferências do jogador (`--preferencias ARQ`; padrão: a pasta de dados do usuário,
@@ -98,6 +100,7 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         resolucao: None,
         tela_virtual: None,
         janela: None,
+        moldura: None,
         video: video::ConfigVideo::default(),
         preferencias: None,
         sem_preferencias: false,
@@ -137,6 +140,8 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
             "--escala" => o.escala = Some(valor()?.parse().map_err(|_| format!("{a}: inteiro (0 = a maior que cabe)"))?),
             "--janela" => o.janela = Some(video::ler_tamanho("--janela", &valor()?)?),
             "--resolucao" => o.resolucao = Some(video::ler_tamanho("--resolucao", &valor()?)?),
+            "--moldura" => o.moldura = Some(true),
+            "--sem-moldura" => o.moldura = Some(false),
             "--preferencias" => o.preferencias = Some(valor()?.into()),
             "--sem-preferencias" => o.sem_preferencias = true,
             "--win-ini" => o.win_ini = Some(valor()?.into()),

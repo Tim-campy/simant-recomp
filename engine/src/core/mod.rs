@@ -22,6 +22,7 @@ pub mod mapa;
 pub mod menus;
 pub mod menus_mods;
 pub mod mini_mapa;
+pub mod moldura_principal;
 pub mod navegacao;
 pub mod partida;
 pub mod popup_castas;

@@ -1,0 +1,23 @@
+{
+  "_comentario": "Barra de título e menu de sistema da janela principal do Windows 3.1 (a janela do SimAnt abre maximizada: _InitInstance chama ShowWindow com SW_SHOWMAXIMIZED; a moldura fica fora da tela e sobram o título, linhas 0-17 mais a linha preta 18, e a barra de menus, 19-37). Só é desenhada com data/video.json -> moldura_windows31 = true (o padrão do port é false: a janela do sistema atual já tem título). Medido na bancada VGA (re_trabalho/agente_menus/m00 e m05b; re_trabalho/moldura/s00-s16, roteiro tests/referencias/roteiros/qemu_ui_moldura_principal.txt). Ver docs/spec/telas/menus.md §8 e engine/src/core/moldura_principal.rs.",
+  "texto": "SimAnt",
+  "altura": 18,
+  "lado_botao": 18,
+  "fontes": [6, 0],
+  "_cores": "Índices de data/paleta.json: título ativo nas cores do sistema (16 = COLOR_ACTIVECAPTION, 18 = COLOR_CAPTIONTEXT); inativo branco com texto preto (com a pergunta do Quit ou a Task List por cima, s12 e s14); botões cinza-claro (8) com relevo branco (15) e cinza-escuro (7); glifos e linhas pretos.",
+  "cores": {"ativo": [16, 18], "inativo": [15, 0], "linha": 0, "botao": 8, "claro": 15, "escuro": 7, "glifo": 0},
+  "_glifo_apertado": "Com o botão apertado, o Windows desenha só a linha escura em cima e à esquerda e o glifo 1 pixel à direita e 2 abaixo (s08, s10).",
+  "glifo_apertado": [1, 2],
+  "_itens": "Menu de sistema padrão do Windows 3.1 para uma janela maximizada (o SimAnt não mexe no da janela principal; _win_Open só troca o das janelas filhas): Move, Size e Maximize acinzentados (m05b, s01). Os comandos: restaurar (no port, restaura a janela do sistema se estiver maximizada), minimizar (minimiza a janela do sistema), fechar (SC_CLOSE: MAINWNDPROC chama _MenuQuit, a pergunta do Quit, s12), alternar (Switch To: a Task List do Windows; no port, nada). Geometria e cores do menu: as da barra de menus (barra_menus.json), com o contorno de cima na linha preta do título e a esquerda em x = 0.",
+  "itens": [
+    {"texto": "&Restore", "comando": "restaurar"},
+    {"texto": "&Move", "comando": "mover", "habilitado": false},
+    {"texto": "&Size", "comando": "tamanho", "habilitado": false},
+    {"texto": "Mi&nimize", "comando": "minimizar"},
+    {"texto": "Ma&ximize", "comando": "maximizar", "habilitado": false},
+    {"texto": null},
+    {"texto": "&Close\tAlt+F4", "comando": "fechar"},
+    {"texto": null},
+    {"texto": "S&witch To...\tCtrl+Esc", "comando": "alternar"}
+  ]
+}

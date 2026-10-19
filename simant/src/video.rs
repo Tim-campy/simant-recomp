@@ -30,6 +30,11 @@ pub struct ConfigVideo {
     /// `false`, ocupa o maior retângulo com a proporção do jogo (pixels de tamanhos desiguais).
     #[serde(default = "verdadeiro")]
     pub escala_inteira: bool,
+    /// Desenha a barra de título e o menu de sistema da janela principal do Windows 3.1 em cima da
+    /// barra de menus (a janela do port fica com a altura toda da tela imitada). Padrão `false`: a
+    /// janela do sistema atual já tem título (docs/decisoes.md, 2026-10-19).
+    #[serde(default)]
+    pub moldura_windows31: bool,
 }
 
 fn resolucao_padrao() -> [u32; 2] {
@@ -46,7 +51,7 @@ fn verdadeiro() -> bool {
 
 impl Default for ConfigVideo {
     fn default() -> Self {
-        ConfigVideo { resolucao_virtual: resolucao_padrao(), escala: 1, janela: None, redimensionavel: true, escala_inteira: true }
+        ConfigVideo { resolucao_virtual: resolucao_padrao(), escala: 1, janela: None, redimensionavel: true, escala_inteira: true, moldura_windows31: false }
     }
 }
 
@@ -120,7 +125,7 @@ mod testes {
     #[test]
     fn linha_de_comando_vence_o_arquivo() {
         let arq: ConfigVideo = serde_json::from_str(r#"{"escala": 3, "janela": [900, 700]}"#).unwrap();
-        assert!(arq.redimensionavel && arq.escala_inteira, "chaves ausentes ficam no padrão");
+        assert!(arq.redimensionavel && arq.escala_inteira && !arq.moldura_windows31, "chaves ausentes ficam no padrão");
         assert_eq!(arq.resolucao_virtual, [640, 480], "tela virtual padrão");
         let c = arq.clone().com_linha_de_comando(None, Some(2), None);
         assert_eq!(c.tamanho_inicial(640, 480, None), (2, (1280, 960)));

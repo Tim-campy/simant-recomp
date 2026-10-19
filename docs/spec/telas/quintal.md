@@ -66,7 +66,7 @@ Sprites com fundo transparente (índice 13, magenta, em todos os bitmaps abaixo)
 
 | Bicho | Quando | Bitmap | Posição |
 |---|---|---|---|
-| gato | `_CatOn ≠ 0` (modos 0 e 1) | 1300 + `_CatFrame` (1300–1305 andando, 1310–1312 sentado, 1320–1329 fugindo) | (`_CatX`, `_CatY`) + desl. por quadro (quadros ≥ 10); na bancada os quadros 0–12 aparecem 1 pixel abaixo da conta [medido, causa em aberto; `ajuste_medido`] |
+| gato | `_CatOn ≠ 0` (modos 0 e 1) | 1300 + `_CatFrame` (1300–1305 andando, 1310–1312 sentado, 1320–1329 fugindo) | (`_CatX`, `_CatY`) + desl. por quadro (quadros ≥ 10); na bancada os quadros 0–12 aparecem 1 pixel abaixo da conta [medido, causa em aberto; `ajuste_medido`; descartados em 2026-10-19: o cabeçalho dos bitmaps, as tabelas de deslocamento, a largura e a paridade da altura (divergencias.md)] |
 | cachorro | `_ForSaleState = 0` | 8500 + `_DogFrame` | (`_DogX`, `_DogY`) + desl. por quadro |
 | menino | `_BoyFrame` ≥ 0 e não (modo 0 e `_BoyHere = 0`) | 8000 + `_BoyFrame`, **qualquer** quadro ≥ 0: inclusive 200 (poltrona, nó 32), 201 (geladeira, nó 34) e 900–903 (porta, nós 20/21) | (`_BoyX`, `_BoyY`) + desl. por quadro; sem deslocamento a partir de 200 (`_DrawSimKid` `1010:af14`) |
 | cortador (`_DrawMower`) | parado: sempre que o menino não está com ele | 8800 | (98, 181) |
