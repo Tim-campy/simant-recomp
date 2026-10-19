@@ -190,10 +190,33 @@ pub struct TabelasAmarela {
     /// Bitmap do `_YellowDialog` da trofalaxia (`_EatMyFood(1)`, 0x2396). Opcional (API 0.22).
     #[serde(default = "imagem_trofalaxia_padrao")]
     pub imagem_trofalaxia: u16,
+    /// Quadros de `_YellowDeath` e `_YellowBirth` (`_YellowDialog` 9100/9101, `_SpiderDialog`).
+    /// Opcional (API 0.23); o padrão é o do original.
+    #[serde(default)]
+    pub quadros: QuadrosAmarela,
 }
 
 fn imagem_trofalaxia_padrao() -> u16 {
     9110
+}
+
+/// Quadros da morte e do renascimento (`telas/mensagens.md` §10–11).
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
+pub struct QuadrosAmarela {
+    /// `_YellowDialog(0x238c, 0)` depois da morte pela aranha ou pela formiga-leão.
+    pub morte: u16,
+    /// `_YellowDialog(0x238d, param + 1)` no fim de `_YellowBirth`: índice 1 ao renascer de um ovo,
+    /// 2 ao fundar uma colônia.
+    pub renascer: u16,
+    /// Textos do quadro de `_SpiderDialog` (`0x2740 − (S1(2) == 0)`): sorteio 0 → o primeiro.
+    pub textos_aranha: [u16; 2],
+}
+
+impl Default for QuadrosAmarela {
+    fn default() -> QuadrosAmarela {
+        QuadrosAmarela { morte: 9100, renascer: 9101, textos_aranha: [10047, 10048] }
+    }
 }
 
 /// Ids dos efeitos sonoros (objetos tipo 5 do banco SOUND, `_myBeginSound`) pedidos por esta parte
@@ -1230,7 +1253,7 @@ fn comer(e: &mut Estado, t: &TabelasAmarela, tipo: i32) {
     }
     if tipo == 1 {
         // `_YellowDialog(9110)` da trofalaxia: quadro com imagem (a interface confere Events).
-        e.eventos.push(Evento::QuadroAmarela(t.imagem_trofalaxia));
+        e.eventos.push(Evento::QuadroAmarela { imagem: t.imagem_trofalaxia, indice: -1 });
     }
     let vida = e.amarela.saude as i32;
     let pop = e.preta.populacao as i32;
@@ -1813,11 +1836,21 @@ pub fn matar_amarela(e: &mut Estado, t: &TabelasAmarela, causa: CausaMorte) {
             morta_em_luta = false;
         }
         CausaMorte::Aranha | CausaMorte::FormigaLeao => {
-            // Quadro da aranha/formiga-leão: interface.
+            // `_SpiderDialog`/`_LionDialog` só com Events; o da aranha sorteia o texto (S1(2)).
+            if eventos {
+                if causa == CausaMorte::Aranha {
+                    let r = e.s.rand1(2);
+                    e.eventos.push(Evento::QuadroAranha(t.quadros.textos_aranha[usize::from(r != 0)]));
+                } else {
+                    e.eventos.push(Evento::QuadroFormigaLeao);
+                }
+            }
             e.preta.comidas_por_predadores = e.preta.comidas_por_predadores.wrapping_add(1);
             musica(e);
             let a = e.amarela.clone();
             animar_luta(e, t, a.plano as i32, a.x as i32, a.y as i32, a.dir as i32, a.tipo as i32, codigo);
+            // `_YellowDialog(0x238c, 0)` (a interface confere Events, como `_YellowDialog`).
+            e.eventos.push(Evento::QuadroAmarela { imagem: t.quadros.morte, indice: 0 });
             morta_em_luta = false;
         }
         CausaMorte::Cercada => {
@@ -1966,6 +1999,8 @@ fn nascer_de_ovo(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32,
     marcar_amarela(e, t, plano, x, y, tipo, dir, MARCA_AMARELA);
     e.pedir_som(t.sons.nascimento);
     e.eventos.push(Evento::Musica(t.musicas.renascer));
+    // `_YellowDialog(0x238d, 1)`: "You have been reborn!".
+    e.eventos.push(Evento::QuadroAmarela { imagem: t.quadros.renascer, indice: 1 });
 }
 
 /// `_YellowBirth` desliga os efeitos sonoros (`_OptionStates[2]` = 0) até pôr o ovo: os `Evento::Som`
@@ -2017,6 +2052,8 @@ fn fundar_colonia(e: &mut Estado, t: &TabelasAmarela, ox: i32, oy: i32) {
     c.populacao += 1;
     e.pedir_som(t.sons.nascimento);
     e.eventos.push(Evento::Musica(t.musicas.fundar_fim));
+    // `_YellowDialog(0x238d, 2)`: "You are now a worker!".
+    e.eventos.push(Evento::QuadroAmarela { imagem: t.quadros.renascer, indice: 2 });
 }
 
 /// `_SetMyLife(_MePlane, _MeLoc, tipo, _MeDir, 0xFF)`.

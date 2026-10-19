@@ -21,6 +21,7 @@ use serde::Deserialize;
 
 use super::avisos::{Avisos, ConfigAvisos, Modal};
 use super::navegacao::{Acao, Evento as EventoTecla, Navegacao};
+use super::quadros_animados::TipoAnimado;
 use crate::rules::amarela::{
     clicar_no_mapa, comando, tecla_de_comando, ControleJogador, Modificadores, RespostaClique, RespostaTecla,
     TabelasAmarela,
@@ -297,6 +298,9 @@ pub struct Partida {
     /// (`bloqueio_ms`) e a janela de edição mostra o quadro da vez (`quadro_animado`).
     animacoes: Vec<AnimacaoDaAmarela>,
     animacao_inicio_ms: u64,
+    /// Avisos modais pedidos antes da animação no mesmo tick (o quadro da aranha ou da formiga-leão
+    /// vem antes de `_AnimYellowFight`): a animação só começa quando eles fecham.
+    modais_antes_da_animacao: usize,
     /// Quadro mostrado no último redesenho (animação, quadro), para só redesenhar quando muda.
     quadro_mostrado: Option<(usize, usize)>,
     /// Rodando os ticks pedidos pelos mods de uma vez: as animações não param nada.
@@ -354,6 +358,7 @@ impl Partida {
             ticks_de_mods: 0,
             animacoes: Vec::new(),
             animacao_inicio_ms: 0,
+            modais_antes_da_animacao: 0,
             quadro_mostrado: None,
             avanco_rapido: false,
         };
@@ -413,13 +418,18 @@ impl Partida {
             return Avanco::default();
         }
         let sobreposta = self.avisos.sobreposta_visivel();
+        let animado = self.avisos.animado().cloned();
         if self.avisos.passar_tempo(self.agora()).is_some() {
             self.redesenhar = true;
+            self.modal_fechado();
             self.depois_de_fechar();
         }
-        self.redesenhar |= sobreposta != self.avisos.sobreposta_visivel();
-        for id in self.avisos.retirar_sons() {
-            self.eventos.push_back(Evento::Som(id));
+        self.redesenhar |= sobreposta != self.avisos.sobreposta_visivel() || animado.as_ref() != self.avisos.animado();
+        let pedidos = self.avisos.retirar_pedidos();
+        self.eventos.extend(pedidos);
+        if self.animando() {
+            // Fecharam os quadros que vinham antes da animação: ela começa agora.
+            return Avanco::default();
         }
         if self.avisos.tem_modal() || self.escolher_colonia || self.parada_pela_interface {
             self.resto_ms = 0;
@@ -571,12 +581,45 @@ impl Partida {
         Some((a.plano, &a.quadros[q]))
     }
 
-    /// Há uma animação da amarela em andamento (a simulação está parada por ela).
+    /// Há uma animação da amarela em andamento (a simulação está parada por ela). Uma animação que
+    /// espera os quadros pedidos antes dela ainda não conta.
     pub fn animando(&self) -> bool {
-        !self.animacoes.is_empty()
+        !self.animacoes.is_empty() && self.modais_antes_da_animacao == 0
+    }
+
+    /// Um aviso modal fechou: se a animação esperava por ele, e era o último, ela começa.
+    fn modal_fechado(&mut self) {
+        if self.modais_antes_da_animacao == 0 {
+            return;
+        }
+        self.modais_antes_da_animacao -= 1;
+        if self.modais_antes_da_animacao == 0 && !self.animacoes.is_empty() {
+            self.animacao_inicio_ms = self.ms_total;
+            self.bloqueio_ms += self.animacoes.iter().map(|a| a.duracao_ms()).sum::<u64>();
+            self.quadro_mostrado = None;
+            self.redesenhar = true;
+        }
+    }
+
+    /// Clique ou tecla com um quadro animado na frente (`_SpiderDialog`, `_LionDialog`,
+    /// `_DrawSimPayoff`): encerra a espera da vez. Devolve o aviso, se fechou.
+    pub fn pular_modal(&mut self) -> Option<Modal> {
+        self.redesenhar = true;
+        let agora = self.agora();
+        let m = self.avisos.pular_animado(agora);
+        let pedidos = self.avisos.retirar_pedidos();
+        self.eventos.extend(pedidos);
+        if m.is_some() {
+            self.modal_fechado();
+            self.depois_de_fechar();
+        }
+        m
     }
 
     fn indice_do_quadro(&self) -> Option<(usize, usize)> {
+        if self.modais_antes_da_animacao > 0 {
+            return None;
+        }
         let mut t = self.ms_total.saturating_sub(self.animacao_inicio_ms);
         for (k, a) in self.animacoes.iter().enumerate() {
             let d = a.duracao_ms();
@@ -696,11 +739,26 @@ impl Partida {
                     self.escolher_colonia = true;
                     self.eventos.push_back(ev);
                 }
-                Evento::QuadroAmarela(imagem) => {
+                Evento::QuadroAmarela { imagem, indice } => {
                     // _YellowDialog: só com Options → Events (_OptionStates[3]).
                     if self.estado.partida.opcoes[3] != 0 {
-                        self.avisos.receber_quadro_amarela(imagem);
+                        self.avisos.receber_quadro_amarela(imagem, indice);
                     }
+                    self.eventos.push_back(ev);
+                }
+                Evento::QuadroAranha(texto) => {
+                    // O tick só pede com Events ligado (e já sorteou o texto).
+                    self.avisos.receber_animado(TipoAnimado::Aranha, Some(texto));
+                    self.eventos.push_back(ev);
+                }
+                Evento::QuadroFormigaLeao => {
+                    self.avisos.receber_animado(TipoAnimado::FormigaLeao, None);
+                    self.eventos.push_back(ev);
+                }
+                Evento::AnimacaoVitoria => {
+                    // _DrawSimPayoff: a interface traz o quintal para a frente (_MapToYard, modo 0,
+                    // plano 0) e a janela 26 vem por cima.
+                    self.avisos.receber_animado(TipoAnimado::Vitoria, None);
                     self.eventos.push_back(ev);
                 }
                 Evento::Mensagem(id) => {
@@ -712,8 +770,13 @@ impl Partida {
                     if !self.avanco_rapido && !a.quadros.is_empty() {
                         if self.animacoes.is_empty() {
                             self.animacao_inicio_ms = self.ms_total;
+                            // Os quadros pedidos antes, no mesmo tick (aranha, formiga-leão), vêm
+                            // primeiro: a animação espera eles fecharem.
+                            self.modais_antes_da_animacao = self.avisos.modais_na_fila();
                         }
-                        self.bloqueio_ms += a.duracao_ms();
+                        if self.modais_antes_da_animacao == 0 {
+                            self.bloqueio_ms += a.duracao_ms();
+                        }
                         self.animacoes.push(*a);
                         self.quadro_mostrado = None;
                         self.redesenhar = true;
@@ -915,6 +978,9 @@ impl Partida {
     pub fn fechar_modal(&mut self) -> Option<Modal> {
         self.redesenhar = true;
         let m = self.avisos.fechar_modal();
+        if m.is_some() {
+            self.modal_fechado();
+        }
         self.depois_de_fechar();
         m
     }
@@ -1366,6 +1432,38 @@ mod testes {
         assert!(!p.animando());
         assert_eq!(p.estado.partida.tempo, t0);
         assert!(p.avancar(2000).ticks > 0, "a simulação volta");
+    }
+
+    #[test]
+    fn quadro_da_aranha_vem_antes_da_luta_e_a_morte_depois() {
+        // _YellowDeath(1) com Events: _SpiderDialog (animação e texto), _AnimYellowFight e
+        // _YellowDialog(9100), nessa ordem; a luta espera os dois quadros da aranha fecharem.
+        let mut p = partida(1);
+        p.estado.partida.opcoes[3] = 1;
+        let q = crate::rules::estado::QuadroAnimacao { mapa: vec![0; 4096], vida: vec![0; 4096], x: 5, y: 6, tipo: 0x70, dir: 0, ovo: 0, base: 0 };
+        let a = AnimacaoDaAmarela { codigo: 1, plano: 1, espera_ms: 165, quadros: vec![q.clone(), q] };
+        p.estado.eventos.push(Evento::QuadroAranha(10047));
+        p.estado.eventos.push(Evento::Animacao(Box::new(a)));
+        p.estado.eventos.push(Evento::QuadroAmarela { imagem: 9100, indice: 0 });
+        p.processar_eventos_do_estado();
+        assert_eq!(p.avisos.modal(), Some(&Modal::Animado(TipoAnimado::Aranha)));
+        assert!(!p.animando(), "a luta espera");
+        p.avancar(55);
+        assert!(p.retirar_eventos().contains(&Evento::Som(45)), "som do início da aranha");
+        assert_eq!(p.pular_modal(), Some(Modal::Animado(TipoAnimado::Aranha)));
+        assert!(p.avisos.residual().is_some(), "a janela da aranha fica aberta");
+        assert_eq!(p.avisos.modal(), Some(&Modal::Quadro { texto: 10047, imagem: None }));
+        assert!(!p.animando());
+        assert_eq!(p.fechar_modal(), Some(Modal::Quadro { texto: 10047, imagem: None }));
+        assert!(p.animando(), "fechado o texto, a luta começa");
+        assert_eq!(p.avisos.modal(), Some(&Modal::Amarela { imagem: 9100, indice: 0 }));
+        p.avancar(100);
+        assert!(p.animando(), "2 quadros: 165 ms");
+        p.avancar(100);
+        assert!(!p.animando());
+        p.avancar(55);
+        assert!(p.avisos.residual().is_none(), "o _YellowDialog(9100) reaproveita a janela");
+        assert_eq!(p.fechar_modal(), Some(Modal::Amarela { imagem: 9100, indice: 0 }));
     }
 
     #[test]

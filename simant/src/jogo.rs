@@ -79,6 +79,12 @@ pub(crate) fn tratar_modal(s: &mut Sessao, ev: &sdl2::event::Event) -> Option<Mo
     use sdl2::event::Event;
     use sdl2::mouse::MouseButton;
     let r = s.clique_modal?;
+    if matches!(s.partida.avisos.modal(), Some(Modal::Animado(_))) {
+        // _SpiderDialog/_LionDialog/_DrawSimPayoff: um clique em qualquer lugar ou uma tecla
+        // (_win_Events, _DialogAbortOrCont) encerra a espera da vez.
+        let pula = matches!(ev, Event::MouseButtonDown { .. } | Event::KeyDown { .. });
+        return if pula { s.partida.pular_modal() } else { None };
+    }
     let tecla = s.partida.avisos.cfg.quadro.tecla_continuar.clone();
     let quadro = matches!(s.partida.avisos.modal(), Some(Modal::Quadro { .. }));
     let fecha = match ev {
@@ -149,6 +155,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
     let mut faixa = None;
     let mut minimizada = false;
     let mut foco: Option<bool> = None;
+    // _DrawSimPayoff na tela: ao fechar, a faixa volta à da janela de edição (bancada, cenário payoff).
+    let mut vitoria_na_tela = false;
     let inicio = Instant::now();
     let mut antes = inicio;
     println!("partida: {} (Shift+0 pausa, Shift+1..4 velocidade, Ctrl+G AutoTrack)", s.situacao());
@@ -504,7 +512,18 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         }
         redesenhar |= menus_ui::passar_tempo(s);
         let pedidos = s.registrar_eventos();
+        if pedidos.iter().any(|e| matches!(e, engine::rules::estado::Evento::AnimacaoVitoria)) {
+            // _DrawSimPayoff: _MapToYard, _SetYardMode(0), _SetMapPlane(0) e _DrawYard antes da janela.
+            modos::aplicar_acao_quintal(s, engine::core::quintal_mapa::AcaoQuintal::ModoQuintal, true);
+            redesenhar = true;
+        }
         audio.tratar(&pedidos, &s.partida.estado.partida.opcoes);
+        let vitoria = matches!(s.partida.avisos.modal(), Some(Modal::Animado(engine::core::quadros_animados::TipoAnimado::Vitoria)));
+        if vitoria_na_tela && !vitoria {
+            s.modos.janela.na_frente = false;
+            redesenhar = true;
+        }
+        vitoria_na_tela = vitoria;
         redesenhar |= s.partida.tomar_redesenho();
         // _DrawRibbonMessage: a mensagem vencida some da faixa.
         let agora_faixa = s.partida.agora();

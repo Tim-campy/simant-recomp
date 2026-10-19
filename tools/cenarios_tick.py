@@ -1457,6 +1457,128 @@ def selecionar(bruto, destino, faixas, descricao):
     print(f"{len(ticks)} ticks -> {destino}")
 
 
+# ------------------------------------------------------------------------------------------------
+# Diálogos animados (_DrawSimPayoff, _SpiderDialog, _LionDialog, _YellowDialog 9100/9101)
+# ------------------------------------------------------------------------------------------------
+
+def ler_bytes(c: Sessao, nome, tam):
+    return list(c.mj.ler_variavel(nome, tam))
+
+
+def ler_i16(c: Sessao, nome, n):
+    b = c.mj.ler_variavel(nome, 2 * n)
+    return [int.from_bytes(b[2 * i:2 * i + 2], "little", signed=True) for i in range(n)]
+
+
+def ligar_events(c: Sessao):
+    """Options → Events (_OptionStates[3], 8:85f8) = 1; devolve o valor anterior."""
+    antes = ler_i16(c, "8:85f8", 1)[0]
+    if antes == 0:
+        c.escrever("8:85f8", 1, 2)
+    return antes
+
+
+def serie_de_telas(c: Sessao, pasta, prefixo, segundos, intervalo=0.3, variaveis=()):
+    """Com a VM rodando, captura a tela a cada `intervalo` s por `segundos` s. Devolve a lista de
+    (k, t relativo, variáveis lidas)."""
+    c.dep.retomar()
+    reg = []
+    t0 = time.time()
+    k = 0
+    while time.time() - t0 < segundos:
+        tela(c, pasta, f"{prefixo}_{k:03d}")
+        r = {"k": k, "t": round(time.time() - t0, 3)}
+        for v in variaveis:
+            try:
+                r[v] = int.from_bytes(c.mj.ler_variavel(v), "little", signed=True)
+            except Exception as e:  # noqa: BLE001
+                r[v] = f"erro: {e}"
+        reg.append(r)
+        k += 1
+        time.sleep(intervalo)
+    return reg
+
+
+def amarela_na_superficie(c: Sessao, limite=400):
+    """Vista da superfície (Ctrl+8) e, se a amarela não está no plano 1, clique numa célula da
+    superfície ao lado do buraco preto mais próximo e avança tick a tick até ela sair."""
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    s = c.save()
+    if s.ler("MePlane") == 1:
+        return
+    buracos = [(x, y) for x in range(128) for y in range(64) if s.celula("MapA", x, y) == 0x50]
+    bx, by = buracos[0]
+    c.clicar_celula(min(127, bx + 2), by)
+    for _ in range(limite):
+        c.avancar(1)
+        if c.ler("MePlane") == 1:
+            c.log(f"amarela na superfície em ({c.ler('MeLocX')}, {c.ler('MeLocY')})")
+            return
+    raise RuntimeError("a amarela não saiu para a superfície")
+
+
+def cenario_payoff(c: Sessao, saida, n):
+    """Trapaça "fred" (_CheatKeys caso 0x14 → _DrawSimPayoff): digita f r e d com o jogo rodando e
+    captura a tela a cada 0,3 s por `n` segundos (padrão do --ticks: use 30)."""
+    pasta = Path(saida).resolve()
+    c.entrada()
+    reg = {"tabela_10_15d8": ler_i16(c, "10:15d8", 12), "OptionStates": ler_i16(c, "OptionStates", 6),
+           "GameTime_antes": c.ler("GameTime")}
+    tela(c, pasta, "antes")
+    c.dep.retomar()
+    c.b.executar("digitar fred")
+    reg["t_digitado"] = time.time()
+    reg["telas"] = serie_de_telas(c, pasta, "pay", n, 0.3, ("GameTime",))
+    (pasta / "payoff.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    return []
+
+
+def cenario_morte_aranha(c: Sessao, saida, n):
+    """_YellowDeath(1) com Events: amarela na superfície; na entrada de um tick a aranha (ligada) é
+    posta uma célula abaixo dela, perseguindo (_SMode 2) a amarela (_Starg −1). Captura n segundos."""
+    pasta = Path(saida).resolve()
+    amarela_na_superficie(c)
+    c.entrada()
+    reg = {"events_antes": ligar_events(c), "tabela_8_87fc": ler_i16(c, "8:87fc", 4)}
+    mx, my = c.ler("MeLocX"), c.ler("MeLocY")
+    sy = my + 1 if my < 63 else my - 1
+    c.escrever("SpidOn", 1)
+    c.escrever("SpidX", mx * 16 + 8)
+    c.escrever("SpidY", sy * 16 + 8)
+    c.escrever("SMode", 2)
+    c.escrever("Starg", -1)
+    c.escrever("SpidDir", 0 if sy > my else 4)
+    reg["amarela"] = [mx, my]
+    reg["aranha"] = [mx, sy]
+    tela(c, pasta, "antes")
+    reg["telas"] = serie_de_telas(c, pasta, "ar", n, 0.3, ("GameTime", "MePlane", "MeHealth"))
+    (pasta / "morte_aranha.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    return []
+
+
+def cenario_morte_leao(c: Sessao, saida, n):
+    """_YellowDeath(2) com Events: amarela na superfície; na entrada de um tick a formiga-leão 0
+    (esperando, _LionListM 0) passa a ficar na célula da amarela. Captura n segundos."""
+    pasta = Path(saida).resolve()
+    amarela_na_superficie(c)
+    c.entrada()
+    reg = {"events_antes": ligar_events(c), "tabela_8_895c": ler_i16(c, "8:895c", 8)}
+    mx, my = c.ler("MeLocX"), c.ler("MeLocY")
+    q = c.ler("LionIndex")
+    reg["LionIndex_antes"] = q
+    if q == 0:
+        c.escrever("LionIndex", 1)
+    for nome, v in (("LionListX", mx), ("LionListY", my), ("LionListM", 0), ("LionListS", 0), ("LionListT", 0)):
+        c.escrever_elemento(nome, 0, v, 1)
+    reg["amarela"] = [mx, my]
+    tela(c, pasta, "antes")
+    reg["telas"] = serie_de_telas(c, pasta, "le", n, 0.3, ("GameTime", "MePlane", "MeHealth"))
+    (pasta / "morte_leao.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    return []
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)

@@ -52,9 +52,9 @@ pub enum EfeitoTrapaca {
 }
 
 impl EfeitoTrapaca {
-    /// O port não tem o que o original faz aqui (animação `_DrawSimPayoff`, DDE, NetBIOS).
+    /// O port não tem o que o original faz aqui (DDE, NetBIOS).
     pub fn sem_equivalente(self) -> bool {
-        matches!(self, EfeitoTrapaca::AnimacaoVitoria | EfeitoTrapaca::BancoDeDados | EfeitoTrapaca::RedeServidor | EfeitoTrapaca::RedeCliente)
+        matches!(self, EfeitoTrapaca::BancoDeDados | EfeitoTrapaca::RedeServidor | EfeitoTrapaca::RedeCliente)
     }
 }
 
@@ -290,7 +290,9 @@ pub fn aplicar(e: &mut Estado, t: &TabelasTrapaca, ta: &TabelasAmarela, efeito: 
             }
             e.pedir_som(Some(if ligou { s.ligou } else { s.desligou }));
         }
-        AnimacaoVitoria | BancoDeDados | RedeServidor | RedeCliente => {}
+        // `_DrawSimPayoff`: só desenho e música (a interface mostra).
+        AnimacaoVitoria => e.eventos.push(Evento::AnimacaoVitoria),
+        BancoDeDados | RedeServidor | RedeCliente => {}
     }
 }
 

@@ -23,6 +23,7 @@ pub mod navegacao;
 pub mod partida;
 pub mod popup_castas;
 pub mod quadro;
+pub mod quadros_animados;
 pub mod menu_ferramentas;
 pub mod quintal_mapa;
 pub mod selecao;

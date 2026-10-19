@@ -275,6 +275,8 @@ impl Sessao<'_> {
             self.clique_modal = clique;
             pendentes.extend(p);
         } else {
+            // A janela que _SpiderDialog deixou aberta continua por cima durante a luta.
+            avisos::desenhar_residual(&mut q, self.recursos, &self.partida.avisos)?;
             self.clique_modal = None;
         }
         if let Some((m, _)) = &self.menu {
@@ -511,7 +513,10 @@ impl Sessao<'_> {
                 EventoRegras::Animacao(_) => {} // a Partida guarda e mostra os quadros
                 EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
                 EventoRegras::EscolherColonia => println!("[tick {t}] escolher outra colônia (_SpecialXfer)"),
-                EventoRegras::QuadroAmarela(id) => println!("[tick {t}] quadro da amarela {id} (_YellowDialog)"),
+                EventoRegras::QuadroAmarela { imagem, .. } => println!("[tick {t}] quadro da amarela {imagem} (_YellowDialog)"),
+                EventoRegras::QuadroAranha(texto) => println!("[tick {t}] quadro da aranha, texto {texto} (_SpiderDialog)"),
+                EventoRegras::QuadroFormigaLeao => println!("[tick {t}] quadro da formiga-leão (_LionDialog)"),
+                EventoRegras::AnimacaoVitoria => println!("[tick {t}] animação da vitória (_DrawSimPayoff)"),
                 EventoRegras::CentralizarNaAmarela | EventoRegras::MensagemFaixa(_) => {} // a faixa é da Partida
             }
         }

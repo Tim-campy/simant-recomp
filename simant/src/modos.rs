@@ -659,47 +659,114 @@ mod testes {
         assert_ne!(pixel(&sem, w, 260, 200), [255, 255, 255]);
     }
 
-    /// Bancada (cenário `trofalaxia`, 2026-10-18): o quadro de `_YellowDialog(9110)` com a contorno
-    /// azul-escuro de 4 pixels em (156, 159)–(361, 326) da área cliente; depois de 45 unidades de
-    /// `_TickCount`, o bitmap 9111 sobreposto em (72, 62), com o som 45; fecha sozinho depois de
-    /// 45 + 45 + 54. Capturas trofalaxia_028/030.png (fora do git, topo 38).
-    #[test]
-    fn quadro_da_trofalaxia_como_no_original() {
-        use engine::core::avisos::Modal;
+    /// Sessão com o save `BALAO_OVO.ANT` (para desenhar avisos por cima), ou `None` sem o jogo.
+    fn sessao_de_teste<'a>(recursos: &'a Recursos, dados: &std::path::Path) -> Option<Sessao<'a>> {
+        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let save = raiz().join("tests/referencias/saves/BALAO_OVO.ANT");
+        Some(Sessao::abrir(recursos, dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap())
+    }
+
+    fn recursos_de_teste() -> Option<(Recursos, PathBuf)> {
         let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
         if !jogo.join("SHARED.NDX").is_file() {
             eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
-            return;
+            return None;
         }
         let dados = raiz().join("data");
         let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
-        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
-        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
-        let save = raiz().join("tests/referencias/saves/BALAO_OVO.ANT");
-        let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
-        let a = &mut s.partida.avisos;
-        assert!(a.receber_quadro_amarela(9110));
-        assert_eq!(a.passar_tempo(1000), None);
-        assert_eq!(a.retirar_sons(), vec![42]);
-        let primeiro = s.quadro_rgb().unwrap();
-        let a = &mut s.partida.avisos;
-        assert_eq!(a.passar_tempo(1044), None);
-        assert!(!a.sobreposta_visivel());
-        assert_eq!(a.passar_tempo(1045), None);
-        assert!(a.sobreposta_visivel());
-        assert_eq!(a.retirar_sons(), vec![45]);
-        let segundo = s.quadro_rgb().unwrap();
+        Some((Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap(), dados))
+    }
+
+    fn gravar_teste(s: &Sessao, nome: &str, rgb: &[u8]) {
         if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
-            let (l, h) = (s.tela.cfg.largura, s.tela.cfg.altura);
-            let saida = PathBuf::from(saida);
-            crate::salvar_png(&saida.join("trofalaxia_a.png"), l, h, &primeiro).unwrap();
-            crate::salvar_png(&saida.join("trofalaxia_b.png"), l, h, &segundo).unwrap();
+            crate::salvar_png(&PathBuf::from(saida).join(format!("{nome}.png")), s.tela.cfg.largura, s.tela.cfg.altura, rgb).unwrap();
         }
-        let w = s.tela.cfg.largura as usize;
-        assert_eq!(pixel(&primeiro, w, 157, 200), [0, 0, 128], "contorno azul-escuro");
-        assert_ne!(primeiro, segundo, "a imagem sobreposta muda o quadro");
+    }
+
+    /// Bancada (cenário `trofalaxia`, 2026-10-18): o quadro de `_YellowDialog(9110)` com o contorno
+    /// azul-escuro de 4 pixels em (156, 159)–(361, 326) da área cliente e 1 pixel preto por fora; o
+    /// bitmap 9111 sobreposto em (72, 62) logo depois (os `_myDelay` voltam logo: mensagens.md §10),
+    /// com os sons 42 e 45; fecha sozinho depois de 54. Capturas `trof1/trof_030.png` (fora do git,
+    /// topo 38).
+    #[test]
+    fn quadro_da_trofalaxia_como_no_original() {
+        use engine::core::avisos::Modal;
+        let Some((recursos, dados)) = recursos_de_teste() else { return };
+        let mut s = sessao_de_teste(&recursos, &dados).unwrap();
         let a = &mut s.partida.avisos;
-        assert_eq!(a.passar_tempo(1000 + 45 + 45 + 53), None);
-        assert_eq!(a.passar_tempo(1000 + 45 + 45 + 54), Some(Modal::Amarela { imagem: 9110 }));
+        assert!(a.receber_quadro_amarela(9110, -1));
+        assert_eq!(a.passar_tempo(1000), None);
+        assert!(a.sobreposta_visivel());
+        assert_eq!(a.retirar_sons(), vec![42, 45]);
+        let rgb = s.quadro_rgb().unwrap();
+        gravar_teste(&s, "trofalaxia", &rgb);
+        let w = s.tela.cfg.largura as usize;
+        assert_eq!(pixel(&rgb, w, 157, 200), [0, 0, 128], "contorno azul-escuro");
+        assert_eq!(pixel(&rgb, w, 155, 200), [0, 0, 0], "linha preta por fora");
+        let a = &mut s.partida.avisos;
+        assert_eq!(a.passar_tempo(1053), None);
+        assert_eq!(a.passar_tempo(1054), Some(Modal::Amarela { imagem: 9110, indice: -1 }));
+    }
+
+    /// Bancada (cenários `morte_aranha` e `morte_leao`, 2026-10-18): a janela 26 com os bitmaps da
+    /// aranha (12000), da formiga-leão (9200), da vitória (16200), e os quadros 9100 e 9101 (2 pixels
+    /// à esquerda; o 9101 com "You have been reborn!" em amarelo no alto). Com `SIMANT_SAIDA_TESTE`,
+    /// grava as telas para `tools/comparar_captura.py --mapear --regiao` contra as capturas.
+    #[test]
+    fn janela_26_como_no_original() {
+        use engine::core::avisos::Modal;
+        use engine::core::quadros_animados::TipoAnimado;
+        let Some((recursos, dados)) = recursos_de_teste() else { return };
+        let mut s = sessao_de_teste(&recursos, &dados).unwrap();
+        let w = s.tela.cfg.largura as usize;
+        // Morte pela formiga-leão: o primeiro quadro (9201) sai 13 + 10 unidades depois de abrir.
+        assert!(s.partida.avisos.receber_animado(TipoAnimado::FormigaLeao, None));
+        s.partida.avisos.passar_tempo(1000);
+        let leao = s.quadro_rgb().unwrap();
+        gravar_teste(&s, "janela26_leao", &leao);
+        assert_eq!(pixel(&leao, w, 361, 200), [0, 0, 128], "200 pixels de largura: contorno até 362");
+        s.partida.avisos.passar_tempo(1023);
+        let leao1 = s.quadro_rgb().unwrap();
+        gravar_teste(&s, "janela26_leao_9201", &leao1);
+        assert_eq!(s.partida.avisos.passar_tempo(1113), Some(Modal::Animado(TipoAnimado::FormigaLeao)));
+        // 9100 e 9101: 2 pixels à esquerda.
+        assert!(s.partida.avisos.receber_quadro_amarela(9100, 0));
+        s.partida.avisos.passar_tempo(2000);
+        let morte = s.quadro_rgb().unwrap();
+        gravar_teste(&s, "janela26_9100", &morte);
+        assert_eq!(pixel(&morte, w, 155, 200), [0, 0, 128]);
+        assert_eq!(pixel(&morte, w, 153, 200), [0, 0, 0]);
+        s.partida.avisos.fechar_modal();
+        assert!(s.partida.avisos.receber_quadro_amarela(9101, 1));
+        s.partida.avisos.passar_tempo(3000);
+        let renascer = s.quadro_rgb().unwrap();
+        gravar_teste(&s, "janela26_9101", &renascer);
+        let amarelos = (180..335).filter(|&x| (163..183).any(|y| pixel(&renascer, w, x, y) == [255, 255, 0])).count();
+        assert!(amarelos > 100, "texto amarelo no alto ({amarelos} colunas)");
+        s.partida.avisos.fechar_modal();
+        // Aranha: base, um quadro, e a janela inativa embaixo do texto.
+        assert!(s.partida.avisos.receber_animado(TipoAnimado::Aranha, Some(10048)));
+        s.partida.avisos.passar_tempo(4000);
+        let aranha = s.quadro_rgb().unwrap();
+        gravar_teste(&s, "janela26_aranha", &aranha);
+        assert_eq!(pixel(&aranha, w, 350, 300), [0, 0, 128], "189 pixels de largura: contorno até 351");
+        s.partida.avisos.passar_tempo(4003);
+        let aranha1 = s.quadro_rgb().unwrap();
+        gravar_teste(&s, "janela26_aranha_12002", &aranha1);
+        assert_ne!(aranha, aranha1);
+        assert_eq!(s.partida.avisos.passar_tempo(4144), Some(Modal::Animado(TipoAnimado::Aranha)));
+        s.partida.avisos.passar_tempo(4145);
+        let texto = s.quadro_rgb().unwrap();
+        gravar_teste(&s, "janela26_aranha_texto", &texto);
+        assert_eq!(pixel(&texto, w, 157, 300), [255, 255, 255], "contorno branco com o texto por cima");
+        s.partida.avisos.fechar_modal();
+        // Vitória: 254 × 199, os olhos em seis lugares.
+        assert!(s.partida.avisos.receber_animado(TipoAnimado::Vitoria, None));
+        for (t, nome) in [(5000, "janela26_vitoria"), (5003, "janela26_vitoria_16211"), (5006, "janela26_vitoria_16212"), (5009, "janela26_vitoria_16210")] {
+            s.partida.avisos.passar_tempo(t);
+            let rgb = s.quadro_rgb().unwrap();
+            gravar_teste(&s, nome, &rgb);
+            assert_eq!(pixel(&rgb, w, 415, 300), [0, 0, 128], "contorno até 416");
+        }
     }
 }

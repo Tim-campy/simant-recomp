@@ -12,6 +12,7 @@ use std::collections::{HashMap, VecDeque};
 use serde::Deserialize;
 
 use super::quadro::Quadro;
+use super::quadros_animados::{Animado, ConfigQuadrosAnimados, TipoAnimado};
 use super::telas::{carregar_janela, desenhar_janela_deslocada, Interface};
 use crate::formats::banco::Chave;
 use crate::formats::bitmap::{Bitmap, TIPO_BITMAP};
@@ -19,7 +20,7 @@ use crate::formats::janela::{Janela, Retangulo};
 use crate::formats::textos::{ListaStrings, TIPO_STRINGS};
 use crate::recursos::Recursos;
 use crate::rules::conselhos::Licao;
-use crate::rules::estado::Estado;
+use crate::rules::estado::{Estado, Evento};
 
 /// Nome do arquivo de dados (sobrescrevível por mod).
 pub const ARQUIVO_CONFIG: &str = "mensagens.json";
@@ -118,18 +119,49 @@ pub struct SequenciaAmarela {
     pub deslocamento: [i16; 2],
     pub som_sobreposta: Option<u16>,
     pub espera_sobreposta_tickcount: u64,
+    /// Texto escrito no objeto `dialogText` (9101: `_win_PrintfAtObj` com a fonte 4). Opcional
+    /// (API 0.23).
+    #[serde(default)]
+    pub texto: Option<TextoQuadroAmarela>,
+    /// Deslocamento da janela medido na bancada (9100 e 9101 ficam 2 pixels à esquerda dos outros
+    /// bitmaps do mesmo tamanho) [causa em aberto]. Opcional (API 0.23).
+    #[serde(default)]
+    pub ajuste: [i16; 2],
+}
+
+/// Texto do `_YellowDialog`: a string `primeiro + índice` da lista SHARED 4/`lista`, centrada no
+/// retângulo (x, y, largura, altura a partir do canto do bitmap), na fonte e na entrada `cor` da
+/// tabela de cores (a do objeto `dialogText`, 13: amarelo sobre preto).
+#[derive(Clone, Debug, Deserialize)]
+pub struct TextoQuadroAmarela {
+    pub lista: u16,
+    pub primeiro: usize,
+    pub fonte: usize,
+    pub retangulo: [i16; 4],
+    pub cor: u8,
 }
 
 /// `_YellowDialog` (`1000:8262`): a janela 26 (`dialogPicWin`) com um bitmap (mensagens.md §10).
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigQuadroAmarela {
-    /// Contorno externo na área cliente (medido na bancada).
-    pub externo: [i16; 4],
+    /// Contorno externo na área cliente medido na bancada com o bitmap 9110. Só documentação desde a
+    /// API 0.23: o contorno sai do tamanho do bitmap ([`geometria_janela_imagem`]).
+    #[serde(default)]
+    pub externo: Option<[i16; 4]>,
     pub borda: i16,
     pub cor_borda: u8,
-    /// Canto do bitmap e tamanho da área que o mostra (o resto é cortado).
+    /// Linha de 1 pixel por fora da borda (preta na bancada). Opcional (API 0.23).
+    #[serde(default)]
+    pub cor_externa: Option<u8>,
+    /// Cor da borda com outra janela por cima (a da aranha embaixo do quadro de texto: branca na
+    /// bancada). Opcional (API 0.23); sem ela, a de sempre.
+    #[serde(default)]
+    pub cor_borda_inativa: Option<u8>,
+    /// Canto do bitmap; a área que o mostra tem o tamanho dele menos 1 pixel em cada eixo (o resto é
+    /// cortado). `area` (medida com o 9110) ficou só como documentação.
     pub imagem_em: [i16; 2],
-    pub area: [i16; 2],
+    #[serde(default)]
+    pub area: Option<[i16; 2]>,
     /// `_DialogWaitInit(3)`: espera final, em `_TickCount`.
     pub espera_final_tickcount: u64,
     /// Bitmap (como texto) → sequência.
@@ -147,6 +179,10 @@ pub struct ConfigAvisos {
     /// Opcional (API 0.22): sem ele, `_YellowDialog` não aparece.
     #[serde(default)]
     pub quadro_amarela: Option<ConfigQuadroAmarela>,
+    /// Opcional (API 0.23): `_SpiderDialog`, `_LionDialog` e `_DrawSimPayoff`; sem ele (ou sem
+    /// `quadro_amarela`, que dá a geometria da janela), não aparecem.
+    #[serde(default)]
+    pub quadros_animados: Option<ConfigQuadrosAnimados>,
 }
 
 impl ConfigAvisos {
@@ -169,8 +205,11 @@ pub enum Modal {
     Quadro { texto: u16, imagem: Option<u16> },
     /// `_EndGameDialog`.
     FimDeJogo { tipo_jogo: i16, pretas_venceram: bool, pontos: i64 },
-    /// `_YellowDialog(bitmap)`: quadro com imagem da formiga amarela (trofalaxia: 9110).
-    Amarela { imagem: u16 },
+    /// `_YellowDialog(bitmap, índice)`: quadro com imagem da formiga amarela (trofalaxia 9110, morte
+    /// 9100, renascimento 9101); `indice` escolhe o texto (−1 sem texto).
+    Amarela { imagem: u16, indice: i16 },
+    /// `_SpiderDialog`, `_LionDialog`, `_DrawSimPayoff`: janela 26 com quadros animados.
+    Animado(TipoAnimado),
 }
 
 impl Modal {
@@ -194,13 +233,28 @@ pub struct Avisos {
     aberto_em: Option<u64>,
     /// `_YellowDialog`: a imagem sobreposta já apareceu.
     sobreposta_visivel: bool,
-    /// Efeitos pedidos pelos quadros (`_myBeginSound` de `_YellowDialog`), para a partida tocar.
-    sons: Vec<u16>,
+    /// Sons e músicas pedidos pelos quadros (`_myBeginSound`, `_myBeginSong`), para a partida tocar.
+    pedidos: Vec<Evento>,
+    /// Quadro animado da frente em andamento.
+    animado: Option<Animado>,
+    /// Janela 26 que ficou aberta depois de `_SpiderDialog` (o último quadro): continua na tela,
+    /// embaixo dos avisos seguintes, até o próximo `_YellowDialog` fechá-la.
+    residual: Option<Animado>,
 }
 
 impl Avisos {
     pub fn new(cfg: ConfigAvisos) -> Avisos {
-        Avisos { cfg, texto: None, expira: None, modais: VecDeque::new(), aberto_em: None, sobreposta_visivel: false, sons: Vec::new() }
+        Avisos {
+            cfg,
+            texto: None,
+            expira: None,
+            modais: VecDeque::new(),
+            aberto_em: None,
+            sobreposta_visivel: false,
+            pedidos: Vec::new(),
+            animado: None,
+            residual: None,
+        }
     }
 
     // --- faixa ---------------------------------------------------------------------------------
@@ -294,22 +348,68 @@ impl Avisos {
 
     /// `_YellowDialog(imagem)` (só com Options → Events, quem chama confere). Sem configuração para
     /// a imagem, nada. Devolve se o quadro entrou na fila.
-    pub fn receber_quadro_amarela(&mut self, imagem: u16) -> bool {
+    pub fn receber_quadro_amarela(&mut self, imagem: u16, indice: i16) -> bool {
         let tem = self.cfg.quadro_amarela.as_ref().is_some_and(|c| c.sequencias.contains_key(&imagem.to_string()));
         if tem {
-            self.modais.push_back(Modal::Amarela { imagem });
+            self.modais.push_back(Modal::Amarela { imagem, indice });
         }
         tem
     }
 
-    /// Efeitos pedidos pelos quadros desde a última chamada.
+    /// Um quadro animado (quem chama confere Events quando o original confere). Sem configuração,
+    /// nada. Na aranha, o quadro de texto (`_PictureDialog`) vem logo depois. Devolve se entrou na
+    /// fila.
+    pub fn receber_animado(&mut self, tipo: TipoAnimado, texto: Option<u16>) -> bool {
+        let tem = self.cfg.quadro_amarela.is_some() && self.cfg.quadros_animados.as_ref().is_some_and(|c| c.de(tipo).is_some());
+        if tem {
+            self.modais.push_back(Modal::Animado(tipo));
+            if let Some(texto) = texto {
+                self.modais.push_back(Modal::Quadro { texto, imagem: None });
+            }
+        }
+        tem
+    }
+
+    /// Quantos avisos modais esperam na fila (o da frente incluído).
+    pub fn modais_na_fila(&self) -> usize {
+        self.modais.len()
+    }
+
+    /// Sons e músicas pedidos pelos quadros desde a última chamada.
+    pub fn retirar_pedidos(&mut self) -> Vec<Evento> {
+        std::mem::take(&mut self.pedidos)
+    }
+
+    /// Só os efeitos de [`Avisos::retirar_pedidos`] (testes).
     pub fn retirar_sons(&mut self) -> Vec<u16> {
-        std::mem::take(&mut self.sons)
+        self.retirar_pedidos().into_iter().filter_map(|e| if let Evento::Som(s) = e { Some(s) } else { None }).collect()
+    }
+
+    /// Estado do quadro animado da frente.
+    pub fn animado(&self) -> Option<&Animado> {
+        self.animado.as_ref()
+    }
+
+    /// A janela 26 que ficou aberta depois da aranha.
+    pub fn residual(&self) -> Option<&Animado> {
+        self.residual.as_ref()
+    }
+
+    /// Clique ou tecla com um quadro animado na frente: encerra a espera da vez. Devolve o aviso
+    /// fechado, se o roteiro acabou.
+    pub fn pular_animado(&mut self, agora: u64) -> Option<Modal> {
+        let ms = self.cfg.ms_por_tickcount;
+        let cfg = self.cfg.quadros_animados.clone()?;
+        let a = self.animado.as_mut()?;
+        let c = cfg.de(a.tipo)?;
+        let p = a.pular(c, &cfg, agora, ms);
+        self.pedidos.extend(p);
+        self.passar_tempo(agora)
     }
 
     /// Sequência e configuração do `_YellowDialog` da frente.
     fn sequencia_amarela(&self) -> Option<(&ConfigQuadroAmarela, &SequenciaAmarela)> {
-        let Some(Modal::Amarela { imagem }) = self.modais.front() else { return None };
+        let Some(Modal::Amarela { imagem, .. }) = self.modais.front() else { return None };
         let c = self.cfg.quadro_amarela.as_ref()?;
         Some((c, c.sequencias.get(&imagem.to_string())?))
     }
@@ -343,13 +443,33 @@ impl Avisos {
             let (fim, sobrepor) = (desde + s.espera_tickcount + s.espera_sobreposta_tickcount + c.espera_final_tickcount, desde + s.espera_tickcount);
             let (som_inicio, som_sobreposta, tem_sobreposta) = (s.som_inicio, s.som_sobreposta, s.sobreposta.is_some());
             if novo {
-                self.sons.extend(som_inicio);
+                // _win_Open: a janela 26 que a aranha deixou aberta recebe o bitmap novo.
+                self.residual = None;
+                self.pedidos.extend(som_inicio.map(Evento::Som));
             }
             if tem_sobreposta && !self.sobreposta_visivel && agora >= sobrepor {
                 self.sobreposta_visivel = true;
-                self.sons.extend(som_sobreposta);
+                self.pedidos.extend(som_sobreposta.map(Evento::Som));
             }
             if agora >= fim {
+                return self.fechar_modal();
+            }
+        }
+        if let Some(Modal::Animado(tipo)) = self.modais.front() {
+            let tipo = *tipo;
+            let ms = self.cfg.ms_por_tickcount;
+            let cfg = self.cfg.quadros_animados.clone()?;
+            let c = cfg.de(tipo)?;
+            if self.animado.is_none() {
+                let (a, p) = Animado::novo(tipo, c, &cfg, desde, ms);
+                self.animado = Some(a);
+                self.residual = None;
+                self.pedidos.extend(p);
+            }
+            let a = self.animado.as_mut()?;
+            let (p, _) = a.passar_tempo(c, &cfg, agora, ms);
+            self.pedidos.extend(p);
+            if a.acabou() {
                 return self.fechar_modal();
             }
         }
@@ -360,7 +480,27 @@ impl Avisos {
     pub fn fechar_modal(&mut self) -> Option<Modal> {
         self.aberto_em = None;
         self.sobreposta_visivel = false;
-        self.modais.pop_front()
+        let m = self.modais.pop_front();
+        match &m {
+            // _YellowDialog termina com _win_Close: some também a janela que a aranha deixou.
+            Some(Modal::Amarela { .. }) => self.residual = None,
+            Some(Modal::Animado(_)) => {
+                // A janela da aranha fica (sem _win_Close), com o último quadro.
+                if let Some(a) = self.animado.take() {
+                    let fica = self.cfg.quadros_animados.as_ref().and_then(|c| c.de(a.tipo)).is_some_and(|c| c.fica_aberta);
+                    if fica {
+                        self.residual = Some(a);
+                    }
+                }
+            }
+            _ => {}
+        }
+        m
+    }
+
+    /// A partida acabou ou foi trocada: some a janela que a aranha deixou.
+    pub fn limpar_residual(&mut self) {
+        self.residual = None;
     }
 }
 
@@ -665,6 +805,7 @@ pub fn desenhar_fim_de_jogo(
 
 /// Desenha o aviso modal da frente, se houver, e devolve o retângulo que o fecha ao ser clicado.
 pub fn desenhar_modal(q: &mut Quadro, recursos: &Recursos, interface: &Interface, avisos: &Avisos) -> Result<(Option<Retangulo>, Vec<String>), String> {
+    desenhar_residual(q, recursos, avisos)?;
     match avisos.modal() {
         None => Ok((None, Vec::new())),
         Some(Modal::Quadro { texto, imagem }) => {
@@ -675,12 +816,84 @@ pub fn desenhar_modal(q: &mut Quadro, recursos: &Recursos, interface: &Interface
             let (r, p) = desenhar_fim_de_jogo(q, recursos, interface, &avisos.cfg.fim_de_jogo, *tipo_jogo, *pretas_venceram, *pontos)?;
             Ok((Some(r), p))
         }
-        Some(Modal::Amarela { imagem }) => {
+        Some(Modal::Amarela { imagem, indice }) => {
             let (c, s) = avisos.sequencia_amarela().ok_or("quadro da amarela sem configuração")?;
             let sobreposta = if avisos.sobreposta_visivel { s.sobreposta.map(|id| (id, s.deslocamento)) } else { None };
-            Ok((Some(desenhar_quadro_amarela(q, recursos, c, *imagem, sobreposta)?), Vec::new()))
+            let externo = desenhar_quadro_amarela(q, recursos, c, *imagem, s.ajuste, sobreposta)?;
+            if let Some(t) = &s.texto {
+                desenhar_texto_amarela(q, recursos, interface, c, s, t, *indice);
+            }
+            Ok((Some(externo), Vec::new()))
+        }
+        Some(Modal::Animado(_)) => {
+            let Some(a) = avisos.animado() else { return Ok((None, Vec::new())) };
+            if !a.janela_visivel() {
+                // _DrawSimPayoff antes de abrir a janela: só o quintal; um clique encerra a espera.
+                return Ok((Some(tela_inteira(q)), Vec::new()));
+            }
+            desenhar_animado(q, recursos, avisos, a, true)?;
+            // _win_Events: qualquer clique encerra a espera da vez.
+            Ok((Some(tela_inteira(q)), Vec::new()))
         }
     }
+}
+
+fn tela_inteira(q: &Quadro) -> Retangulo {
+    Retangulo { esq: 0, topo: 0, dir: q.largura as i16, base: q.altura as i16 }
+}
+
+/// A janela 26 de um quadro animado com o último quadro desenhado. `ativa` = nenhuma janela por
+/// cima (a borda muda de cor quando outra fica na frente).
+fn desenhar_animado(q: &mut Quadro, recursos: &Recursos, avisos: &Avisos, a: &Animado, ativa: bool) -> Result<(), String> {
+    let (Some(ca), Some(cq)) = (avisos.cfg.quadros_animados.as_ref(), avisos.cfg.quadro_amarela.as_ref()) else { return Ok(()) };
+    let Some(c) = ca.de(a.tipo) else { return Ok(()) };
+    let (_, area) = desenhar_janela_imagem(q, recursos, cq, c.bitmap, [0, 0], ativa)?;
+    if let Some(id) = a.quadro {
+        let bm = recursos.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d))?;
+        let antes = q.recorte.replace(area);
+        for [dx, dy] in &c.posicoes {
+            q.bitmap(&bm, i32::from(area.esq + dx), i32::from(area.topo + dy));
+        }
+        q.recorte = antes;
+    }
+    Ok(())
+}
+
+/// A janela que `_SpiderDialog` deixou aberta, se houver: embaixo do aviso da frente (com a borda de
+/// janela inativa) ou sozinha, durante a luta.
+pub fn desenhar_residual(q: &mut Quadro, recursos: &Recursos, avisos: &Avisos) -> Result<(), String> {
+    match avisos.residual() {
+        Some(a) => desenhar_animado(q, recursos, avisos, a, !avisos.tem_modal()),
+        None => Ok(()),
+    }
+}
+
+/// Geometria da janela 26 com um bitmap de `largura × altura`: contorno externo (sem a linha de fora)
+/// e área do bitmap (o tamanho dele menos 1 em cada eixo, a partir de `imagem_em` + `ajuste`; medido
+/// na bancada com os bitmaps 9110, 9200, 12000 e 16200).
+pub fn geometria_janela_imagem(c: &ConfigQuadroAmarela, largura: usize, altura: usize, ajuste: [i16; 2]) -> (Retangulo, Retangulo) {
+    let [ix, iy] = c.imagem_em;
+    let (ix, iy) = (ix + ajuste[0], iy + ajuste[1]);
+    let area = Retangulo { esq: ix, topo: iy, dir: ix + largura.saturating_sub(1) as i16, base: iy + altura.saturating_sub(1) as i16 };
+    let b = c.borda;
+    let externo = Retangulo { esq: area.esq - b, topo: area.topo - b, dir: area.dir + b, base: area.base + b };
+    (externo, area)
+}
+
+/// Linha de fora, contorno e bitmap da janela 26; devolve (externo, área).
+fn desenhar_janela_imagem(q: &mut Quadro, recursos: &Recursos, c: &ConfigQuadroAmarela, imagem: u16, ajuste: [i16; 2], ativa: bool) -> Result<(Retangulo, Retangulo), String> {
+    let bm = recursos.objeto(Chave { tipo: TIPO_BITMAP, id: imagem }).and_then(|d| Bitmap::decodificar(&d))?;
+    let (externo, area) = geometria_janela_imagem(c, bm.largura, bm.altura, ajuste);
+    if let Some(cor) = c.cor_externa {
+        let fora = Retangulo { esq: externo.esq - 1, topo: externo.topo - 1, dir: externo.dir + 1, base: externo.base + 1 };
+        q.preencher(fora, cor, cor);
+    }
+    let borda = if ativa { c.cor_borda } else { c.cor_borda_inativa.unwrap_or(c.cor_borda) };
+    q.preencher(externo, borda, borda);
+    let antes = q.recorte.replace(area);
+    q.bitmap(&bm, i32::from(area.esq), i32::from(area.topo));
+    q.recorte = antes;
+    Ok((externo, area))
 }
 
 /// `_YellowDialog`: contorno de `borda` pixels na cor `cor_borda` e o bitmap cortado na área; com a
@@ -691,21 +904,35 @@ pub fn desenhar_quadro_amarela(
     recursos: &Recursos,
     c: &ConfigQuadroAmarela,
     imagem: u16,
+    ajuste: [i16; 2],
     sobreposta: Option<(u16, [i16; 2])>,
 ) -> Result<Retangulo, String> {
-    let [e, t, d, b] = c.externo;
-    let externo = Retangulo { esq: e, topo: t, dir: d + 1, base: b + 1 };
-    q.preencher(externo, c.cor_borda, c.cor_borda);
-    let [ix, iy] = c.imagem_em;
-    let area = Retangulo { esq: ix, topo: iy, dir: ix + c.area[0], base: iy + c.area[1] };
-    let antes = q.recorte.replace(area);
-    let bitmap = |id: u16| recursos.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d));
-    q.bitmap(&bitmap(imagem)?, i32::from(ix), i32::from(iy));
+    let (externo, area) = desenhar_janela_imagem(q, recursos, c, imagem, ajuste, true)?;
     if let Some((id, [dx, dy])) = sobreposta {
-        q.bitmap(&bitmap(id)?, i32::from(ix + dx), i32::from(iy + dy));
+        let bm = recursos.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d))?;
+        let antes = q.recorte.replace(area);
+        q.bitmap(&bm, i32::from(area.esq + dx), i32::from(area.topo + dy));
+        q.recorte = antes;
     }
-    q.recorte = antes;
     Ok(externo)
+}
+
+/// Texto do `_YellowDialog` (9101): a string `primeiro + índice` centrada no retângulo (a partir do
+/// canto do bitmap), com a cor da entrada `cor` da tabela de cores.
+fn desenhar_texto_amarela(q: &mut Quadro, recursos: &Recursos, interface: &Interface, c: &ConfigQuadroAmarela, s: &SequenciaAmarela, t: &TextoQuadroAmarela, indice: i16) {
+    let Ok(i) = usize::try_from(indice) else { return };
+    let linhas = linhas_do_texto(recursos, t.lista);
+    let Some(texto) = linhas.get(t.primeiro + i) else { return };
+    let Some(Some(f)) = interface.fontes.get(t.fonte) else { return };
+    let cor = interface.cores.get(t.cor as usize).copied().unwrap_or(crate::formats::janela::Cor { frente: 11, fundo: 0, fundo2: 0 });
+    let [ix, iy] = c.imagem_em;
+    let (ix, iy) = (ix + s.ajuste[0], iy + s.ajuste[1]);
+    let [x, y, w, h] = t.retangulo;
+    let r = Retangulo { esq: ix + x, topo: iy + y, dir: ix + x + w, base: iy + y + h };
+    // Recortado à área do bitmap (o retângulo medido passa da borda de cima).
+    let antes = q.recorte.replace(Retangulo { esq: r.esq.max(ix), topo: r.topo.max(iy), ..r });
+    q.texto(r, f, texto, 3, cor.frente, cor.fundo);
+    q.recorte = antes;
 }
 
 #[cfg(test)]

@@ -435,6 +435,47 @@ fn y14_morte_de_fome_e_renascer_como_ovo() {
 }
 
 #[test]
+fn quadros_da_morte_pela_aranha_e_pela_formiga_leao() {
+    // _YellowDeath(1/2) com Events: _SpiderDialog (sorteia S1(2) para o texto) ou _LionDialog antes
+    // da música e da luta; _YellowDialog(9100, 0) depois. Sem Events: nenhum quadro e nenhum S1(2).
+    for (causa, eventos) in [(CausaMorte::Aranha, 1), (CausaMorte::Aranha, 0), (CausaMorte::FormigaLeao, 1)] {
+        let mut e = estado(1, 10, 10);
+        e.partida.opcoes[3] = eventos;
+        e.s.definir_semente(0x4321);
+        let mut s = e.s;
+        let r = if causa == CausaMorte::Aranha && eventos != 0 { s.rand1(2) } else { -1 };
+        let musica = s.rand1(5);
+        matar_amarela(&mut e, t(), causa);
+        let ev = &e.eventos;
+        let quadro = ev.iter().position(|x| matches!(x, Evento::QuadroAranha(_) | Evento::QuadroFormigaLeao));
+        let m = ev.iter().position(|x| matches!(x, Evento::Musica(_))).unwrap();
+        assert_eq!(ev[m], Evento::Musica(t().musicas.morte_base + musica as u16), "{causa:?} {eventos}");
+        let morte = ev.iter().position(|x| *x == Evento::QuadroAmarela { imagem: 9100, indice: 0 }).unwrap();
+        assert!(morte > m);
+        match (causa, eventos) {
+            (CausaMorte::Aranha, 1) => {
+                assert_eq!(ev[quadro.unwrap()], Evento::QuadroAranha(if r == 0 { 10047 } else { 10048 }));
+                assert!(quadro.unwrap() < m);
+            }
+            (CausaMorte::FormigaLeao, _) => assert!(quadro.unwrap() < m),
+            _ => assert_eq!(quadro, None),
+        }
+    }
+}
+
+#[test]
+fn renascer_de_ovo_pede_o_quadro_9101() {
+    let mut e = estado(1, 10, 10);
+    e.ninho_b.lista.adicionar(Formiga { x: 30, y: 10, modo: 8, tipo: 3, s: 0 });
+    e.ninho_b.vida.definir(30, 10, 3);
+    matar_amarela(&mut e, t(), CausaMorte::Pisada);
+    let ev = &e.eventos;
+    let musica = ev.iter().position(|x| *x == Evento::Musica(t().musicas.renascer)).unwrap();
+    assert_eq!(ev.last(), Some(&Evento::QuadroAmarela { imagem: 9101, indice: 1 }));
+    assert!(ev.len() - 1 > musica);
+}
+
+#[test]
 fn y14b_sem_corpo_no_quick_e_derrota() {
     let mut e = estado(1, 10, 10);
     matar_amarela(&mut e, t(), CausaMorte::Pisada);
