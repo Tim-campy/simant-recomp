@@ -795,6 +795,11 @@ pub fn aplicar_acao(
         // Cada passo: ferramenta e subopção (escritas na memória na bancada), Ctrl, e as células por
         // onde o cursor passou com o botão apertado (a primeira = onde apertou).
         let mut efeitos = Vec::new();
+        // `_LionListX[−1]` da bancada (byte alto do seletor de `_EggStr`, memória do Windows), quando
+        // a ação passa por `_KillAntLion(-1)` (inimigos.md §1.4).
+        if let Some(x) = acao["leao_x_vaga_menos_1"].as_u64() {
+            e.leao_x_vaga_menos_1 = Some(x as u8);
+        }
         for p in passos {
             let f = p["f"].as_i64().ok_or("passo sem f")? as i16;
             let fer = Ferramenta::de_i16(f).ok_or(format!("ferramenta {f}"))?;
