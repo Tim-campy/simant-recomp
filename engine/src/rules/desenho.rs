@@ -201,8 +201,10 @@ pub struct EdicaoNoTick {
     /// `_editWidth`, `_editHeight` (células da vista).
     pub largura: i32,
     pub altura: i32,
-    /// `_TickCount` usado pelos prazos dos balões "Silly" dentro do tick [hipótese: o do começo do
-    /// tick; o original lê o relógio a cada desenho].
+    /// `_TickCount` usado pelos prazos dos balões "Silly" dentro do tick: o do começo do tick, mais
+    /// as esperas das animações da amarela ([`avancar_relogio_no_tick`]). O original lê o relógio a
+    /// cada desenho; fora das animações o tick não espera, e as leituras dão o mesmo valor (bancada,
+    /// rng.md "Desenho dentro do tick").
     pub tick_count: u32,
     /// `data/baloes.json` e `_Dx8`/`_Dy8` (balão da aranha).
     pub baloes: std::sync::Arc<TabelasBaloes>,
@@ -240,6 +242,14 @@ pub fn comecar_tick(e: &mut Estado) {
         j.no_tick = true;
         j.desenhos = 0;
         j.passos = 0;
+    }
+}
+
+/// As animações da amarela (`_AnimYellowFight`, `_AnimYellowInsane`) esperam o relógio antes de cada
+/// quadro: o desenho do quadro lê `_TickCount` `degraus` adiante. Sem efeito fora do tick.
+pub fn avancar_relogio_no_tick(e: &mut Estado, degraus: u32) {
+    if let Some(j) = e.edicao_no_tick.as_deref_mut().filter(|j| j.no_tick) {
+        j.tick_count = j.tick_count.wrapping_add(degraus);
     }
 }
 

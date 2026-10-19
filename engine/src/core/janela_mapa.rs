@@ -59,6 +59,9 @@ impl ConfigMapa {
 pub struct JanelaMapa {
     pub cfg: ConfigMapa,
     pub celulas: Vec<u8>,
+    /// As células que a tela mostra: com a janela atrás, `_UpdateWindows` alterna `_DrawMap` (gera e
+    /// mostra) com `_DrawMapData` (só gera), e a tela fica com a geração anterior ([`JanelaMapa::mostrar`]).
+    pub na_tela: Vec<u8>,
     ultimo_modo: Option<i16>,
     /// `_GameTime` da última geração (o original gera em `_UpdateWindows`, depois do tick).
     ultimo_tempo: Option<u32>,
@@ -159,7 +162,7 @@ impl JanelaMapa {
 
     /// Sem bitmaps nem títulos (testes e ferramentas sem o banco do jogo).
     pub fn sem_banco(cfg: ConfigMapa) -> JanelaMapa {
-        JanelaMapa { cfg, celulas: vec![0; COLUNAS * LINHAS], ultimo_modo: None, ultimo_tempo: None, ultimo_plano: None, bitmaps: HashMap::new(), titulos: Vec::new() }
+        JanelaMapa { cfg, celulas: vec![0; COLUNAS * LINHAS], na_tela: vec![0; COLUNAS * LINHAS], ultimo_modo: None, ultimo_tempo: None, ultimo_plano: None, bitmaps: HashMap::new(), titulos: Vec::new() }
     }
 
     pub fn carregar(recursos: &Recursos) -> Result<JanelaMapa, String> {
@@ -175,7 +178,7 @@ impl JanelaMapa {
             .iter()
             .map(|l| l.iter().map(|&b| b as char).collect())
             .collect();
-        Ok(JanelaMapa { cfg, celulas: vec![0; COLUNAS * LINHAS], ultimo_modo: None, ultimo_tempo: None, ultimo_plano: None, bitmaps, titulos })
+        Ok(JanelaMapa { cfg, celulas: vec![0; COLUNAS * LINHAS], na_tela: vec![0; COLUNAS * LINHAS], ultimo_modo: None, ultimo_tempo: None, ultimo_plano: None, bitmaps, titulos })
     }
 
     /// Título (`_SetMapTitle`): a entrada `_MapMode` da lista 1000.
@@ -187,6 +190,28 @@ impl JanelaMapa {
     /// trilhas (`_showTrails`) e o mesmo modo, parte das células da última geração e só escreve
     /// as que têm vida, acumulando os rastros.
     pub fn atualizar(&mut self, e: &Estado, trilhas: bool) {
+        if self.gerar(e, trilhas) {
+            self.mostrar();
+        }
+    }
+
+    /// Como [`JanelaMapa::atualizar`], mas uma geração por tick (`_UpdateWindows`) só vai para a tela
+    /// se `na_tela` (a janela na frente, ou a vez do `_DrawMap` na alternância com ela atrás:
+    /// `core::partida::Partida::tomar_mapa_na_tela`). A geração fora do tick (troca de plano,
+    /// abertura) é sempre mostrada.
+    pub fn atualizar_no_timer(&mut self, e: &Estado, trilhas: bool, na_tela: bool) {
+        if self.gerar(e, trilhas) || na_tela {
+            self.mostrar();
+        }
+    }
+
+    /// Copia a última geração para a tela (`_DrawMap`).
+    pub fn mostrar(&mut self) {
+        self.na_tela.clone_from(&self.celulas);
+    }
+
+    /// Gera as células se preciso. Devolve `true` se a geração foi fora do tick (sempre mostrada).
+    fn gerar(&mut self, e: &Estado, trilhas: bool) -> bool {
         let tempo = e.partida.tempo;
         let plano = e.vistas.plano;
         // A geração é de `_UpdateWindows` (depois de um tick). Sem tick, só a troca de plano
@@ -194,7 +219,7 @@ impl JanelaMapa {
         // jogo pausado, o botão de cheiro troca só o título [bancada, telas/mapa.md §6].
         let modo = if self.ultimo_tempo == Some(tempo) {
             if self.ultimo_modo.is_some() && self.ultimo_plano == Some(plano) {
-                return;
+                return false;
             }
             plano
         } else {
@@ -202,9 +227,11 @@ impl JanelaMapa {
         };
         let acumula = trilhas && self.ultimo_modo == Some(modo);
         gerar_celulas(&self.cfg, e, modo, acumula, &mut self.celulas);
+        let fora_do_tick = self.ultimo_tempo == Some(tempo);
         self.ultimo_modo = Some(modo);
         self.ultimo_plano = Some(plano);
         self.ultimo_tempo = Some(tempo);
+        fora_do_tick
     }
 
     /// Desenha o conteúdo em `area` (canto da área do mapa): as células, a aranha e a pegada (no
@@ -214,7 +241,7 @@ impl JanelaMapa {
         let antes = q.recorte.replace(Retangulo { dir: area.esq + (COLUNAS as i16) * 4, base: area.topo + (LINHAS as i16) * 4, ..area });
         for y in 0..LINHAS {
             for x in 0..COLUNAS {
-                let c = self.celulas[indice(x, y)];
+                let c = self.na_tela[indice(x, y)];
                 let (px, py) = (ox + x as i32 * LADO, oy + y as i32 * LADO);
                 if c < 16 {
                     q.preencher(Retangulo { esq: px as i16, topo: py as i16, dir: (px + LADO) as i16, base: (py + LADO) as i16 }, c, c);

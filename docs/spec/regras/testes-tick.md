@@ -349,6 +349,18 @@ Achados:
 4. **Artefatos da bancada evitados:** (a) o clique em (320, 310) que fecha uma caixa pode chegar à janela de edição depois de a caixa sumir e virar uma ordem para a amarela (visto na 1ª gravação de `fome`: destino (40, 9) e um passo); `cenarios_regras.py` fecha as caixas com Enter; (b) o relógio do Mac lido depois de uma caixa modal não é gravado (a lista termina na caixa), e o `_CatDelay` gravado com ele não é reproduzível (vistos em `cortador` e `pisada`); nesses cenários o gato fica fora de jogo (`_CatDelay` enorme na preparação).
 5. **A aranha do jogador com `_SMode` 0 ou 1 não é cercada**: o controle do jogador substitui o resto de `_MoveSpider` (inimigos.md 2.2); a 1ª tentativa de `aranha_jogador_cercada` (aranha parada) não morreu em 4 ticks. Cercada perseguindo, morre.
 
+### Sexta rodada (2026-10-19): desenho dentro do tick que faltava
+
+`tools/cenarios_regras.py` (cenários `aranha_autotrack`, `aranha_movey`, `morte_aranha_silly`), snapshot `rico`, com `capturar_tick_relogio`: além do vetor normal, as variáveis dos balões (`Baloes`, em `antes` e `depois`) e o valor de cada `_TickCount` lido pelo desenho (`TickCount_lidos`, breakpoints nos retornos dos `CALL _TickCount` do segmento 3; o relógio do Mac do vetor é a primeira leitura de `_MacTickCount`). Os 14 vetores batem 307/307 com S, R, vida e os extras dos balões (`ticks_originais`):
+
+| Subpasta | Ticks | O que exercita |
+|---|---|---|
+| `aranha_jogador_autotrack` | 1810, 1812, 1844–1852 | aranha do jogador com AutoTrack: anda (a vista segue, sem sorteio) e, no modo alvo, persegue (palpos `S1(4)` no `_GotoMyAnt` de cada passo) e come; inimigos.md 2.7 |
+| `desenho_aranha_movey` | 1800, 1811 | aranha à vista no redesenho de antes de entrar no buraco e no `_GotoMyAnt` depois de sair do ninho, com "Silly" (balão da aranha); rng.md |
+| `amarela_morte_aranha_silly` | 1793 | morte pela aranha com "Silly", sem música e sem Events: o `_TickCount` de cada quadro de `_AnimYellowFight` (+3 por quadro); rng.md |
+
+Achados: (1) o port não chamava `_GotoMyAnt` na aranha do jogador com AutoTrack (corrigido); (2) o relógio dos balões dentro do tick é o do momento do desenho: igual ao do começo fora das animações, +1 e depois +3 por quadro na luta (o port modela as esperas; o tempo de desenho e o das caixas modais, não); (3) `_AnimYellowInsane` espera 2 degraus por quadro (110 ms, não 55: `amarela.json`).
+
 ### Quinta rodada, tutorial (2026-10-18): tutorial completo com as ações do jogador
 
 `tests/referencias/ticks/tutorial_completo/` (16 ticks, 2,1 MB; `cenarios_tick.py gravar tutorial_completo DIR --snapshot tut`, detalhes em [conselhos.md](conselhos.md) §3.1): o roteiro faz a ação que cada lição pede (cliques calculados, teclas, arrasto no Behavior, clique segurado no gráfico) e grava inteiros só os ticks em que `_TutorCnt` chega a múltiplo de 8; grava o snapshot `tutcur` a cada lição para retomar. Ações que dependem de coordenadas de outras janelas vêm do ambiente (`TUT_EXTRA`, JSON por lição). Duas gravações brutas (fora do git): 124 ticks das lições 1–26 (com o relógio lido depois da caixa) e 185 das lições 1–57.
