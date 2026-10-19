@@ -58,6 +58,16 @@ pub struct Extras {
     /// `_TimeTemp` (`9:9b10`, 32 bits, fora do save): prazo ou marco da lição do tutorial; `None` em
     /// vetores anteriores à captura.
     pub time_temp: Option<i32>,
+    /// Janela que a bancada pôs na frente (`_win_IsWinInFront`; 0 edição, 0x100 mapa, 0x1200 Behavior,
+    /// 0x1300 Caste, 0x1900 quintal), anotada pelo roteiro do tutorial (`tutorial_completo`); o
+    /// original não a guarda na memória do jogo. `None` = não anotada (nenhuma janela para o tutor).
+    pub janela_na_frente: Option<u16>,
+    /// Colunas e linhas da janela de edição quando o vetor não é da janela padrão da bancada
+    /// (25 × 19): no Tutorial ela abre maior (39 × 21). Usado ao centralizar a vista dentro do tick.
+    pub vista_edicao: Option<(i32, i32)>,
+    /// Primeira leitura de `_MacTickCount` feita pelo tick depois de fechada uma caixa modal
+    /// (`MacTickCount_depois_da_caixa` do extras.json; só em `antes`).
+    pub relogio_depois_da_caixa: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -75,6 +85,10 @@ struct ExtrasJson {
     mac_tick_count: Option<i64>,
     #[serde(rename = "TimeTemp", default)]
     time_temp: Option<i64>,
+    #[serde(rename = "JanelaNaFrente", default)]
+    janela_na_frente: Option<i64>,
+    #[serde(rename = "VistaEdicao", default)]
+    vista_edicao: Option<(i32, i32)>,
 }
 
 impl From<ExtrasJson> for Extras {
@@ -90,6 +104,9 @@ impl From<ExtrasJson> for Extras {
             cycle: j.cycle as i16,
             relogio_mac: j.mac_tick_count.map(|v| v as u32),
             time_temp: j.time_temp.map(|v| v as i32),
+            janela_na_frente: j.janela_na_frente.map(|v| v as u16),
+            vista_edicao: j.vista_edicao,
+            relogio_depois_da_caixa: None,
         }
     }
 }
@@ -98,6 +115,8 @@ impl From<ExtrasJson> for Extras {
 struct ExtrasArquivo {
     antes: ExtrasJson,
     depois: ExtrasJson,
+    #[serde(rename = "MacTickCount_depois_da_caixa", default)]
+    depois_da_caixa: Vec<Option<i64>>,
 }
 
 /// Um vetor de tick do original, já lido.
@@ -145,7 +164,10 @@ impl VetorTick {
             depois,
             vida_antes,
             vida_depois,
-            extras_antes: ex.antes.into(),
+            extras_antes: Extras {
+                relogio_depois_da_caixa: ex.depois_da_caixa.first().copied().flatten().map(|v| v as u32),
+                ..Extras::from(ex.antes)
+            },
             extras_depois: ex.depois.into(),
         })
     }
@@ -418,7 +440,7 @@ const VISTA_BANCADA: (i32, i32) = (25, 19);
 /// (`Evento::CentralizarNaAmarela`, tratado por `core::partida`); o comparador reproduz só o efeito no
 /// save, com a geometria da bancada: centraliza `_MapPnt` na amarela e, se ela está noutro plano, troca
 /// `_MapPlane` e `_MapMode` (`_SetMapModeAnt`). Fora do Experimental, como `core::partida`.
-fn aplicar_vista_da_bancada(e: &mut Estado) {
+fn aplicar_vista_da_bancada(e: &mut Estado, vista: (i32, i32)) {
     if e.partida.tipo_jogo == 3 {
         return;
     }
@@ -440,15 +462,15 @@ fn aplicar_vista_da_bancada(e: &mut Estado) {
             e.vistas.plano = plano;
             e.vistas.modo_mapa = plano;
         }
-        let (px, py) = centralizar_edicao(e.vistas.ponto, i32::from(x), i32::from(y), plano);
+        let (px, py) = centralizar_edicao(e.vistas.ponto, i32::from(x), i32::from(y), plano, vista);
         e.vistas.ponto = (px as i16, py as i16);
     }
 }
 
 /// `_CenterEdit` (`1010:1620`, telas/jogo.md "Centralizar"): anda `_MapPnt` até (x − w/2, y − h/2)
 /// como uma reta de Bresenham em ponto fixo (o eixo menor pode ficar um passo aquém) e aplica os limites.
-fn centralizar_edicao(ponto: (i16, i16), x: i32, y: i32, plano: i16) -> (i32, i32) {
-    let (w, h) = VISTA_BANCADA;
+fn centralizar_edicao(ponto: (i16, i16), x: i32, y: i32, plano: i16, vista: (i32, i32)) -> (i32, i32) {
+    let (w, h) = vista;
     let (mut px, mut py) = (ponto.0 as i32, ponto.1 as i32);
     let (dx, dy) = (x - px - w / 2, y - py - h / 2);
     let (ax, ay) = (dx.unsigned_abs(), dy.unsigned_abs());
@@ -480,13 +502,25 @@ pub fn regras_do_vetor(v: &VetorTick) -> super::tick::RegrasOriginais {
     if let Some(t) = v.extras_antes.time_temp {
         r.memoria_tutor.tempo_limite = i64::from(t);
     }
+    if let Some(j) = v.extras_antes.janela_na_frente {
+        r.interface_tutor.janelas = vec![j];
+    }
     r
+}
+
+/// O que a interface faz depois do tick e que o vetor registra: fechar a caixa da lição com o relógio
+/// lido depois dela (`MemoriaTutor::caixa_fechada`). Chamar depois de [`comparar_tick`], antes de
+/// conferir `_TimeTemp`.
+pub fn depois_do_tick(v: &VetorTick, regras: &mut super::tick::RegrasOriginais) {
+    if let Some(r) = v.extras_antes.relogio_depois_da_caixa {
+        regras.memoria_tutor.caixa_fechada(i64::from(r));
+    }
 }
 
 pub fn comparar_tick(v: &VetorTick, layout: &LayoutSave, regras: &mut dyn Regras) -> Result<RelatorioTick, String> {
     comparar_com(v, layout, |e| {
         tick(e, regras);
-        aplicar_vista_da_bancada(e);
+        aplicar_vista_da_bancada(e, v.extras_antes.vista_edicao.unwrap_or(VISTA_BANCADA));
         Ok(())
     })
 }
@@ -804,7 +838,7 @@ pub fn rodar_sequencia(dir: &Path, layout: &LayoutSave, regras: &mut dyn Regras)
         e.relogio_mac = antes.relogio_mac;
         e.tecla_global = antes.global_key;
         tick(&mut e, regras);
-        aplicar_vista_da_bancada(&mut e);
+        aplicar_vista_da_bancada(&mut e, VISTA_BANCADA);
         e.retirar_eventos();
         if primeiro_sorteio_diferente.is_none()
             && (e.s.semente() != depois.semente_s || e.r.estado() != depois.semente_r)
