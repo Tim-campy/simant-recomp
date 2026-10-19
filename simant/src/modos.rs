@@ -161,7 +161,13 @@ fn tratar_efeitos(s: &mut Sessao, efeitos: Vec<Efeito>) {
         match e {
             Efeito::Som { id, .. } => s.partida.estado.eventos.push(Evento::Som(id)),
             Efeito::Musica(id) => s.partida.estado.eventos.push(Evento::Musica(id)),
-            Efeito::Aviso { lista, indice } => println!("aviso: texto {indice} da lista {lista}"),
+            // _EditMessage(texto, 0xB4, 0, 1) das ferramentas (1010:763b): faixa, importante.
+            Efeito::Aviso { lista, indice } => s.partida.estado.eventos.push(Evento::MensagemFaixa(engine::rules::estado::MensagemFaixa {
+                lista,
+                indice: indice as u8,
+                duracao: 0xB4,
+                importante: true,
+            })),
             Efeito::Examinar(x) => s.abrir_exame(x),
         }
     }
