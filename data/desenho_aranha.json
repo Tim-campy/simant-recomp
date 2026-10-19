@@ -1,0 +1,475 @@
+{
+  "_comentario": "Desenho da aranha na janela de edição (_DrawSpider 1010:1d6a, _DrawLegs 1010:2be0, _DrawPalps 1010:2594). Tabelas extraídas do SIMANTW.EXE por tools/extrair_desenho_aranha.py (endereços no topo do script); o resto são imediatos do pseudocódigo (_origem). Coordenadas em pixels, relativas ao centro da aranha (_SpidX, _SpidY), para a direção 0 (pernas_reto, palpos_reto) ou 1 (pernas_diagonal, palpos_diagonal); as outras direções são giros e espelhos dessas (docs/spec/telas/jogo.md, 'Aranha na janela de edição'). Cores em índices da paleta.",
+  "sprite_corpo": 1000,
+  "sprite_agonia": 1050,
+  "cor_transparente": 13,
+  "cor_pernas": 0,
+  "cor_palpos": 0,
+  "cor_palpos_jogador": 11,
+  "corpo_x": [
+    -6,
+    -20,
+    -25,
+    -20,
+    -6,
+    -8,
+    -10,
+    -9
+  ],
+  "corpo_y": [
+    -10,
+    -8,
+    -6,
+    -20,
+    -26,
+    -20,
+    -6,
+    -9
+  ],
+  "agonia_x": [
+    -27,
+    -21,
+    -14,
+    -14
+  ],
+  "agonia_y": [
+    -25,
+    -15,
+    -10,
+    -10
+  ],
+  "pernas_reto": {
+    "inicio_x": [
+      5,
+      6,
+      5,
+      4
+    ],
+    "inicio_y": [
+      -6,
+      -3,
+      -1,
+      1
+    ],
+    "joelho_x": [
+      [
+        14,
+        15,
+        14,
+        12,
+        10,
+        10,
+        11,
+        13
+      ],
+      [
+        14,
+        13,
+        14,
+        17,
+        19,
+        18,
+        16,
+        15
+      ],
+      [
+        14,
+        13,
+        14,
+        16,
+        16,
+        14,
+        12,
+        14
+      ],
+      [
+        11,
+        13,
+        11,
+        9,
+        8,
+        8,
+        9,
+        10
+      ]
+    ],
+    "joelho_y": [
+      [
+        -19,
+        -16,
+        -14,
+        -13,
+        -12,
+        -13,
+        -16,
+        -18
+      ],
+      [
+        -8,
+        -7,
+        -5,
+        -5,
+        -8,
+        -6,
+        -6,
+        -7
+      ],
+      [
+        1,
+        2,
+        3,
+        2,
+        1,
+        -1,
+        -1,
+        0
+      ],
+      [
+        9,
+        10,
+        11,
+        8,
+        6,
+        4,
+        6,
+        7
+      ]
+    ],
+    "pe_x": [
+      [
+        21,
+        22,
+        22,
+        23,
+        23,
+        20,
+        18,
+        18
+      ],
+      [
+        35,
+        33,
+        32,
+        32,
+        34,
+        34,
+        34,
+        35
+      ],
+      [
+        33,
+        33,
+        33,
+        33,
+        30,
+        30,
+        31,
+        33
+      ],
+      [
+        23,
+        22,
+        19,
+        21,
+        22,
+        23,
+        23,
+        23
+      ]
+    ],
+    "pe_y": [
+      [
+        -42,
+        -38,
+        -34,
+        -30,
+        -26,
+        -31,
+        -37,
+        -41
+      ],
+      [
+        -10,
+        -11,
+        -17,
+        -23,
+        -26,
+        -22,
+        -18,
+        -14
+      ],
+      [
+        2,
+        6,
+        10,
+        14,
+        12,
+        7,
+        1,
+        -2
+      ],
+      [
+        28,
+        32,
+        31,
+        24,
+        19,
+        16,
+        20,
+        24
+      ]
+    ]
+  },
+  "pernas_diagonal": {
+    "inicio_x": [
+      7,
+      6,
+      3,
+      0
+    ],
+    "inicio_y": [
+      0,
+      2,
+      5,
+      6
+    ],
+    "joelho_x": [
+      [
+        22,
+        21,
+        19,
+        17,
+        15,
+        16,
+        18,
+        21
+      ],
+      [
+        16,
+        14,
+        13,
+        16,
+        19,
+        17,
+        15,
+        15
+      ],
+      [
+        8,
+        7,
+        7,
+        8,
+        9,
+        10,
+        8,
+        9
+      ],
+      [
+        -2,
+        -1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "joelho_y": [
+      [
+        -3,
+        0,
+        0,
+        0,
+        -1,
+        -2,
+        -3,
+        -3
+      ],
+      [
+        4,
+        4,
+        7,
+        9,
+        8,
+        8,
+        7,
+        5
+      ],
+      [
+        13,
+        13,
+        14,
+        14,
+        14,
+        11,
+        10,
+        12
+      ],
+      [
+        18,
+        15,
+        12,
+        11,
+        13,
+        15,
+        17,
+        14
+      ]
+    ],
+    "pe_x": [
+      [
+        44,
+        41,
+        39,
+        36,
+        34,
+        35,
+        38,
+        41
+      ],
+      [
+        31,
+        30,
+        34,
+        39,
+        42,
+        39,
+        37,
+        34
+      ],
+      [
+        21,
+        18,
+        15,
+        12,
+        11,
+        15,
+        20,
+        24
+      ],
+      [
+        -10,
+        -4,
+        0,
+        3,
+        0,
+        -3,
+        -6,
+        -9
+      ]
+    ],
+    "pe_y": [
+      [
+        -14,
+        -10,
+        -7,
+        -4,
+        -1,
+        -7,
+        -13,
+        -15
+      ],
+      [
+        18,
+        16,
+        11,
+        7,
+        6,
+        9,
+        12,
+        15
+      ],
+      [
+        27,
+        29,
+        32,
+        35,
+        33,
+        28,
+        24,
+        24
+      ],
+      [
+        38,
+        34,
+        31,
+        30,
+        33,
+        36,
+        38,
+        41
+      ]
+    ]
+  },
+  "palpos_reto": {
+    "inicio": [
+      4,
+      -10
+    ],
+    "joelho_x": [
+      6,
+      7,
+      8,
+      9
+    ],
+    "joelho_y": [
+      -16,
+      -16,
+      -16,
+      -15
+    ],
+    "ponta_x": [
+      3,
+      3,
+      5,
+      6
+    ],
+    "ponta_y": [
+      -15,
+      -17,
+      -18,
+      -18
+    ]
+  },
+  "palpos_diagonal": {
+    "inicio": [
+      10,
+      -3
+    ],
+    "joelho_x": [
+      16,
+      17,
+      17,
+      17
+    ],
+    "joelho_y": [
+      -6,
+      -5,
+      -4,
+      -3
+    ],
+    "ponta_x": [
+      13,
+      15,
+      16,
+      17
+    ],
+    "ponta_y": [
+      -8,
+      -8,
+      -7,
+      -6
+    ]
+  },
+  "_origem": {
+    "sprite_corpo": "_DrawSpider: _db_LoadObject(_SpidDir + 1000, 2) fora da agonia",
+    "sprite_agonia": "_DrawSpider: _db_LoadObject(_Scycle + 0x41a, 2) com _SMode 5; sem pernas nem palpos",
+    "cor_transparente": "_CopyMaskBitmap2 1030:b110: o nibble 0xD não é copiado",
+    "cor_pernas": "_DrawLegs: _ConvColor(0xF) (preto do Mac; telas/mapa.md, _PatchColorArrays)",
+    "cor_palpos": "_DrawPalps: _ConvColor(0xF) com _MeMode != 1",
+    "cor_palpos_jogador": "_DrawPalps: _ConvColor(1) com _MeMode == 1 (amarelo do Mac)",
+    "palpos_reto.inicio": "_DrawPalps direção 0: os palpos saem de (+-4, -10)",
+    "palpos_diagonal.inicio": "_DrawPalps direção 1: saem de (10, -3) e (3, -10)"
+  }
+}

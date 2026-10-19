@@ -111,11 +111,16 @@ pub fn desenhar_colonias(e: &mut Estado) {
 /// `_DrawPalps` (`1010:2594`) dentro de `_DrawSpider`, a cada redesenho da janela de edição com a
 /// aranha visível (`_PreDrawSpider`: `_SpidOn`, plano 0 ou 1 e a aranha dentro da vista — quem sabe é
 /// a interface) e `_SMode` ≠ 5: um `SRand1(4)`, exceto com `_SMode` < 2 e `_MeSMode` < 6.
+/// O índice sorteado fica em `Estado::palpos_aranha` (0 sem sorteio), para o desenho.
 pub fn desenhar_palpos(e: &mut Estado) -> u32 {
-    if e.aranha.estado == 5 || (e.aranha.estado < 2 && e.amarela.modo_aranha < 6) {
+    if e.aranha.estado == 5 {
         return 0;
     }
-    e.s.rand1(4);
+    if e.aranha.estado < 2 && e.amarela.modo_aranha < 6 {
+        e.palpos_aranha = 0;
+        return 0;
+    }
+    e.palpos_aranha = e.s.rand1(4) as u8;
     1
 }
 

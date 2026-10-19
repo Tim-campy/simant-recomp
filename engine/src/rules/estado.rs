@@ -1203,6 +1203,9 @@ pub struct Estado {
     /// fechada ou sem interface (nenhum desenho). Quem roda o tick (interface, comparador) preenche.
     /// regras/rng.md, "Desenho dentro do tick"; `rules::desenho::EdicaoNoTick`.
     pub edicao_no_tick: Option<Box<super::desenho::EdicaoNoTick>>,
+    /// Índice das tabelas dos palpos da aranha no último redesenho da janela de edição (o `S1(4)` de
+    /// `_DrawPalps`; 0 quando não há sorteio). Só para o desenho (`core::aranha_edicao`).
+    pub palpos_aranha: u8,
 }
 
 /// Índice de cor nas tabelas por cor (`modos_do_tick`).
@@ -1270,6 +1273,7 @@ impl Estado {
             passo_queda: (0, 255),
             eventos: Vec::new(),
             edicao_no_tick: None,
+            palpos_aranha: 0,
         }
     }
 
