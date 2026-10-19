@@ -1,0 +1,23 @@
+# Disco SVGA (vbesvga.drv): título, "Select a Game" e Quick Game (pausado com Shift+0).
+# Saída em re_trabalho/svga/svga800_*.png (1024x768: qemu_svga1024_quick.txt).
+# python tools/qemu_bancada.py preparar_svga 800 600 python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_svga_quick.txt --disco re_trabalho/qemu/svga_c_800x600.img --overlay re_trabalho/qemu/svga_q800.qcow2
+# O título completo aparece por volta de 60 s (mais tarde que com o VGA.DRV, ~35 s).
+esperar 65
+capturar re_trabalho/svga/svga800_titulo.png
+teclas spc
+esperar 4
+teclas spc
+esperar 6
+capturar re_trabalho/svga/svga800_selecao.png
+# Quick Game (botão superior direito do Select a Game; em 800x600 o ícone fica em ~(345, 228))
+clicar_em 345 228
+esperar 15
+capturar re_trabalho/svga/diag_quick_15.png
+esperar 5
+capturar re_trabalho/svga/diag_quick_20.png
+teclas shift+0
+esperar 3
+capturar re_trabalho/svga/svga800_quick.png
+esperar 3
+capturar re_trabalho/svga/diag_quick_pausado.png
+fim

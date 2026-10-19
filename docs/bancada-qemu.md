@@ -183,6 +183,17 @@ Teste: `qemu_titulo_logo.txt` captura a tela a cada ~1,4 s, de 24 s a 49 s, com 
 - **`-icount shift=N,sleep=on`** liga o relógio da VM ao número de instruções (2^N ns por instrução). Um snapshot gravado sem `-icount` carrega, mas a simulação fica parada (`GameTime` e `_gameCycles` não andam em 60 s); é preciso boot completo (`tools/ritmo_icount.py`). O TCG com `icount` emula só ~3–8 milhões de instruções por segundo do host, então a VM fica atrás do relógio do host: o tempo da VM tem de ser medido dentro dela. O contador de tiques do BIOS (`0040:006C`, lido no endereço linear `0x46C` com `Memoria.ler_linear`) serve: em normal dá **6,07 ticks/s** em tempo da VM com shift 5, 6 e 7 (o modelo dá 6,06), contra 1,5–3,7 ticks/s no relógio do host. Resultado das medições: [spec/regras/simulacao-visao-geral.md](spec/regras/simulacao-visao-geral.md) §3.3.
 - **Som:** `-audiodev wav,... -device sb16,audiodev=...,irq=7 -parallel none [-device adlib,...]`; a gravação funciona, mas não serve de referência (OPL2 contra driver de OPL3, silêncios descartados, efeitos que não batem): [spec/regras/som.md](spec/regras/som.md), "Áudio do original na bancada QEMU". Também exige boot completo.
 
+## Bancada SVGA: 800×600 e 1024×768 em 256 cores (2026-10-19)
+
+Para conferir a tela virtual do port (spec/telas/resolucao.md) há um disco C: à parte com o driver livre **vbesvga.drv** (github.com/PluMGMK/vbesvga.drv, release v1.0-beta4; zip baixado em `re_trabalho/downloads/vbesvga/`, SHA-1 dos arquivos conferido com o `VBESVGA.SHA` do pacote), que usa o VBE do `-vga std` do QEMU. Nada do pacote roda no host: `VBESVGA.DRV`, `VDDVBE.386` e `VBEVMDIB.3GR` só são copiados para `WINDOWS\SYSTEM` da cópia.
+
+- `python tools/qemu_bancada.py preparar_svga LARGURA ALTURA [BPP] [--disco ARQ.img] [--drivers DIR]` monta `re_trabalho/qemu/svga_c_LxA/` a partir de `SimAnt-T` e gera `svga_c_LxA.img` (DOSBox-X com `-silent`, sem janela). Recusa nomes que não comecem com `svga`; não toca no `c.img` nem nos overlays da bancada padrão.
+- `SYSTEM.INI` da cópia: `[boot]` `display.drv=vbesvga.drv`, `386grabber=vbevmdib.3gr`; `[386Enh]` `display=vddvbe.386` (mais os ajustes da bancada padrão); seção `[VBESVGA.DRV]` com `Width`, `Height` e `Depth=8`. Fontes VGA (96 dpi).
+- `roteiro ... --disco ARQ.img --overlay ARQ.qcow2` usa esse disco (com `--disco` e snapshots, `--overlay` é obrigatório). Roteiros: `qemu_svga_boot.txt`, `qemu_svga_selecao.txt`, `qemu_svga640_quick.txt`, `qemu_svga_quick.txt` (800×600) e `qemu_svga1024_quick.txt`. O boot é mais lento (título completo por volta de 60 s).
+- `tools/png_diff6.py` compara dois PNGs em 6 bits por canal (o DAC do DOSBox-X expande 6 bits para 0x82/0xC3, o do QEMU dá 0x80/0xC0); `tools/png_cores.py` conta as cores de um PNG.
+
+Resultado: modo 386 avançado, 8 bpp; a barra de título ativa sai azul-claro (#a4c8f0, a mesma do DOSBox-X), como o esquema padrão do Windows em 256 cores. O título em 800×600 é idêntico (0 pixels diferentes em 6 bits) à captura antiga do DOSBox-X. Capturas em `re_trabalho/svga/` (`svga800_*`, `svga1024_*`); comparações em `tests/referencias/README.md`, "Tela virtual".
+
 ## Cuidados
 
 - O DOS grava com atraso. Antes de encerrar, espere uns 15 s depois de salvar; o `fim` já usa `quit`. O primeiro save (`QUICK1.ANT`) saiu com 0 bytes porque o QEMU foi morto logo depois de salvar.

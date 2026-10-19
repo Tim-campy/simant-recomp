@@ -1,0 +1,20 @@
+# Disco SVGA 640x480x8 (vbesvga.drv): título, "Select a Game" e Quick Game (pausado com Shift+0).
+# Separa efeito de resolução x efeito de driver (comparar com a bancada VGA.DRV 640x480 16 cores).
+# python tools/qemu_bancada.py preparar_svga 640 480
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_svga640_quick.txt --disco re_trabalho/qemu/svga_c_640x480.img --overlay re_trabalho/qemu/svga_q640.qcow2
+esperar 65
+capturar re_trabalho/svga/svga640_titulo.png
+teclas spc
+esperar 4
+teclas spc
+esperar 6
+capturar re_trabalho/svga/svga640_selecao.png
+# Quick Game: na bancada VGA 640x480 o ícone fica em (345, 228)
+esperar 4
+clicar_em 345 228
+esperar 25
+capturar re_trabalho/svga/diag640_quick_antes_pausa.png
+teclas shift+0
+esperar 3
+capturar re_trabalho/svga/svga640_quick.png
+fim

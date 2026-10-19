@@ -71,8 +71,25 @@ pub(crate) enum AlvoMenu {
 }
 
 impl Sessao<'_> {
+    /// Sessão com a tela de `data/tela_jogo.json` como está (640×442, a bancada): a dos testes.
+    #[cfg(test)]
     pub(crate) fn abrir<'a>(recursos: &'a Recursos, dados: &Path, origem: Origem, cores: Vec<[u8; 3]>) -> Result<Sessao<'a>, String> {
-        let cfg: ConfigTelaJogo = recursos.dados("tela_jogo.json")?;
+        Self::abrir_na_tela(recursos, dados, origem, cores, None)
+    }
+
+    /// Sessão na tela virtual dada (docs/spec/telas/resolucao.md): tamanho da área cliente e tabela
+    /// de posições; `None` = os de `data/tela_jogo.json`.
+    pub(crate) fn abrir_na_tela<'a>(
+        recursos: &'a Recursos,
+        dados: &Path,
+        origem: Origem,
+        cores: Vec<[u8; 3]>,
+        tela_virtual: Option<engine::core::resolucao::TelaVirtual>,
+    ) -> Result<Sessao<'a>, String> {
+        let mut cfg: ConfigTelaJogo = recursos.dados("tela_jogo.json")?;
+        if let Some(t) = tela_virtual {
+            t.aplicar_tela_jogo(&mut cfg);
+        }
         let nav_cfg: ConfigNavegacao = recursos.dados("navegacao.json")?;
         let cfg_sim = ConfigSimulacao::carregar(recursos)?;
         let cfg_partida: ConfigPartida = recursos.dados(partida::ARQUIVO_CONFIG)?;
@@ -625,5 +642,71 @@ impl Sessao<'_> {
         let pausa = if p.pausado != 0 { ", pausado" } else { "" };
         let track = if p.opcoes[0] != 0 { ", AutoTrack" } else { "" };
         format!("{vel}{pausa}{track}")
+    }
+}
+
+#[cfg(test)]
+mod testes_tela_virtual {
+    use super::*;
+    use engine::core::resolucao::{ConfigResolucao, ARQUIVO};
+
+    fn raiz() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
+    }
+
+    /// QUICK2.ANT aberto na tela virtual dada (sem os arquivos do jogo, o teste é ignorado).
+    fn quick2(resolucao: [u32; 2], f: impl FnOnce(&mut Sessao)) {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let tela = recursos.dados::<ConfigResolucao>(ARQUIVO).unwrap().tela(resolucao).unwrap();
+        let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
+        let origem = Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido);
+        let mut s = Sessao::abrir_na_tela(&recursos, &dados, origem, cores, Some(tela)).unwrap();
+        f(&mut s);
+    }
+
+    fn externo(s: &Sessao, c: Controle) -> Retangulo {
+        s.janelas.gerente.janela(s.janelas.cfg.id(c)).unwrap().externo
+    }
+
+    #[test]
+    fn tela_virtual_640_e_a_de_tela_jogo_json() {
+        // 640×480 dá a mesma tela de data/tela_jogo.json (a da bancada): os testes de tela não mudam.
+        quick2([640, 480], |s| {
+            assert_eq!((s.tela.cfg.largura, s.tela.cfg.altura, s.tela.cfg.tabela_posicoes), (640, 442, 0));
+            assert_eq!(s.interface.posicoes[19][..2], [342, 158], "Caste na tabela 9/0");
+        });
+    }
+
+    #[test]
+    fn tela_virtual_800_e_1024_usam_a_tabela_8() {
+        let mut em_640 = Vec::new();
+        quick2([640, 480], |s| em_640 = vec![externo(s, Controle::Castas), externo(s, Controle::Tarefas)]);
+        if em_640.is_empty() {
+            return;
+        }
+        for (r, l, a) in [([800, 600], 800, 562), ([1024, 768], 1024, 730)] {
+            quick2(r, |s| {
+                assert_eq!((s.tela.cfg.largura, s.tela.cfg.altura, s.tela.cfg.tabela_posicoes), (l, a, 8));
+                // Caste e Behavior descem 127 linhas (9/0: y = 158; 9/8: y = 285), para baixo da edição.
+                let castas = externo(s, Controle::Castas);
+                let tarefas = externo(s, Controle::Tarefas);
+                assert_eq!((castas.esq, castas.topo), (em_640[0].esq, em_640[0].topo + 127));
+                assert_eq!((tarefas.esq, tarefas.topo), (em_640[1].esq, em_640[1].topo + 127));
+                // A faixa ocupa a largura toda; o quadro tem o tamanho da área cliente.
+                let rgb = s.quadro_rgb().unwrap();
+                assert_eq!(rgb.len(), (l * a) as usize * 3);
+                let px = |x: u32, y: u32| rgb[((y * l + x) * 3) as usize..((y * l + x) * 3 + 3) as usize].to_vec();
+                assert_eq!(px(l - 1, 30), vec![0xc0, 0xc0, 0xc0], "fundo cinza da faixa até a borda direita");
+                assert_eq!(px(l - 1, a - 1), vec![0xff, 0xfb, 0xf0], "fundo da área cliente");
+            });
+        }
     }
 }

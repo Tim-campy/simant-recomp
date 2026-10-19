@@ -139,4 +139,4 @@ O padrão de preenchimento com duas cores (xadrez) **não** foi exercitado nessa
 
 ## Port
 
-O port usa os retângulos absolutos dos objetos, deslocados para a posição calculada acima. A tabela usada (0 ou 8) é configurável em `data/jogo.json`. Texto ainda não é desenhado: falta especificar as fontes. As janelas 34 e 3 não têm texto visível.
+O port usa os retângulos absolutos dos objetos, deslocados para a posição calculada acima. No executável, a tabela (0 ou 8) e o tamanho da área cliente vêm da tela virtual (`data/video.json` → `resolucao_virtual`, regra em `data/resolucao.json`; ver [../telas/resolucao.md](../telas/resolucao.md)); `data/jogo.json` → `tabela_posicoes` ficou para os testes e exemplos. Texto ainda não é desenhado: falta especificar as fontes. As janelas 34 e 3 não têm texto visível.
