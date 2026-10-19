@@ -73,6 +73,9 @@ pub struct Extras {
     /// Primeira leitura de `_MacTickCount` feita pelo tick depois de fechada uma caixa modal
     /// (`MacTickCount_depois_da_caixa` do extras.json; só em `antes`).
     pub relogio_depois_da_caixa: Option<u32>,
+    /// `_DROPdir` (`9:9c66`, fora do save): direção da comida que cai na casa (superficie.md 8.2);
+    /// `None` em vetores anteriores à captura (vale o 0 do port).
+    pub drop_dir: Option<u8>,
 }
 
 #[derive(Deserialize)]
@@ -98,6 +101,8 @@ struct ExtrasJson {
     edicao_aberta: Option<bool>,
     #[serde(rename = "Baloes", default)]
     baloes: Option<HashMap<String, i64>>,
+    #[serde(rename = "DROPdir", default)]
+    drop_dir: Option<i64>,
 }
 
 impl From<ExtrasJson> for Extras {
@@ -117,6 +122,7 @@ impl From<ExtrasJson> for Extras {
             vista_edicao: j.vista_edicao,
             edicao_aberta: j.edicao_aberta,
             relogio_depois_da_caixa: None,
+            drop_dir: j.drop_dir.map(|v| v as u8),
         }
     }
 }
@@ -266,6 +272,9 @@ pub fn montar_entrada(v: &VetorTick, layout: &LayoutSave) -> Result<Entrada, Str
     e.relogio_mac = x.relogio_mac;
     e.tindex = x.tindex as i32;
     e.tecla_global = x.global_key;
+    if let Some(d) = x.drop_dir {
+        e.passo_queda = super::casa::TabelasCasa::padrao().passo_queda(d);
+    }
     e.superficie.vida.dados.clone_from(&v.vida_antes.a);
     e.ninho_b.vida.dados.clone_from(&v.vida_antes.b);
     e.ninho_r.vida.dados.clone_from(&v.vida_antes.r);
@@ -799,6 +808,11 @@ pub fn aplicar_acao(
         // Cada passo: ferramenta e subopção (escritas na memória na bancada), Ctrl, e as células por
         // onde o cursor passou com o botão apertado (a primeira = onde apertou).
         let mut efeitos = Vec::new();
+        // `_LionListX[−1]` da bancada (byte alto do seletor de `_EggStr`, memória do Windows), quando
+        // a ação passa por `_KillAntLion(-1)` (inimigos.md §1.4).
+        if let Some(x) = acao["leao_x_vaga_menos_1"].as_u64() {
+            e.leao_x_vaga_menos_1 = Some(x as u8);
+        }
         for p in passos {
             let f = p["f"].as_i64().ok_or("passo sem f")? as i16;
             let fer = Ferramenta::de_i16(f).ok_or(format!("ferramenta {f}"))?;

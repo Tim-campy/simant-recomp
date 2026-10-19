@@ -1,0 +1,92 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-19",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "rico",
+ "descricao": "Morte natural por casta (superficie.md 6.5, ninho.md 3.1): _HealthB = _HealthR = 1 com _AlwaysHealthy = 1; pretas e vermelhas da superfície e do ninho vermelho viram soldados e machos. 1761 soldado preto no ninho; 1763 soldado preto na superfície; 1772 operária vermelha na superfície (conta em _BAntsExpired); 1796 macho preto na superfície; 1811 rainha nova preta no ninho; 1842 macho vermelho na superfície",
+ "passos": [
+  "A[31] em (3, 34) T 0x13 -> 0x33",
+  "A[44] em (3, 31) T 0x15 -> 0x25 M 14",
+  "A[49] em (4, 34) T 0x12 -> 0x32",
+  "A[62] em (4, 32) T 0x15 -> 0x25 M 14",
+  "A[64] em (3, 30) T 0x14 -> 0x34",
+  "A[67] em (5, 34) T 0x14 -> 0x24 M 14",
+  "A[71] em (2, 32) T 0x14 -> 0x34",
+  "A[73] em (4, 33) T 0x11 -> 0x21 M 14",
+  "A[1] em (107, 30) T 0x9b -> 0xb3",
+  "A[3] em (106, 62) T 0x96 -> 0xa6 M 14",
+  "A[5] em (93, 59) T 0x97 -> 0xb7",
+  "A[12] em (124, 20) T 0x96 -> 0xa6 M 14",
+  "A[13] em (87, 28) T 0x96 -> 0xb6",
+  "A[15] em (120, 18) T 0x90 -> 0xa0 M 14",
+  "A[19] em (115, 24) T 0x96 -> 0xb6",
+  "A[21] em (85, 19) T 0x97 -> 0xa7 M 14",
+  "R[47] em (33, 2) T 0x93 -> 0xb3",
+  "AlwaysHealthy <- 1",
+  "HealthB <- 1",
+  "HealthR <- 1"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ]
+ },
+ "ticks": [
+  "tick_001761",
+  "tick_001763",
+  "tick_001772",
+  "tick_001796",
+  "tick_001811",
+  "tick_001842"
+ ],
+ "selecao": [
+  "1761",
+  "1763",
+  "1772",
+  "1796",
+  "1811",
+  "1842"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}

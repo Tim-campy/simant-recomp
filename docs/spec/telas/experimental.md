@@ -204,7 +204,7 @@ A vista do Experimental novo em `_MapPnt` = (52, 23) (seção acima) fecha com `
 - **Ctrl em cavar/encher** (`exp_ninho`, ninho preto pela vista Ctrl+9): cavar (28, 5), Ctrl+cavar na mesma célula (enche), Ctrl+encher em (29, 5) (cava) e arrasto de cavar de (24, 7) a (27, 7): 307/307 com o mesmo S.
 - **Cheiro** (`exp_cheiro`, superfície): alarme com clique curto em (60, 30), com o botão parado ~2 s em (66, 30) e Ctrl+alarme em (60, 30): 307/307 com **6 voltas paradas** no segundo (o passo `parado` do vetor; ~3 voltas por segundo na bancada, o ritmo do redesenho).
 
-**Não verificado no original:** formiga em ninho, inseticida sobre a aranha e a formiga-leão.
+**Não verificado no original:** formiga em ninho, inseticida sobre a aranha e sobre uma formiga-leão da lista. O inseticida num tile de formiga-leão **sem** entrada na lista (`_KillAntLion(-1)`) foi conferido em 2026-10-19 (ação `acoes/exp_leao_m1`, regras/inimigos.md §1.4).
 
 ## 10. Lacunas e divergências
 

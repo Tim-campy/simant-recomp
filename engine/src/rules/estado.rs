@@ -1207,6 +1207,10 @@ pub struct Estado {
     /// Jogo Completo; `_InitSimYard` põe 1 (jogo novo e Load, que chama `_RandYard`). `None` = não se
     /// sabe (estado lido de um vetor no meio da partida): vale o `_ColonyTotalRed` de antes da passada.
     pub ultimas_colonias_vermelhas: Option<i16>,
+    /// X da "vaga −1" da lista das formigas-leão (`_LionListX[−1]`, o byte alto do seletor de
+    /// `_EggStr`, fora do save): `None` enquanto é o seletor do Windows (desconhecido); depois de um
+    /// `_KillAntLion(-1)` com a lista não vazia, o X da formiga-leão 0 que saiu (inimigos.md §1.4).
+    pub leao_x_vaga_menos_1: Option<u8>,
     /// Pedidos à interface acumulados desde a última vez que foram retirados.
     pub eventos: Vec<Evento>,
     /// A janela de edição para os desenhos que o original faz DENTRO do tick (`_GotoMyAnt`,
@@ -1287,6 +1291,7 @@ impl Estado {
             camada_edicao: -1,
             passo_queda: (0, 255),
             ultimas_colonias_vermelhas: None,
+            leao_x_vaga_menos_1: None,
             eventos: Vec::new(),
             edicao_no_tick: None,
             transferencia_no_tick: None,

@@ -434,17 +434,23 @@ pub fn matar_formiga_leao(e: &mut Estado, t: &TabelasInimigos, k: usize) {
 
 /// `_KillAntLion(-1)` (inimigos.md §1.4): o Inseticida acertou um tile de formiga-leão sem entrada na
 /// lista. O original lê e grava a "vaga −1" de cada vetor, que são bytes de outras variáveis. O port
-/// reproduz o que cai no estado da partida: com `_LionIndex` > 0, a lista perde a entrada 0 (todas
-/// deslizam uma vaga, o contador cai 1), o byte alto de `_BoyMsgCnt` recebe o T da entrada 0 e o
-/// byte alto de `_LastThemeSong` recebe o Y dela. Não reproduz o `_SetMap(1, X[−1], Y[−1], 0x3F)`,
-/// cujo x é o byte alto do seletor de `_EggStr` (memória do Windows, fora do port), nem as gravações
-/// em `_EggStr`, `_CenterPnt` e `_mapOutBuf` (interface; no original podem corromper ponteiros).
+/// reproduz o que cai no estado da partida: `_SetMap(1, X[−1], Y[−1], 0x3F)` com Y[−1] = byte alto de
+/// `_LastThemeSong` e X[−1] = `Estado::leao_x_vaga_menos_1` (sem ele, o byte alto do seletor de
+/// `_EggStr`, memória do Windows: o port não grava); com `_LionIndex` > 0, a lista perde a entrada 0
+/// (todas deslizam uma vaga, o contador cai 1) e a vaga −1 recebe os campos dela: X em
+/// `leao_x_vaga_menos_1`, T no byte alto de `_BoyMsgCnt`, Y no de `_LastThemeSong`. Não reproduz as
+/// gravações em `_CenterPnt` e `_mapOutBuf` (interface). Conferido na bancada (2026-10-19, ação
+/// `exp_leao_m1`: oito jatos, 0x3F no centro das duas formigas-leão que saíram).
 pub fn matar_formiga_leao_sem_entrada(e: &mut Estado) {
+    if let Some(x) = e.leao_x_vaga_menos_1 {
+        let y = (e.partida.ultima_musica as u16 >> 8) as i32;
+        e.superficie.mapa.definir(i32::from(x), y, 0x3F);
+    }
     let fl = &mut e.formigas_leao;
     if fl.quantidade <= 0 {
         return;
     }
-    let (t0, y0) = (fl.t[0], fl.y[0]);
+    let (x0, t0, y0) = (fl.x[0], fl.t[0], fl.y[0]);
     fl.quantidade -= 1;
     let n = (fl.quantidade as usize).min(9);
     fl.x.copy_within(1..n + 1, 0);
@@ -452,6 +458,7 @@ pub fn matar_formiga_leao_sem_entrada(e: &mut Estado) {
     fl.t.copy_within(1..n + 1, 0);
     fl.m.copy_within(1..n + 1, 0);
     fl.s.copy_within(1..n + 1, 0);
+    e.leao_x_vaga_menos_1 = Some(x0);
     let m = &mut e.menino;
     m.boy_msg_cnt = ((m.boy_msg_cnt as u32 & 0x00FF_FFFF) | (u32::from(t0) << 24)) as i32;
     let p = &mut e.partida;
@@ -1279,6 +1286,10 @@ mod testes {
         assert_eq!(e.menino.boy_msg_cnt, 0x0401_2345);
         assert_eq!(e.partida.ultima_musica, 11 * 256 + 2);
         assert_eq!(e.superficie.mapa, mapa);
+        // A segunda chamada grava 0x3F onde estava a formiga-leão que saiu (X e Y da vaga −1).
+        matar_formiga_leao_sem_entrada(&mut e);
+        assert_eq!(e.superficie.mapa.em(10, 11), Some(0x3F));
+        assert_eq!(e.formigas_leao.quantidade, 1);
         // Sem formigas-leão, nada.
         let mut v = Estado::vazio();
         matar_formiga_leao_sem_entrada(&mut v);

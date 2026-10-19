@@ -749,6 +749,7 @@ EXTRAS = {
     "Tindex": ("Tindex", 2),           # 9:9b6a, índice global das listas
     "GlobalKey": ("GlobalKey", 2),     # 9:7866, última tecla (0xA8 dispara chuva em _DoSimYard)
     "TimeTemp": ("TimeTemp", 4),       # 9:9b10, prazo/marco do tutorial (conselhos.md), fora do save
+    "DROPdir": ("DROPdir", 2),         # 9:9c66, direção da comida que cai na casa (superficie.md 8.2), fora do save
 }
 # Mapas de ocupação (campo T por célula), fora do save; gravados à parte (vida_antes.bin / vida_depois.bin)
 VIDA = (("LifeA", 8192), ("LifeB", 4096), ("LifeR", 4096))

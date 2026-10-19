@@ -54,7 +54,8 @@ _fechar_original = Sessao.fechar_caixa_ate_o_retorno
 # pode chegar à janela de edição depois de a caixa sumir e virar uma ordem para a amarela (visto em
 # `fome`: destino (40, 9) e um passo dados pelo clique), e um clique cortado pela parada no retorno
 # deixaria o botão apertado para o Windows; o send-key solta a tecla sozinho
-Sessao.fechar_caixa_ate_o_retorno = lambda self, k, limite=15: _fechar_original(self, 1 if k < 4 else k, limite)
+Sessao.fechar_caixa_ate_o_retorno = lambda self, k, limite=15, relogio=None: _fechar_original(
+    self, 1 if k < 4 else k, limite, relogio)
 
 
 # ------------------------------------------------------------------------------------------------

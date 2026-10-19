@@ -144,6 +144,8 @@ Detalhes e ordem de sorteios em [ninho.md](ninho.md#5-cuidar-das-crias-m--1-_don
 
 ### 5.2 Cabeça, a cada tick (`_SimQueenB`, grupo 12)
 
+**Verificado (2026-10-19, vetores `rainha_fome` e `rainha_vermelha_fome`, testes-tick.md "Sétima rodada"):** com `_HealthB` = 0 a cabeça preta morre no 1775 com o diálogo 10015 aberto dentro do tick e a cauda some no tick seguinte, quando `_BlkQueens` vai a 0; o mesmo na vermelha (10016) com `_HealthR` = 0. A imunidade à morte natural (M = 9) está no vetor `ninho_n02`.
+
 ```
 se Sk(64) == 0:
     se _HealthB == 0:                                   (R: _HealthR)

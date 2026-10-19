@@ -4,14 +4,14 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 
 **Medições desta revisão** (comandos rodados nesta data):
 
-- `cargo test --workspace` com `SIMANT_DIR` = `SimAnt-T/MAXIS/ANTWIN`: **591 testes passaram, 0 falharam, 0 ignorados**, em 36 binários de teste (unitários de `engine` e `simant` e 33 arquivos de integração em `engine/tests/`). `cargo clippy --workspace --all-targets -- -D warnings`: sem avisos.
+- `cargo test --workspace` com `SIMANT_DIR` = `SimAnt-T/MAXIS/ANTWIN`: **591 testes passaram, 0 falharam, 0 ignorados**, em 36 binários de teste (603 depois da sétima rodada de vetores e do merge do áudio FM, mesma data) (unitários de `engine` e `simant` e 33 arquivos de integração em `engine/tests/`). `cargo clippy --workspace --all-targets -- -D warnings`: sem avisos.
 - Vetores do original no repositório (`tests/referencias/`, contados nas pastas e na saída dos testes):
-  - **173 vetores de tick** (5 na raiz e 168 em 50 subpastas de `ticks/`): **172 exigidos 307/307** blocos, com extras e vida, por `engine/tests/ticks_originais.rs`; o 173.º (`inseticida_morte/21`, fim de jogo) é conferido pela interface (`fim_de_jogo_interface.rs`), 307/307 com S e R. Nenhum vetor pendente.
+  - **204 vetores de tick** (5 na raiz e 199 em 66 subpastas de `ticks/`; eram 173 antes da sétima rodada, `regras/testes-tick.md`): **203 exigidos 307/307** blocos, com extras e vida, por `engine/tests/ticks_originais.rs`; o restante (`inseticida_morte/21`, fim de jogo) é conferido pela interface (`fim_de_jogo_interface.rs`), 307/307 com S e R. Nenhum vetor pendente.
   - **2 sequências longas** (`ticks_longos/rico_200`, 200 ticks; `full_600`, 600 ticks do Jogo Completo com a Yard View na frente, inclusive os 17.650 passos de S do desenho entre os ticks): iguais ao original.
-  - **15 ações da interface** (`acoes/`: troca de patch e da casa, PLACE dentro e fora, `_SpecialXfer`, Quick → Experimental, Start Game, Ctrl e arrasto, ninho e cheiro do Experimental, chuva e enxame desenhados, dois Mystery): todas 307/307.
+  - **16 ações da interface** (`acoes/`: inseticida num tile de formiga-leão sem entrada, desde a sétima rodada; troca de patch e da casa, PLACE dentro e fora, `_SpecialXfer`, Quick → Experimental, Start Game, Ctrl e arrasto, ninho e cheiro do Experimental, chuva e enxame desenhados, dois Mystery): todas 307/307.
   - **1 Load do tutorial** (`load_tutorial/`): 307/307.
   - **21 casos de regra** da bancada (`casos/*.json`): 20 confirmados no original e iguais no port; C-10 não conferível (mensagem modal no Load). (C-04 a C-07 viraram vetores de tick.)
-  - 74 roteiros de bancada em `tests/referencias/roteiros/`.
+  - 76 roteiros de bancada em `tests/referencias/roteiros/`.
 - Cobertura por nome das funções do original (heurística, §2.13): das 1.319 funções dos segmentos de código 1–7, **497 (38%) aparecem pelo nome no código ou nos dados do port** e 715 (54%) no código ou nas specs (eram 452 e 663 na revisão anterior). Nos módulos de regras `SIMONE` e `SIMANT1`, 185 de 292 (63%) estão no código e só 24 não aparecem em lugar nenhum.
 
 ## 1. Resumo
@@ -54,14 +54,14 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 
 - **Completo e verificado:** ordem do tick (`_DoAntSim`), geradores S e R, superfície (lista A, feromônios, luta, comida, entrada no ninho, líder vermelha), ninhos preto e vermelho (escavação, comida, saída, invasoras, água), ciclo de vida (ovos, rainha, castas, casos C-04 a C-07), inimigos (formiga-leão com cerco, aranha com cerco, fuga, vingança, faro, laser e aranha do jogador com e sem AutoTrack, lagarta, bicho-de-conta), formiga amarela (andar, contorno, comer, ninho, luta, as mortes 1–10, choque, loucura), quintal (menino, cortador, inseticida, gato, cachorro, pássaro, chuva, enxames, `_SimColonies`), conselhos e tutorial no tick, trapaças, e o **desenho dentro do tick** (sorteios do redesenho da janela de edição em `_GotoMyAnt`, nas animações, na trofalaxia e em `_DoAntMoveY`, inclusive com "Silly" e com o `_TickCount` do momento). Evidência: 173 vetores, 2 sequências, 15 ações, 20 casos.
 - **Feito nesta rodada (2026-10-19):** `_ExitHole` com a lista A cheia igual ao original (a formiga vai para a folga da vaga 1000 e se perde; a compactação deixa uma vaga com resto; `regras/ninho.md` §4.6); `_KillAntLion(-1)` do Inseticida reproduzido no que cai no estado (a formiga-leão 0 sai da lista; bytes altos de `_BoyMsgCnt` e `_LastThemeSong`), sem as gravações em ponteiros do Windows (`regras/inimigos.md` §1.4); `_LastColonyPopR` fora do save (1 depois de `_InitSimYard` e do Load; `regras/quintal.md`). Nenhum dos três tem caso na bancada.
-- **Implementado, não verificado:** a lista consolidada está em §3 (morte natural, proporção de vitórias, revoada natural, estratégia vermelha, recrutamento, N-02/04/05/08/11, afogamento de adultas, defeitos do original marcados [hipótese], os três itens acima).
+- **Implementado, não verificado:** a lista consolidada está em §3 (estratégia vermelha, recrutamento, defeitos do original marcados [hipótese]). **Conferidos em 2026-10-19 (sétima rodada de vetores, `regras/testes-tick.md`):** morte natural por casta e das rainhas, proporção de vitórias, revoada natural, N-02/04/05/08/11, afogamento de adultas, lista A cheia em `_ExitHole`, `_KillAntLion(-1)` (com uma correção: o `_SetMap` da vaga −1), `_LastColonyPopR` depois do Load, o clique esquerdo no laço do `MYTIMERFUNC` e a queda de comida na casa nos dois carpetes.
 - **Parcial (divergência registrada):** `_SpecialXfer` troca de patch **depois** do tick (o original troca dentro do passo 17; S e R batem assim mesmo nos vetores e na ação `special_xfer`); desde 2026-10-18 a partida ao vivo reage à mensagem 10058.
 - **Falta:** modos 17/18 e grupos 10/11/15 sem significado conhecido (`formigas.md`); `_RevSpider` sem chamador visto (`inimigos.md`); chamadas indiretas de `_ForceModeA/B`, `_StartAttack`, `_GetNewRedTask` não procuradas (`superficie.md`); a direção dentro dos ninhos de `_GetRandDir`/`_GetDefendDir` (`feromonios.md`, "ainda não foi portada"; os vetores do ninho batem, então ou o caminho não é exercitado ou a spec está desatualizada — a conferir).
 
 ### 2.3 Geração de mundo
 
 - **Completo e verificado:** `_RandYard`/`_RandWorld` do Quick Game (`engine/tests/geracao_quick2.rs`); casa em quatro patches pelo `_XferPatch` (`xfer_casa`); `_InitPillar`; `_GenerateTutorial` no Load de `Tutorial.Ant` (`load_tutorial/`); jogo novo depois do fim de jogo (`inseticida_morte/21`).
-- **Implementado, não verificado** (`geracao-mundo.md`): `_CanBeHouseHole`; patches 5–7, 9, 15, 36/37 e cozinha sem pia; `_DigOutBNest/RNest`; ramos de Tutorial, Full e Experimental de `_InitYelloAnt`/`_RandWorld`; `_AddFood` com parâmetro ≥ 0; `_DROPdir` (guardado em `Estado::passo_queda` desde 2026-10-18) e a queda de comida na casa (`_DropFoodA`, `superficie.md` 8.2).
+- **Implementado, não verificado** (`geracao-mundo.md`): `_CanBeHouseHole`; patches 5–7, 9, 15, 36/37 e cozinha sem pia; `_DigOutBNest/RNest`; ramos de Tutorial, Full e Experimental de `_InitYelloAnt`/`_RandWorld`; `_AddFood` com parâmetro ≥ 0; a queda de comida na cozinha e nos ladrilhos (`_DROPdir` 2 e 0; os carpetes, 1 e 3, foram conferidos em 2026-10-19, `superficie.md` 8.2).
 - **Falta:** só verificação (saves gerados na bancada logo depois de cada tipo de jogo; `geracao-mundo.md` §"Como verificar").
 
 ### 2.4 Jogo ao vivo (laço, relógio, ritmo)
@@ -98,7 +98,7 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 ### 2.6 Diálogos e menus
 
 - **Completo e verificado:** barra de menus da janela principal (File, Window, View, Options, Speed; itens, marcas, aceleradores, navegação por teclado; 100% nas capturas m00–m08), About (98,81%), Status (`_ScoreDialog`, 100%), Quit (99,51%), quadros de mensagem, fim de jogo, "Saved correctly", pergunta do Load, Save As/Load (imitação), menus de segurar e de ícones, menu de ferramentas do Experimental, quadros animados da janela 26 (trofalaxia, 9100/9101, aranha, formiga-leão, vitória).
-- **Implementado, não verificado:** Load Game do "Select a Game" na abertura (o "Load Ant Hill" por cima; Cancel volta); Status no Full Game e no Experimental; a ajuda dos itens de menu com o modo de ajuda (`_ProcMenuHelp`); diálogos de arquivo modais em relação ao `WM_TIMER` [hipótese].
+- **Implementado, não verificado:** Cancel do "Load Ant Hill" aberto pela abertura (volta ao "Select a Game"; o Load Game em si foi conferido em 2026-10-19: o original fecha o "Select a Game" antes do diálogo, e o port passou a fazer o mesmo); Status no Full Game e no Experimental; a ajuda dos itens de menu com o modo de ajuda (`_ProcMenuHelp`); diálogos de arquivo modais em relação ao `WM_TIMER` [hipótese].
 - **Falta:** o menu de sistema e o título da janela principal (o port usa a janela do sistema operacional; por isso → no Speed volta direto ao File); o menu de um item (`editToExp`, janela 10) do botão de ferramentas no Quick Game (o port vira Experimental direto); os diálogos internos do WinHelp (Open, Print, Annotate, Define…).
 
 ### 2.7 Som e música
@@ -168,32 +168,31 @@ Formatos
 - Classes do campo T e bits 0–2 nas crias (`formatos/save-ant.md`, [hipótese]).
 
 Regras
-- Morte natural (T1), luta e proporção de vitórias (T5, T6), revoada natural (T8), estratégia vermelha (T9), recrutamento pelo jogador (T11) (`regras/superficie.md`).
+- Estratégia vermelha (T9), recrutamento pelo jogador (T11) (`regras/superficie.md`).
 - A lista 4/1100 por estágio (`regras/ciclo-de-vida.md`); amarela vermelha pondo ovo preto e recriação da cauda em lutas ([hipótese]).
 - Pedrinha cuspida pela formiga-leão (a regra; o desenho foi conferido).
-- Afogamento de adultas no ninho (1/100 por tick, `regras/ninho.md` 8.3) e N-02, N-04, N-05, N-08, N-11.
 - Defeitos do original marcados [hipótese] no ninho e coluna 106 de `_CarpetFloorR`.
 - Suavização dupla na volta de `_Cycle` e giro duplo de `_GetNestDir` (`regras/feromonios.md`).
 - Textos do balão do menino (lista 4/1200) (`regras/quintal.md`).
 - Seção 13 de `regras/formiga-amarela.md` além de Y-01..Y-04 e Y13; quadros do choque e da loucura com a janela de edição atrás.
 - Retorno exato de `_CalcScore` e o sentido da nota 3 (`regras/simulacao-visao-geral.md`).
-- Novos desta rodada, só pelo código: lista A cheia em `_ExitHole`, `_KillAntLion(-1)`, `_LastColonyPopR` depois do Load, saída do laço pelo clique esquerdo.
+- `_KillAntLion(-1)`: o x do primeiro `_SetMap` é o byte alto do seletor de `_EggStr` (memória do Windows; o port só o tem quando o vetor o traz).
 
 Geração de mundo
-- `_CanBeHouseHole`; patches da casa 5–7, 9, 15, 36/37 e cozinha sem pia; `_DigOutBNest/RNest`; ramos de Tutorial/Full/Experimental de `_InitYelloAnt`/`_RandWorld`; `_AddFood` com parâmetro ≥ 0; `_DROPdir` e a queda de comida na casa.
+- `_CanBeHouseHole`; patches da casa 5–7, 9, 15, 36/37 e cozinha sem pia; `_DigOutBNest/RNest`; ramos de Tutorial/Full/Experimental de `_InitYelloAnt`/`_RandWorld`; `_AddFood` com parâmetro ≥ 0; a queda de comida na cozinha e nos ladrilhos (`_DROPdir` 2 e 0).
 
 Jogo ao vivo
 - Taxa de fast/ultra em máquina real; cadência sem foco 170 → 220 ms; `mac_por_tick` fora da bancada.
 - O que o original mostra depois de `_XferPatch` (`_RandWorld` põe `_MapPnt` = (0x40, 0x20) e o original só redesenha; o port leva a vista até a amarela).
 
 Telas
-- Rainha amarela 0xFE (`telas/jogo.md`); cartões 127 e 129 do Info e clique em palavra em negrito.
+- Cartões 127 e 129 do Info e clique em palavra em negrito.
 - Telas maiores e perfil de driver: a VGA de 16 cores em 800×600 e 1024×768 (sem driver na bancada); Examine e mini mapa em 256 cores; as cores do perfil `svga256` além do título e do fundo (`divergencias.md`).
 - Altura mínima da edição e clique comido na janela de trás (`telas/janelas.md` §8, [hipótese]); contorno XOR e realce do menu de sistema.
 - Cores do mapa (`_ConvColor`, [hipótese]).
 - Clique direito no Experimental e nas janelas de controle, F1 com janela de controle, Shift+F1, Delete, `yardHelpBut`, cursor das ferramentas (`telas/ajuda-contexto.md` §6).
-- Posição do menu de ferramentas no Quick Game; avisos do Experimental na faixa; botões da faixa 35 com bitmaps trocados.
-- Load Game da abertura; Status no Full Game e no Experimental; ajuda dos itens de menu.
+- Posição do menu de ferramentas no Quick Game; avisos do Experimental na faixa. Faixa 35 aberta com o jogo pausado: o original deixa vazios os números do quintal e as barras de saúde até o próximo redesenho, o port os desenha (`divergencias.md`, 2026-10-19).
+- A janela do mapa atrás logo depois de um Load (o original a desenha; o port a deixa preta na exportação, `divergencias.md`); Status no Full Game e no Experimental; ajuda dos itens de menu.
 
 Som
 - Comparado só na abertura (andamento, notas, volume relativo, timbre aproximado; `regras/som.md`). Sem captura: as outras músicas, os efeitos dentro do jogo (taxa real na SB16), os sons da luta no tempo, a preempção no mesmo milissegundo e os sons da janela 26.
@@ -242,8 +241,8 @@ Não há outro item de alto impacto: tudo o que o jogador alcança no original e
 | Item | Esforço |
 |---|---|
 | Captura das outras músicas e dos efeitos dentro do jogo no DOSBox-X (a abertura e o nível de um efeito já estão: `tools/som_dosbox.py`) | M |
-| Vetores ou casos para os ramos raros de §3 (morte natural, proporção de vitórias, revoada natural, estratégia vermelha, recrutamento, N-02/04/05/08/11, afogamento, lista A cheia, `_KillAntLion(-1)`, Load de Jogo Completo sem vermelhas) | M |
-| Capturas: rainha amarela 0xFE, Load Game da abertura, Status no Full/Experimental, telas maiores, avisos do Experimental, faixa 35 com botões trocados, o que se vê depois de `_XferPatch` | P |
+| Vetores ou casos para os ramos raros que restam em §3 (estratégia vermelha, recrutamento, queda de comida na cozinha e nos ladrilhos); os demais foram feitos em 2026-10-19 (sétima rodada) | P–M |
+| Capturas: Status no Full/Experimental, telas maiores, avisos do Experimental, o que se vê depois de `_XferPatch` | P |
 | Saves gerados na bancada logo depois de Tutorial/Full/Experimental para os ramos da geração | P |
 | Ritmo fast/ultra numa máquina real | P |
 
