@@ -8,11 +8,13 @@
 //!   retorno de `_DoAntSim`;
 //! - `vida_antes.bin` / `vida_depois.bin`: `_LifeA` (8.192) + `_LifeB` (4.096) + `_LifeR` (4.096);
 //! - `extras.json`: `{"antes": {...}, "depois": {...}}` com sementes S e R, `_gameCycles`, `_Tindex`,
-//!   `_GlobalKey`, `GameTime` e `Cycle`.
+//!   `_GlobalKey`, `GameTime` e `Cycle`; opcionalmente as variáveis dos balões "Silly" (`Baloes`, fora
+//!   do save) e as leituras de `_TickCount` do desenho dentro do tick (`TickCount_lidos`).
 //!
 //! Uso: [`VetorTick::ler`] → [`comparar_tick`] → [`RelatorioTick`] (implementa `Display`).
 //! Ferramenta de linha de comando: `cargo run -p engine --example comparar_tick -- <dir>`.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
 
@@ -94,6 +96,8 @@ struct ExtrasJson {
     vista_edicao: Option<(i32, i32)>,
     #[serde(rename = "EdicaoAberta", default)]
     edicao_aberta: Option<bool>,
+    #[serde(rename = "Baloes", default)]
+    baloes: Option<HashMap<String, i64>>,
 }
 
 impl From<ExtrasJson> for Extras {
@@ -123,6 +127,16 @@ struct ExtrasArquivo {
     depois: ExtrasJson,
     #[serde(rename = "MacTickCount_depois_da_caixa", default)]
     depois_da_caixa: Vec<Option<i64>>,
+    #[serde(rename = "TickCount_lidos", default)]
+    tick_count_lidos: Vec<LeituraTickCount>,
+}
+
+/// Uma leitura de `_TickCount` (`GetTickCount() / 55`) feita dentro do tick: quem leu (`seg:off` do
+/// retorno, ou `_MacTickCount`) e o valor.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct LeituraTickCount {
+    pub de: String,
+    pub v: i64,
 }
 
 /// Um vetor de tick do original, já lido.
@@ -136,6 +150,12 @@ pub struct VetorTick {
     pub vida_depois: CamadasVida,
     pub extras_antes: Extras,
     pub extras_depois: Extras,
+    /// Variáveis dos balões "Silly" na entrada e no retorno do tick (`Baloes` do extras.json; nomes de
+    /// `tools/cenarios_tick.py`, `VARS_BALOES`), quando gravadas.
+    pub baloes_antes: Option<HashMap<String, i64>>,
+    pub baloes_depois: Option<HashMap<String, i64>>,
+    /// Leituras de `_TickCount` dentro do tick, na ordem (vazio em vetores sem a captura).
+    pub tick_count_lidos: Vec<LeituraTickCount>,
 }
 
 fn ler_arquivo(dir: &Path, nome: &str) -> Result<Vec<u8>, String> {
@@ -163,7 +183,8 @@ impl VetorTick {
         let vida_antes = vida_de_bytes(&ler_arquivo(dir, "vida_antes.bin")?)?;
         let vida_depois = vida_de_bytes(&ler_arquivo(dir, "vida_depois.bin")?)?;
         let texto = String::from_utf8(ler_arquivo(dir, "extras.json")?).map_err(|e| e.to_string())?;
-        let ex: ExtrasArquivo = serde_json::from_str(&texto).map_err(|e| format!("{nome}/extras.json: {e}"))?;
+        let mut ex: ExtrasArquivo = serde_json::from_str(&texto).map_err(|e| format!("{nome}/extras.json: {e}"))?;
+        let (baloes_antes, baloes_depois) = (ex.antes.baloes.take(), ex.depois.baloes.take());
         Ok(VetorTick {
             nome,
             antes,
@@ -175,6 +196,9 @@ impl VetorTick {
                 ..Extras::from(ex.antes)
             },
             extras_depois: ex.depois.into(),
+            baloes_antes,
+            baloes_depois,
+            tick_count_lidos: ex.tick_count_lidos,
         })
     }
 }
@@ -248,9 +272,81 @@ pub fn montar_entrada(v: &VetorTick, layout: &LayoutSave) -> Result<Entrada, Str
     // A janela de edição da bancada, para os desenhos de dentro do tick (`desenho::EdicaoNoTick`).
     if x.edicao_aberta.unwrap_or(true) {
         let (w, h) = x.vista_edicao.unwrap_or(VISTA_BANCADA);
-        e.edicao_no_tick = Some(Box::new(super::desenho::EdicaoNoTick::padrao(w, h)));
+        let mut j = super::desenho::EdicaoNoTick::padrao(w, h);
+        if let Some(t) = relogio_do_tick(v) {
+            j.tick_count = t;
+        }
+        e.edicao_no_tick = Some(Box::new(j));
+    }
+    if let Some(b) = &v.baloes_antes {
+        aplicar_baloes(&mut e, b);
     }
     Ok(Entrada { estado: e, vida_reconstruida, pendencias_vida, ida_e_volta })
+}
+
+/// `_TickCount` do começo do tick para o desenho dentro do tick (`desenho::EdicaoNoTick::tick_count`):
+/// a primeira leitura gravada (do desenho ou de `_MacTickCount`, que lê o mesmo relógio). `None` sem
+/// leituras.
+pub fn relogio_do_tick(v: &VetorTick) -> Option<u32> {
+    v.tick_count_lidos.first().map(|l| l.v as u32)
+}
+
+/// Variáveis dos balões por fala (`rules::baloes::Fala`, nessa ordem): prazo, fala ligada e índice.
+const BALOES_PRAZO: [&str; 6] =
+    ["BFightBalloonTicks", "RFightBalloonTicks", "EggBalloonTicks", "QueenBalloonTicks", "RestBalloonTicks", "SpidBalloonTicks"];
+const BALOES_LIGADO: [&str; 6] =
+    ["WantBFightBalloon", "WantRFightBalloon", "WantEggBalloon", "WantQueenBalloon", "WantRestBalloon", "WantSpiderBalloon"];
+const BALOES_INDICE: [&str; 6] =
+    ["BFightBalloonIndex", "RFightBalloonIndex", "EggBalloonIndex", "QueenBalloonIndex", "RestBalloonIndex", "8:87da"];
+/// Por tipo do tick (`rules::baloes::TipoBalao`: luta, descanso, rainha, ovo): contagem, ponto e plano
+/// atuais, último ponto.
+const BALOES_TIPO: [[&str; 4]; 4] = [
+    ["FightBalloonCnt", "CurFightPnt", "CurFightPlane", "LastFightPnt"],
+    ["RestBalloonCnt", "CurRestPnt", "CurRestPlane", "LastRestPnt"],
+    ["QueenBalloonCnt", "CurQueenPnt", "CurQueenPlane", "LastQueenPnt"],
+    ["EggBalloonCnt", "CurEggPnt", "CurEggPlane", "LastEggPnt"],
+];
+
+/// Um `Point` do original (4 bytes: x na palavra baixa, y na alta).
+fn ponto(v: i64) -> (i16, i16) {
+    ((v & 0xFFFF) as u16 as i16, ((v >> 16) & 0xFFFF) as u16 as i16)
+}
+
+/// Põe em `Estado::baloes` (fora do save) as variáveis gravadas na entrada do tick.
+fn aplicar_baloes(e: &mut Estado, b: &HashMap<String, i64>) {
+    let g = |k: &str| b.get(k).copied().unwrap_or(0);
+    let x = &mut e.baloes;
+    for (i, [cnt, atual, plano, ultimo]) in BALOES_TIPO.iter().enumerate() {
+        x.contagem[i] = g(cnt) as i16;
+        x.atual[i] = ponto(g(atual));
+        x.atual_plano[i] = g(plano) as i16;
+        x.ultimo[i] = ponto(g(ultimo));
+    }
+    for i in 0..6 {
+        x.prazo[i] = g(BALOES_PRAZO[i]) as u32;
+        x.ligado[i] = g(BALOES_LIGADO[i]) != 0;
+        x.indice[i] = g(BALOES_INDICE[i]) as i16;
+    }
+    x.modo_aranha_visto = g("LastSMode") as i16;
+    x.quantidade = 0;
+    if b.contains_key("editWidth") {
+        x.vista = (g("editWidth") as i16, g("editHeight") as i16);
+    }
+}
+
+/// Os balões depois do tick, comparados quando o vetor os tem: prazos, falas ligadas, índices e o
+/// `_SMode` visto pelo balão da aranha.
+fn comparar_baloes(original: &HashMap<String, i64>, e: &Estado) -> Vec<ComparacaoExtra> {
+    let b = &e.baloes;
+    let o = |k: &str| original.get(k).copied().unwrap_or(0);
+    let mut v = Vec::new();
+    for i in 0..6 {
+        v.push(ComparacaoExtra { nome: BALOES_PRAZO[i], original: o(BALOES_PRAZO[i]) as u32, port: b.prazo[i] });
+        v.push(ComparacaoExtra { nome: BALOES_LIGADO[i], original: u32::from(o(BALOES_LIGADO[i]) != 0), port: u32::from(b.ligado[i]) });
+        v.push(ComparacaoExtra { nome: BALOES_INDICE[i], original: o(BALOES_INDICE[i]) as u16 as u32, port: b.indice[i] as u16 as u32 });
+    }
+    v.push(ComparacaoExtra { nome: "LastSMode", original: o("LastSMode") as u16 as u32, port: b.modo_aranha_visto as u16 as u32 });
+    v
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -530,13 +626,16 @@ pub fn comparar_com(
     }
 
     let x = &v.extras_depois;
-    let extras = vec![
+    let mut extras = vec![
         ComparacaoExtra { nome: "SementeS", original: x.semente_s as u32, port: e.s.semente() as u32 },
         ComparacaoExtra { nome: "SementeR", original: x.semente_r, port: e.r.estado() },
         ComparacaoExtra { nome: "gameCycles", original: x.game_cycles, port: e.ciclos_jogo },
         ComparacaoExtra { nome: "Tindex", original: x.tindex as u16 as u32, port: e.tindex as u16 as u32 },
         ComparacaoExtra { nome: "GlobalKey", original: x.global_key as u16 as u32, port: e.tecla_global as u16 as u32 },
     ];
+    if let Some(b) = &v.baloes_depois {
+        extras.extend(comparar_baloes(b, &e));
+    }
 
     Ok(RelatorioTick {
         nome: v.nome.clone(),
@@ -786,6 +885,9 @@ pub fn rodar_sequencia(dir: &Path, layout: &LayoutSave, regras: &mut dyn Regras)
         vida_depois: vida_inicio,
         extras_antes: x0,
         extras_depois: d0,
+        baloes_antes: None,
+        baloes_depois: None,
+        tick_count_lidos: Vec::new(),
     };
     let mut e = montar_entrada(&v, layout)?.estado;
     let mut primeiro_sorteio_diferente = None;

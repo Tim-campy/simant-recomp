@@ -866,6 +866,218 @@ def cenario_bichos_desenho(c: Sessao, saida, n):
     return []
 
 
+# ------------------------------------------------------------------------------------------------
+# Desenho dentro do tick: AutoTrack da aranha do jogador, aranha à vista em _DoAntMoveY e balões
+# "Silly" (regras/rng.md, "Desenho dentro do tick")
+# ------------------------------------------------------------------------------------------------
+
+# _TickCount @ 1008:18ac (segmento de código 2, GetTickCount() / 55); _MacTickCount (1000:9694) o chama
+TICKCOUNT = (2, 6316)
+MAC_INI, MAC_FIM = 0x9694, 0x96A5
+MAX_TICKCOUNT = 400
+
+
+def retornos_tickcount(c: Sessao, nseg=3):
+    """Endereços (linear, "seg:off") logo depois de cada CALL far a _TickCount no segmento de código
+    `nseg` (3 = ANTEDIT: _DrawSpider, _DrawCurBalloons, mensagens do quintal): o padrão 9A off sel na
+    memória carregada, com o seletor real do segmento 2."""
+    mj = c.mj
+    sel3, sel2 = mj.seletor_codigo(nseg), mj.seletor_codigo(TICKCOUNT[0])
+    base, limite, _ = mj.descritor(sel3)
+    codigo = mj.ler_linear(base, limite + 1)
+    padrao = bytes([0x9A]) + struct.pack("<HH", TICKCOUNT[1], sel2)
+    out, k = [], codigo.find(padrao)
+    while k >= 0:
+        out.append((base + k + 5, f"{nseg}:{k + 5:04x}"))
+        k = codigo.find(padrao, k + 1)
+    return out
+
+
+def capturar_tick_relogio(c: Sessao, timeout=6):
+    """Como Sessao.capturar_tick, mais: as variáveis dos balões "Silly" (cenarios_tick.VARS_BALOES) em
+    `antes.Baloes` e `depois.Baloes`, e o valor de cada _TickCount lido pelo desenho dentro do tick
+    (`TickCount_lidos`: [{"de": "seg:off", "v": valor}], breakpoints logo depois dos CALL a _TickCount
+    do segmento 3, DX:AX lido ali; o laço de espera das animações, que lê o relógio sem parar, não é
+    interrompido). O relógio do Mac do vetor (`antes.MacTickCount`) é a primeira leitura de
+    _MacTickCount (breakpoint no RETF, só a primeira). Uma caixa modal (o tick não volta em `timeout`
+    s) é fechada com Enter, como em contar_no_tick."""
+    dep, mj = c.dep, c.mj
+    dep.ir_entrada()
+    out = {"estado_antes.bin": mj.estado(), "vida_antes.bin": dep.vida()}
+    ex = {"antes": {**dep.extras(), "Baloes": ct.ler_baloes(c)}}
+    g = mj.sessao_gdb()
+    sitios = dict(retornos_tickcount(c))
+    mac_ret = mj.linear_codigo(*qb.MACTICKCOUNT_RETF)
+    lidos, mac, dialogos = [], [], 0
+    armados = set(sitios) | {dep.retorno, mac_ret}
+    for a in armados:
+        g.breakpoint(a)
+    try:
+        while True:
+            try:
+                g.continuar_ate_parar(timeout)
+            except RuntimeError:
+                g.drenar()
+                g.s.sendall(b"$c#63")
+                time.sleep(0.2)
+                c.q.cmd("send-key", keys=[{"type": "qcode", "data": "ret"}], **{"hold-time": 150})
+                dialogos += 1
+                if dialogos > 6:
+                    raise
+                g.s.settimeout(60)
+                while not g._e_parada(g._proximo()):
+                    pass
+                g.s.settimeout(30)
+            pc, regs = dep.pc()
+            if pc == dep.retorno:
+                break
+            v = (regs["EDX"] & 0xFFFF) << 16 | (regs["EAX"] & 0xFFFF)
+            if pc == mac_ret:
+                mac.append(v)
+                lidos.append({"de": "_MacTickCount", "v": v})
+            elif pc in sitios:
+                lidos.append({"de": sitios[pc], "v": v})
+            else:
+                c.log(f"parada inesperada em {pc:#x}")
+                continue
+            # passa por cima: desliga, um passo, religa (o de _MacTickCount fica desligado)
+            g.breakpoint(pc, False)
+            if pc == mac_ret:
+                armados.discard(pc)
+                continue
+            g.drenar()
+            g.s.sendall(b"$s#73")
+            while not g._e_parada(g._proximo()):
+                pass
+            g.breakpoint(pc)
+    finally:
+        for a in armados:
+            g.breakpoint(a, False)
+    out["estado_depois.bin"] = mj.estado()
+    out["vida_depois.bin"] = dep.vida()
+    ex["depois"] = {**dep.extras(), "Baloes": ct.ler_baloes(c)}
+    ex["antes"]["MacTickCount"] = mac[0] if mac else None
+    ex["MacTickCount_lidos"] = mac[:1]
+    ex["TickCount_lidos"] = lidos
+    if dialogos:
+        ex["dialogos"] = dialogos
+    out["extras.json"] = ex
+    return out
+
+
+def gravar_relogio(c: Sessao, saida, n, parar=None):
+    """Como Sessao.gravar, com capturar_tick_relogio."""
+    nomes = []
+    for _ in range(n):
+        arqs = capturar_tick_relogio(c)
+        gt = arqs["extras.json"]["antes"]["GameTime"]
+        pasta = Path(saida).resolve() / f"tick_{gt:06d}"
+        for nome_arq, conteudo in arqs.items():
+            qb.gravar(pasta / nome_arq, conteudo)
+        nomes.append(pasta.name)
+        lidos = arqs["extras.json"]["TickCount_lidos"]
+        c.b.log(f"{pasta.name}: {[(x['de'], x['v']) for x in lidos][:40]}")
+        if parar and parar(ct.Save(arqs["estado_depois.bin"])):
+            break
+    return nomes
+
+
+def cenario_aranha_autotrack(c: Sessao, saida, n):
+    """A aranha do jogador com AutoTrack (_OptionStates[0] = 1): _MoveSpider chama _GotoMyAnt a cada
+    passo. Anda 8 células (_SMode 1: o desenho de dentro do tick não sorteia), depois o modo alvo
+    (tecla 1 e clique numa preta 10 células adiante): persegue (_SMode 2, palpos S1(4) a cada vez que
+    a vista anda) e come (_SMode 3)."""
+    x, y = virar_aranha(c)
+    c.escrever_elemento("OptionStates", 0, 1, 2)
+    nomes = []
+    c.clicar_celula(x + 8, y, pausado=True)
+    nomes += gravar_relogio(c, saida, n, parar=lambda d: d.ler("SpidX") >> 4 == x + 8)
+    c.entrada()
+    s = c.save()
+    sx, sy = c.ler("SpidX") >> 4, c.ler("SpidY") >> 4
+    vida_a = vida_ler(c, "A")
+    alvo = next((sx + dx, sy) for dx in range(10, 24) if livre_a(s, vida_a, sx + dx, sy))
+    mover_formiga(c, s, "A", pretas_da_superficie(s, 1)[0], *alvo, m=17)
+    c.teclas("1")
+    time.sleep(1)
+    c.clicar_celula(*alvo)
+    time.sleep(1)
+    c.entrada()
+    c.log(f"alvo {alvo}: _SMode = {c.ler('SMode')}, _MeSMode = {c.ler('MeSMode')}")
+    comeu = []
+
+    def parar(d):
+        if d.ler("SMode") == 3:
+            comeu.append(1)
+        return len(comeu) >= 3
+    nomes += gravar_relogio(c, saida, n, parar=parar)
+    return nomes
+
+
+def cenario_aranha_movey(c: Sessao, saida, n):
+    """Aranha à vista durante _DoAntMoveY, com "Silly": a aranha come parada (_SMode 3, _EatCnt 300) a
+    duas células de um buraco da superfície e a amarela, ao lado do buraco, recebe o clique nele. O
+    redesenho de antes de entrar no buraco sorteia os palpos e o balão da aranha (_LastSMode posto em 0,
+    diferente de 3: prazo novo com o _TickCount do momento); depois, o _GotoMyAnt leva a vista ao ninho.
+    Depois um clique na superfície ao lado do buraco: sair do ninho (o redesenho de antes da saída é no
+    ninho; o _GotoMyAnt de depois volta à superfície, com a aranha à vista)."""
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    esperar_compactacao(c)
+    s = c.save()
+    vida_a = vida_ler(c, "A")
+    buracos = [(x, y) for x in range(4, 120) for y in range(4, 58) if s.celula("MapA", x, y) == 0x50]
+    c.log(f"buracos da superfície: {buracos}")
+    livre = lambda x, y: 0 < x < 127 and 0 < y < 63 and s.celula("MapA", x, y) < 0x48 and vida_a[x * 64 + y] in (0, 0xFF)
+    escolha = next((x, y, ax, ay, sx, sy) for x, y in buracos for ax, ay in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
+                   if livre(ax, ay) for sx, sy in ((x - 3, y + 2), (x + 3, y + 2), (x - 3, y - 2), (x + 3, y - 2), (x, y + 3), (x, y - 3))
+                   if livre(sx, sy))
+    bx, by, ax, ay, sx, sy = escolha
+    por_amarela(c, 1, ax, ay, vida=100)
+    aranha_em(c, sx, sy, modo=3, direcao=2)
+    c.escrever("EatCnt", 300)
+    c.escrever_elemento("OptionStates", 5, 1, 2)
+    c.escrever("LastSMode", 0, 2)
+    c.log(f"buraco ({bx}, {by}); amarela ({ax}, {ay}); aranha ({sx}, {sy})")
+    nomes = []
+    c.clicar_celula(bx, by, pausado=True)
+    # o redesenho do timer entre o clique e este tick já viu _SMode 3: de novo 0, na entrada
+    c.escrever("LastSMode", 0, 2)
+    nomes += gravar_relogio(c, saida, n, parar=lambda d: d.ler("MePlane") != 1)
+    c.entrada()
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.entrada()
+    c.escrever("EatCnt", 300)
+    c.escrever("LastSMode", 0, 2)
+    c.clicar_celula(ax, ay, pausado=True)
+    c.escrever("LastSMode", 0, 2)
+    nomes += gravar_relogio(c, saida, n, parar=lambda d: d.ler("MePlane") == 1)
+    return nomes
+
+
+def cenario_morte_aranha_silly(c: Sessao, saida, n):
+    """Como `amarela_aranha` (a aranha come a amarela: _YellowDeath(1) com _AnimYellowFight), com
+    "Silly" e a música desligada (todos os quadros): o balão da aranha sorteia nos quadros com o
+    _TickCount de cada um. Confere se o desenho de dentro do tick usa o relógio do começo do tick."""
+    c.entrada()
+    esperar_compactacao(c)
+    s = c.save()
+    vida_a = vida_ler(c, "A")
+    x, y = lugar_aberto(s, vida_a, raio=2)
+    por_amarela(c, 1, x + 1, y, vida=100)
+    aranha_em(c, x, y, modo=2, direcao=2)
+    c.escrever("StargLife", 0xFF)
+    c.escrever("Starg", -1)
+    c.escrever_elemento("OptionStates", 5, 1, 2)
+    c.escrever_elemento("OptionStates", 1, 0, 2)
+    # sem Events: a caixa da aranha (_SpiderDialog) pararia o relógio no meio do tick
+    c.escrever_elemento("OptionStates", 3, 0, 2)
+    c.escrever("LastSMode", 3, 2)
+    return gravar_relogio(c, saida, n)
+
+
 VIDA_RICO = ("vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução "
              "de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a "
              "preparação também escreve marcas no mapa de vida")
