@@ -161,6 +161,7 @@ Para e avança a simulação exatamente um tick por vez. Detalhes, experimentos 
 - **Watchpoints de leitura** (`Z3`) em `Depurador.mapear_leituras`: o QEMU informa o início do watchpoint atingido, não o byte lido; por isso as faixas são cortadas em pedaços.
 - **Ritmo:** ~0,45 s por `passo_tick`; `ate_gametime` avança ~3 ticks/s (a VM livre faz ~6).
 - O jogo precisa estar rodando a simulação (não pausado nem minimizado); sem parada em 120 s, o script interrompe e desiste.
+- **Ramo que depende de sorteio:** grave o tick sem forçar nada, procure no port a semente S de entrada que leva ao ramo (`cargo run -p engine --release --example buscar_semente -- DIR_TICK SIMBOLO[ou NOME[i]] [VALOR|nz]`) e escreva-a (`SementeS`) na entrada do mesmo tick antes de gravar de novo (testes-tick.md, sétima e oitava rodadas).
 
 ## Logotipo com a metade superior branca (investigado)
 
