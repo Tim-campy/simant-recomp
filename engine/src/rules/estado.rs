@@ -1214,6 +1214,10 @@ pub struct Estado {
     /// fechada ou sem interface (nenhum desenho). Quem roda o tick (interface, comparador) preenche.
     /// regras/rng.md, "Desenho dentro do tick"; `rules::desenho::EdicaoNoTick`.
     pub edicao_no_tick: Option<Box<super::desenho::EdicaoNoTick>>,
+    /// A escolha de `_SpecialXfer` já conhecida (fora do save): com ela a troca de patch acontece
+    /// DENTRO do tick, onde o original a faz, e o resto do tick roda no patch novo. `None`: o tick só
+    /// pede a escolha (`Evento::EscolherColonia`). Depois do tick, `resultado` diz o que a troca fez.
+    pub transferencia_no_tick: Option<Box<super::troca_patch::TransferenciaNoTick>>,
     /// Índice das tabelas dos palpos da aranha no último redesenho da janela de edição (o `S1(4)` de
     /// `_DrawPalps`; 0 quando não há sorteio). Só para o desenho (`core::aranha_edicao`).
     pub palpos_aranha: u8,
@@ -1285,6 +1289,7 @@ impl Estado {
             ultimas_colonias_vermelhas: None,
             eventos: Vec::new(),
             edicao_no_tick: None,
+            transferencia_no_tick: None,
             palpos_aranha: 0,
         }
     }

@@ -1967,11 +1967,21 @@ fn reencarnar(e: &mut Estado, t: &TabelasAmarela) {
             e.partida.pretas_venceram = 0;
         } else if tipo == 2 {
             if e.preta.total_colonias > 1 {
-                // `_SpecialXfer`: o jogador escolhe outra colônia no mapa do quintal. O tick só pede a
-                // escolha; o efeito existe (`vetor_tick::transferencia_especial` + troca de patch), mas só
-                // os vetores o chamam: a interface ainda não liga a escolha [lacuna: interface].
+                // `_SpecialXfer`: o jogador escolhe outra colônia no mapa do quintal, aqui mesmo, e o
+                // resto do tick roda no patch novo. Com a escolha conhecida (`transferencia_no_tick`),
+                // a troca acontece agora; sem ela, o tick só a pede e a interface roda o tick de novo
+                // com a escolha (`Partida`, telas/quintal.md §8).
                 e.eventos.push(Evento::Mensagem(t.mensagens.outra_colonia));
-                e.eventos.push(Evento::EscolherColonia);
+                match e.transferencia_no_tick.take() {
+                    Some(mut x) if x.resultado.is_none() => {
+                        x.resultado = Some(super::troca_patch::transferir_com_escolha(e, &x));
+                        e.transferencia_no_tick = Some(x);
+                    }
+                    outro => {
+                        e.transferencia_no_tick = outro;
+                        e.eventos.push(Evento::EscolherColonia);
+                    }
+                }
             } else {
                 e.partida.fim_de_jogo = 1;
                 e.partida.pretas_venceram = 0;

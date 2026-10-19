@@ -463,7 +463,18 @@ fn clicar_sem_parada(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Par
     // o PLACE também chega aqui, dentro ou fora do alcance (bancada: acoes/place e place_fora).
     p.nav.pontos[0] = (i32::from(px), i32::from(py));
     p.estado.vistas.ponto_quintal = (px, py);
+    if j.escolhendo_colonia && p.tick_esperando_colonia() {
+        // O tick parado roda de novo com a escolha (a troca DENTRO do tick, como no original).
+        if let Err(r) = troca_patch::conferir_colonia(&mut p.estado, px, py) {
+            p.processar_eventos_do_estado();
+            return Ok(RespostaQuintal::Colonia(r));
+        }
+        let r = p.concluir_transferencia_especial(px, py).unwrap_or_else(|| Err("sem tick parado".into()))?;
+        j.escolhendo_colonia = false;
+        return Ok(RespostaQuintal::Colonia(troca_patch::ResultadoColonia::Trocou(r)));
+    }
     if j.escolhendo_colonia {
+        // Sem o tick guardado (pedido de fora do tick): a troca depois dele.
         let geracao = p.regras.geracao.as_ref().ok_or("tabelas de geração não carregadas (troca de patch)")?;
         let r = troca_patch::escolher_colonia(&mut p.estado, geracao, &p.cfg_simulacao, px, py)?;
         if let troca_patch::ResultadoColonia::Trocou(t) = r {

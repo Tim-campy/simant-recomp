@@ -352,6 +352,81 @@ fn transferencia_especial_ao_vivo() {
     assert_eq!(p.estado.ambiente.patch, (5, 8));
 }
 
+/// `_SpecialXfer` DENTRO do tick ao vivo (telas/quintal.md §8): a partir do vetor `acoes/special_xfer`
+/// (a amarela morre sem corpo no Jogo Completo com duas colônias), o tick para na escolha; o clique na
+/// colônia roda o tick de novo com a escolha. O resultado é o mesmo de um tick que já sabia a escolha
+/// (a troca no ponto do original e o resto do tick no patch novo), e só um tick passa.
+#[test]
+fn transferencia_especial_dentro_do_tick_ao_vivo() {
+    use engine::core::quintal_mapa::{clicar, iniciar_escolha_de_colonia, ConfigQuintalMapa, JanelaQuintal, RespostaQuintal};
+    use engine::rules::troca_patch::{ResultadoColonia, TransferenciaNoTick};
+    use engine::rules::vetor_tick::{montar_entrada, VetorTick};
+    let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+    if !jogo.join("SHARED.NDX").is_file() {
+        eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+        return;
+    }
+    let r = engine::recursos::Recursos::abrir(&jogo, &["SHARED".to_string()], &raiz().join("data"), None).unwrap();
+    let geracao = engine::rules::geracao::TabelasGeracao::carregar(&r).unwrap();
+    let layout = LayoutSave::carregar(&raiz().join("data/save_layout.json")).unwrap();
+    let v = VetorTick::ler(&raiz().join("tests/referencias/acoes/special_xfer"), &layout).unwrap();
+    let nova = || {
+        let e = montar_entrada(&v, &layout).unwrap().estado;
+        let nav = Navegacao::do_save(&v.antes, PosicaoVista::AoCarregar, 25, 19).unwrap();
+        let mut p = Partida::nova(
+            e,
+            nav,
+            RegrasOriginais { geracao: Some(geracao.clone()), ..RegrasOriginais::default() },
+            TabelasAmarela::padrao().clone(),
+            ConfigSimulacao::de_json(&ler("simulacao.json")).unwrap(),
+            ConfigPartida::de_json(&ler("partida.json")).unwrap(),
+            ConfigAvisos::de_json(&ler("mensagens.json")).unwrap(),
+        );
+        p.janelas_desenho = Default::default();
+        p
+    };
+    let tempo = nova().estado.partida.tempo;
+
+    // Referência: o tick que já sabe a escolha (10, 8).
+    let mut b = nova();
+    b.estado.transferencia_no_tick = Some(Box::new(TransferenciaNoTick {
+        patch: (10, 8),
+        geracao: std::sync::Arc::new(geracao.clone()),
+        cfg: ConfigSimulacao::de_json(&ler("simulacao.json")).unwrap(),
+        resultado: None,
+    }));
+    b.rodar_tick();
+    let feita = b.estado.transferencia_no_tick.take().and_then(|t| t.resultado);
+    assert!(matches!(feita, Some(Ok(_))), "{feita:?}");
+    assert_eq!(b.estado.ambiente.patch, (10, 8));
+
+    // Ao vivo: o tick para na escolha.
+    let mut a = nova();
+    a.rodar_tick();
+    assert!(a.escolher_colonia && a.tick_esperando_colonia());
+    let mut j = JanelaQuintal::default();
+    assert!(iniciar_escolha_de_colonia(&mut j, &mut a) || a.avisos.tem_modal());
+    while a.avisos.tem_modal() {
+        a.pular_modal();
+        a.fechar_modal();
+    }
+    iniciar_escolha_de_colonia(&mut j, &mut a);
+    assert!(j.escolhendo_colonia);
+    let cfg = ConfigQuintalMapa::de_json(&ler("quintal_mapa.json")).unwrap();
+    let ponto = |alvo| (0..640).flat_map(|x| (0..442).map(move |y| (x, y))).find(|&(x, y)| cfg.patch_em(x, y) == Some(alvo)).unwrap();
+    let (x, y) = ponto((10, 8));
+    let r = clicar(&mut j, &cfg, &mut a, x, y, false, false).unwrap();
+    assert!(matches!(r, RespostaQuintal::Colonia(ResultadoColonia::Trocou(_))), "{r:?}");
+    assert!(!a.escolher_colonia && !a.tick_esperando_colonia() && !j.escolhendo_colonia);
+    assert_eq!(a.estado.ambiente.patch, (10, 8));
+    assert_eq!(a.estado.partida.tempo, tempo + 1, "um tick só");
+    a.estado.eventos.clear();
+    b.estado.eventos.clear();
+    // Ao vivo a vista ainda vai até a amarela depois da troca (decisão do port, `_GotoMyAnt`: plano e canto da vista).
+    a.estado.vistas = b.estado.vistas.clone();
+    assert!(a.estado == b.estado, "o tick repetido com a escolha é igual ao tick que já a sabia");
+}
+
 /// O relógio do Mac da partida começa no maior prazo guardado no save (`_CatDelay` 2669 no QUICK2):
 /// o gato é testado já no primeiro tick, como num Windows ligado há mais tempo que a sessão que
 /// salvou (quintal.md, "Relógios do port").
