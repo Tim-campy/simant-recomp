@@ -220,6 +220,17 @@ impl Sessao<'_> {
             s.depois_de_abrir(a);
         }
         s.sincronizar_janelas();
+        // _NewGame (`1000:d6dc`): no Tutorial (tipo 0, escolhido no "Select a Game"; não no Load de
+        // Tutorial.Ant) a janela de edição é maximizada (`_win_Zoom(0)` = ShowWindow SW_MAXIMIZE) antes
+        // do _CenterEdit na amarela (telas/janelas.md §8).
+        if matches!(origem, Origem::Novo(_, TipoJogo::Tutorial) | Origem::NovoNaPartida(_, TipoJogo::Tutorial))
+            && !s.janelas.gerente.janela(janelas::ID_EDICAO).is_some_and(|j| j.maximizada())
+            && s.janelas.gerente.maximizar(janelas::ID_EDICAO)
+        {
+            s.sincronizar_janelas();
+            s.partida.centralizar_edicao_na_amarela();
+            s.sincronizar_janelas();
+        }
         mods_ui::avisar_teclas_ocupadas(&s);
         Ok(s)
     }
@@ -263,7 +274,8 @@ impl Sessao<'_> {
             self.info.carregar(self.recursos);
         }
         if self.janelas.aberta(Controle::Mapa) {
-            self.mapa.atualizar(&self.partida.estado, self.partida.mostrar_trilhas);
+            let na_tela = self.partida.tomar_mapa_na_tela();
+            self.mapa.atualizar_no_timer(&self.partida.estado, self.partida.mostrar_trilhas, na_tela);
         }
         // Janelas na ordem do gerenciador (janelas.md §8): as de baixo da de edição são desenhadas
         // entre a faixa e ela, as outras depois. As janelas filhas ficam dentro da área cliente da
@@ -610,6 +622,9 @@ impl Sessao<'_> {
         j.quintal_aberto = g.aberta(quintal);
         j.quintal_na_frente = topo == Some(quintal);
         j.edicao_aberta = g.aberta(janelas::ID_EDICAO);
+        let mapa = self.janelas.cfg.id(Controle::Mapa);
+        self.partida.mapa_aberto = g.aberta(mapa);
+        self.partida.mapa_na_frente = topo == Some(mapa);
         j.edicao_na_frente = topo == Some(janelas::ID_EDICAO);
         // `_win_IsWinInFront(0)` das animações de morte e de loucura da amarela (quantos quadros e
         // sorteios): a ordem real do gerenciador, no lugar do valor fixo de amarela.json.
@@ -641,6 +656,11 @@ mod testes_tela_virtual {
 
     /// QUICK2.ANT aberto na tela virtual dada (sem os arquivos do jogo, o teste é ignorado).
     fn quick2(resolucao: [u32; 2], f: impl FnOnce(&mut Sessao)) {
+        abrir(resolucao, None, f)
+    }
+
+    /// Jogo novo do tipo dado (semente 1), ou QUICK2.ANT com `None`, na tela virtual dada.
+    fn abrir(resolucao: [u32; 2], novo: Option<TipoJogo>, f: impl FnOnce(&mut Sessao)) {
         let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
         if !jogo.join("SHARED.NDX").is_file() {
             eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
@@ -652,9 +672,33 @@ mod testes_tela_virtual {
         let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
         let tela = recursos.dados::<ConfigResolucao>(ARQUIVO).unwrap().tela(resolucao).unwrap();
         let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
-        let origem = Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido);
+        let origem = match novo {
+            Some(tipo) => Origem::Novo(1, tipo),
+            None => Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido),
+        };
         let mut s = Sessao::abrir_na_tela(&recursos, &dados, origem, cores, Some(tela)).unwrap();
         f(&mut s);
+    }
+
+    #[test]
+    fn tutorial_abre_a_janela_de_edicao_maximizada_na_tela_virtual() {
+        // _NewGame: no Tutorial, _win_Zoom(0). Em 640×480 a vista fica com 39 × 21 células, como a
+        // _editWidth × _editHeight gravada pela bancada nos vetores do tutorial.
+        for (resolucao, vista) in [([640, 480], Some((39, 21))), ([800, 600], None)] {
+            abrir(resolucao, Some(TipoJogo::Tutorial), |s| {
+                let j = *s.janelas.gerente.janela(janelas::ID_EDICAO).unwrap();
+                assert!(j.maximizada(), "{resolucao:?}");
+                // maximizada, a moldura fica fora da área (como no Windows): cobre a largura toda da tela virtual
+                assert!(j.externo.esq <= 0 && j.externo.dir >= s.tela.cfg.largura as i16, "{resolucao:?}: {:?}", j.externo);
+                if let Some((w, h)) = vista {
+                    assert_eq!((s.partida.nav.vista.largura, s.partida.nav.vista.altura), (w, h));
+                }
+            });
+        }
+        // Os outros tipos não maximizam.
+        abrir([640, 480], Some(TipoJogo::Rapido), |s| {
+            assert!(!s.janelas.gerente.janela(janelas::ID_EDICAO).unwrap().maximizada());
+        });
     }
 
     fn externo(s: &Sessao, c: Controle) -> Retangulo {

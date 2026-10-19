@@ -174,14 +174,100 @@ pub fn reta_simant(q: &mut Quadro, x0: i32, y0: i32, x1: i32, y1: i32, cor: u8) 
     }
 }
 
+/// `_os_ClipLine` (`1018:6e24`), chamado por `_PlotLine` antes de percorrer a reta: recorta as pontas
+/// no retângulo `r` (bordas incluídas) por **bissecção** (telas/jogo.md, "Recorte das retas"). Com as
+/// duas pontas do mesmo lado de fora, nada; com as duas dentro, a reta inteira. Senão, uma ponta de
+/// fora (a primeira, se estiver fora) é trocada pelo ponto da borda achado dividindo ao meio o
+/// segmento até a outra (média com deslocamento aritmético); a borda testada é, nesta ordem, a de
+/// cima, a de baixo, a esquerda e a direita. Do lado de coordenada menor, o novo extremo anda 1 a mais
+/// (para a bissecção terminar). Repete até as duas pontas estarem dentro. O ponto achado não é, em
+/// geral, o da reta original: a reta recortada é percorrida de novo a partir dele.
+pub fn recortar_reta(r: Retangulo, a: (i32, i32), b: (i32, i32)) -> Option<((i32, i32), (i32, i32))> {
+    let (ox, oy) = (i32::from(r.esq), i32::from(r.topo));
+    let (xmax, ymax) = (i32::from(r.dir) - 1 - ox, i32::from(r.base) - 1 - oy);
+    let codigo = |(x, y): (i32, i32)| {
+        let mut c = 0;
+        if x < 0 {
+            c |= 8;
+        } else if x > xmax {
+            c |= 4;
+        }
+        if y < 0 {
+            c |= 1;
+        } else if y > ymax {
+            c |= 2;
+        }
+        c
+    };
+    let (mut a, mut b) = ((a.0 - ox, a.1 - oy), (b.0 - ox, b.1 - oy));
+    for _ in 0..8 {
+        let (ca, cb) = (codigo(a), codigo(b));
+        if ca & cb != 0 {
+            return None;
+        }
+        if ca | cb == 0 {
+            return Some(((a.0 + ox, a.1 + oy), (b.0 + ox, b.1 + oy)));
+        }
+        let (fora, c, dentro) = if ca != 0 { (a, ca, b) } else { (b, cb, a) };
+        let novo = if c & 1 != 0 {
+            bisseccao(fora, dentro, |p| p.1, 0, true)
+        } else if c & 2 != 0 {
+            bisseccao(fora, dentro, |p| p.1, ymax, false)
+        } else if c & 8 != 0 {
+            bisseccao(fora, dentro, |p| p.0, 0, true)
+        } else {
+            bisseccao(fora, dentro, |p| p.0, xmax, false)
+        };
+        if ca != 0 {
+            a = novo;
+        } else {
+            b = novo;
+        }
+    }
+    None
+}
+
+/// Divide ao meio o segmento `fora`–`dentro` até o ponto médio cair na borda `eixo(p) == borda`.
+/// `fora_menor`: a ponta de fora está do lado das coordenadas menores (cima/esquerda).
+fn bisseccao(fora: (i32, i32), dentro: (i32, i32), eixo: impl Fn((i32, i32)) -> i32, borda: i32, fora_menor: bool) -> (i32, i32) {
+    let (mut o, mut i) = (fora, dentro);
+    let mais_um = |m: (i32, i32)| if eixo((1, 0)) == 1 { (m.0 + 1, m.1) } else { (m.0, m.1 + 1) };
+    for _ in 0..64 {
+        let m = ((o.0 + i.0) >> 1, (o.1 + i.1) >> 1);
+        let v = eixo(m);
+        if v == borda {
+            return m;
+        }
+        match (v < borda, fora_menor) {
+            (true, true) => o = mais_um(m),
+            (false, true) => i = m,
+            (true, false) => i = mais_um(m),
+            (false, false) => o = m,
+        }
+    }
+    o
+}
+
+/// `_PlotLine` com o recorte do quadro (`_os_ClipLine`): a reta recortada antes de ser percorrida.
+fn reta_recortada(q: &mut Quadro, a: (i32, i32), b: (i32, i32), cor: u8) {
+    let (a, b) = match q.recorte {
+        Some(r) => match recortar_reta(r, a, b) {
+            Some(p) => p,
+            None => return,
+        },
+        None => (a, b),
+    };
+    reta_simant(q, a.0, a.1, b.0, b.1, cor);
+}
+
 /// `_ed_LineTo` (`1010:22fa`): a reta com 2 pixels de espessura — repetida 1 pixel abaixo se o eixo x
-/// é o maior, senão 1 pixel à direita.
+/// é o maior, senão 1 pixel à direita. Cada uma passa pelo recorte (`_os_ClipLine`).
 fn reta_grossa(q: &mut Quadro, (x0, y0): (i32, i32), (x1, y1): (i32, i32), cor: u8) {
-    reta_simant(q, x0, y0, x1, y1, cor);
+    reta_recortada(q, (x0, y0), (x1, y1), cor);
     if (y0 - y1).abs() < (x0 - x1).abs() {
-        reta_simant(q, x0, y0 + 1, x1, y1 + 1, cor);
+        reta_recortada(q, (x0, y0 + 1), (x1, y1 + 1), cor);
     } else {
-        reta_simant(q, x0 + 1, y0, x1 + 1, y1, cor);
+        reta_recortada(q, (x0 + 1, y0), (x1 + 1, y1), cor);
     }
 }
 
@@ -309,6 +395,21 @@ mod testes {
         let mut q = Quadro::new(10, 10, 0);
         reta_simant(&mut q, 0, 0, 2, 2, 1);
         assert_eq!(pontos(&q).len(), 3);
+    }
+
+    #[test]
+    fn recorte_por_bisseccao_leva_a_ponta_de_fora_para_a_borda() {
+        let r = Retangulo { esq: 0, topo: 0, dir: 100, base: 50 };
+        // dentro: inalterada; do mesmo lado de fora: nada
+        assert_eq!(recortar_reta(r, (10, 10), (20, 20)), Some(((10, 10), (20, 20))));
+        assert_eq!(recortar_reta(r, (10, 60), (20, 70)), None);
+        // saindo por baixo: a ponta de fora cai na última linha (49)
+        let (a, b) = recortar_reta(r, (10, 40), (13, 60)).unwrap();
+        assert_eq!(a, (10, 40));
+        assert_eq!(b.1, 49);
+        // saindo por cima e pela esquerda
+        assert_eq!(recortar_reta(r, (10, 10), (10, -30)).unwrap().1, (10, 0));
+        assert_eq!(recortar_reta(r, (-7, 5), (20, 5)).unwrap().0, (0, 5));
     }
 
     #[test]
