@@ -144,7 +144,7 @@ pub struct ConfigAvisos {
     pub faixa: ConfigFaixa,
     pub fim_de_jogo: ConfigFimDeJogo,
     pub pontuacao: ConfigPontuacao,
-    /// Opcional (API 0.21): sem ele, `_YellowDialog` não aparece.
+    /// Opcional (API 0.22): sem ele, `_YellowDialog` não aparece.
     #[serde(default)]
     pub quadro_amarela: Option<ConfigQuadroAmarela>,
 }

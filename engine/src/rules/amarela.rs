@@ -187,7 +187,7 @@ pub struct TabelasAmarela {
     pub mensagens: MensagensAmarela,
     #[serde(default)]
     pub sons: SonsAmarela,
-    /// Bitmap do `_YellowDialog` da trofalaxia (`_EatMyFood(1)`, 0x2396). Opcional (API 0.21).
+    /// Bitmap do `_YellowDialog` da trofalaxia (`_EatMyFood(1)`, 0x2396). Opcional (API 0.22).
     #[serde(default = "imagem_trofalaxia_padrao")]
     pub imagem_trofalaxia: u16,
 }
