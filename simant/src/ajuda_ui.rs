@@ -418,6 +418,50 @@ pub struct CursoresSdl {
     mapa: HashMap<String, sdl2::mouse::Cursor>,
     seta: Option<sdl2::mouse::Cursor>,
     atual: Option<Option<String>>,
+    /// Cursores com pixels "inverter" (AND 1 + XOR 1: a lente do `MAGCURSOR`): o cursor do sistema
+    /// não inverte o que está embaixo, então o port esconde o do sistema e desenha este no quadro.
+    software: HashMap<String, ne::Cursor>,
+    /// Cursor do sistema transparente (para esconder o do sistema).
+    vazio: Option<sdl2::mouse::Cursor>,
+}
+
+/// O cursor tem pixels que invertem a tela (AND 1 e XOR 1).
+pub fn tem_inversao(c: &ne::Cursor) -> bool {
+    c.e.iter().zip(&c.x).any(|(&e, &x)| e && x)
+}
+
+/// Inverte um pixel como o XOR do cursor no driver de 16 cores: o índice i vira i ^ 15, que na
+/// paleta padrão é o complemento RGB, menos os dois cinzas (7 ↔ 8).
+fn inverter_rgb(p: [u8; 3]) -> [u8; 3] {
+    match p {
+        [128, 128, 128] => [192, 192, 192],
+        [192, 192, 192] => [128, 128, 128],
+        [r, g, b] => [255 - r, 255 - g, 255 - b],
+    }
+}
+
+/// Desenha o cursor `c` com o ponto quente em (x, y) num quadro RGB `largura` × `altura`, como o
+/// Windows: AND 1 + XOR 0 transparente, AND 0 preto ou branco, AND 1 + XOR 1 inverte.
+pub fn desenhar_cursor(c: &ne::Cursor, rgb: &mut [u8], largura: usize, altura: usize, x: i32, y: i32) {
+    let (x0, y0) = (x - i32::from(c.quente.0), y - i32::from(c.quente.1));
+    for j in 0..c.altura {
+        for i in 0..c.largura {
+            let (px, py) = (x0 + i as i32, y0 + j as i32);
+            if px < 0 || py < 0 || px as usize >= largura || py as usize >= altura {
+                continue;
+            }
+            let k = j * c.largura + i;
+            let o = (py as usize * largura + px as usize) * 3;
+            let atual = [rgb[o], rgb[o + 1], rgb[o + 2]];
+            let novo = match (c.e[k], c.x[k]) {
+                (true, false) => continue,
+                (false, false) => [0, 0, 0],
+                (false, true) => [255, 255, 255],
+                (true, true) => inverter_rgb(atual),
+            };
+            rgb[o..o + 3].copy_from_slice(&novo);
+        }
+    }
 }
 
 fn criar(c: &ne::Cursor) -> Result<sdl2::mouse::Cursor, String> {
@@ -447,20 +491,32 @@ impl CursoresSdl {
             }
         }
         let seta = sdl2::mouse::Cursor::from_system(sdl2::mouse::SystemCursor::Arrow).ok();
-        CursoresSdl { mapa, seta, atual: None }
+        let software = s.ajuda.cursores.iter().filter(|(_, c)| tem_inversao(c)).map(|(n, c)| (n.clone(), c.clone())).collect();
+        let vazio = criar(&ne::Cursor { largura: 32, altura: 32, quente: (0, 0), e: vec![true; 32 * 32], x: vec![false; 32 * 32] }).ok();
+        CursoresSdl { mapa, seta, atual: None, software, vazio }
     }
 
-    /// Troca o cursor se o desejado em (x, y) mudou.
-    pub fn atualizar(&mut self, s: &Sessao, x: i32, y: i32) {
+    /// Troca o cursor se o desejado em (x, y) mudou. Devolve se a tela precisa ser redesenhada (o
+    /// cursor desenhado pelo port entrou ou saiu).
+    pub fn atualizar(&mut self, s: &Sessao, x: i32, y: i32) -> bool {
         let quer = cursor_em(s, x, y).filter(|n| self.mapa.contains_key(n));
         if self.atual.as_ref() == Some(&quer) {
-            return;
+            return false;
         }
-        match quer.as_ref().and_then(|n| self.mapa.get(n)).or(self.seta.as_ref()) {
+        let antes = self.por_software().is_some();
+        let soft = quer.as_ref().is_some_and(|n| self.software.contains_key(n));
+        let c = if soft { self.vazio.as_ref() } else { quer.as_ref().and_then(|n| self.mapa.get(n)).or(self.seta.as_ref()) };
+        match c {
             Some(c) => c.set(),
-            None => return,
+            None => return false,
         }
         self.atual = Some(quer);
+        antes || soft
+    }
+
+    /// O cursor que o port desenha no quadro, se houver.
+    pub fn por_software(&self) -> Option<&ne::Cursor> {
+        self.atual.as_ref()?.as_ref().and_then(|n| self.software.get(n))
     }
 }
 
@@ -607,6 +663,27 @@ mod testes {
         assert!(tecla_no_visor_com(&mut s, "Space", true, false));
         assert!(tecla_no_visor_com(&mut s, "n", false, false));
         assert!(s.ajuda.minimizada());
+    }
+
+    /// AND/XOR como o Windows: transparente, preto, branco e invertido (a lente do `MAGCURSOR`, que
+    /// o cursor do sistema do port pintava de preto). Dos cursores do jogo, só a lupa inverte.
+    #[test]
+    fn cursor_com_lente_invertida() {
+        let c = ne::Cursor { largura: 4, altura: 1, quente: (1, 0), e: vec![true, false, false, true], x: vec![false, false, true, true] };
+        let mut rgb = vec![128u8; 6 * 3];
+        rgb[3 * 3..3 * 3 + 3].copy_from_slice(&[128, 128, 0]);
+        desenhar_cursor(&c, &mut rgb, 6, 1, 2, 0);
+        assert_eq!(&rgb[3..6], &[128, 128, 128], "transparente");
+        assert_eq!(&rgb[6..9], &[0, 0, 0]);
+        assert_eq!(&rgb[9..12], &[255, 255, 255]);
+        assert_eq!(&rgb[12..15], &[192, 192, 192], "cinza escuro invertido = cinza claro (7 ^ 15 = 8)");
+        let raiz = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz.join("SimAnt-T/MAXIS/ANTWIN"));
+        let Ok(exe) = std::fs::read(jogo.join("SIMANTW.EXE")) else { return };
+        let todos = ne::cursores(&exe).unwrap();
+        let mut com: Vec<&str> = todos.iter().filter(|(_, c)| tem_inversao(c)).map(|(n, _)| n.as_str()).collect();
+        com.sort();
+        assert_eq!(com, ["MAGCURSOR"]);
     }
 }
 

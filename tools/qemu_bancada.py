@@ -1068,6 +1068,15 @@ class Bancada:
             clicar(q)
         elif c == "clicar":
             clicar(q)
+        elif c == "clicar_duplo_em":
+            # duplo clique (os dois cliques em ~0,25 s, como o `botoes(True)` de cenarios_tick.py)
+            mouse_canto(q)
+            mover_rel(q, int(a[0]), int(a[1]))
+            time.sleep(0.2)
+            for _ in range(2):
+                for down in (True, False):
+                    q.cmd("input-send-event", events=[{"type": "btn", "data": {"down": down, "button": "left"}}])
+                    time.sleep(0.06)
         elif c == "clicar_direito":
             clicar(q, "right")
         elif c == "clicar_direito_em":

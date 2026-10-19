@@ -44,6 +44,13 @@ pub(crate) struct Opcoes {
     pub(crate) janela: Option<(u32, u32)>,
     /// Barra de título do Windows 3.1 (`--moldura` liga, `--sem-moldura` desliga); vence `data/video.json`.
     pub(crate) moldura: Option<bool>,
+    /// Com a moldura do Windows 3.1, manter a do sistema (`--moldura-do-sistema`) ou substituí-la
+    /// (`--sem-moldura-do-sistema`); vence `data/video.json` → `substituir_moldura_do_sistema`.
+    pub(crate) substituir_moldura: Option<bool>,
+    /// Ritmo de Fast/Ultra (`--velocidades original|proporcional`); vence `data/partida.json`.
+    pub(crate) velocidades: Option<String>,
+    /// Cadência sem foco (`--sem-foco lenta|original`); vence `data/partida.json`.
+    pub(crate) sem_foco: Option<String>,
     /// Opções de vídeo resolvidas (`data/video.json` + linha de comando), preenchidas em `principal`.
     pub(crate) video: video::ConfigVideo,
     /// Arquivo de preferências do jogador (`--preferencias ARQ`; padrão: a pasta de dados do usuário,
@@ -96,6 +103,31 @@ pub(crate) struct Opcoes {
     pub(crate) som: som::OpcoesSom,
 }
 
+/// Valores de `--velocidades` (data/partida.json → `relogio.ritmo_velocidades.modo`).
+pub(crate) const VELOCIDADES: [&str; 2] = ["proporcional", "original"];
+/// Valores de `--sem-foco` (`lenta` = `relogio.sem_foco_velocidade` 0; `original` = `null`).
+pub(crate) const SEM_FOCO: [&str; 2] = ["lenta", "original"];
+
+fn ler_escolha(opcao: &str, v: String, validos: &[&str]) -> Result<String, String> {
+    if validos.contains(&v.as_str()) {
+        Ok(v)
+    } else {
+        Err(format!("{opcao}: '{v}' ({})", validos.join(" ou ")))
+    }
+}
+
+/// O que `--velocidades` e `--sem-foco` mudam em `data/partida.json` (por cima dos mods), ou `None`.
+pub(crate) fn sobreposicao_partida(velocidades: Option<&str>, sem_foco: Option<&str>) -> Option<serde_json::Value> {
+    let mut relogio = serde_json::Map::new();
+    if let Some(v) = velocidades {
+        relogio.insert("ritmo_velocidades".into(), serde_json::json!({ "modo": v }));
+    }
+    if let Some(s) = sem_foco {
+        relogio.insert("sem_foco_velocidade".into(), if s == "lenta" { serde_json::json!(0) } else { serde_json::Value::Null });
+    }
+    (!relogio.is_empty()).then(|| serde_json::json!({ "relogio": relogio }))
+}
+
 pub(crate) fn ler_acoes(texto: &str) -> Result<Vec<Acao>, String> {
     texto
         .split(',')
@@ -133,6 +165,9 @@ pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
         tela_virtual: None,
         janela: None,
         moldura: None,
+        substituir_moldura: None,
+        velocidades: None,
+        sem_foco: None,
         video: video::ConfigVideo::default(),
         preferencias: None,
         sem_preferencias: false,
@@ -178,6 +213,10 @@ pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
             "--resolucao" => o.resolucao = Some(video::ler_tamanho("--resolucao", &valor()?)?),
             "--moldura" => o.moldura = Some(true),
             "--sem-moldura" => o.moldura = Some(false),
+            "--moldura-do-sistema" => o.substituir_moldura = Some(false),
+            "--sem-moldura-do-sistema" => o.substituir_moldura = Some(true),
+            "--velocidades" => o.velocidades = Some(ler_escolha(&a, valor()?, &VELOCIDADES)?),
+            "--sem-foco" => o.sem_foco = Some(ler_escolha(&a, valor()?, &SEM_FOCO)?),
             "--preferencias" => o.preferencias = Some(valor()?.into()),
             "--sem-preferencias" => o.sem_preferencias = true,
             "--win-ini" => o.win_ini = Some(valor()?.into()),
@@ -271,4 +310,35 @@ pub(crate) fn semente(o: &Opcoes) -> u32 {
             .map(|d| d.as_millis() as u32)
             .unwrap_or(0)
     })
+}
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    fn args(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// `--velocidades` e `--sem-foco` viram uma sobreposição de `data/partida.json` que, mesclada
+    /// por cima do arquivo do port, volta às regras do original.
+    #[test]
+    fn ritmo_pela_linha_de_comando() {
+        let o = ler_opcoes(args(&["--velocidades", "original", "--sem-foco", "original"])).unwrap();
+        let v = sobreposicao_partida(o.velocidades.as_deref(), o.sem_foco.as_deref()).unwrap();
+        let caminho = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/partida.json");
+        let mut json: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(caminho).unwrap()).unwrap();
+        let padrao = ConfigPartida::de_json(&json.to_string()).unwrap();
+        assert_eq!(padrao.relogio.ritmo_velocidades.modo, partida::ModoRitmo::Proporcional);
+        assert_eq!(padrao.relogio.sem_foco_velocidade, Some(0));
+        engine::recursos::mesclar(&mut json, v);
+        let c = ConfigPartida::de_json(&json.to_string()).unwrap();
+        assert_eq!(c.relogio.ritmo_velocidades.modo, partida::ModoRitmo::Original);
+        assert_eq!(c.relogio.ritmo_velocidades.multiplicadores, padrao.relogio.ritmo_velocidades.multiplicadores);
+        assert_eq!(c.relogio.sem_foco_velocidade, None);
+        assert!(sobreposicao_partida(None, None).is_none());
+        assert_eq!(sobreposicao_partida(None, Some("lenta")), Some(serde_json::json!({"relogio": {"sem_foco_velocidade": 0}})));
+        assert!(ler_opcoes(args(&["--velocidades", "rapida"])).is_err());
+        assert!(ler_opcoes(args(&["--sem-foco"])).is_err());
+    }
 }

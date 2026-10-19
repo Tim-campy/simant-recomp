@@ -73,7 +73,7 @@ pub struct ConfigNavegacao {
     pub botoes_faixa: std::collections::HashMap<String, Acao>,
     pub repeticao: ConfigRepeticao,
     /// Outros botões fixos da faixa 34 (`_ProcMapRibbonEvent`): `ribToSpider` (0x2207,
-    /// `_GotoSpider`) e `ribStats` (0x2209, `_ScoreDialog`). Opcional (API 0.37): sem ele, os dois
+    /// `_GotoSpider`) e `ribStats` (0x2209, `_ScoreDialog`). Opcional (API 0.40): sem ele, os dois
     /// não fazem nada, como antes.
     #[serde(default)]
     pub botoes_faixa_outros: std::collections::HashMap<String, BotaoFaixa>,

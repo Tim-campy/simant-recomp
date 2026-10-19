@@ -47,7 +47,7 @@ Opções de `roteiro`: `--overlay ARQ.qcow2` (abre o disco C: por esse overlay; 
 | `esperar SEG` | espera SEG segundos do relógio do host |
 | `teclas T1 T2 ...` | `send-key` com qcodes do QMP (`spc`, `ret`, `esc`, `alt+f`, ...) |
 | `digitar TEXTO` | digita letras, números e espaço |
-| `mouse_canto`, `mover DX DY`, `clicar`, `clicar_em X Y` | mouse relativo (`input-send-event`); com a aceleração desligada, 1 unidade = 1 pixel |
+| `mouse_canto`, `mover DX DY`, `clicar`, `clicar_em X Y`, `clicar_duplo_em X Y` | mouse relativo (`input-send-event`); com a aceleração desligada, 1 unidade = 1 pixel; o duplo clique solta os dois cliques em ~0,25 s (com `clicar_em` seguido de `clicar` o Windows não viu um duplo clique no quintal) |
 | `capturar ARQ.png` | `screendump` |
 | `memoria INICIO TAMANHO ARQ` | `pmemsave` (RAM **física**) |
 | `pausar` / `continuar` | `stop` / `cont` do QMP: congela a CPU, o relógio da VM e a simulação. No modo tick, `continuar` volta a rodar livre (os breakpoints já estão desligados) |

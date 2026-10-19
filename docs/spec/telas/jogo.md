@@ -212,6 +212,13 @@ Os eventos de objeto chegam por `_DoEvent` (`1000:0bc2`), que despacha pelo byte
 | `0x2203` | `ribToBNest` | `_ClearMapScentButtons`, `_SetMapPlane(2)` |
 | `0x2204` | `ribToRNest` | `_ClearMapScentButtons`, `_SetMapPlane(3)` |
 | `0x2205` | `ribToSurface` | `_ClearMapScentButtons`, `_SetMapPlane(1)` |
+| `0x2206` | `ribToYellow` | abre o mini mapa (`_OpenMiniMapWin`; [mapa.md](mapa.md) §7) |
+| `0x2207` | `ribToSpider` (botão da aranha) | `_GotoSpider` (`1000:a844`): sem `_SpidOn`, só o som de erro (`_myBeginSound(1, 0, 0x7e)`); senão, com a superfície na tela, `_CenterEdit(_SpidX >> 4, _SpidY >> 4)` e a alternância do mapa zerada; noutro plano, `_SetMapPlaneLocation(1, x, y)` (troca para a superfície centralizando uma vez, sem mexer no ponto lembrado) e `_DrawMap` |
+| `0x2208` | `ribHelp` | ajuda da faixa ([ajuda-contexto.md](ajuda-contexto.md)) |
+| `0x2209` | `ribStats` (Status Window Button) | `_ScoreDialog`: a janela Status, a mesma de Window → Status ([menus.md](menus.md) §6) |
+| `0x220A` | `ribTools` | `_RibbonToolsMenu` |
+
+**Port:** `ribToSpider` e `ribStats` em `data/navegacao.json` → `botoes_faixa_outros` (`Partida::ir_para_aranha`, `simant/src/modos.rs`; teste `botao_da_aranha` em `engine/tests/partida_quick2.rs`). A faixa 35 não tem esses botões [código: `_ProcYardRibbonEvent`]; `editGoSpider` (objeto 12 da janela de edição) chama o mesmo `_GotoSpider`, mas não é visível em 640×480.
 
 A janela do mapa (`_ProcMapEvent`, `1010:c222`) tem botões equivalentes (0x106–0x108 → planos 1 a 3) [código]; a janela existe no port desde 2026-10-18 ([mapa.md](mapa.md)). Não foi estudado em que fase do clique (apertar ou soltar) o evento é gerado [em aberto]; o port age ao apertar.
 

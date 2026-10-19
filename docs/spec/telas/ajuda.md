@@ -20,9 +20,24 @@ Capturas `re_trabalho/agente_ui/a02` (contexto 4, clique na edição em modo de 
 - **Lugar:** o port não tem a barra de título nem o menu do SimAnt (a área do jogo é a área cliente de 640 × 442, 37 linhas abaixo do topo da tela do original). A janela de ajuda fica em x 213–637 como no original e do topo à base da área cliente (y 0–441; `externo` em `data/ajuda.json`) [escolha do port: o original vai de 2 a 477 da tela, o que daria −35 a 440 na área cliente]. Por isso tudo fica 2 linhas acima do original em relação à moldura, e a janela tem 34 linhas a menos de texto.
 - **Fontes:** título, menu: System (`VGASYS.FON`, índice 6 de `interface.json`); botões: MS Sans Serif 8 pt negrito (7); texto: as fontes do `|FONT` do arquivo pelo tamanho e pelo negrito, mapeadas em `fontes` de `data/ajuda.json` para MS Sans Serif 10 pt (8), 12 pt (9), 10 pt negrito (10), 12 pt negrito (11), do `SSERIFE.FON` do Windows do usuário (o WinHelp troca a "Helv" do arquivo por ela).
 - **Navegação:** clique num salto troca o tópico e guarda o anterior para o Back; Contents vai ao índice (contexto 0x100); `<<` e `>>` seguem a sequência do cabeçalho do tópico; Back volta. Teclas: Esc fecha, setas/PageUp/PageDown/Home/End rolam, Backspace = Back, a letra sublinhada de um botão aciona o botão. Barra de rolagem vertical quando o texto não cabe (setas: 16 pixels; trilho: uma página).
-- **Fechar:** Esc, File → Exit ou duplo clique na caixa do menu de sistema (o menu de sistema não abre) [escolha do port].
+- **Fechar:** Esc, File → Exit, duplo clique na caixa do menu de sistema, Close do menu de sistema ou Alt+F4 (§2.1).
 - **Abrir:** `VisorAjuda::abrir_contexto(n)` (HELP_CONTEXT; zera o histórico [hipótese]) e `abrir_indice()` (HELP_INDEX). Um contexto que não existe deixa o visor como estava.
 - **Figuras:** as `bmN` (DIB de 16 cores) são convertidas para a cor mais próxima entre as 16 do Windows da paleta do port; ficam na linha do texto com a base na linha de base [hipótese: posição não comparada com o original].
+
+### 2.1 A janela como janela do Windows (bancada 2026-10-19)
+
+O WinHelp é uma janela de nível superior do Windows 3.1, com moldura grossa, título, caixa do menu de sistema e botões de minimizar e maximizar. Roteiros `tests/referencias/roteiros/qemu_ajuda_janela.txt` e `qemu_ajuda_janela2.txt` (capturas `re_trabalho/ag_dlgaj/aj/h00`–`h17`, `k00`–`k08`, fora do git; coordenadas da tela):
+
+- **Menu de sistema** (clique simples na caixa, h01; Alt+Espaço, h15): Restore (acinzentado), Move, Size, Minimize, Maximize, —, Close Alt+F4, —, Switch To... Ctrl+Esc. Caixa de 167 pixels com o canto esquerdo na caixa do menu (x 217, não no contorno da janela como nas janelas filhas), o topo na linha do título, atalhos na coluna 98, letras sublinhadas R, M, S, n, x, C, w, e uma sombra cinza-clara de 1 pixel à direita e embaixo a partir do segundo pixel. Duplo clique na caixa fecha (Close).
+- **Mover** (h03, h04): arrastar o título mostra um contorno pontilhado em XOR de **3 pixels** (a moldura menos 1), com os pontos invertidos onde x + y da tela é par; a janela vai ao soltar. A janela pode sair pela borda de baixo da tela.
+- **Maximizar** (h05): ocupa a tela inteira com a moldura de fora, por cima do título e dos menus do SimAnt; o botão vira o de restaurar (h06 restaura no lugar de antes). Duplo clique no título maximiza e restaura (h09).
+- **Redimensionar** (h07, k00–k02): pelas bordas e cantos; o mínimo é **102 × 26** (só o título com a moldura). Numa janela estreita a barra de menus quebra em linhas de 18 + 1 pixels ("File Edit" / "Bookmark" / "Help") e os botões ficam um embaixo do outro (linhas de 21), e o texto se ajusta à largura (com barra de rolagem horizontal, que o port não tem).
+- **Minimizar** (h11): a janela vira ícone da área de trabalho, escondido atrás do SimAnt maximizado; o SimAnt fica ativo. O Alt+Tab do Windows (h12) mostra o Program Manager; um pedido de ajuda novo restaura o WinHelp no lugar e no tamanho de antes (h14).
+- **Fechar e abrir de novo** (k03): a janela reabre no lugar e no tamanho em que estava [o WinHelp grava a posição no `WIN.INI` ao sair; hipótese: chave `M_WindowPosition`, não lida].
+
+**Port** (`simant/src/ajuda_ui.rs`, `engine/src/core/gerenciador.rs`, `data/ajuda.json` → `janela`): a janela do WinHelp entra num gerenciador de janelas próprio, com a "área de trabalho" igual à área cliente do port; a moldura (caixa e menu de sistema, título, bordas, minimizar, maximizar) é dele e o resto vai ao visor. Mínimo, menu, coluna do atalho e sombra vêm de `ajuda.json` → `janela`; o resto da aparência do menu é a das janelas filhas (`janelas.json` → `gerenciador.menu_sistema`). Maximizada, ocupa a área cliente (não cobre o título e a barra de menus); minimizada, some até o próximo pedido de ajuda; Switch To... só fecha o menu; a posição fica só na sessão ([../../divergencias.md](../../divergencias.md)). O visor quebra a barra de menus e a de botões quando a janela é estreita e deixa o título à esquerda quando ele não cabe. Exportação: `cargo run -p engine --example ajuda -- JOGO saída.png [--externo E,T,D,B] [--maximizada] [--inativa] [--menu-sistema] [--arrasto E,T,D,B]`.
+
+**Conferido** (`tools/comparar_captura.py --mapear`, port com o visor 2 linhas acima): menu de sistema **98,84%** na região do menu (h01; a diferença é o Restore acinzentado e realçado), maximizada **99,90%** (h05), janela de 102 pixels **99,76%** (k01). Teste: `janela_de_ajuda_move_redimensiona_minimiza_e_maximiza` (`simant/src/ajuda_ui.rs`).
 
 ## 3. Conferência
 
@@ -46,6 +61,6 @@ Capturas `re_trabalho/agente_ui/winhelp/` (`w00`–`w07` menus, `s01`–`s09` Se
 
 ## 5. Não reproduzido
 
-- Os diálogos dos itens de menu (Open, Print Topic, Print Setup, Copy, Annotate, Define, How to Use Help, About Help) e Always on Top; o menu de sistema, mover/redimensionar a janela, a janela ir para trás do jogo.
+- Os diálogos dos itens de menu (Open, Print Topic, Print Setup, Copy, Annotate, Define, How to Use Help, About Help) e Always on Top; a janela ir para trás do jogo; a Task List (Switch To...); a barra de rolagem horizontal da janela estreita; maximizar por cima do título e dos menus do SimAnt (§2.1).
 - Destaque do item de menu com o mouse passando por cima (só pelo teclado); arrastar no menu.
 - Regra exata da largura e da posição dos popups (uma só amostra), History com barra de rolagem.

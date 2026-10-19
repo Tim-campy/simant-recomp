@@ -322,6 +322,7 @@ pub fn aplicar_acao_quintal(s: &mut Sessao, a: AcaoQuintal, trazer: bool) {
         }
         _ => {
             let aberta = s.janelas.aberta(Controle::Quintal);
+            let faixa_34 = !s.modos.janela.na_frente;
             s.modos.janela.aplicar(a, &mut s.partida.estado);
             // _PlaceQueenInYard: _StopSimulation até o clique.
             s.partida.parada_pela_interface = s.modos.janela.colocando_rainha;
@@ -337,6 +338,11 @@ pub fn aplicar_acao_quintal(s: &mut Sessao, a: AcaoQuintal, trazer: bool) {
             }
             if abre && (trazer || !aberta) {
                 s.abrir_quintal();
+            }
+            // Ctrl+Y/5/6/7 trocam a faixa 34 pela 35 sem `_DrawYardData`: os dados só voltam no
+            // próximo tick (bancada agyard/b_faixa35, c4 e d4).
+            if trazer && tecla_de_modo && faixa_34 && s.modos.janela.na_frente {
+                s.modos.janela.faixa_sem_dados(s.partida.estado.partida.tempo);
             }
         }
     }
@@ -923,5 +929,135 @@ mod testes {
         let depois = recorte(&s.quadro_rgb().unwrap());
         assert!(s.edicao_congelada.is_none());
         assert_ne!(depois, antes);
+    }
+
+    fn sessao_completo<'a>(recursos: &'a Recursos, dados: &std::path::Path) -> Sessao<'a> {
+        let cores = engine::paleta::carregar_rgb(recursos).unwrap();
+        Sessao::abrir(recursos, dados, Origem::Novo(1234, TipoJogo::Completo), cores).unwrap()
+    }
+
+    /// Bancada 2026-10-19 (`re_trabalho/agyard/c_xfer`, Jogo Completo rodando): a troca de patch
+    /// acontece no duplo clique, antes do quadro 10006; fechado o quadro, a simulação volta e a janela
+    /// de edição atrás do quintal mostra o patch novo no tick seguinte (x3, meio segundo depois). O
+    /// quintal continua aberto. A faixa 35 aberta pelo botão Yard tem os números e as barras.
+    #[test]
+    fn troca_com_o_jogo_rodando_redesenha_a_edicao_atras_do_quintal() {
+        let Some((recursos, dados)) = recursos_de_teste() else { return };
+        let mut s = sessao_completo(&recursos, &dados);
+        s.partida.estado.partida.pausado = 0;
+        let i = engine::rules::troca_patch::indice_patch(10, 8).unwrap();
+        s.partida.estado.preta.populacao_quintal.0[i] = 3;
+        s.partida.estado.preta.total_colonias = 2;
+        s.abrir_quintal();
+        s.quadro_rgb().unwrap();
+        let t = s.partida.estado.partida.tempo;
+        assert!(s.modos.janela.dados_da_faixa(t), "botão Yard: a faixa 35 vem com os dados (c1, d2)");
+        let ponto = (0..640)
+            .flat_map(|x| (0..442).map(move |y| (x, y)))
+            .find(|&(x, y)| s.modos.quintal.cfg.patch_em(x, y) == Some((10, 8)))
+            .unwrap();
+        clique_no_quintal(&mut s, ponto.0, ponto.1, false, false);
+        clique_no_quintal(&mut s, ponto.0, ponto.1, true, false);
+        assert_eq!(s.partida.estado.ambiente.patch, (10, 8), "a troca vem antes do quadro");
+        assert!(s.partida.fechar_modal().is_some(), "quadro 10006");
+        for _ in 0..10 {
+            s.partida.avancar(100);
+            s.quadro_rgb().unwrap();
+        }
+        assert!(s.partida.estado.partida.tempo > t, "a simulação voltou depois do quadro");
+        assert!(s.edicao_congelada.is_none(), "a edição já mostra o patch novo");
+        assert!(s.janelas.aberta(Controle::Quintal) && s.modos.janela.na_frente);
+    }
+
+    /// Faixa 35 sem dados só pelo Ctrl+Y/5/6/7 com a 34 na tela (bancada agyard/b_faixa35: c4 e d4
+    /// vazios; c1 botão Yard, d2 clique no quintal e d3 Ctrl+M com os dados), até o próximo tick.
+    #[test]
+    fn faixa_35_vazia_so_pelo_ctrl_y_ate_o_tick() {
+        let Some((recursos, dados)) = recursos_de_teste() else { return };
+        let mut s = sessao_completo(&recursos, &dados);
+        s.partida.estado.partida.pausado = 1;
+        let r = s.modos.quintal.retangulo_da_faixa("ribYellowH2").unwrap();
+        let w = s.tela.cfg.largura as usize;
+        let barra = |rgb: &[u8]| -> Vec<u8> {
+            (r.topo..r.base).flat_map(|y| (r.esq..r.dir).map(move |x| (y as usize, x as usize))).flat_map(|(y, x)| rgb[(y * w + x) * 3..(y * w + x) * 3 + 3].to_vec()).collect()
+        };
+        aplicar_acao_quintal(&mut s, AcaoQuintal::ModoQuintal, true);
+        let vazia = s.quadro_rgb().unwrap();
+        assert!(!s.modos.janela.dados_da_faixa(s.partida.estado.partida.tempo), "Ctrl+Y com o jogo pausado");
+        // Volta à edição (faixa 34) e traz o quintal pelo botão: com os dados.
+        s.janelas.gerente.trazer_para_frente(janelas::ID_EDICAO);
+        s.modos.janela.na_frente = false;
+        s.quadro_rgb().unwrap();
+        s.abrir_quintal();
+        let cheia = s.quadro_rgb().unwrap();
+        assert!(s.modos.janela.dados_da_faixa(s.partida.estado.partida.tempo));
+        assert_ne!(barra(&vazia), barra(&cheia), "a barra de saúde da amarela é desenhada na faixa 35");
+        // Ctrl+Y de novo a partir da 34 e um tick depois.
+        s.janelas.gerente.trazer_para_frente(janelas::ID_EDICAO);
+        s.modos.janela.na_frente = false;
+        s.quadro_rgb().unwrap();
+        aplicar_acao_quintal(&mut s, AcaoQuintal::ModoQuintal, true);
+        s.quadro_rgb().unwrap();
+        assert!(!s.modos.janela.dados_da_faixa(s.partida.estado.partida.tempo));
+        s.partida.estado.partida.tempo += 1;
+        assert_eq!(barra(&s.quadro_rgb().unwrap()), barra(&cheia), "o tick seguinte desenha os dados");
+    }
+
+    /// `_NewGame` → `_SetDefaultWindows`: o quintal que tomou o lugar do mapa volta a ser o mapa
+    /// (`_YardToMap`) e `_OpenEditWindow` ativa a edição: faixa 34 no jogo novo (relato do Tutorial).
+    #[test]
+    fn jogo_novo_com_o_quintal_na_frente_volta_a_faixa_34() {
+        let Some((recursos, dados)) = recursos_de_teste() else { return };
+        let mut s = sessao_completo(&recursos, &dados);
+        s.abrir_quintal();
+        assert!(s.modos.janela.na_frente && !s.janelas.aberta(Controle::Mapa));
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
+        let mut nova = Sessao::abrir(&recursos, &dados, Origem::NovoNaPartida(&s.partida.estado, TipoJogo::Tutorial), cores).unwrap();
+        nova.herdar_janelas(&s);
+        assert!(!nova.modos.janela.na_frente, "faixa 34");
+        assert!(nova.janelas.aberta(Controle::Mapa) && !nova.janelas.aberta(Controle::Quintal), "o mapa no lugar do quintal");
+        assert_eq!(nova.janelas.gerente.topo(), Some(janelas::ID_EDICAO));
+    }
+
+    /// Vitória no Jogo Completo (`_SimColonies` → 10057 com o terceiro parâmetro 1, depois
+    /// `_DrawSimPayoff`, depois `_EndGameDialog`): o texto "Congratulations!..." vem antes da
+    /// animação, mesmo com Options → Events desligado.
+    #[test]
+    fn vitoria_mostra_o_texto_antes_da_animacao() {
+        use engine::core::avisos::Modal;
+        use engine::core::quadros_animados::TipoAnimado;
+        use engine::rules::estado::Evento;
+        let Some((recursos, dados)) = recursos_de_teste() else { return };
+        let mut s = sessao_completo(&recursos, &dados);
+        s.partida.estado.partida.opcoes[3] = 0;
+        s.partida.estado.partida.fim_de_jogo = 1;
+        s.partida.estado.partida.pretas_venceram = 1;
+        for ev in [Evento::Mensagem(10057), Evento::AnimacaoVitoria, Evento::DialogoFimDeJogo] {
+            s.partida.estado.eventos.push(ev);
+        }
+        s.partida.processar_eventos_do_estado();
+        assert_eq!(s.partida.avisos.modal(), Some(&Modal::Quadro { texto: 10057, imagem: None }));
+        s.partida.fechar_modal();
+        assert_eq!(s.partida.avisos.modal(), Some(&Modal::Animado(TipoAnimado::Vitoria)));
+        s.partida.fechar_modal();
+        assert!(matches!(s.partida.avisos.modal(), Some(Modal::FimDeJogo { pretas_venceram: true, .. })));
+    }
+
+    /// Ctrl+clique num botão configurável da faixa 35 (bancada `qemu_faixa35_botoes.txt`: Ctrl+clique
+    /// no 1º, soltar em (60, 269) da tela = MUSIC, a função 7, que passa às duas faixas).
+    #[test]
+    fn ctrl_clique_nos_botoes_da_faixa_35() {
+        let Some((recursos, dados)) = recursos_de_teste() else { return };
+        let mut s = sessao_completo(&recursos, &dados);
+        s.abrir_quintal();
+        let r = s.modos.quintal.retangulo_da_faixa("ribUserDef2A").unwrap();
+        let (x, y) = (i32::from(r.esq + r.dir) / 2, i32::from(r.topo + r.base) / 2);
+        assert!(matches!(clique_na_faixa(&mut s, x, y), Resposta::Seguir), "o laço da janela trata o botão");
+        assert!(s.abrir_menu_de_icones(x, y), "Ctrl+clique abre o menu de ícones");
+        // A captura tem 38 linhas de título e menu acima da área cliente do port.
+        s.soltar_menu(60, 269 - 38, false);
+        assert_eq!(s.partida.funcao_do_botao("ribUserDef2A"), Some(7), "MUSIC");
+        assert_eq!(s.partida.funcao_do_botao("ribUserDef1A"), Some(7), "sem Shift, as duas faixas");
+        assert!(s.menu.is_none());
     }
 }

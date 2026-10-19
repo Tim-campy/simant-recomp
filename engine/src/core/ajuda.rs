@@ -125,7 +125,7 @@ pub struct ConfigAjuda {
     pub janelas: Option<super::ajuda_janelas::ConfigJanelasAjuda>,
     /// A janela do WinHelp como janela de nível superior do Windows 3.1 (menu de sistema, mover,
     /// redimensionar, minimizar, maximizar), pelo gerenciador de janelas (`core/gerenciador.rs`).
-    /// Opcional (API 0.37): sem ela, a interface usa o menu e o tamanho mínimo das janelas filhas.
+    /// Opcional (API 0.40): sem ela, a interface usa o menu e o tamanho mínimo das janelas filhas.
     #[serde(default)]
     pub janela: Option<ConfigJanelaAjuda>,
 }

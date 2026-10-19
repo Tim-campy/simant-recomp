@@ -141,7 +141,7 @@ pub struct ConfigDialogoArquivo {
     pub recuo_pasta: i16,
     pub texto_pasta: i16,
     /// Listas suspensas, ícones das unidades, limite do nome, repetição das setas e a roda do
-    /// mouse (telas/arquivos.md §3.1). Opcional (API 0.38): sem ela, os valores medidos.
+    /// mouse (telas/arquivos.md §3.1). Opcional (API 0.40): sem ela, os valores medidos.
     #[serde(default)]
     pub controles: ControlesArquivo,
 }

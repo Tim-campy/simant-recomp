@@ -45,7 +45,14 @@ arquivo do jogo é distribuído; os textos do jogo também são lidos da instala
 
 - Janela nítida: ciente de DPI, ampliação por múltiplos inteiros, redimensionável.
 - Tela virtual de 640×480 (padrão), 800×600 ou 1024×768, com o layout que o original usa em cada uma.
-- Barra de título do Windows 3.1 opcional (`--moldura`).
+- Barra de título do Windows 3.1 opcional (`--moldura`), que substitui a moldura do sistema: janela
+  sem borda, arrastada pelo título, maximizar/restaurar/minimizar e menu de sistema na janela de
+  verdade, moldura grossa de 4 pixels com a janela restaurada, Alt+F4 (`--moldura-do-sistema` mantém a
+  borda do sistema). Escolha do usuário.
+- Velocidades rápida e ultra a 2,5× e 5× a normal (escolha do usuário; `--velocidades original` volta ao
+  ritmo do 486 da bancada) e simulação na lenta enquanto a janela está sem foco (`--sem-foco original`
+  mantém o ritmo); o tick, o save e o menu Speed não mudam. Caixas no launcher.
+- Sintetizador simples como padrão das músicas (escolha do usuário; o FM continua em `--sintetizador fm`).
 - Preferências guardadas entre partidas na pasta do usuário (no lugar do `[SimAnt]` do `WIN.INI`).
 - Teclas e opções em arquivos de dados (`data/*.json`).
 - Linha de comando para rodar sem janela (`--ticks`, `--salvar`, exportação de telas e sons).
