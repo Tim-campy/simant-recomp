@@ -218,6 +218,12 @@ fn clique_no_menu(s: &mut Sessao, x: i32, y: i32) {
 /// Experimental: botão apertado (`pressionar`) ou arrasto (`arrastar`) numa célula do mapa.
 fn ferramenta_no_mapa(s: &mut Sessao, x: i32, y: i32, ctrl: bool, arrasto: bool) -> bool {
     let Some((cx, cy)) = s.tela.celula_em(x, y, &s.partida.nav) else { return false };
+    ferramenta_na_celula(s, cx, cy, ctrl, arrasto);
+    true
+}
+
+/// Experimental: a ferramenta na célula (cx, cy) do plano mostrado (`_processExp`).
+pub(crate) fn ferramenta_na_celula(s: &mut Sessao, cx: i32, cy: i32, ctrl: bool, arrasto: bool) {
     let plano = i32::from(s.partida.nav.plano_mapa);
     let mut ctl = s.modos.controle_exp.clone();
     let c = Contexto { tabelas: &s.modos.tabelas_exp, amarela: &s.partida.tabelas_amarela, inimigos: &s.partida.regras.inimigos };
@@ -229,7 +235,6 @@ fn ferramenta_no_mapa(s: &mut Sessao, x: i32, y: i32, ctrl: bool, arrasto: bool)
     };
     s.modos.controle_exp = ctl;
     tratar_efeitos(s, efeitos);
-    true
 }
 
 /// Menu de ferramentas aberto (`_DoExpMenu`, menu "de proximidade"): o mouse andando com o botão

@@ -278,14 +278,8 @@ pub fn executar(s: &mut Sessao, c: ComandoMenu, destino_salvar: Option<&std::pat
         SalvarComo => s.salvar_com_dialogo(true, destino_salvar),
         Sair => s.abrir_pergunta_sair(),
         Edicao => s.janelas.trazer_para_frente(None),
-        Mapa => {
-            // _OpenMapYard: sem o quintal aberto, a janela do mapa; com ele, o quintal (_MapToYard).
-            if s.janelas.aberta(Controle::Quintal) {
-                super::modos::aplicar_acao_quintal(s, AcaoQuintal::Abrir, true);
-            } else {
-                s.abrir_mapa();
-            }
-        }
+        // _OpenMapYard: sem o quintal aberto, a janela do mapa; com ele, o quintal (_MapToYard).
+        Mapa => s.abrir_mapa_ou_quintal(),
         Comportamento => s.janelas.trazer_para_frente(Some(Controle::Tarefas)),
         Castas => s.janelas.trazer_para_frente(Some(Controle::Castas)),
         Historico => s.janelas.trazer_para_frente(Some(Controle::Historico)),

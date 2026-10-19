@@ -172,6 +172,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 || s.modos.escolhendo
                 || s.modos.menu_aberto
                 || s.exame.is_some()
+                || s.mini.aberto()
                 || modos::segurando(s);
             let ev = match menus_ui::evento(s, ev, modal) {
                 menus_ui::Filtro::Passar(ev) => ev,
@@ -200,6 +201,16 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     return Ok(());
                 }
                 continue;
+            }
+            if !matches!(ev, Event::Quit { .. } | Event::Window { .. }) {
+                if let Some(r) = mini_ui::evento(s, &ev) {
+                    // Mini mapa aberto (_OpenMiniMapWin): modal, recebe todo o mouse.
+                    if let Event::MouseMotion { x, y, .. } = ev {
+                        cursor = (x, y);
+                    }
+                    redesenhar |= r;
+                    continue;
+                }
             }
             if matches!(ev, Event::Quit { .. }) && s.menu_mod.is_some() {
                 return Ok(());
@@ -295,6 +306,10 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                         continue;
                     }
                     let nas_janelas = mousestate.left() && s.janelas.mover(s.recursos, &mut s.partida.estado, x, y).unwrap_or(false);
+                    if nas_janelas {
+                        // _MapAreaEvent: o arrasto na área do mapa leva a vista junto.
+                        s.centralizar_pelo_mapa();
+                    }
                     if nas_janelas || (mousestate.left() && modos::mover(s, x, y, ctrl_apertado(&eventos))) {
                         redesenhar = true;
                     }
@@ -352,6 +367,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     // 2. Janelas (gerenciador, janelas.md §8): só a da frente sob o cursor recebe.
                     // 3. Fora das janelas: faixa.
                     let popup = s.modos.escolhendo || s.modos.menu_aberto;
+                    s.janelas.shift = shift_apertado(&eventos);
+                    s.janelas.ctrl = ctrl;
                     let rota = if popup { janelas_ui::Roteamento::Fora } else { s.clicar_nas_janelas(x, y, clicks >= 2) };
                     let resposta = match rota {
                         _ if popup => modos::clique_popup(s, x, y),
@@ -381,7 +398,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                             }
                         }
                         janelas_ui::Roteamento::Fora => {
-                            if !s.modos.janela.na_frente && s.botao_de_cheiro_em(x, y) {
+                            if (!s.modos.janela.na_frente && s.botao_de_cheiro_em(x, y)) || mini_ui::abrir_pelo_botao(s, x, y) {
+                                // Botão de cheiro ou o do mini mapa (ribToYellow, _OpenMiniMapWin).
                                 modos::Resposta::Tratada
                             } else if let Some(i) = s.marcador_em(x, y).filter(|_| !s.modos.janela.na_frente) {
                                 s.partida.marcador(i, ctrl);
