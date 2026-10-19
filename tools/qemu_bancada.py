@@ -3,10 +3,12 @@
 Preparação (uma vez):  python tools/qemu_bancada.py preparar
 Roteiro:               python tools/qemu_bancada.py roteiro ARQUIVO [--overlay ARQ.qcow2] [--mem MB] [--qemu-args "ARGS"]
 Extrair do disco:      python tools/qemu_bancada.py extrair CAMINHO_DOS DESTINO [--overlay ARQ.qcow2] [--disco ARQ.img]
-Disco SVGA (VBE):      python tools/qemu_bancada.py preparar_svga LARGURA ALTURA [BPP] [--disco ARQ.img] [--drivers DIR]
+Disco SVGA (VBE):      python tools/qemu_bancada.py preparar_svga LARGURA ALTURA [BPP] [--disco ARQ.img] [--drivers DIR] [--ajuda-padrao]
     Disco C: à parte (padrão re_trabalho/qemu/svga_c_LARGURAxALTURA.img) com o driver livre vbesvga.drv
     (github.com/PluMGMK/vbesvga.drv) sobre o VBE do -vga std; não toca a c.img nem o overlay padrão.
     Rodar com ele: `roteiro ARQUIVO --disco ARQ.img` (ou com `--overlay svga_X.qcow2`, que nasce sobre o --disco).
+    --ajuda-padrao: tira da cópia do WIN.INI a posição guardada do WinHelp ([Windows Help] H_WindowPosition),
+    para o visor de ajuda abrir no lugar padrão do Windows, como na bancada VGA (telas/resolucao.md).
 
 Comandos de roteiro (um por linha, # = comentário):
     esperar SEG                 espera SEG segundos (relógio do host)
@@ -212,7 +214,7 @@ DRIVERS_VBESVGA = RAIZ / "re_trabalho" / "downloads" / "vbesvga" / "x"
 ARQUIVOS_VBESVGA = ("VBESVGA.DRV", "VDDVBE.386", "VBEVMDIB.3GR")
 
 
-def preparar_svga(largura, altura, bpp=8, imagem=None, drivers=DRIVERS_VBESVGA):
+def preparar_svga(largura, altura, bpp=8, imagem=None, drivers=DRIVERS_VBESVGA, ajuda_padrao=False):
     """Disco C: à parte com o driver vbesvga.drv em LARGURA×ALTURA×BPP sobre o VBE do `-vga std`.
     Não toca DISCO_C, IMAGEM_C nem o overlay padrão; usa a pasta TRAB/svga_c_LxA e a imagem
     TRAB/svga_c_LxA.img (ou `imagem`). Overlays sobre a imagem antiga ficam inválidos: apague-os."""
@@ -242,6 +244,10 @@ def preparar_svga(largura, altura, bpp=8, imagem=None, drivers=DRIVERS_VBESVGA):
     substituir_ini(pasta / "WINDOWS" / "WIN.INI", {
         "[windows]": "[windows]\r\nMouseSpeed=0\r\nMouseThreshold1=0\r\nMouseThreshold2=0",
     })
+    if ajuda_padrao:
+        win = pasta / "WINDOWS" / "WIN.INI"
+        linhas = win.read_bytes().split(b"\r\n")
+        win.write_bytes(b"\r\n".join(lin for lin in linhas if not lin.startswith(b"H_WindowPosition=")))
     if not DISQUETE.exists():
         gravar_disquete()
     criar_imagem_c(pasta, imagem, None, silencioso=True)
@@ -1214,6 +1220,9 @@ if __name__ == "__main__":
     qa = opcao(args, "--qemu-args")
     dc = opcao(args, "--disco")
     dr = opcao(args, "--drivers", str(DRIVERS_VBESVGA))
+    ap = "--ajuda-padrao" in args
+    if ap:
+        args.remove("--ajuda-padrao")
     if not args:
         sys.exit(__doc__)
     if args[0] == "preparar":
@@ -1221,7 +1230,7 @@ if __name__ == "__main__":
             sys.exit("preparar recria só a c.img padrão; para outro disco use preparar_svga --disco")
         preparar()
     elif args[0] == "preparar_svga":
-        preparar_svga(int(args[1]), int(args[2]), int(args[3]) if len(args) > 3 else 8, dc, dr)
+        preparar_svga(int(args[1]), int(args[2]), int(args[3]) if len(args) > 3 else 8, dc, dr, ap)
     elif args[0] == "roteiro":
         roteiro(args[1], ov, mb, qa, dc)
     elif args[0] == "extrair":

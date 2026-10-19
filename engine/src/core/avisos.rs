@@ -164,6 +164,11 @@ pub struct ConfigQuadroAmarela {
     /// Canto do bitmap; a área que o mostra tem o tamanho dele menos 1 pixel em cada eixo (o resto é
     /// cortado). `area` (medida com o 9110) ficou só como documentação.
     pub imagem_em: [i16; 2],
+    /// `imagem_em` é o x sem alinhamento e o Windows põe a área cliente da janela 26 (onde o bitmap
+    /// começa) no byte mais próximo do driver (`CS_BYTEALIGNCLIENT`; telas/resolucao.md §7). Opcional
+    /// (API 0.29); sem ele, `imagem_em` vale como está.
+    #[serde(default)]
+    pub alinhar_ao_criar: bool,
     #[serde(default)]
     pub area: Option<[i16; 2]>,
     /// `_DialogWaitInit(3)`: espera final, em `_TickCount`.
@@ -244,6 +249,8 @@ pub struct Avisos {
     /// Janela 26 que ficou aberta depois de `_SpiderDialog` (o último quadro): continua na tela,
     /// embaixo dos avisos seguintes, até o próximo `_YellowDialog` fechá-la.
     residual: Option<Animado>,
+    /// Driver imitado (alinhamento da janela 26); o padrão não alinha.
+    pub driver: super::resolucao::PerfilDriver,
 }
 
 impl Avisos {
@@ -258,6 +265,7 @@ impl Avisos {
             pedidos: Vec::new(),
             animado: None,
             residual: None,
+            driver: Default::default(),
         }
     }
 
@@ -500,6 +508,17 @@ impl Avisos {
             _ => {}
         }
         m
+    }
+
+    /// `ajuste` da janela 26 com o alinhamento ao byte do driver, se `alinhar_ao_criar`.
+    pub fn ajuste_janela_imagem(&self, c: &ConfigQuadroAmarela, ajuste: [i16; 2]) -> [i16; 2] {
+        if !c.alinhar_ao_criar {
+            return ajuste;
+        }
+        // O alinhamento é o da janela criada no lugar de `imagem_em`; o `ajuste` da sequência (9100 e
+        // 9101, causa em aberto) vem depois.
+        let x = c.imagem_em[0];
+        [ajuste[0] + self.driver.alinhar(x) - x, ajuste[1]]
     }
 
     /// A partida acabou ou foi trocada: some a janela que a aranha deixou.
@@ -825,9 +844,9 @@ pub fn desenhar_modal(q: &mut Quadro, recursos: &Recursos, interface: &Interface
         Some(Modal::Amarela { imagem, indice }) => {
             let (c, s) = avisos.sequencia_amarela().ok_or("quadro da amarela sem configuração")?;
             let sobreposta = if avisos.sobreposta_visivel { s.sobreposta.map(|id| (id, s.deslocamento)) } else { None };
-            let externo = desenhar_quadro_amarela(q, recursos, c, *imagem, s.ajuste, sobreposta)?;
+            let externo = desenhar_quadro_amarela(q, recursos, c, *imagem, avisos.ajuste_janela_imagem(c, s.ajuste), sobreposta)?;
             if let Some(t) = &s.texto {
-                desenhar_texto_amarela(q, recursos, interface, c, s, t, *indice);
+                desenhar_texto_amarela(q, recursos, interface, c, avisos.ajuste_janela_imagem(c, s.ajuste), t, *indice);
             }
             Ok((Some(externo), Vec::new()))
         }
@@ -853,7 +872,7 @@ fn tela_inteira(q: &Quadro) -> Retangulo {
 fn desenhar_animado(q: &mut Quadro, recursos: &Recursos, avisos: &Avisos, a: &Animado, ativa: bool) -> Result<(), String> {
     let (Some(ca), Some(cq)) = (avisos.cfg.quadros_animados.as_ref(), avisos.cfg.quadro_amarela.as_ref()) else { return Ok(()) };
     let Some(c) = ca.de(a.tipo) else { return Ok(()) };
-    let (_, area) = desenhar_janela_imagem(q, recursos, cq, c.bitmap, [0, 0], ativa)?;
+    let (_, area) = desenhar_janela_imagem(q, recursos, cq, c.bitmap, avisos.ajuste_janela_imagem(cq, [0, 0]), ativa)?;
     if let Some(id) = a.quadro {
         let bm = recursos.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d))?;
         let antes = q.recorte.replace(area);
@@ -925,14 +944,14 @@ pub fn desenhar_quadro_amarela(
 
 /// Texto do `_YellowDialog` (9101): a string `primeiro + índice` centrada no retângulo (a partir do
 /// canto do bitmap), com a cor da entrada `cor` da tabela de cores.
-fn desenhar_texto_amarela(q: &mut Quadro, recursos: &Recursos, interface: &Interface, c: &ConfigQuadroAmarela, s: &SequenciaAmarela, t: &TextoQuadroAmarela, indice: i16) {
+fn desenhar_texto_amarela(q: &mut Quadro, recursos: &Recursos, interface: &Interface, c: &ConfigQuadroAmarela, ajuste: [i16; 2], t: &TextoQuadroAmarela, indice: i16) {
     let Ok(i) = usize::try_from(indice) else { return };
     let linhas = linhas_do_texto(recursos, t.lista);
     let Some(texto) = linhas.get(t.primeiro + i) else { return };
     let Some(Some(f)) = interface.fontes.get(t.fonte) else { return };
     let cor = interface.cores.get(t.cor as usize).copied().unwrap_or(crate::formats::janela::Cor { frente: 11, fundo: 0, fundo2: 0 });
     let [ix, iy] = c.imagem_em;
-    let (ix, iy) = (ix + s.ajuste[0], iy + s.ajuste[1]);
+    let (ix, iy) = (ix + ajuste[0], iy + ajuste[1]);
     let [x, y, w, h] = t.retangulo;
     let r = Retangulo { esq: ix + x, topo: iy + y, dir: ix + x + w, base: iy + y + h };
     // Recortado à área do bitmap (o retângulo medido passa da borda de cima).

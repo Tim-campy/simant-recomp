@@ -1,5 +1,5 @@
 {
-  "_comentario": "Moldura da interface do original, medida na captura do DOSBox-X (tests/referencias/capturas/titulo_800x600.png). Ver docs/spec/formatos/janela.md, seção 'Posicionamento na tela'.",
+  "_comentario": "Moldura da interface do original, medida na captura do DOSBox-X (tests/referencias/capturas/titulo_800x600.png). Ver docs/spec/formatos/janela.md, seção 'Posicionamento na tela'. O que depende do driver de vídeo (alinhamento ao byte, o pixel a mais do contorno no S3, as cores 16 e 17) fica em data/resolucao.json → perfis_driver (API 0.29; a antiga borda.ajuste_x_contorno é ignorada).",
   "largura": 800,
   "altura": 562,
   "fundo": 17,
@@ -12,8 +12,7 @@
   "borda": {
     "largura": 5,
     "cor_externa": 0,
-    "cor": 16,
-    "ajuste_x_contorno": 1
+    "cor": 16
   },
   "fontes": {
     "_comentario": "Índice = byte 'fonte' dos objetos de texto (_font_SetFont). 'FONTRES.FON#Nome' = fonte .FNT pelo nome; demais = arquivo FONT do Mac. Índices 8–11: MS Sans Serif 10 pt, 12 pt, 10 pt negrito e 12 pt negrito, usadas pelo visor de ajuda (data/ajuda.json). Ver docs/spec/formatos/fonte.md",

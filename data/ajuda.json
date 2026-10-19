@@ -3,6 +3,8 @@
   "arquivo": "SIMANT.HLP",
   "titulo": "SimAnt Help - SIMANT.HLP",
   "externo": [213, 0, 638, 442],
+  "_posicao_padrao": "Lugar padrão do WinHelp 3.1 sem posição guardada no WIN.INI, medido na bancada VGA (640x480: x 213..637, y 2..477) e na SVGA (800x600: 266..797 e 2..597; 1024x768: 341..1021 e 2..765; re_trabalho/svga/ag*_ajuda.png, disco preparado com --ajuda-padrao): da coluna largura/3 até largura - 3, da linha 2 até altura - 3 da tela. O port põe o visor da coluna largura/divisor_x até largura - margem_direita (exclusivo) e do topo à base da área cliente (a parte de cima da tela não existe no port). O WIN.INI do usuário guarda [Windows Help] H_WindowPosition=[266,200,266,200,0], de uma sessão em 800x600: com ela o original abre o visor nesse lugar [hipótese: não testado].",
+  "posicao_padrao": {"divisor_x": 3, "margem_direita": 2},
   "espessura_moldura": 4,
   "altura_titulo": 18,
   "altura_menu": 18,

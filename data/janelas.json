@@ -26,7 +26,7 @@
     "_cores_barras": "_modeColors (DGROUP 1048:159a) = 42, 43, 46 por _ConvColor. Medido: F verde, D amarelo, N ciano.",
     "cores_barras": [10, 11, 14]
   },
-  "_ajuste_posicao": "A janela vai para a posição da tabela tipo 9 (objeto 9/0 na bancada QEMU 640×480) mais a faixa; medido nas capturas j01/j02/j04 de tests/referencias/roteiros/qemu_janelas.txt: mais 2 linhas.",
+  "_ajuste_posicao": "A janela vai para a posição da tabela tipo 9 (objeto 9/0 na bancada QEMU 640×480) mais a faixa; medido nas capturas j01/j02/j04 de tests/referencias/roteiros/qemu_janelas.txt: mais 2 linhas. Em x, a borda esquerda da área cliente (canto + contorno + 1 de WS_BORDER) vai para o byte mais próximo do perfil de driver (data/resolucao.json; telas/resolucao.md §7): isso dá o x + 1 das janelas de controle e o ajuste de 1 pixel que a Info tinha na bancada VGA (277 + 3 = 280 já é múltiplo de 8).",
   "ajuste_posicao": [0, 2],
   "altura_titulo": 18,
   "_fonte_titulo": "Fontes (índices de interface.json) do título do Windows, a primeira que existir: 6 = System do Windows 3.1 (VGASYS.FON da instalação do usuário, SimAnt-T/WINDOWS/SYSTEM); 0 = Gaia8x14 do jogo.",
@@ -94,7 +94,7 @@
     {"tecla": "P", "ctrl": true, "acao": "mover"},
     {"tecla": "Z", "ctrl": true, "acao": "maximizar_edicao"}
   ],
-  "info": {"janela": 5, "objeto_area": "infoArea", "ajuste": [1, 0]},
+  "info": {"janela": 5, "objeto_area": "infoArea", "ajuste": [0, 0]},
   "historico": {
     "_comentario": "Janela 21 (_OpenHistoryWindow, _ProcHistoryEvent, _ToggleHistButton, _drawHistGraph em 1000:8a6a–8e78). Séries de _HistGraphs (8:8672) e parceiras de escala de _AltHistGraphs (8:869a), por símbolo do save; nomes da lista 4/1050. As cores dos 4 lugares vêm de _ConvColor(0x43, 0x46, 0x49, 0x45) (8:8e4c): medidas na bancada (2026-10-18, telas/janelas.md §3) = vermelho 9, azul-escuro 4, oliva 3, magenta-escuro 5. ajuste_grafico: as linhas e a caixa do nome ficam 1 pixel acima e à esquerda do retângulo do objeto (medido).",
     "janela": 21,

@@ -44,7 +44,7 @@ use crate::rules::inimigos::TabelasInimigos;
 use crate::rules::tick::{Regras, RegrasAmarela, RegrasConselhos, RegrasInimigos, RegrasNinho, RegrasQuintal, RegrasSuperficie};
 
 /// Versão da API de mods que os scripts veem em `API_VERSAO`.
-pub const VERSAO_API: &str = "0.28";
+pub const VERSAO_API: &str = "0.29";
 
 /// Tamanho máximo do texto de `mostrar_mensagem` (caracteres).
 pub const MAX_TEXTO_MENSAGEM: usize = 120;

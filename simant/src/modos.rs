@@ -444,7 +444,7 @@ mod testes {
         let dados = raiz().join("data");
         let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
         let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
-        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
         let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
         let mut velha = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores.clone()).unwrap();
         let do_arquivo = velha.partida.estado.partida.opcoes;
@@ -474,7 +474,7 @@ mod testes {
         let dados = raiz().join("data");
         let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
         let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
-        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
         let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
         let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
         let (r, _) = s.tela.objeto_da_faixa(&s.modos.quintal.cfg.botao_abrir).unwrap();
@@ -520,7 +520,7 @@ mod testes {
         let dados = raiz().join("data");
         let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
         let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
-        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
         let mut s = Sessao::abrir(&recursos, &dados, Origem::Novo(1234, TipoJogo::Experimental), cores).unwrap();
         assert_eq!(s.partida.estado.partida.tipo_jogo, 3);
         // Uma célula da área do mapa da edição.
@@ -585,7 +585,7 @@ mod testes {
         let dados = raiz().join("data");
         let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
         let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
-        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
         let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
         let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
         clicar(&mut s, 580, 77 - 37);
@@ -619,7 +619,7 @@ mod testes {
         let dados = raiz().join("data");
         let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
         let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
-        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
         let save = raiz().join("tests/referencias/saves").join(save);
         let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
         s.partida.nav.vista.x = 22;
@@ -666,7 +666,7 @@ mod testes {
 
     /// Sessão com o save `BALAO_OVO.ANT` (para desenhar avisos por cima), ou `None` sem o jogo.
     fn sessao_de_teste<'a>(recursos: &'a Recursos, dados: &std::path::Path) -> Option<Sessao<'a>> {
-        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let cores = engine::paleta::carregar_rgb(recursos).unwrap();
         let save = raiz().join("tests/referencias/saves/BALAO_OVO.ANT");
         Some(Sessao::abrir(recursos, dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap())
     }
