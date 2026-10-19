@@ -476,6 +476,44 @@ fn renascer_de_ovo_pede_o_quadro_9101() {
 }
 
 #[test]
+fn linha_do_tempo_da_morte_e_do_renascimento() {
+    // _YellowDeath(5) e _YellowBirth, com a janela de edição aberta: os pedidos saem na ordem em
+    // que o original os faz dentro do tick — centralizar no lugar da morte, o desenho de lá, a
+    // música e o quadro da morte; só depois centralizar no ovo, os estágios do ovo (animação de
+    // 220 ms por estágio) e o quadro 9101.
+    let mut e = estado(1, 10, 10);
+    e.partida.opcoes[3] = 1;
+    e.ninho_b.lista.adicionar(Formiga { x: 30, y: 10, modo: 8, tipo: 3, s: 0 });
+    e.ninho_b.vida.definir(30, 10, 3);
+    e.vistas.plano = 1;
+    e.edicao_no_tick = Some(Box::new(engine::rules::desenho::EdicaoNoTick::padrao(25, 19)));
+    engine::rules::desenho::comecar_tick(&mut e);
+    matar_amarela(&mut e, t(), CausaMorte::Pisada);
+    let ev = &e.eventos;
+    let pos = |f: &dyn Fn(&Evento) -> bool| ev.iter().position(f).unwrap();
+    let morte = pos(&|x| *x == Evento::Mensagem(10034));
+    let centro_morte = pos(&|x| matches!(x, Evento::CentralizarNaAmarela { plano: 1, x: 10, y: 10 }));
+    let centro_ovo = pos(&|x| matches!(x, Evento::CentralizarNaAmarela { plano: 2, x: 30, y: 10 }));
+    let ovo = pos(&|x| matches!(x, Evento::Animacao(a) if a.codigo == -2));
+    let renasceu = pos(&|x| *x == Evento::QuadroAmarela { imagem: 9101, indice: 1 });
+    assert!(centro_morte < morte && morte < centro_ovo && centro_ovo < ovo && ovo < renasceu);
+    // Antes do quadro da morte, a janela de edição desenhada no lugar da morte, com a amarela.
+    let foto = ev[..morte].iter().rev().find_map(|x| if let Evento::Instantaneo { plano, quadro } = x { Some((*plano, quadro)) } else { None });
+    let (plano, q) = foto.expect("instantâneo antes do quadro da morte");
+    assert_eq!(plano, 1);
+    assert_eq!(q.vida[10 * 64 + 10], 0xFF);
+    // Os estágios 2–7 e a operária pronta; uma espera de 220 ms depois de cada estágio.
+    let Evento::Animacao(a) = &ev[ovo] else { unreachable!() };
+    assert_eq!((a.plano, a.espera_ms, a.quadros.len()), (2, 220, 7));
+    let ovos: Vec<i16> = a.quadros[..6].iter().map(|q| q.ovo).collect();
+    assert_eq!(ovos, [2, 3, 4, 5, 6, 7]);
+    assert!(a.quadros[..6].iter().all(|q| q.tipo == 0) && a.quadros[6].tipo == 0x10);
+    let esperas = ev[ovo..renasceu].iter().filter(|x| **x == Evento::Espera(220)).count();
+    assert_eq!(esperas, 6);
+    assert!(!ev[ovo..].iter().any(|x| matches!(x, Evento::Instantaneo { .. })), "os desenhos dos estágios vão na animação");
+}
+
+#[test]
 fn y14b_sem_corpo_no_quick_e_derrota() {
     let mut e = estado(1, 10, 10);
     matar_amarela(&mut e, t(), CausaMorte::Pisada);

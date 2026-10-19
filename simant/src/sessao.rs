@@ -628,7 +628,7 @@ impl Sessao<'_> {
                 EventoRegras::DialogoAranha { texto } => println!("[tick {t}] quadro da aranha, texto {texto} (_SpiderDialog)"),
                 EventoRegras::Musica(id) => println!("[tick {t}] música {id}"),
                 EventoRegras::Som(_) | EventoRegras::TemaDoNinho | EventoRegras::Espera(_) => {} // tocados por som::Audio
-                EventoRegras::Animacao(_) => {} // a Partida guarda e mostra os quadros
+                EventoRegras::Animacao(_) | EventoRegras::Instantaneo { .. } => {} // a Partida guarda e mostra os quadros
                 EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
                 EventoRegras::EscolherColonia => println!("[tick {t}] escolher outra colônia (_SpecialXfer)"),
                 EventoRegras::QuadroAmarela { imagem, .. } => println!("[tick {t}] quadro da amarela {imagem} (_YellowDialog)"),

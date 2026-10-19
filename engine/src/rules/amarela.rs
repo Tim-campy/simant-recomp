@@ -92,6 +92,11 @@ pub struct AnimacaoAmarela {
     /// 2 degraus = 110 ms por quadro (a mesma conta que dá os 165 ms da luta, medidos na bancada).
     #[serde(default = "espera_loucura_padrao")]
     pub espera_loucura_ms: u16,
+    /// `_YellowBirth` (`1000:739e`): cada estágio do ovo (2–7) espera `_MacTickCount` chegar a
+    /// "início + 10"; como ele anda de 3 em 3 a cada 55 ms, são 4 degraus = 220 ms. Só apresentação
+    /// (o estado e os sorteios não dependem dela).
+    #[serde(default = "espera_ovo_padrao")]
+    pub espera_ovo_ms: u16,
     /// Com música ligada, as mortes 1–9 saem no primeiro quadro (antes do sorteio), porque no
     /// caminho MCI do Windows `_mySongIsDone` devolve sempre verdadeiro (regras/som.md). Falso: faz
     /// todos os quadros, como o caminho Sound Blaster.
@@ -111,6 +116,16 @@ fn degraus(ms: u16) -> u32 {
 fn espera_loucura_padrao() -> u16 {
     110
 }
+
+fn espera_ovo_padrao() -> u16 {
+    220
+}
+
+/// Códigos de `Evento::Animacao` que não são de `_AnimYellowFight` (0–10): `_AnimYellowInsane` (−1) e
+/// os estágios do ovo de `_YellowBirth` ao renascer (−2) e ao fundar uma colônia (−3).
+const ANIMACAO_LOUCURA: i32 = -1;
+const ANIMACAO_RENASCER: i32 = -2;
+const ANIMACAO_FUNDAR: i32 = -3;
 
 fn verdadeiro() -> bool {
     true
@@ -1611,23 +1626,13 @@ fn quadros_morte(e: &Estado, t: &TabelasAmarela) -> i32 {
 /// Fotografa a janela de edição do plano `plano` como `_DoEditUpdateDraw` a desenharia agora (mapa,
 /// vida e os campos `_Me*` da marca 0xFF). Só lê o estado.
 fn quadro_da_tela(e: &Estado, plano: i32) -> Option<QuadroAnimacao> {
-    let (mapa, vida) = match plano {
-        0 | 1 => (&e.superficie.mapa, &e.superficie.vida),
-        2 => (&e.ninho_b.mapa, &e.ninho_b.vida),
-        3 => (&e.ninho_r.mapa, &e.ninho_r.vida),
-        _ => return None,
-    };
-    let a = &e.amarela;
-    Some(QuadroAnimacao {
-        mapa: mapa.dados.clone(),
-        vida: vida.dados.clone(),
-        x: a.x,
-        y: a.y,
-        tipo: a.tipo,
-        dir: a.dir,
-        ovo: a.ovo,
-        base: a.base,
-    })
+    super::desenho::foto_da_edicao(e, plano as i16)
+}
+
+/// Os pedidos feitos durante uma animação (esperas e sons) vão depois do `Evento::Animacao`; os
+/// instantâneos dos redesenhos de cada quadro saem (os quadros já estão na animação).
+fn depois_da_animacao(e: &mut Estado, pedidos: Vec<Evento>) {
+    e.eventos.extend(pedidos.into_iter().filter(|ev| !matches!(ev, Evento::Instantaneo { .. })));
 }
 
 /// Junta os quadros desenhados de uma animação num `Evento::Animacao` (nada se não houve quadro).
@@ -1695,7 +1700,7 @@ fn animar_luta(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, d
     }
     let pedidos = std::mem::replace(&mut e.eventos, fila_antes);
     pedir_animacao(e, codigo, plano, t.animacao.espera_quadro_ms, fotos);
-    e.eventos.extend(pedidos);
+    depois_da_animacao(e, pedidos);
     if codigo == 10 {
         por_tile(e, 1, x, y, tile_original);
     }
@@ -1751,8 +1756,8 @@ fn animar_loucura(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32
         fotos.extend(quadro_da_tela(e, plano));
     }
     let pedidos = std::mem::replace(&mut e.eventos, fila_antes);
-    pedir_animacao(e, -1, plano, t.animacao.espera_loucura_ms, fotos);
-    e.eventos.extend(pedidos);
+    pedir_animacao(e, ANIMACAO_LOUCURA, plano, t.animacao.espera_loucura_ms, fotos);
+    depois_da_animacao(e, pedidos);
     let d = e.amarela.dir as i32;
     limpar_minha_vida(e, t, plano, cx, cy, tipo, d);
     let a = &mut e.amarela;
@@ -2040,16 +2045,27 @@ fn nascer_de_ovo(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32,
     depois_do_nascimento(e, t);
     // `_YellowDeath` já trocou 0x60 por 0x10, então na prática a direção é sempre 6.
     e.amarela.dir = if tipo_inicial == TIPO_RAINHA { 2 } else { 6 };
+    // Os estágios 2–7, cada um desenhado e esperado (`espera_ovo_ms`), e a formiga pronta: uma
+    // animação para a interface (só apresentação).
+    let espera = t.animacao.espera_ovo_ms;
+    let fila_antes = std::mem::take(&mut e.eventos);
+    let mut fotos = Vec::new();
     for estagio in 2..=7 {
         e.amarela.ovo = estagio;
         let dir = e.amarela.dir as i32;
         marcar_amarela(e, t, plano, x, y, 0, dir, MARCA_AMARELA);
         redesenhar(e);
+        fotos.extend(quadro_da_tela(e, plano));
+        e.eventos.push(Evento::Espera(espera));
     }
     let dir = e.amarela.dir as i32;
     marcar_amarela(e, t, plano, x, y, tipo, dir, MARCA_AMARELA);
     redesenhar(e);
+    fotos.extend(quadro_da_tela(e, plano));
     e.pedir_som(t.sons.nascimento);
+    let pedidos = std::mem::replace(&mut e.eventos, fila_antes);
+    pedir_animacao(e, ANIMACAO_RENASCER, plano, espera, fotos);
+    depois_da_animacao(e, pedidos);
     e.eventos.push(Evento::Musica(t.musicas.renascer));
     // `_YellowDialog(0x238d, 1)`: "You have been reborn!".
     e.eventos.push(Evento::QuadroAmarela { imagem: t.quadros.renascer, indice: 1 });
@@ -2090,10 +2106,16 @@ fn fundar_colonia(e: &mut Estado, t: &TabelasAmarela, ox: i32, oy: i32) {
     });
     e.pedir_som(t.sons.nascimento_ovo);
     depois_do_nascimento(e, t);
+    let espera = t.animacao.espera_ovo_ms;
+    let plano_animado = e.amarela.plano as i32;
+    let fila_antes = std::mem::take(&mut e.eventos);
+    let mut fotos = Vec::new();
     for estagio in 2..=7u8 {
         let p = e.amarela.plano as i32;
         por_vida(e, t, p, ox, oy, estagio);
         redesenhar(e);
+        fotos.extend(quadro_da_tela(e, p));
+        e.eventos.push(Evento::Espera(espera));
     }
     desmarcar(e, t);
     let a = e.amarela.clone();
@@ -2106,7 +2128,11 @@ fn fundar_colonia(e: &mut Estado, t: &TabelasAmarela, ox: i32, oy: i32) {
     c.castas[4] -= 1;
     c.populacao += 1;
     redesenhar(e);
+    fotos.extend(quadro_da_tela(e, plano_animado));
     e.pedir_som(t.sons.nascimento);
+    let pedidos = std::mem::replace(&mut e.eventos, fila_antes);
+    pedir_animacao(e, ANIMACAO_FUNDAR, plano_animado, espera, fotos);
+    depois_da_animacao(e, pedidos);
     e.eventos.push(Evento::Musica(t.musicas.fundar_fim));
     // `_YellowDialog(0x238d, 2)`: "You are now a worker!".
     e.eventos.push(Evento::QuadroAmarela { imagem: t.quadros.renascer, indice: 2 });

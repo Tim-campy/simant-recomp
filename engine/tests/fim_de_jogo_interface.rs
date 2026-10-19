@@ -55,20 +55,25 @@ fn morte_pelo_inseticida_pede_o_fim_de_jogo_uma_vez_com_a_pontuacao_do_original(
     let mut p = partida(&v, &layout);
     // `Partida::rodar_tick` põe o relógio do Mac pelo tempo da partida; aqui vale o lido no original
     // (o gato sorteia conforme o relógio), então o tick roda como em `rodar_tick`, sem essa troca.
-    for _ in 0..3 {
-        tick(&mut p.estado, &mut p.regras);
-        p.processar_eventos_do_estado();
-    }
+    // Tick 21: a morte. A apresentação do tick, na ordem do original: a loucura (_AnimYellowInsane)
+    // segura o resto.
+    tick(&mut p.estado, &mut p.regras);
+    p.processar_eventos_do_estado();
     assert_eq!(p.estado.partida.fim_de_jogo, 1, "_IsGameOver");
     assert_eq!(p.estado.partida.pretas_venceram, 0);
-    let eventos = p.retirar_eventos();
-    assert_eq!(eventos.iter().filter(|e| **e == Evento::DialogoFimDeJogo).count(), 1, "{eventos:?}");
+    assert!(p.animando());
+    p.avancar(10_000);
+    assert!(!p.animando());
     // Como no original: a caixa da morte ("You are covered with insecticide!", 10042, captura
     // dialogo_21_0.png), a de derrota sem corpo (`_PictStrnDialog(0, 10056, 1)` em `_YellowDeath`,
     // `1000:7746`; na bancada fechada pelo Enter logo depois do clique, sem captura) e o GAME OVER
-    // (dialogo_21_1.png).
+    // (dialogo_21_1.png), pedido pelos ticks seguintes (o segundo pedido fica atrás do quadro).
     assert!(matches!(p.fechar_modal(), Some(Modal::Quadro { texto: 10042, .. })));
     assert!(matches!(p.fechar_modal(), Some(Modal::Quadro { texto: 10056, .. })));
+    for _ in 0..2 {
+        tick(&mut p.estado, &mut p.regras);
+        p.processar_eventos_do_estado();
+    }
     match p.avisos.modal() {
         Some(Modal::FimDeJogo { tipo_jogo, pretas_venceram, pontos }) => {
             assert_eq!((*tipo_jogo, *pretas_venceram), (2, false));
@@ -77,6 +82,8 @@ fn morte_pelo_inseticida_pede_o_fim_de_jogo_uma_vez_com_a_pontuacao_do_original(
         outro => panic!("esperava o quadro de fim de jogo, veio {outro:?}"),
     }
     assert!(matches!(p.fechar_modal(), Some(Modal::FimDeJogo { .. })));
+    let eventos = p.retirar_eventos();
+    assert_eq!(eventos.iter().filter(|e| **e == Evento::DialogoFimDeJogo).count(), 1, "{eventos:?}");
 }
 
 /// Depois do clique no "GAME OVER", o original chama `_NewGame(0)`: a tela "Select a Game" e, com
@@ -126,6 +133,7 @@ fn fim_de_jogo_volta_a_selecao_e_comeca_jogo_completo() {
         tick(&mut p.estado, &mut p.regras);
         p.processar_eventos_do_estado();
     }
+    p.avancar(10_000); // a animação da loucura, antes dos quadros
     let mut fechados = Vec::new();
     while let Some(m) = p.fechar_modal() {
         fechados.push(m);
