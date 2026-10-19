@@ -378,6 +378,8 @@ impl RegrasQuintal for RegrasOriginais {
 /// `_InitSimYard` (`1030:1378`, quintal.md §8).
 pub fn iniciar_quintal(e: &mut Estado, t: &TabelasQuintal) {
     let v = &t.valores_iniciais;
+    // `_LastColonyPopB = _LastColonyPopR = 1` (só o vermelho é lido, pela mensagem 10052).
+    e.ultimas_colonias_vermelhas = Some(1);
     let m = &mut e.menino;
     m.boy_msg_cnt = 0;
     m.x = v.menino_x;
@@ -1235,8 +1237,9 @@ pub fn simular_colonias(e: &mut Estado, t: &TabelasQuintal) {
         return;
     }
     let r = &t.regras;
-    // `_LastColonyPopR` não está no save: é o `_ColonyTotalRed` da passada anterior.
-    let ultima_vermelha = e.vermelha.total_colonias;
+    // `_LastColonyPopR` não está no save: 1 depois de `_InitSimYard`, depois o `_ColonyTotalRed` da
+    // passada anterior do Jogo Completo; sem essa informação (vetores), o `_ColonyTotalRed` de antes.
+    let ultima_vermelha = e.ultimas_colonias_vermelhas.unwrap_or(e.vermelha.total_colonias);
     e.ambiente.atualizar_colonias = 1;
     manter_enxame(e, Cor::Preta, r.enxame_teto);
     manter_enxame(e, Cor::Vermelha, r.enxame_teto);
@@ -1337,6 +1340,8 @@ fn jogo_completo(e: &mut Estado, t: &TabelasQuintal, ultima_vermelha: i16) {
             e.eventos.push(Evento::Mensagem(m.tome_a_casa));
         }
     }
+    // `_LastColonyPopR = _ColonyTotalRed` (`9:8118`), só aqui, no Jogo Completo.
+    e.ultimas_colonias_vermelhas = Some(e.vermelha.total_colonias);
     if e.ambiente.casa_a_venda == 0 && e.ambiente.colonias_na_casa > t.regras.casa_limite {
         e.ambiente.casa_a_venda = 1;
         e.menino.no_numero = 0;

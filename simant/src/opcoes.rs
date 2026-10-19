@@ -30,6 +30,9 @@ pub(crate) struct Opcoes {
     /// resolvida em `principal` só para a partida com janela; `--sem-preferencias` desliga).
     pub(crate) preferencias: Option<PathBuf>,
     pub(crate) sem_preferencias: bool,
+    /// `WIN.INI` lido como origem das preferências enquanto não há o arquivo do port (`--win-ini ARQ`;
+    /// padrão: procurado a partir da pasta do jogo, simant/src/preferencias.rs).
+    pub(crate) win_ini: Option<PathBuf>,
     /// Quick Game gerado pelo port.
     pub(crate) novo_jogo: bool,
     /// Semente do Quick Game (padrão: relógio).
@@ -98,6 +101,7 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
         video: video::ConfigVideo::default(),
         preferencias: None,
         sem_preferencias: false,
+        win_ini: None,
         novo_jogo: false,
         semente: None,
         ticks: None,
@@ -135,6 +139,7 @@ pub(crate) fn ler_opcoes() -> Result<Opcoes, String> {
             "--resolucao" => o.resolucao = Some(video::ler_tamanho("--resolucao", &valor()?)?),
             "--preferencias" => o.preferencias = Some(valor()?.into()),
             "--sem-preferencias" => o.sem_preferencias = true,
+            "--win-ini" => o.win_ini = Some(valor()?.into()),
             "--capturar-janela" => o.capturar_janela = Some(valor()?.into()),
             "--novo-jogo" => o.novo_jogo = true,
             "--semente" => o.semente = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),

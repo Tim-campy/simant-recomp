@@ -43,6 +43,7 @@ Todas as teclas vêm de `data/partida.json`, `data/navegacao.json`, `data/janela
 | `--escala N`, `--janela LxA` | ampliação da tela virtual (inteira, nítida) e tamanho inicial da janela; `0` = a maior que cabe |
 | `--sem-som`, `--soundfont ARQ.sf2` | sem áudio; SoundFont General MIDI para as músicas (ou `SIMANT_SOUNDFONT`; sem ela, sintetizador simples) |
 | `--preferencias ARQ`, `--sem-preferencias` | arquivo das opções guardadas entre partidas (no lugar do `[SimAnt]` do `WIN.INI`; padrão em `%APPDATA%\SimAnt recomp\SimAnt\`) |
+| `--win-ini ARQ` | `WIN.INI` lido (só leitura) como origem das opções enquanto o arquivo acima não existe; padrão: `WINDOWS/WIN.INI` na pasta do jogo ou nas duas de cima |
 | `--ticks N`, `--avancar-ms MS`, `--acoes A,B`, `--quintal M`, `--janela-mapa M`, `--mini-mapa N` | testes sem interação: roda ticks, passa tempo real, aplica ações de navegação, abre o quintal, o mapa num modo ou o mini mapa (N aberturas) |
 | `--exportar-tela-jogo ARQ.png`, `--exportar-telas DIR`, `--exportar-som DIR`, `--capturar-janela ARQ.png`, `--sair-apos-ms N` | grava a tela de jogo, as telas da abertura, os efeitos e músicas em WAV, ou o que a janela mostrava |
 

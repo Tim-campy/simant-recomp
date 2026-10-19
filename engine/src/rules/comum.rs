@@ -829,12 +829,21 @@ pub fn sair_pelo_buraco<D: Direcoes + ?Sized>(e: &mut Estado, dirs: &D, hx: i32,
         0
     };
     let l = &mut e.superficie.lista;
-    if l.usadas() >= CAPACIDADE_A {
-        // O original grava na vaga 1000 (fora da lista) e compacta; o port compacta e grava na
-        // primeira vaga livre. [divergência só com a lista A cheia; ninho.md, lacunas]
+    let f = Formiga { x: ax as u8, y: ay as u8, modo: m, tipo: t, s: s_novo };
+    if l.usadas() < CAPACIDADE_A {
+        l.adicionar(f);
+    } else {
+        // Lista cheia (ninho.md §4.6): o original grava na vaga 1000, que é a folga de 2 bytes depois
+        // de cada vetor de 1000 (fora do save e de toda varredura), e só então compacta as vagas
+        // 0..999. A formiga se perde; se a compactação abriu vagas, o contador ainda soma 1 e passa a
+        // incluir a vaga seguinte às compactadas com o que estava nela (a compactação não apaga o
+        // fim): uma vaga vazia (T = 0) ou a cópia de uma formiga que foi deslizada. Devolve 1 mesmo
+        // assim (quem chamou tira a formiga do ninho).
         l.compactar();
+        if l.usadas() < CAPACIDADE_A {
+            l.indice += 1;
+        }
     }
-    l.adicionar(Formiga { x: ax as u8, y: ay as u8, modo: m, tipo: t, s: s_novo });
     true
 }
 
@@ -1159,6 +1168,52 @@ pub fn novo_buraco<T: Terreno + ?Sized, D: Direcoes + ?Sized>(t: &mut T, dirs: &
 #[cfg(test)]
 mod testes {
     use super::*;
+
+    struct Dirs8;
+    impl Direcoes for Dirs8 {
+        fn deslocamentos(&self) -> (&[i8; 8], &[i8; 8]) {
+            (&[0, 1, 1, 1, 0, -1, -1, -1], &[-1, -1, 0, 1, 1, 1, 0, -1])
+        }
+    }
+
+    fn lista_a_cheia(buracos: &[usize]) -> Estado {
+        let mut e = Estado::vazio();
+        let l = &mut e.superficie.lista;
+        for (i, f) in l.vagas.iter_mut().enumerate() {
+            *f = Formiga { x: (i % 100) as u8, y: (i / 100) as u8, modo: 2, tipo: if buracos.contains(&i) { 0 } else { 0x10 }, s: i as u8 };
+        }
+        l.indice = CAPACIDADE_A as i16;
+        e
+    }
+
+    /// ninho.md §4.6: com a lista A cheia a formiga vai para a vaga 1000 (perdida) e a compactação
+    /// deixa o contador com uma vaga a mais, com o resto que estava nela.
+    #[test]
+    fn saida_com_a_lista_a_cheia_segue_o_original() {
+        // Sem buracos: a formiga se perde e o contador fica em 1000; a saída conta como feita.
+        let mut e = lista_a_cheia(&[]);
+        let antes = e.superficie.lista.clone();
+        assert!(sair_pelo_buraco(&mut e, &Dirs8, 30, 30, 0x10, 2, 0));
+        assert_eq!(e.superficie.lista, antes);
+
+        // Dois buracos antes da vaga 998: as 998 vivas deslizam e a vaga 998 (que tinha a formiga
+        // 998, agora copiada na 996) entra na lista: a formiga nova não aparece, a 998 fica duplicada.
+        let mut e = lista_a_cheia(&[5, 7]);
+        let velha_998 = e.superficie.lista.vagas[998];
+        assert!(sair_pelo_buraco(&mut e, &Dirs8, 30, 30, 0x10, 2, 0));
+        let l = &e.superficie.lista;
+        assert_eq!(l.indice, 999);
+        assert_eq!(l.vagas[996], velha_998);
+        assert_eq!(l.vagas[998], velha_998);
+        assert!(l.vagas[..999].iter().all(|f| f.x != 30 || f.y != 29), "a formiga que saiu não está na lista");
+
+        // Buraco no fim (vaga 999): a vaga incluída é a própria 999, vazia.
+        let mut e = lista_a_cheia(&[999]);
+        assert!(sair_pelo_buraco(&mut e, &Dirs8, 30, 30, 0x10, 2, 0));
+        let l = &e.superficie.lista;
+        assert_eq!(l.indice, 1000);
+        assert_eq!(l.vagas[999].tipo, 0);
+    }
 
     #[test]
     fn comida_cai_na_casa_pelo_dropdir() {

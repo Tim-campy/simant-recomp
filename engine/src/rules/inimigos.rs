@@ -432,6 +432,32 @@ pub fn matar_formiga_leao(e: &mut Estado, t: &TabelasInimigos, k: usize) {
     }
 }
 
+/// `_KillAntLion(-1)` (inimigos.md §1.4): o Inseticida acertou um tile de formiga-leão sem entrada na
+/// lista. O original lê e grava a "vaga −1" de cada vetor, que são bytes de outras variáveis. O port
+/// reproduz o que cai no estado da partida: com `_LionIndex` > 0, a lista perde a entrada 0 (todas
+/// deslizam uma vaga, o contador cai 1), o byte alto de `_BoyMsgCnt` recebe o T da entrada 0 e o
+/// byte alto de `_LastThemeSong` recebe o Y dela. Não reproduz o `_SetMap(1, X[−1], Y[−1], 0x3F)`,
+/// cujo x é o byte alto do seletor de `_EggStr` (memória do Windows, fora do port), nem as gravações
+/// em `_EggStr`, `_CenterPnt` e `_mapOutBuf` (interface; no original podem corromper ponteiros).
+pub fn matar_formiga_leao_sem_entrada(e: &mut Estado) {
+    let fl = &mut e.formigas_leao;
+    if fl.quantidade <= 0 {
+        return;
+    }
+    let (t0, y0) = (fl.t[0], fl.y[0]);
+    fl.quantidade -= 1;
+    let n = (fl.quantidade as usize).min(9);
+    fl.x.copy_within(1..n + 1, 0);
+    fl.y.copy_within(1..n + 1, 0);
+    fl.t.copy_within(1..n + 1, 0);
+    fl.m.copy_within(1..n + 1, 0);
+    fl.s.copy_within(1..n + 1, 0);
+    let m = &mut e.menino;
+    m.boy_msg_cnt = ((m.boy_msg_cnt as u32 & 0x00FF_FFFF) | (u32::from(t0) << 24)) as i32;
+    let p = &mut e.partida;
+    p.ultima_musica = ((p.ultima_musica as u16 & 0x00FF) | (u16::from(y0) << 8)) as i16;
+}
+
 /// `_FindInLionList(x, y)`: maior índice < `_LionIndex` com esse centro.
 pub fn achar_formiga_leao(e: &Estado, x: i32, y: i32) -> Option<usize> {
     let fl = &e.formigas_leao;
@@ -1231,6 +1257,33 @@ pub fn bichos_de_conta(e: &mut Estado, t: &TabelasInimigos) {
 #[cfg(test)]
 mod testes {
     use super::*;
+
+    /// inimigos.md §1.4: `_KillAntLion(-1)` tira a entrada 0 e grava o T e o Y dela nos bytes altos
+    /// de `_BoyMsgCnt` e `_LastThemeSong`; o mapa não muda.
+    #[test]
+    fn inseticida_sem_entrada_na_lista_tira_a_formiga_leao_0() {
+        let mut e = Estado::vazio();
+        let fl = &mut e.formigas_leao;
+        fl.quantidade = 3;
+        fl.x[..3].copy_from_slice(&[10, 20, 30]);
+        fl.y[..3].copy_from_slice(&[11, 21, 31]);
+        fl.t[..3].copy_from_slice(&[4, 5, 6]);
+        fl.m[..3].copy_from_slice(&[1, 0, 2]);
+        e.menino.boy_msg_cnt = 0x0001_2345;
+        e.partida.ultima_musica = 2;
+        let mapa = e.superficie.mapa.clone();
+        matar_formiga_leao_sem_entrada(&mut e);
+        let fl = &e.formigas_leao;
+        assert_eq!(fl.quantidade, 2);
+        assert_eq!((&fl.x[..2], &fl.y[..2], &fl.t[..2], &fl.m[..2]), (&[20, 30][..], &[21, 31][..], &[5, 6][..], &[0, 2][..]));
+        assert_eq!(e.menino.boy_msg_cnt, 0x0401_2345);
+        assert_eq!(e.partida.ultima_musica, 11 * 256 + 2);
+        assert_eq!(e.superficie.mapa, mapa);
+        // Sem formigas-leão, nada.
+        let mut v = Estado::vazio();
+        matar_formiga_leao_sem_entrada(&mut v);
+        assert_eq!(v.menino.boy_msg_cnt, 0);
+    }
 
     #[test]
     fn tabelas_embutidas_carregam() {
