@@ -426,8 +426,20 @@ pub fn clique_na_edicao(s: &mut Sessao, x: i32, y: i32, ctrl: bool) -> bool {
 /// Clique na área cliente do quintal (que é a janela da frente): patch, troca de patch, PLACE.
 pub fn clique_no_quintal(s: &mut Sessao, x: i32, y: i32, duplo: bool, shift: bool) {
     let m = &mut s.modos;
+    let vista_antiga = s.partida.nav.vista;
     match quintal_mapa::clicar(&mut m.janela, &m.quintal.cfg, &mut s.partida, x, y, duplo, shift) {
-        Ok(r) => println!("quintal: clique {} em ({x}, {y}): {r:?}", if duplo { "duplo" } else { "simples" }),
+        Ok(r) => {
+            println!("quintal: clique {} em ({x}, {y}): {r:?}", if duplo { "duplo" } else { "simples" });
+            if let quintal_mapa::RespostaQuintal::Troca(engine::rules::troca_patch::ResultadoTroca::Trocou { .. }) = r {
+                // A troca deixa o jogo pausado e o original mantém o patch antigo na edição até o
+                // próximo redesenho (bancada, vista_xfer: edicao_na_frente.png).
+                s.edicao_congelada = Some(crate::sessao::EdicaoCongelada {
+                    vista_antiga,
+                    vista_nova: s.partida.nav.vista,
+                    tempo: s.partida.estado.partida.tempo,
+                });
+            }
+        }
         Err(e) => eprintln!("quintal: {e}"),
     }
 }
@@ -843,5 +855,59 @@ mod testes {
             gravar_teste(&s, nome, &rgb);
             assert_eq!(pixel(&rgb, w, 413, 300), [0, 0, 128], "contorno até 414");
         }
+    }
+
+    /// Troca de patch pelo duplo clique no quintal com o jogo pausado: a janela de edição continua
+    /// com o desenho do patch antigo (chão, formigas e polegares) até o próximo tick ou uma navegação,
+    /// como no original (bancada, `cenarios_raros.py vista_xfer`: `edicao_na_frente.png`).
+    #[test]
+    fn edicao_mostra_o_patch_antigo_ate_o_proximo_redesenho() {
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz().join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
+        let mut s = Sessao::abrir(&recursos, &dados, Origem::Novo(1234, TipoJogo::Completo), cores).unwrap();
+        s.partida.estado.partida.pausado = 1;
+        // Uma colônia preta no patch (10, 8), como no cenário da bancada.
+        let i = engine::rules::troca_patch::indice_patch(10, 8).unwrap();
+        s.partida.estado.preta.populacao_quintal.0[i] = 3;
+        s.partida.estado.preta.total_colonias = 2;
+        let area = s.tela.retangulo_da_edicao();
+        let (w, h) = (s.tela.cfg.largura as usize, s.tela.cfg.altura as usize);
+        let recorte = |rgb: &[u8]| -> Vec<u8> {
+            let mut v = Vec::new();
+            for y in area.topo.max(0) as usize..(area.base as usize).min(h) {
+                v.extend_from_slice(&rgb[(y * w + area.esq.max(0) as usize) * 3..(y * w + (area.dir as usize).min(w)) * 3]);
+            }
+            v
+        };
+        let antes = recorte(&s.quadro_rgb().unwrap());
+        let ponto = (0..640)
+            .flat_map(|x| (0..442).map(move |y| (x, y)))
+            .find(|&(x, y)| s.modos.quintal.cfg.patch_em(x, y) == Some((10, 8)))
+            .unwrap();
+        s.modos.janela.aberta = true;
+        s.modos.janela.na_frente = true;
+        clique_no_quintal(&mut s, ponto.0, ponto.1, false, false);
+        clique_no_quintal(&mut s, ponto.0, ponto.1, true, false);
+        assert_eq!(s.partida.estado.ambiente.patch, (10, 8), "trocou de patch");
+        assert!(s.edicao_congelada.is_some());
+        // O quadro da troca (2_dialogo na bancada) fechado: sobra a edição.
+        assert!(s.partida.avisos.fechar_modal().is_some());
+        let agora = recorte(&s.quadro_rgb().unwrap());
+        let difs: Vec<usize> = (0..antes.len() / 3).filter(|&k| antes[3 * k..3 * k + 3] != agora[3 * k..3 * k + 3]).collect();
+        let lw = (area.dir.min(w as i16) - area.esq.max(0)) as usize;
+        let caixa = difs.iter().fold((usize::MAX, usize::MAX, 0, 0), |(a, b, c, d), &k| (a.min(k % lw), b.min(k / lw), c.max(k % lw), d.max(k / lw)));
+        assert!(difs.is_empty(), "pausado, a edição mostra o patch antigo: {} pixels diferentes em {caixa:?}", difs.len());
+        // O próximo tick (ou uma navegação) redesenha com o patch novo.
+        s.partida.estado.partida.tempo += 1;
+        let depois = recorte(&s.quadro_rgb().unwrap());
+        assert!(s.edicao_congelada.is_none());
+        assert_ne!(depois, antes);
     }
 }

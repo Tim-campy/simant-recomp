@@ -355,7 +355,7 @@ Verificado (`engine/tests/estado_simulacao.rs` e testes de unidade de `estado.rs
 - Periodicidade e ordem das chamadas, com regras de teste que anotam cada chamada e o `_Cycle`: todo tick, ticks ímpares (lagarta), a cada 64 (alimentação, contagem, histórico), a cada 128 por fase (compactação A/B/R), e a volta do `_Cycle` depois de 0x1000.
 - `de_mundo` com a semente do `QUICK2.ANT` (precisa de `SIMANT_DIR`): controles, opções, velocidade, `_Barrier`, `_NextFeed`, vistas, buracos, rainhas e escavação iguais ao save.
 
-Não verificado: nenhuma parte do tick foi comparada passo a passo com o original, porque as sub-rotinas ainda não existem. O caminho do Full Game em `_CountAnts` (nova colônia vermelha) não tem teste. `de_mundo` não aplica `_InitSimYard` nem `_ResetYellowVars` (os campos ficam zerados).
+Não verificado: nenhuma parte do tick foi comparada passo a passo com o original, porque as sub-rotinas ainda não existem. O caminho do Full Game em `_CountAnts` (nova colônia vermelha) não tem teste. Desde 2026-10-19 `de_mundo` aplica `_ResetYellowVars`, o resto de `_InitSpider`, `_ClearHistory(1)`, o `_CurEditMode` de `_SetMapPlane` e os valores estáticos do executável, e `_InitSimYard` fica com `quintal::iniciar_quintal` (`carregar::estado_do_mundo_novo`): o jogo novo de Full Game, Experimental e Tutorial bate 307/307 com o original antes do 1º tick (geracao-mundo.md §8).
 
 ## Lacunas
 

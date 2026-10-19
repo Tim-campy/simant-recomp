@@ -1123,6 +1123,36 @@ pub struct ValoresIniciais {
     pub botoes_historico: [i16; 10],
     pub barreira_quintal: i16,
     pub barreira_casa: i16,
+    /// Valores estáticos do `SIMANTW.EXE` que nenhuma rotina do jogo novo escreve (conferidos no
+    /// original em 2026-10-19, geracao-mundo.md "Tipos de jogo no original"): `_MakeMe` e `_ModeMe`
+    /// (8:8a56/8a58) = 2, `_ColonyUpdateFlag` (8:8a68) = 1, `_MeFoodInType` (8:8a6e) = −1 e
+    /// `_TutLesson` (8:85ee) = 1. Opcionais no JSON (API 0.34).
+    #[serde(default)]
+    pub estaticos: EstaticosIniciais,
+    /// `_SetMapPlane(_MePlane)` do `_NewGame`: `_CurEditMode` = tabela 8:8608 por plano.
+    #[serde(default = "modo_edicao_por_plano_padrao")]
+    pub modo_edicao_por_plano: [i16; 4],
+}
+
+fn modo_edicao_por_plano_padrao() -> [i16; 4] {
+    [0, 0, 1, 2]
+}
+
+/// Ver `ValoresIniciais::estaticos`.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EstaticosIniciais {
+    pub proxima_casta: i16,
+    pub proximo_modo: i16,
+    pub atualizar_colonias: i16,
+    pub comeu_tipo: i16,
+    pub licao: i16,
+}
+
+impl Default for EstaticosIniciais {
+    fn default() -> Self {
+        EstaticosIniciais { proxima_casta: 2, proximo_modo: 2, atualizar_colonias: 1, comeu_tipo: -1, licao: 1 }
+    }
 }
 
 /// Conteúdo de `data/simulacao.json`.
@@ -1535,8 +1565,10 @@ impl Estado {
     ///
     /// Além do que a geração produz, aplica os passos de `_NewGame`, `_RandYard`, `_RandWorld` (18),
     /// `_InitSimVars`, `_initControls`, `_ClearHistory`, `_OverlayTileSet` (`_Barrier`) e `_CountAnts`
-    /// descritos na spec, com os valores de `data/simulacao.json`. Não reproduz `_InitSimYard`
-    /// (posições do menino e do cachorro) nem `_ResetYellowVars`: ficam zerados (lacuna).
+    /// descritos na spec, com os valores de `data/simulacao.json`, mais `_InitSpider`,
+    /// `_ResetYellowVars`, o `_CurEditMode` de `_SetMapPlane` e os valores estáticos do executável que
+    /// o jogo novo não escreve (conferido no original, geracao-mundo.md "Tipos de jogo no original").
+    /// `_InitSimYard` (menino, cachorro) fica com `quintal::iniciar_quintal`.
     pub fn de_mundo(m: &Mundo, s: GeradorS, r: GeradorR, cfg: &ConfigSimulacao) -> Result<Estado, String> {
         let ini = &cfg.inicial;
         let mut e = Estado::vazio();
@@ -1564,8 +1596,15 @@ impl Estado {
             mostrar_porcentagem_castas: ini.mostrar_porcentagem,
             mostrar_porcentagem_tarefas: ini.mostrar_porcentagem,
             modo_por_rainha: 1,
-            ..Controles::default()
+            proxima_casta: ini.estaticos.proxima_casta,
+            proximo_modo: ini.estaticos.proximo_modo,
         };
+        // Valores estáticos do executável que o jogo novo não escreve (`_TutLesson` só volta a 1 no
+        // Tutorial) e `_ClearHistory(1)` (1000:8cfc) do `_RandYard`: `_B/RColoniesStarted = 1`.
+        e.tutorial.licao = ini.estaticos.licao;
+        e.ambiente.atualizar_colonias = ini.estaticos.atualizar_colonias;
+        e.preta.colonias_fundadas = 1;
+        e.vermelha.colonias_fundadas = 1;
         if m.tipo_jogo == TipoJogo::Tutorial {
             e.tutorial.licao = 1;
             e.tutorial.dada = 0;
@@ -1671,10 +1710,16 @@ impl Estado {
             arrotos: m.aranha.arrotos,
             ligada: m.aranha.ligada as i16,
             alvo: -2,
+            // `_InitSpider` (`1020:4668`): `_StargLife = −1`, `_SuserX/Y = 0x40` (conferido no
+            // original nos três tipos de jogo, 2026-10-19).
+            alvo_tipo: -1,
+            destino_x: 0x40,
+            destino_y: 0x40,
             ..Aranha::default()
         };
 
-        // Formiga amarela (_InitYelloAnt) e a vista do plano dela (_RandYard, passo 9).
+        // Formiga amarela (_InitYelloAnt, que termina em _ResetYellowVars) e a vista do plano dela
+        // (_RandYard, passo 9).
         let a = &m.amarela;
         e.amarela = Amarela {
             plano: a.plano,
@@ -1689,8 +1734,18 @@ impl Estado {
             aviso_saude: ini.aviso_saude,
             renascer_x: m.renascer.0,
             renascer_y: m.renascer.1,
+            comeu_tipo: ini.estaticos.comeu_tipo,
+            // _ResetYellowVars (1000:72ba): destino e última posição = posição, `_MeCrazyCnt = −2`.
+            alvo_plano: a.plano,
+            alvo_x: a.x,
+            alvo_y: a.y,
+            ultimo_x: a.x,
+            ultimo_y: a.y,
+            contorno_contagem: -2,
             ..Amarela::default()
         };
+        // _NewGame: _SetMapPlane(_MePlane) grava _CurEditMode pela tabela 8:8608.
+        e.partida.modo_edicao = ini.modo_edicao_por_plano.get(a.plano as usize).copied().unwrap_or(0);
         let ponto = (a.x, a.y);
         match a.plano {
             2 => e.preta.vista_ninho = ponto,

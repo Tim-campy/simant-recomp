@@ -59,7 +59,8 @@ impl Sessao<'_> {
             }
         }
         let (mx, my) = self.partida.nav.maximo();
-        let v = self.partida.nav.vista;
+        // Congelada depois da troca de patch: os polegares também ficam onde estavam.
+        let v = self.edicao_congelada.map_or(self.partida.nav.vista, |c| c.vista_antiga);
         let (h, vv) = (Rolagem { pos: v.x, max: mx }, Rolagem { pos: v.y, max: my });
         self.janelas.gerente.definir_rolagem(ID_EDICAO, h, vv);
         let g = &self.janelas.gerente;
@@ -322,9 +323,8 @@ impl Sessao<'_> {
                 Controle::Quintal => {
                     let g = janelas.geometria(recursos, c)?;
                     let m = &self.modos;
-                    m.quintal.desenhar_janela(q, estado);
                     let fonte_balao = interface.fontes.get(m.quintal.cfg.balao_menino.fonte).and_then(|f| f.as_ref());
-                    m.quintal.desenhar_balao_do_menino(q, estado, fonte_balao);
+                    m.quintal.desenhar_janela_com_balao(q, estado, fonte_balao);
                     // _UpdateYardMessage: a mensagem da faixa também no rodapé do quintal.
                     let texto = self.partida.avisos.texto_vigente(self.partida.agora()).map(|t| match t {
                         engine::core::avisos::TextoFaixa::Literal(s) => m

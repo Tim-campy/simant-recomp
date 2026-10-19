@@ -37,7 +37,7 @@ O jogo usa dois tipos de fonte, escolhidos por `_font_SetFont(n)` (`1008:611c`) 
 
 ### Desenho de uma string (`_font_MakeImage`, `1030:ade0`; `_DrawChar`, `1030:b033`)
 
-- Caractere ausente (`owTable[c] = 0xFFFF`) usa o glifo de índice `lastChar − firstChar + 1`. A tabela é indexada pelo próprio código do caractere (o `firstChar` é 0 em todas).
+- Caractere ausente (`owTable[c] = 0xFFFF`) **mede** como o glifo de índice `lastChar − firstChar + 1` (`__font_StringWidth`, `__font_CharWidth`), mas `_font_MakeImage` lê esse índice como **byte** (`*(byte *)(fonte + 0x28)`) e desenha o glifo `(lastChar − firstChar + 1) & 0xFF`, andando o avanço dele: nas fontes com `lastChar` = 255 (`font1`, `font2`, `font4`) é o glifo 0, vazio, e o ausente não aparece (a imagem fica com a largura medida). Na `font3` (`lastChar` 216) é o próprio glifo 217. [código; conferido no balão do menino nº 4, que tem um 0x7F: telas/quintal.md §2.3, 2026-10-19.] A tabela é indexada pelo próprio código do caractere (o `firstChar` é 0 em todas).
 - **Avanço** = byte baixo de `owTable[c]`, **mais 1 se `kernMax < 0`**.
 - **Deslocamento x** do glifo = byte alto + `kernMax` se `kernMax ≥ 0`; se `kernMax < 0`, o deslocamento é 0. É uma particularidade do código, não a regra do Mac.
 - O glifo é a coluna `locTable[c] .. locTable[c+1]` da faixa. O jogo copia a partir da **linha 1** da faixa (a linha 0 é ignorada), com `fRectHeight − 1` linhas. A altura da imagem e `__font_FontHeight` valem `fRectHeight − 1`.

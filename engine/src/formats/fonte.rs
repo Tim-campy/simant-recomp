@@ -139,9 +139,24 @@ impl FonteMac {
         }
     }
 
+    /// Avanço contado na largura da string (`__font_StringWidth`, `__font_CharWidth`): o ausente
+    /// mede como o glifo `lastChar − firstChar + 1`.
     fn avanco(&self, c: u8) -> usize {
         let i = self.indice(c);
         (self.ow[i] & 0xFF) as usize + usize::from(self.kern_max < 0)
+    }
+
+    /// Glifo desenhado por `_font_MakeImage`: para o ausente, o jogo guarda o índice
+    /// `lastChar − firstChar + 1` num **byte** (`1030:ade0`), então com `lastChar` = 255 desenha o
+    /// glifo 0 (vazio nas quatro fontes) e anda o avanço dele, não o medido. Conferido no balão do
+    /// menino nº 4 ("I hope I don't" + 0x7F: nada depois do "t" na bancada; telas/quintal.md §2.3).
+    fn indice_desenhado(&self, c: u8) -> usize {
+        let i = self.indice(c);
+        if i == self.ultimo + 1 {
+            i & 0xFF
+        } else {
+            i
+        }
     }
 
     fn pixel_faixa(&self, x: usize, y: usize) -> bool {
@@ -154,7 +169,7 @@ impl FonteMac {
         let mut bits = vec![false; largura * altura];
         let mut pena = 0usize;
         for &c in texto {
-            let i = self.indice(c);
+            let i = self.indice_desenhado(c);
             let desloc = if self.kern_max < 0 { 0 } else { ((self.ow[i] >> 8) as i32 + self.kern_max as i32).max(0) as usize };
             let (x0, x1) = (self.loc[i] as usize, self.loc[i + 1] as usize);
             for y in 0..altura {
@@ -166,7 +181,7 @@ impl FonteMac {
                     }
                 }
             }
-            pena += self.avanco(c);
+            pena += (self.ow[i] & 0xFF) as usize + usize::from(self.kern_max < 0);
         }
         ImagemTexto { largura, altura, bits }
     }
@@ -313,6 +328,25 @@ mod testes {
         assert_eq!(f.largura_texto(&[0]), 3);
         // caractere ausente usa o glifo "ausente" (avanço 1 + 1)
         assert_eq!(f.largura_texto(&[1]), 2);
+    }
+
+    /// FONT1 (lastChar 255): o 0x7F ausente mede como o glifo 256 (a caixa, avanço 5 + 1), mas
+    /// `_font_MakeImage` guarda o índice num byte e desenha o glifo 0, vazio (balão do menino nº 4).
+    #[test]
+    fn ausente_com_last_char_255_desenha_o_glifo_zero() {
+        let dir = std::env::var_os("SIMANT_DIR").map(std::path::PathBuf::from);
+        let Some(d) = dir.and_then(|d| std::fs::read(d.join("FONT1")).ok()) else {
+            eprintln!("AVISO: FONT1 não encontrada; teste ignorado");
+            return;
+        };
+        let f = Fonte::Mac(FonteMac::decodificar(&d).unwrap());
+        let (t, ausente) = (f.largura_texto(b"t"), f.largura_texto(&[0x7F]));
+        assert_eq!(ausente, 6, "mede a caixa");
+        let img = f.imagem(b"t");
+        assert_eq!(img.largura, t + ausente);
+        for y in 0..img.altura {
+            assert!((t..img.largura).all(|x| !img.bits[y * img.largura + x]), "nada desenhado depois do t");
+        }
     }
 }
 

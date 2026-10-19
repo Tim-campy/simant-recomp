@@ -15,6 +15,9 @@ Uso:
   python -I tools/som_dosbox.py niveis ARQ.wav [--janela 1]
   python -I tools/som_dosbox.py comparar ORIGINAL.wav PORT.wav [--midi ARQ.mid] [--png saida.png]
   python -I tools/som_dosbox.py harmonicos ARQ.mid ORIGINAL.wav INICIO_S PORT.wav CANAL
+  python -I tools/som_dosbox.py comparar_todas ORIGINAIS PORT/musicas saida.json
+  python -I tools/som_dosbox.py perfil ORIGINAIS PORT/musicas PROGRAMA nome,nome,...
+  python -I tools/som_dosbox.py percussao ORIGINAIS PORT/musicas nome,nome,...
   python -I tools/som_dosbox.py quadros VIDEO.avi PASTA [--cada 5]
 """
 import argparse
@@ -365,6 +368,15 @@ def reamostrar(x, de, para):
     return np.interp(np.arange(n) * de / para, np.arange(len(x)), x)
 
 
+def passa_altas(x, taxa, corte=20.0):
+    """Tira o que fica abaixo de `corte` Hz (CC e subsônicos). O DOSBox-X grava a componente contínua
+    das ondas de meia senoide do OPL (a placa real tinha saída acoplada por capacitor) e o port também a
+    gera; não se ouve, mas pesa no RMS (ex.: +5 dB no jolly2 do port antes do ajuste de 2026-10-19)."""
+    X = np.fft.rfft(x)
+    X[np.fft.rfftfreq(len(x), 1 / taxa) < corte] = 0
+    return np.fft.irfft(X, len(x))
+
+
 def melhor_alinhamento(fa, fb, centro, max_desloc):
     """Deslocamento (quadros) de b em relação a a que maximiza a correlação dos ataques."""
     melhor = (-1e9, 0)
@@ -406,7 +418,7 @@ def comparar(orig, port, arq_midi=None, png=None, desloc_max_s=2.0):
     taxa_o, xo = ler_wav(orig)
     taxa_p, xp = ler_wav(port)
     taxa = 22050
-    xo, xp = reamostrar(xo, taxa_o, taxa), reamostrar(xp, taxa_p, taxa)
+    xo, xp = passa_altas(reamostrar(xo, taxa_o, taxa), taxa), passa_altas(reamostrar(xp, taxa_p, taxa), taxa)
     (io, fo), (ip, fp) = trecho_com_som(xo, taxa), trecho_com_som(xp, taxa)
     print(f"original: {len(xo) / taxa:.1f} s gravados, som de {io:.2f} a {fo:.2f} s")
     print(f"port:     {len(xp) / taxa:.1f} s gravados, som de {ip:.2f} a {fp:.2f} s ({fp - ip:.2f} s)")
@@ -464,6 +476,9 @@ def comparar(orig, port, arq_midi=None, png=None, desloc_max_s=2.0):
     # Envelope (energia por quadro em dB, alinhada): serve também para a percussão pura.
     la, lb = 10 * np.log10((a**2).sum(1) + 1e-9), 10 * np.log10((b**2).sum(1) + 1e-9)
     res["envelope"] = float(np.corrcoef(la, lb)[0, 1])
+    # Nível no mesmo trecho alinhado (soma da energia dos quadros): não depende de onde cada gravação
+    # acha o fim do som (caudas de soltura longas baixavam o RMS "no trecho com som" do port).
+    res["energia_alinhada_db"] = float(10 * np.log10((b**2).sum() / (a**2).sum()))
     res["envelope_controle"] = float(np.mean([np.corrcoef(la, np.roll(lb, r))[0, 1] for r in (37, 91, 173)]))
     # Timbre: centróide espectral e distribuição de energia por faixa.
     def centroide(mag):
@@ -526,6 +541,98 @@ def comparar_todas(pasta_orig, pasta_port, pasta_midi, saida_json):
               f"env {r['envelope']:.2f} ({r['envelope_controle']:.2f})  esp {r['esp_corr']:.2f}  RMS {r['rms_o']:6.1f}/{r['rms_p']:6.1f} dBFS")
     with open(saida_json, "w", encoding="utf-8") as f:
         json.dump(tudo, f, indent=1)
+
+
+def _par_de_gravacoes(pasta_orig, pasta_port, nome, corte=None):
+    """(taxa, sinal, início do som) do original (nome.wav) e do port (ID_nome.wav), e as notas do .MID."""
+    snd = os.path.join(raiz_principal(), "SimAnt-T", "MAXIS", "ANTWIN", "SOUND")
+    notas = [n for n in ler_midi(os.path.join(snd, nome.upper() + ".MID")) if n[1] <= 10]
+    port = [f for f in os.listdir(pasta_port) if f.lower().endswith("_" + nome + ".wav")][0]
+    sinais = {}
+    for q, arq in (("original", os.path.join(pasta_orig, nome + ".wav")), ("port", os.path.join(pasta_port, port))):
+        tx, x = ler_wav(arq)
+        if corte:
+            x = passa_altas(x, tx, corte)
+        sinais[q] = (tx, x, trecho_com_som(x, tx)[0])
+    return notas, sinais
+
+
+def perfil_programa(pasta_orig, pasta_port, programa, nomes, janela=(0.03, 0.3), nh=12):
+    """Perfil harmônico médio (dB relativos ao maior, harmônicos 1-nh) de um programa, nas janelas em
+    que nenhuma outra nota começa (acordes e outros canais valem; percussão começando perto, não) e
+    pulando os parciais que coincidem (3 %) com os de outra nota soando. Original e port alinhados pelo
+    início do som. Ver docs/spec/regras/som.md, "Ajuste do banco FM contra as 28 músicas"."""
+    res = {"original": [], "port": []}
+    for nome in nomes:
+        notas, sinais = _par_de_gravacoes(pasta_orig, pasta_port, nome)
+        t0 = min(n[0] for n in notas)
+        for n in notas:
+            t, c, nota, vel, dur, prog = n
+            if c == 10 or prog != programa or dur < janela[0] + 0.08:
+                continue
+            a, b = t + janela[0], t + min(dur, janela[1])
+            outras = [m for m in notas if m is not n and m[0] < b + 0.02 and m[0] + m[4] + 0.15 > a]
+            if any((m[1] == 10 and a - 0.15 < m[0] < b) or (m[1] != 10 and a - 0.1 < m[0] < b) for m in outras):
+                continue
+            f0 = 440 * 2 ** ((nota - 69) / 12)
+            fs = [440 * 2 ** ((m[2] - 69) / 12) for m in outras if m[1] != 10]
+            valido = [all(abs(h * f0 / (k * g) - 1) > 0.03 for g in fs for k in range(1, nh + 1)) for h in range(1, nh + 1)]
+            if not any(valido):
+                continue
+            for q, (tx, x, io) in sinais.items():
+                i0, i1 = int((io + a - t0) * tx), int((io + b - t0) * tx)
+                seg = x[i0:i1] * np.hanning(i1 - i0)
+                mag = np.abs(np.fft.rfft(seg, 8 * len(seg)))
+                fr = np.fft.rfftfreq(8 * len(seg), 1 / tx)
+                hh = np.array([mag[(fr > f0 * h * 0.985) & (fr < f0 * h * 1.015)].max() if f0 * h * 1.015 < fr[-1] else 1e-9
+                               for h in range(1, nh + 1)])
+                ref = max(hh[v] for v in range(nh) if valido[v])
+                res[q].append(np.where(valido, 20 * np.log10(hh / ref + 1e-6), np.nan))
+    for q, v in res.items():
+        if v:
+            with np.errstate(all="ignore"):
+                m = np.nanmean(np.array(v), 0)
+            print(f"programa {programa} {q:8s} ({len(v)} janelas) " + " ".join("    ." if np.isnan(x) else f"{x:5.0f}" for x in m))
+        else:
+            print(f"programa {programa} {q:8s}: nenhuma janela")
+
+
+def percussao_notas(pasta_orig, pasta_port, nomes, livre=0.14):
+    """Para cada nota do canal 10, nos inícios isolados (nenhum outro início de 30 ms antes a `livre`
+    depois): o aumento de potência (máximo dos quadros de 20 ms depois menos o de antes, em dB relativos
+    ao RMS da abertura), a frequência dominante e o centróide dos primeiros 55 ms. Sem som: < -80 dB.
+    Os sinais passam antes por um passa-altas de 40 Hz (a componente contínua do DOSBox-X)."""
+    ref = {}
+    _, sinais = _par_de_gravacoes(pasta_orig, pasta_port, "gamethme", 40)
+    for q, (tx, x, io) in sinais.items():
+        a, b = trecho_com_som(x, tx)
+        ref[q] = 10 * np.log10((x[int(a * tx) : int(b * tx)] ** 2).mean())
+    res = {}
+    for nome in nomes:
+        notas, sinais = _par_de_gravacoes(pasta_orig, pasta_port, nome, 40)
+        t0 = min(n[0] for n in notas)
+        inicios = [n[0] for n in notas]
+        for q, (tx, x, io) in sinais.items():
+            def pot(a, b):
+                return (x[int(a * tx) : int(b * tx)] ** 2).mean()
+
+            for t, c, nota, vel, dur, prog in notas:
+                if c != 10 or inicios.count(t) > 1 or any(u != t and t - 0.03 < u < t + livre for u in inicios):
+                    continue
+                tt = io + t - t0
+                antes = pot(tt - 0.03, tt - 0.002)
+                depois = [pot(tt + 0.005 + 0.02 * k, tt + 0.025 + 0.02 * k) for k in range(int(livre / 0.02) - 1)]
+                s = x[int((tt + 0.005) * tx) : int((tt + 0.06) * tx)]
+                m = np.abs(np.fft.rfft(s * np.hanning(len(s)), 4 * len(s))) ** 2
+                f = np.fft.rfftfreq(4 * len(s), 1 / tx)
+                res.setdefault((nota, q), []).append((10 * np.log10(max(max(depois) - antes, 1e-12)) - ref[q], f[m.argmax()],
+                                                      (m * f).sum() / m.sum()))
+    for nota in sorted({k[0] for k in res}):
+        linha = f"nota {nota:3d}"
+        for q in ("original", "port"):
+            v = np.array(res.get((nota, q), [(np.nan,) * 3]))
+            linha += f" | {q} n={len(v):3d} nível {np.median(v[:, 0]):6.1f} dB pico {np.median(v[:, 1]):5.0f} Hz centróide {np.median(v[:, 2]):5.0f} Hz"
+        print(linha)
 
 
 def desenhar(png, a, b, fr, qps):
@@ -661,6 +768,15 @@ def main():
     h.add_argument("desloc", type=float, help="início da música no original (s)")
     h.add_argument("port")
     h.add_argument("canal", type=int)
+    pf = sub.add_parser("perfil")
+    pf.add_argument("pasta_orig")
+    pf.add_argument("pasta_port")
+    pf.add_argument("programa", type=int)
+    pf.add_argument("nomes", help="músicas separadas por vírgula")
+    pc = sub.add_parser("percussao")
+    pc.add_argument("pasta_orig")
+    pc.add_argument("pasta_port")
+    pc.add_argument("nomes", help="músicas separadas por vírgula")
     ct = sub.add_parser("comparar_todas")
     ct.add_argument("pasta_orig")
     ct.add_argument("pasta_port")
@@ -680,6 +796,10 @@ def main():
         capturar_musicas(a.pasta, nomes, a.oplemu)
     elif a.cmd == "comparar_todas":
         comparar_todas(a.pasta_orig, a.pasta_port, os.path.join(raiz_principal(), "SimAnt-T", "MAXIS", "ANTWIN", "SOUND"), a.saida_json)
+    elif a.cmd == "perfil":
+        perfil_programa(a.pasta_orig, a.pasta_port, a.programa, a.nomes.split(","))
+    elif a.cmd == "percussao":
+        percussao_notas(a.pasta_orig, a.pasta_port, a.nomes.split(","))
     elif a.cmd == "quadros":
         quadros_chave(a.avi, a.pasta, a.cada)
     elif a.cmd == "midi":

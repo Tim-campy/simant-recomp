@@ -224,7 +224,21 @@ fn casa_igual_ao_original_depois_de_xfer_patch() {
     let r = Recursos::abrir(&jogo, &["SHARED".to_string()], &raiz().join("data"), None).unwrap();
     let t = TabelasGeracao::carregar(&r).unwrap();
     let layout = LayoutSave::carregar(&raiz().join("data/save_layout.json")).unwrap();
-    for (arquivo, px, py) in [("CASA_0_0", 0, 0), ("CASA_0_4", 0, 4), ("CASA_0_12", 0, 12), ("CASA_1_4", 1, 4)] {
+    for (arquivo, px, py) in [
+        ("CASA_0_0", 0, 0),
+        ("CASA_0_4", 0, 4),
+        ("CASA_0_12", 0, 12),
+        ("CASA_1_4", 1, 4),
+        // 2026-10-19: os patches que faltavam (5, 6, 7, 9, 15, 36, 37) e a cozinha sem pia (16).
+        ("CASA_0_5", 0, 5),
+        ("CASA_0_6", 0, 6),
+        ("CASA_0_7", 0, 7),
+        ("CASA_0_9", 0, 9),
+        ("CASA_0_15", 0, 15),
+        ("CASA_1_0", 1, 0),
+        ("CASA_2_4", 2, 4),
+        ("CASA_2_5", 2, 5),
+    ] {
         let j = JogoSalvo::abrir(&layout, &raiz().join(format!("tests/referencias/saves/{arquivo}.ANT"))).unwrap();
         let bloco = |s: &str| j.bloco(s).unwrap().to_vec();
         assert_eq!(j.u16("TERRAINset").unwrap(), 1, "{arquivo}");
@@ -246,7 +260,7 @@ fn casa_igual_ao_original_depois_de_xfer_patch() {
         ] {
             let orig = bloco(nome);
             let dif = orig.iter().zip(port.iter()).filter(|(a, b)| a != b).count();
-            assert_eq!(dif, 0, "{arquivo}: {nome} com {dif} células diferentes");
+            assert_eq!(dif, 0, "{arquivo}: {nome} com {dif} células diferentes (pretas {pretas}, vermelhas {vermelhas})");
         }
     }
 }

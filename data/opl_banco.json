@@ -2,8 +2,8 @@
  "_comentario": "Banco FM próprio do port (2 operadores por timbre, campos dos registradores do OPL). Gerado por tools/gerar_banco_opl.py; ver docs/spec/formatos/som.md, 'Sintetizador FM'. melodicos: 128 programas General MIDI; percussao: nota do canal 10 -> timbre com nota_fixa (nota ausente = silêncio). curva_volume_db: atenuação = -curva x log10(vel x volume x expressão). ganho: 1 = um canal no máximo dá 1/8 da escala, como o chip.",
  "tremolo_profundo": true,
  "vibrato_profundo": true,
- "curva_volume_db": 40.0,
- "ganho": 2.25,
+ "curva_volume_db": 25.0,
+ "ganho": 1.65,
  "melodicos": [
   {
    "nome": "Acoustic Grand Piano",
@@ -11,22 +11,19 @@
     "mult": 1,
     "tl": 24,
     "ar": 15,
-    "dr": 4,
+    "dr": 2,
     "sl": 6,
     "rr": 6,
-    "sustenta": true,
-    "ksl": 1,
-    "ksr": true
+    "sustenta": true
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
+    "tl": 6,
     "ar": 15,
-    "dr": 3,
+    "dr": 2,
     "sl": 15,
     "rr": 6,
-    "sustenta": true,
-    "ksr": true
+    "sustenta": true
    },
    "realimentacao": 5
   },
@@ -86,11 +83,10 @@
     "mult": 1,
     "tl": 10,
     "ar": 15,
-    "dr": 4,
+    "dr": 2,
     "sl": 15,
     "rr": 5,
-    "sustenta": true,
-    "ksr": true
+    "sustenta": true
    },
    "portadora": {
     "mult": 1,
@@ -99,8 +95,7 @@
     "dr": 2,
     "sl": 15,
     "rr": 5,
-    "sustenta": true,
-    "ksr": true
+    "sustenta": true
    },
    "realimentacao": 6
   },
@@ -463,8 +458,8 @@
   {
    "nome": "Church Organ",
    "modulador": {
-    "mult": 1,
-    "tl": 8,
+    "mult": 3,
+    "tl": 30,
     "ar": 13,
     "dr": 0,
     "sl": 0,
@@ -474,18 +469,15 @@
     "vib": true
    },
    "portadora": {
-    "mult": 2,
-    "tl": 2,
+    "mult": 1,
+    "tl": 8,
     "ar": 13,
     "dr": 0,
     "sl": 0,
     "rr": 6,
     "sustenta": true,
-    "onda": 2,
     "vib": true
-   },
-   "realimentacao": 3,
-   "aditivo": true
+   }
   },
   {
    "nome": "Reed Organ",
@@ -513,8 +505,8 @@
   {
    "nome": "Accordion",
    "modulador": {
-    "mult": 1,
-    "tl": 22,
+    "mult": 4,
+    "tl": 42,
     "ar": 12,
     "dr": 0,
     "sl": 0,
@@ -524,15 +516,14 @@
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
+    "tl": 4,
     "ar": 12,
     "dr": 0,
     "sl": 0,
     "rr": 7,
     "sustenta": true,
     "vib": true
-   },
-   "realimentacao": 6
+   }
   },
   {
    "nome": "Harmonica",
@@ -609,8 +600,8 @@
   {
    "nome": "Acoustic Guitar (steel)",
    "modulador": {
-    "mult": 3,
-    "tl": 18,
+    "mult": 1,
+    "tl": 22,
     "ar": 15,
     "dr": 3,
     "sl": 15,
@@ -620,14 +611,14 @@
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
+    "tl": 4,
     "ar": 15,
     "dr": 2,
     "sl": 15,
     "rr": 6,
     "sustenta": true
    },
-   "realimentacao": 6
+   "realimentacao": 5
   },
   {
    "nome": "Electric Guitar (jazz)",
@@ -759,7 +750,7 @@
    },
    "portadora": {
     "mult": 4,
-    "tl": 0,
+    "tl": 6,
     "ar": 15,
     "dr": 3,
     "sl": 15,
@@ -794,7 +785,7 @@
    "nome": "Electric Bass (finger)",
    "modulador": {
     "mult": 1,
-    "tl": 14,
+    "tl": 24,
     "ar": 15,
     "dr": 2,
     "sl": 4,
@@ -802,15 +793,15 @@
     "sustenta": true
    },
    "portadora": {
-    "mult": 2,
-    "tl": 0,
+    "mult": 3,
+    "tl": 4,
     "ar": 15,
     "dr": 1,
     "sl": 3,
     "rr": 7,
     "sustenta": true
    },
-   "realimentacao": 5
+   "realimentacao": 6
   },
   {
    "nome": "Electric Bass (pick)",
@@ -838,7 +829,7 @@
    "nome": "Fretless Bass",
    "modulador": {
     "mult": 1,
-    "tl": 22,
+    "tl": 36,
     "ar": 15,
     "dr": 2,
     "sl": 4,
@@ -846,15 +837,15 @@
     "sustenta": true
    },
    "portadora": {
-    "mult": 1,
-    "tl": 0,
+    "mult": 2,
+    "tl": 3,
     "ar": 15,
     "dr": 1,
     "sl": 3,
     "rr": 7,
     "sustenta": true
    },
-   "realimentacao": 4
+   "realimentacao": 6
   },
   {
    "nome": "Slap Bass 1",
@@ -1162,7 +1153,7 @@
    "modulador": {
     "mult": 1,
     "tl": 26,
-    "ar": 6,
+    "ar": 4,
     "dr": 0,
     "sl": 0,
     "rr": 6,
@@ -1171,8 +1162,8 @@
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
-    "ar": 5,
+    "tl": 12,
+    "ar": 4,
     "dr": 0,
     "sl": 0,
     "rr": 6,
@@ -1351,7 +1342,7 @@
    "nome": "Trombone",
    "modulador": {
     "mult": 1,
-    "tl": 22,
+    "tl": 26,
     "ar": 10,
     "dr": 2,
     "sl": 2,
@@ -1361,7 +1352,7 @@
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
+    "tl": 6,
     "ar": 12,
     "dr": 1,
     "sl": 1,
@@ -1369,7 +1360,7 @@
     "sustenta": true,
     "vib": true
    },
-   "realimentacao": 6
+   "realimentacao": 3
   },
   {
    "nome": "Tuba",
@@ -1398,26 +1389,28 @@
   {
    "nome": "Muted Trumpet",
    "modulador": {
-    "mult": 2,
-    "tl": 26,
+    "mult": 1,
+    "tl": 21,
     "ar": 10,
     "dr": 2,
     "sl": 2,
     "rr": 7,
     "sustenta": true,
+    "onda": 1,
     "vib": true
    },
    "portadora": {
     "mult": 1,
-    "tl": 16,
+    "tl": 2,
     "ar": 12,
     "dr": 1,
     "sl": 1,
     "rr": 7,
     "sustenta": true,
+    "onda": 1,
     "vib": true
    },
-   "realimentacao": 4
+   "realimentacao": 3
   },
   {
    "nome": "French Horn",
@@ -1639,7 +1632,7 @@
   {
    "nome": "English Horn",
    "modulador": {
-    "mult": 3,
+    "mult": 1,
     "tl": 28,
     "ar": 12,
     "dr": 0,
@@ -1650,7 +1643,7 @@
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
+    "tl": 6,
     "ar": 12,
     "dr": 0,
     "sl": 0,
@@ -2257,25 +2250,23 @@
    "nome": "Pad 8 (sweep)",
    "modulador": {
     "mult": 1,
-    "tl": 18,
-    "ar": 3,
+    "tl": 63,
+    "ar": 15,
     "dr": 0,
     "sl": 0,
-    "rr": 5,
-    "sustenta": true,
-    "vib": true
+    "rr": 15,
+    "sustenta": true
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
-    "ar": 6,
+    "tl": 3,
+    "ar": 15,
     "dr": 0,
     "sl": 0,
-    "rr": 5,
+    "rr": 8,
     "sustenta": true,
     "vib": true
-   },
-   "realimentacao": 6
+   }
   },
   {
    "nome": "FX 1 (rain)",
@@ -2988,44 +2979,44 @@
   "35": {
    "nome": "Acoustic Bass Drum",
    "modulador": {
-    "mult": 0,
-    "tl": 10,
+    "mult": 1,
+    "tl": 18,
     "ar": 15,
     "dr": 6,
     "sl": 15,
     "rr": 7
    },
    "portadora": {
-    "mult": 0,
-    "tl": 0,
+    "mult": 1,
+    "tl": 4,
     "ar": 15,
     "dr": 5,
     "sl": 15,
     "rr": 7
    },
    "realimentacao": 4,
-   "nota_fixa": 24
+   "nota_fixa": 40
   },
   "36": {
    "nome": "Bass Drum 1",
    "modulador": {
-    "mult": 0,
-    "tl": 10,
+    "mult": 1,
+    "tl": 15,
     "ar": 15,
     "dr": 6,
     "sl": 15,
     "rr": 7
    },
    "portadora": {
-    "mult": 0,
-    "tl": 0,
+    "mult": 1,
+    "tl": 6,
     "ar": 15,
     "dr": 5,
     "sl": 15,
     "rr": 7
    },
    "realimentacao": 4,
-   "nota_fixa": 26
+   "nota_fixa": 42
   },
   "37": {
    "nome": "Side Stick",
@@ -3039,7 +3030,7 @@
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
+    "tl": 8,
     "ar": 15,
     "dr": 7,
     "sl": 15,
@@ -3072,23 +3063,23 @@
   "39": {
    "nome": "Hand Clap",
    "modulador": {
-    "mult": 15,
-    "tl": 0,
+    "mult": 1,
+    "tl": 30,
     "ar": 15,
-    "dr": 7,
+    "dr": 8,
     "sl": 15,
-    "rr": 7
+    "rr": 8
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
+    "tl": 2,
     "ar": 15,
     "dr": 7,
     "sl": 15,
     "rr": 7
    },
-   "realimentacao": 7,
-   "nota_fixa": 66
+   "realimentacao": 2,
+   "nota_fixa": 95
   },
   "40": {
    "nome": "Electric Snare",
@@ -3102,7 +3093,7 @@
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
+    "tl": 8,
     "ar": 15,
     "dr": 7,
     "sl": 15,
@@ -3114,22 +3105,22 @@
   "41": {
    "nome": "Low Floor Tom",
    "modulador": {
-    "mult": 0,
-    "tl": 22,
+    "mult": 15,
+    "tl": 18,
     "ar": 15,
-    "dr": 5,
+    "dr": 9,
     "sl": 15,
-    "rr": 6
+    "rr": 9
    },
    "portadora": {
     "mult": 1,
-    "tl": 8,
+    "tl": 4,
     "ar": 15,
     "dr": 4,
     "sl": 15,
     "rr": 6
    },
-   "realimentacao": 3,
+   "realimentacao": 7,
    "nota_fixa": 35
   },
   "42": {
@@ -3144,7 +3135,7 @@
    },
    "portadora": {
     "mult": 1,
-    "tl": 2,
+    "tl": 7,
     "ar": 15,
     "dr": 9,
     "sl": 15,
@@ -3156,22 +3147,22 @@
   "43": {
    "nome": "High Floor Tom",
    "modulador": {
-    "mult": 0,
-    "tl": 22,
+    "mult": 15,
+    "tl": 24,
     "ar": 15,
-    "dr": 5,
+    "dr": 9,
     "sl": 15,
-    "rr": 6
+    "rr": 9
    },
    "portadora": {
     "mult": 1,
-    "tl": 8,
+    "tl": 6,
     "ar": 15,
     "dr": 4,
     "sl": 15,
     "rr": 6
    },
-   "realimentacao": 3,
+   "realimentacao": 7,
    "nota_fixa": 37
   },
   "44": {
@@ -3186,7 +3177,7 @@
    },
    "portadora": {
     "mult": 1,
-    "tl": 4,
+    "tl": 8,
     "ar": 15,
     "dr": 8,
     "sl": 15,
@@ -3198,22 +3189,22 @@
   "45": {
    "nome": "Low Tom",
    "modulador": {
-    "mult": 0,
-    "tl": 22,
+    "mult": 15,
+    "tl": 18,
     "ar": 15,
-    "dr": 5,
+    "dr": 9,
     "sl": 15,
-    "rr": 6
+    "rr": 9
    },
    "portadora": {
     "mult": 1,
-    "tl": 8,
+    "tl": 4,
     "ar": 15,
     "dr": 4,
     "sl": 15,
     "rr": 6
    },
-   "realimentacao": 3,
+   "realimentacao": 7,
    "nota_fixa": 41
   },
   "46": {
@@ -3228,7 +3219,7 @@
    },
    "portadora": {
     "mult": 1,
-    "tl": 2,
+    "tl": 14,
     "ar": 15,
     "dr": 5,
     "sl": 15,
@@ -3240,44 +3231,44 @@
   "47": {
    "nome": "Low-Mid Tom",
    "modulador": {
-    "mult": 0,
+    "mult": 15,
     "tl": 22,
     "ar": 15,
-    "dr": 5,
+    "dr": 9,
     "sl": 15,
-    "rr": 6
+    "rr": 9
    },
    "portadora": {
     "mult": 1,
-    "tl": 8,
+    "tl": 6,
     "ar": 15,
     "dr": 4,
     "sl": 15,
     "rr": 6
    },
-   "realimentacao": 3,
-   "nota_fixa": 44
+   "realimentacao": 7,
+   "nota_fixa": 43
   },
   "48": {
    "nome": "Hi-Mid Tom",
    "modulador": {
-    "mult": 0,
-    "tl": 22,
+    "mult": 15,
+    "tl": 16,
     "ar": 15,
-    "dr": 5,
+    "dr": 9,
     "sl": 15,
-    "rr": 6
+    "rr": 9
    },
    "portadora": {
     "mult": 1,
-    "tl": 8,
+    "tl": 5,
     "ar": 15,
     "dr": 4,
     "sl": 15,
     "rr": 6
    },
-   "realimentacao": 3,
-   "nota_fixa": 47
+   "realimentacao": 7,
+   "nota_fixa": 42
   },
   "49": {
    "nome": "Crash Cymbal 1",
@@ -3290,8 +3281,8 @@
     "rr": 3
    },
    "portadora": {
-    "mult": 3,
-    "tl": 2,
+    "mult": 1,
+    "tl": 13,
     "ar": 15,
     "dr": 3,
     "sl": 15,
@@ -3303,23 +3294,23 @@
   "50": {
    "nome": "High Tom",
    "modulador": {
-    "mult": 0,
+    "mult": 15,
     "tl": 22,
     "ar": 15,
-    "dr": 5,
+    "dr": 9,
     "sl": 15,
-    "rr": 6
+    "rr": 9
    },
    "portadora": {
     "mult": 1,
-    "tl": 8,
+    "tl": 2,
     "ar": 15,
     "dr": 4,
     "sl": 15,
     "rr": 6
    },
-   "realimentacao": 3,
-   "nota_fixa": 50
+   "realimentacao": 7,
+   "nota_fixa": 47
   },
   "51": {
    "nome": "Ride Cymbal 1",
@@ -3333,7 +3324,7 @@
    },
    "portadora": {
     "mult": 5,
-    "tl": 4,
+    "tl": 20,
     "ar": 15,
     "dr": 4,
     "sl": 15,
@@ -3458,8 +3449,8 @@
     "rr": 3
    },
    "portadora": {
-    "mult": 3,
-    "tl": 2,
+    "mult": 1,
+    "tl": 13,
     "ar": 15,
     "dr": 3,
     "sl": 15,
@@ -3479,8 +3470,8 @@
     "rr": 4
    },
    "portadora": {
-    "mult": 2,
-    "tl": 6,
+    "mult": 1,
+    "tl": 19,
     "ar": 15,
     "dr": 4,
     "sl": 15,
@@ -3489,47 +3480,26 @@
    "realimentacao": 7,
    "nota_fixa": 70
   },
-  "59": {
-   "nome": "Ride Cymbal 2",
-   "modulador": {
-    "mult": 15,
-    "tl": 0,
-    "ar": 15,
-    "dr": 4,
-    "sl": 15,
-    "rr": 4
-   },
-   "portadora": {
-    "mult": 5,
-    "tl": 4,
-    "ar": 15,
-    "dr": 4,
-    "sl": 15,
-    "rr": 4
-   },
-   "realimentacao": 7,
-   "nota_fixa": 90
-  },
   "60": {
    "nome": "Hi Bongo",
    "modulador": {
-    "mult": 1,
-    "tl": 30,
-    "ar": 15,
-    "dr": 8,
-    "sl": 15,
-    "rr": 8
-   },
-   "portadora": {
-    "mult": 1,
+    "mult": 15,
     "tl": 0,
     "ar": 15,
     "dr": 7,
     "sl": 15,
     "rr": 7
    },
-   "realimentacao": 2,
-   "nota_fixa": 74
+   "portadora": {
+    "mult": 1,
+    "tl": 2,
+    "ar": 15,
+    "dr": 7,
+    "sl": 15,
+    "rr": 7
+   },
+   "realimentacao": 7,
+   "nota_fixa": 84
   },
   "61": {
    "nome": "Low Bongo",
@@ -3657,47 +3627,28 @@
    "realimentacao": 2,
    "nota_fixa": 62
   },
-  "67": {
-   "nome": "High Agogo",
-   "modulador": {
-    "mult": 4,
-    "tl": 30,
-    "ar": 15,
-    "dr": 8,
-    "sl": 15,
-    "rr": 8
-   },
-   "portadora": {
-    "mult": 1,
-    "tl": 0,
-    "ar": 15,
-    "dr": 7,
-    "sl": 15,
-    "rr": 7
-   },
-   "realimentacao": 2,
-   "nota_fixa": 86
-  },
   "68": {
    "nome": "Low Agogo",
    "modulador": {
-    "mult": 4,
-    "tl": 30,
+    "mult": 1,
+    "tl": 40,
     "ar": 15,
-    "dr": 8,
-    "sl": 15,
-    "rr": 8
+    "dr": 0,
+    "sl": 0,
+    "rr": 8,
+    "sustenta": true
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
+    "tl": 5,
     "ar": 15,
-    "dr": 7,
-    "sl": 15,
-    "rr": 7
+    "dr": 1,
+    "sl": 2,
+    "rr": 8,
+    "sustenta": true
    },
    "realimentacao": 2,
-   "nota_fixa": 79
+   "nota_fixa": 96
   },
   "69": {
    "nome": "Cabasa",
@@ -3716,27 +3667,6 @@
     "dr": 8,
     "sl": 15,
     "rr": 8
-   },
-   "realimentacao": 7,
-   "nota_fixa": 98
-  },
-  "70": {
-   "nome": "Maracas",
-   "modulador": {
-    "mult": 15,
-    "tl": 0,
-    "ar": 15,
-    "dr": 9,
-    "sl": 15,
-    "rr": 9
-   },
-   "portadora": {
-    "mult": 1,
-    "tl": 6,
-    "ar": 15,
-    "dr": 9,
-    "sl": 15,
-    "rr": 9
    },
    "realimentacao": 7,
    "nota_fixa": 98
@@ -3862,35 +3792,14 @@
    },
    "portadora": {
     "mult": 1,
-    "tl": 0,
+    "tl": 5,
     "ar": 15,
     "dr": 7,
     "sl": 15,
     "rr": 7
    },
    "realimentacao": 2,
-   "nota_fixa": 77
-  },
-  "77": {
-   "nome": "Low Wood Block",
-   "modulador": {
-    "mult": 3,
-    "tl": 30,
-    "ar": 15,
-    "dr": 8,
-    "sl": 15,
-    "rr": 8
-   },
-   "portadora": {
-    "mult": 1,
-    "tl": 0,
-    "ar": 15,
-    "dr": 7,
-    "sl": 15,
-    "rr": 7
-   },
-   "realimentacao": 2,
-   "nota_fixa": 72
+   "nota_fixa": 80
   },
   "78": {
    "nome": "Mute Cuica",
@@ -3933,26 +3842,6 @@
    },
    "realimentacao": 3,
    "nota_fixa": 67
-  },
-  "80": {
-   "nome": "Mute Triangle",
-   "modulador": {
-    "mult": 5,
-    "tl": 30,
-    "ar": 15,
-    "dr": 7,
-    "sl": 15,
-    "rr": 7
-   },
-   "portadora": {
-    "mult": 3,
-    "tl": 0,
-    "ar": 15,
-    "dr": 7,
-    "sl": 15,
-    "rr": 7
-   },
-   "nota_fixa": 96
   },
   "81": {
    "nome": "Open Triangle",

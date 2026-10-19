@@ -1,0 +1,37 @@
+# Repetição de (0, 5) e (2, 4), que recusaram com uma formiga só (a colônia de 1 some em _SimColonies antes do clique): população 20.
+# Completo, colônia preta (e, em alguns, vermelha) escrita em _YMapPopB/_YMapPopR[n], duplo clique na Yard View;
+# estado logo depois de _XferPatch. Ver docs/spec/regras/geracao-mundo.md §5.3 (mesma rota de qemu_casa_0_4.txt).
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_casa_restantes2.txt --overlay <cópia do c_overlay.qcow2>
+snapshot_carregar quick
+esperar 2
+escrever_variavel CurGameType 2
+escrever_variavel 8:00a9 20 1
+escrever_variavel 8:0169 0 1
+clicar_em 37 55
+esperar 4
+capturar re_trabalho/geracao/casa_0_5_antes.png
+clicar_em 248 277
+clicar
+esperar 6
+capturar re_trabalho/geracao/casa_0_5_depois.png
+pausar
+estado re_trabalho/geracao/casa_0_5.ANT
+extras re_trabalho/geracao/casa_0_5_extras.json
+continuar
+snapshot_carregar quick
+esperar 2
+escrever_variavel CurGameType 2
+escrever_variavel 8:00c8 20 1
+escrever_variavel 8:0188 3 1
+clicar_em 37 55
+esperar 4
+capturar re_trabalho/geracao/casa_2_4_antes.png
+clicar_em 314 267
+clicar
+esperar 6
+capturar re_trabalho/geracao/casa_2_4_depois.png
+pausar
+estado re_trabalho/geracao/casa_2_4.ANT
+extras re_trabalho/geracao/casa_2_4_extras.json
+continuar
+fim

@@ -22,7 +22,20 @@ pub fn estado_de_jogo_novo(
     let mut r = GeradorR::default();
     r.semear_com_ticks(&mut s, semente, semente);
     let m = Mundo::novo_jogo(tipo, &mut r, &mut s, tab)?;
-    let mut e = Estado::de_mundo(&m, s, r, cfg)?;
+    estado_do_mundo_novo(&m, s, r, cfg, quintal)
+}
+
+/// O estado do jogo novo a partir do mundo já gerado por `_RandYard` (o resto do `_NewGame` depois do
+/// "Select a Game" da abertura). Separado para os testes que regeram o mundo com as sementes de
+/// patch gravadas pelo original (engine/tests/geracao_modos.rs).
+pub fn estado_do_mundo_novo(
+    m: &Mundo,
+    s: GeradorS,
+    r: GeradorR,
+    cfg: &ConfigSimulacao,
+    quintal: &TabelasQuintal,
+) -> Result<Estado, String> {
+    let mut e = Estado::de_mundo(m, s, r, cfg)?;
     iniciar_quintal(&mut e, quintal);
     Ok(e)
 }
@@ -147,8 +160,8 @@ pub fn estado_do_tutorial(
 /// amarela e o port ainda não põe em `Estado::de_mundo` (alvo e última posição = a posição dela).
 fn manter_do_anterior(e: &mut Estado, a: &Estado) {
     for (n, v) in [(&mut e.preta, &a.preta), (&mut e.vermelha, &a.vermelha)] {
+        // `_B/RColoniesStarted` não: `_ClearHistory(1)` do `_RandYard` os põe em 1 (`Estado::de_mundo`).
         n.modos = v.modos;
-        n.colonias_fundadas = v.colonias_fundadas;
         n.total_colonias = v.total_colonias;
         n.modo_estrategico = v.modo_estrategico;
     }
