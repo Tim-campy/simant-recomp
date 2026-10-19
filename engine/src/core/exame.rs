@@ -34,10 +34,11 @@ pub struct ConfigExame {
     /// largura da moldura azul e deslocamento do conteúdo (bitmap) dentro dela.
     #[serde(default)]
     pub ajuste_canto: [i32; 2],
-    /// Somado ao canto só na primeira abertura da janela na sessão (medido: 3 pixels à direita, em
-    /// duas sessões da bancada; causa não localizada, telas/janelas.md §4.3).
-    #[serde(default)]
-    pub ajuste_primeira_abertura: [i32; 2],
+    /// Na primeira abertura da sessão a área cliente (o canto mais `largura_borda`) vai para o
+    /// múltiplo deste valor mais próximo (`gerenciador::alinhar_cliente_ao_criar`; 8 = um byte em 16
+    /// cores). 1 = sem alinhamento.
+    #[serde(default = "um")]
+    pub alinhamento_ao_criar: i32,
     #[serde(default)]
     pub largura_borda: Option<i16>,
     #[serde(default)]
@@ -96,12 +97,13 @@ impl JanelaExame {
         (x + self.cfg.ajuste_canto[0], y + self.cfg.ajuste_canto[1])
     }
 
-    /// `canto` de uma abertura: na primeira da sessão soma `ajuste_primeira_abertura`.
+    /// `canto` de uma abertura: na primeira da sessão a janela é criada e a área cliente fica
+    /// alinhada (`alinhamento_ao_criar`).
     pub fn canto_ao_abrir(&mut self, celula: (i32, i32), area: (i32, i32), tela: (i32, i32)) -> (i32, i32) {
-        let (mut x, mut y) = self.canto(celula, area, tela);
+        let (mut x, y) = self.canto(celula, area, tela);
         if !self.ja_aberta {
-            x += self.cfg.ajuste_primeira_abertura[0];
-            y += self.cfg.ajuste_primeira_abertura[1];
+            let b = i32::from(self.cfg.largura_borda.unwrap_or(0));
+            x = super::gerenciador::alinhar_cliente_ao_criar(x + b, self.cfg.alinhamento_ao_criar) - b;
             self.ja_aberta = true;
         }
         (x, y)
@@ -155,4 +157,9 @@ impl JanelaExame {
         }
         q.recorte = antes;
     }
+}
+
+/// Sem alinhamento (padrão de `alinhamento_ao_criar`).
+fn um() -> i32 {
+    1
 }

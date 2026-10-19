@@ -22,8 +22,8 @@
     0,
     0
   ],
-  "_ajuste_primeira_abertura": "Medido na bancada (2026-10-18, cenarios_tick.py examine_sessao, duas sessões do snapshot rico): a primeira janela Examine da sessão fica 3 pixels à direita; as seguintes, na mesma célula, no lugar calculado. Causa não localizada.",
-  "ajuste_primeira_abertura": [3, 0],
+  "_alinhamento_ao_criar": "Na primeira abertura da sessão a janela é criada (CreateWindow em _win_Open; classes com CS_BYTEALIGNCLIENT, estilo 0x1008) e o Windows põe a área cliente (canto + largura_borda) no múltiplo de 8 pixels mais próximo (1 byte em 16 cores): na bancada (cenarios_tick.py examine_sessao) a primeira janela tem a área branca em x = 208 e as seguintes, na mesma célula, em 205 (o lugar calculado).",
+  "alinhamento_ao_criar": 8,
   "largura_borda": 5,
   "ajuste_conteudo": [
     0,

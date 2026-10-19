@@ -12,6 +12,20 @@ use super::quadro::Quadro;
 use crate::formats::fonte::Fonte;
 use crate::formats::janela::Retangulo;
 
+/// Alinhamento da área cliente na criação de uma janela (`CS_BYTEALIGNCLIENT`, estilo 0x1008 das
+/// classes que `_InitApplication`, `1000:3dd0`, registra): na **primeira** abertura de uma janela (o `CreateWindow` de
+/// `_win_Open`, `1030:ca2e`, só quando ainda não há `_win_hwnd`), o Windows põe a borda esquerda da
+/// área cliente no múltiplo de `alinhamento` pixels mais próximo (um byte da memória de vídeo: 8
+/// pixels em 16 cores, 1 em 256); nas aberturas seguintes a janela já existe e fica onde foi pedida.
+/// Explica o Examine 3 pixels à direita e o mini mapa 1 coluna à esquerda só na primeira abertura
+/// (telas/janelas.md §4.3, telas/mapa.md §7). [hipótese: o empate (resto 4) arredonda para cima]
+pub fn alinhar_cliente_ao_criar(x_cliente: i32, alinhamento: i32) -> i32 {
+    if alinhamento <= 1 {
+        return x_cliente;
+    }
+    (x_cliente + alinhamento / 2).div_euclid(alinhamento) * alinhamento
+}
+
 /// Estilo da janela do Windows criada por `_win_Open` (`1030:ca2e`), a partir dos bytes 0x1C e 0x1D
 /// do cabeçalho do layout e dos objetos de título (tipos 12 e 18).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

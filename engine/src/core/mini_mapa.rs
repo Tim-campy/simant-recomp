@@ -35,17 +35,18 @@ pub struct ConfigMiniMapa {
 }
 
 /// Posição e moldura medidas na bancada (m01/m02 e mini3, 2026-10-18): x pela conta de
-/// `_OpenMiniMapWin` (centro do botão − metade da largura do objeto 0) + `ajuste_x` (na primeira
-/// abertura; depois `ajuste_x_reaberto`); contorno na linha `topo` da área
+/// `_OpenMiniMapWin` (centro do botão − metade da largura do objeto 0) + `ajuste_x`; na primeira
+/// abertura da execução a janela é criada e a área cliente fica alinhada
+/// (`alinhamento_ao_criar`, `gerenciador::alinhar_cliente_ao_criar`); contorno na linha `topo` da área
 /// cliente; 1 linha de contorno e `largura_borda − 1` de borda; o exterior mede o objeto 0 mais
 /// `largura_borda` (a área de dentro fica 1 pixel menor que o mapa de 128 × 64 em cada sentido).
 #[derive(Clone, Debug, Deserialize)]
 pub struct MolduraMini {
     pub topo: i16,
     pub ajuste_x: i16,
-    /// `ajuste_x` da segunda abertura em diante, na mesma execução (bancada mini3: 155 na primeira,
-    /// 156 depois, em qualquer plano) [causa não identificada].
-    pub ajuste_x_reaberto: i16,
+    /// Alinhamento da área cliente na criação da janela (primeira abertura; 8 = um byte em 16
+    /// cores): bancada mini3, 155 na primeira abertura e 156 depois.
+    pub alinhamento_ao_criar: i16,
     pub largura_borda: i16,
     pub cor_borda: u8,
     pub cor_contorno: u8,
@@ -117,10 +118,12 @@ impl MiniMapa {
     pub fn abrir(&mut self, botao: Retangulo, e: &Estado, mapa: &JanelaMapa, trilhas: bool, segurando: bool, pausado: bool) {
         let m = &self.cfg.moldura;
         let (w, h) = self.tamanho;
-        let ajuste = if self.reaberto { m.ajuste_x_reaberto } else { m.ajuste_x };
-        self.reaberto = true;
-        let esq = botao.esq + (botao.dir - botao.esq) / 2 - w / 2 + ajuste;
         let b = m.largura_borda;
+        let mut esq = botao.esq + (botao.dir - botao.esq) / 2 - w / 2 + m.ajuste_x;
+        if !self.reaberto {
+            esq = super::gerenciador::alinhar_cliente_ao_criar(i32::from(esq + b), i32::from(m.alinhamento_ao_criar)) as i16 - b;
+        }
+        self.reaberto = true;
         self.externo = Some(Retangulo { esq, topo: m.topo, dir: esq + w + b, base: m.topo + h + b });
         self.plano = e.vistas.plano.max(1);
         let modo = if (2..=3).contains(&self.plano) { self.plano } else { 1 };
@@ -254,7 +257,8 @@ mod testes {
         JanelaMapa::sem_banco(serde_json::from_str(include_str!("../../../data/mapa.json")).unwrap())
     }
 
-    /// ribToYellow (207, 41)–(232, 59): o mini mapa abre em x = 207 + 12 − 66 + 2 = 155, com o
+    /// ribToYellow (207, 41)–(232, 59): o mini mapa abre em x = 207 + 12 − 66 + 3 = 156, com a área
+    /// cliente (161) alinhada a 160 na primeira abertura: 155, com o
     /// contorno na linha 75 e 137 × 73 por fora (bancada m02: (155, 113)–(291, 185) na tela, área
     /// cliente a partir da linha 38).
     #[test]
