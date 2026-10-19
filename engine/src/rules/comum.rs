@@ -221,7 +221,7 @@ pub fn parte_dos_recursos<T: serde::de::DeserializeOwned>(
     let mut v: serde_json::Value = r.dados(arquivo)?;
     let comuns: serde_json::Value = r.dados(ARQUIVO_COMUNS)?;
     completar_com_comuns(arquivo, &mut v, &comuns, usos)?;
-    serde_json::from_value(v).map_err(|e| format!("{arquivo}: {e}"))
+    serde_json::from_value(v).map_err(|e| format!("{}: {e}", r.descrever_dados(arquivo)))
 }
 
 // ---------------------------------------------------------------------------------------------

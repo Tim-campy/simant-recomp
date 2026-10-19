@@ -201,12 +201,87 @@ fn mod_de_comum_json_vale_para_todas_as_partes() {
     assert_eq!(regras.inimigos.turn_tab, padrao.inimigos.turn_tab);
     assert_eq!(regras.feromonios.turn_tab, padrao.feromonios.turn_tab);
 
-    // Uma tabela que falta em comum.json é erro ao carregar, com o nome do arquivo.
+    // API 0.26: um comum.json de mod sem uma tabela herda a do port (mesclagem por chave)...
     fs::remove_file(m.join("data/ninho.json")).unwrap();
     sobrescrever(&m, "comum.json", |v| {
         v.as_object_mut().unwrap().remove("borda_buraco");
     });
     let r = Recursos::abrir(&jogo, &[], &dados_do_port(), Some(&mods)).unwrap();
+    let regras = RegrasOriginais::carregar_sem_banco(&r).unwrap();
+    assert_eq!(regras.ninho.borda_buraco, padrao.ninho.borda_buraco);
+    // ... e, com "_substituir", o arquivo do mod vale inteiro: a tabela que falta é erro, com o nome
+    // do arquivo.
+    sobrescrever(&m, "comum.json", |v| {
+        v.as_object_mut().unwrap().remove("borda_buraco");
+        v["_substituir"] = true.into();
+    });
+    let r = Recursos::abrir(&jogo, &[], &dados_do_port(), Some(&mods)).unwrap();
     let erro = RegrasOriginais::carregar_sem_banco(&r).unwrap_err();
     assert!(erro.contains("comum.json") && erro.contains("borda_buraco"), "{erro}");
+}
+
+/// API de mods 0.26: os `data/*.json` dos mods são mesclados por chave sobre os do port, na ordem
+/// dos mods: objetos mesclam, listas e valores substituem, `"_substituir": true` troca o objeto
+/// inteiro. Um mod que traz o arquivo inteiro dá o mesmo resultado de antes.
+#[test]
+fn dados_de_mods_sao_mesclados_por_chave() {
+    use serde_json::{json, Value};
+
+    let raiz = tmp("mesclar");
+    let (jogo, dados, mods) = (raiz.join("jogo"), raiz.join("data"), raiz.join("mods"));
+    for d in [&jogo, &dados, &mods] {
+        fs::create_dir_all(d).unwrap();
+    }
+    let base = json!({
+        "a": 1,
+        "lista": [1, 2, 3],
+        "obj": { "x": 1, "y": 2, "fundo": { "p": true, "q": false } },
+        "mapa": { "F1": "ajuda", "F2": "pausa" }
+    });
+    fs::write(dados.join("x.json"), base.to_string()).unwrap();
+    let a = criar_mod(&mods, "a-parcial", &[]);
+    fs::create_dir_all(a.join("data")).unwrap();
+    fs::write(a.join("data/x.json"), r#"{"obj": {"y": 20, "fundo": {"q": true}, "novo": "n"}, "lista": [9]}"#).unwrap();
+    let b = criar_mod(&mods, "b-substitui", &["a-parcial"]);
+    fs::create_dir_all(b.join("data")).unwrap();
+    fs::write(b.join("data/x.json"), r#"{"mapa": {"_substituir": true, "F3": "mapa"}, "a": null}"#).unwrap();
+
+    let r = Recursos::abrir(&jogo, &[], &dados, Some(&mods)).unwrap();
+    let v: Value = r.dados("x.json").unwrap();
+    assert_eq!(
+        v,
+        json!({
+            "a": null,
+            "lista": [9],
+            "obj": { "x": 1, "y": 20, "fundo": { "p": true, "q": true }, "novo": "n" },
+            "mapa": { "F3": "mapa" }
+        })
+    );
+
+    // Um mod que traz o arquivo inteiro (como até a 0.25) dá exatamente o arquivo do mod.
+    fs::remove_dir_all(&b).unwrap();
+    let inteiro = json!({ "a": 5, "lista": [], "obj": { "x": 0, "y": 0, "fundo": { "p": false, "q": false } }, "mapa": { "F1": "x", "F2": "y" } });
+    fs::write(a.join("data/x.json"), inteiro.to_string()).unwrap();
+    let r = Recursos::abrir(&jogo, &[], &dados, Some(&mods)).unwrap();
+    assert_eq!(r.dados::<Value>("x.json").unwrap(), inteiro);
+
+    // Um arquivo que só existe no mod entra inteiro (sem as marcas).
+    fs::write(a.join("data/so_do_mod.json"), r#"{"k": {"_substituir": true, "v": 1}}"#).unwrap();
+    let r = Recursos::abrir(&jogo, &[], &dados, Some(&mods)).unwrap();
+    assert_eq!(r.dados::<Value>("so_do_mod.json").unwrap(), json!({ "k": { "v": 1 } }));
+
+    // Um mod parcial de verdade: só a chance do gato em quintal.json.
+    let m = criar_mod(&mods, "c-gato", &[]);
+    fs::create_dir_all(m.join("data")).unwrap();
+    fs::write(m.join("data/quintal.json"), r#"{"regras": {"gato_chance": 64}}"#).unwrap();
+    let r = Recursos::abrir(&jogo, &[], &dados_do_port(), Some(&mods)).unwrap();
+    let regras = engine::rules::tick::RegrasOriginais::carregar_sem_banco(&r).unwrap();
+    let padrao = engine::rules::tick::RegrasOriginais::default();
+    assert_eq!(regras.quintal.regras.gato_chance, 64);
+    assert_eq!(regras.quintal.regras.chuva_chance_1, padrao.quintal.regras.chuva_chance_1);
+    // Erro depois da mesclagem cita o arquivo e os mods.
+    fs::write(m.join("data/quintal.json"), r#"{"regras": {"gato_chance": "muito"}}"#).unwrap();
+    let r = Recursos::abrir(&jogo, &[], &dados_do_port(), Some(&mods)).unwrap();
+    let erro = engine::rules::tick::RegrasOriginais::carregar_sem_banco(&r).unwrap_err();
+    assert!(erro.contains("quintal.json") && erro.contains("c-gato"), "{erro}");
 }
