@@ -1,0 +1,13 @@
+# Diagnóstico do boot com o disco SVGA (vbesvga.drv): telas a cada ~10 s.
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_svga_boot.txt --disco re_trabalho/qemu/svga_c_800x600.img --overlay re_trabalho/qemu/svga_diag.qcow2
+esperar 15
+capturar re_trabalho/svga/diag_b15.png
+esperar 10
+capturar re_trabalho/svga/diag_b25.png
+esperar 10
+capturar re_trabalho/svga/diag_b35.png
+esperar 10
+capturar re_trabalho/svga/diag_b45.png
+esperar 15
+capturar re_trabalho/svga/diag_b60.png
+fim

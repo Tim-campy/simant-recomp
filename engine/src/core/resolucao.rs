@@ -25,7 +25,7 @@ pub struct FaixaTabela {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct ConfigResolucao {
     /// Linhas da tela acima da área cliente da janela principal maximizada (barra de título e de
-    /// menus): 38 medidas em 640×480 e em 800×600.
+    /// menus): 38, medidas em 640×480, 800×600 e 1024×768.
     pub linhas_acima_da_area_cliente: u32,
     /// Em ordem: a primeira faixa cuja `ate_altura` comporta a altura da tela dá a tabela.
     pub tabelas_posicoes: Vec<FaixaTabela>,

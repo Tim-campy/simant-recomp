@@ -2,7 +2,11 @@
 
 Preparação (uma vez):  python tools/qemu_bancada.py preparar
 Roteiro:               python tools/qemu_bancada.py roteiro ARQUIVO [--overlay ARQ.qcow2] [--mem MB] [--qemu-args "ARGS"]
-Extrair do disco:      python tools/qemu_bancada.py extrair CAMINHO_DOS DESTINO [--overlay ARQ.qcow2]
+Extrair do disco:      python tools/qemu_bancada.py extrair CAMINHO_DOS DESTINO [--overlay ARQ.qcow2] [--disco ARQ.img]
+Disco SVGA (VBE):      python tools/qemu_bancada.py preparar_svga LARGURA ALTURA [BPP] [--disco ARQ.img] [--drivers DIR]
+    Disco C: à parte (padrão re_trabalho/qemu/svga_c_LARGURAxALTURA.img) com o driver livre vbesvga.drv
+    (github.com/PluMGMK/vbesvga.drv) sobre o VBE do -vga std; não toca a c.img nem o overlay padrão.
+    Rodar com ele: `roteiro ARQUIVO --disco ARQ.img` (ou com `--overlay svga_X.qcow2`, que nasce sobre o --disco).
 
 Comandos de roteiro (um por linha, # = comentário):
     esperar SEG                 espera SEG segundos (relógio do host)
@@ -178,25 +182,70 @@ def preparar():
     print(f"preparado: {IMAGEM_C} e {DISQUETE}")
 
 
-def criar_imagem_c():
-    """Cria um disco FAT16 de 100 MB com o conteúdo de DISCO_C usando IMGMAKE/COPY do DOSBox-X.
-    (O vvfat do QEMU em modo leitura-escrita falha quando o Windows grava no disco.)"""
-    if IMAGEM_C.exists():
-        IMAGEM_C.unlink()
-    if OVERLAY_PADRAO.exists():  # o overlay (e seus snapshots) só vale sobre a c.img de onde nasceu
-        OVERLAY_PADRAO.unlink()
+def criar_imagem_c(pasta=DISCO_C, imagem=IMAGEM_C, overlay=OVERLAY_PADRAO, silencioso=False):
+    """Cria um disco FAT16 de 100 MB com o conteúdo de `pasta` usando IMGMAKE/COPY do DOSBox-X.
+    (O vvfat do QEMU em modo leitura-escrita falha quando o Windows grava no disco.)
+    `overlay`: overlay qcow2 nascido da imagem antiga, apagado junto (None: nenhum).
+    `silencioso`: DOSBox-X com -silent (sem janela)."""
+    if imagem.exists():
+        imagem.unlink()
+    if overlay is not None and overlay.exists():  # o overlay (e seus snapshots) só vale sobre a imagem de onde nasceu
+        overlay.unlink()
     rel =lambda p: str(p.relative_to(RAIZ))  # noqa: E731
-    pastas = sorted(str(p.relative_to(DISCO_C)) for p in DISCO_C.rglob("*") if p.is_dir())
-    linhas = ["[sdl]", "output = surface", "[autoexec]", f'mount d "{rel(DISCO_C)}"',
-              f"imgmake {rel(IMAGEM_C)} -t hd -size 100", f"imgmount e {rel(IMAGEM_C)}"]
+    pastas = sorted(str(p.relative_to(pasta)) for p in pasta.rglob("*") if p.is_dir())
+    linhas = ["[sdl]", "output = surface", "[autoexec]", f'mount d "{rel(pasta)}"',
+              f"imgmake {rel(imagem)} -t hd -size 100", f"imgmount e {rel(imagem)}"]
     barra = "\\"
     linhas += [f"md E:{barra}{p}" for p in pastas]
     linhas += [f"copy D:{barra}{p}{barra}*.* E:{barra}{p}" for p in pastas
-               if any(f.is_file() for f in (DISCO_C / p).iterdir())]
+               if any(f.is_file() for f in (pasta / p).iterdir())]
     linhas += ["exit"]
-    conf = TRAB / "criar_imagem.conf"
+    conf = TRAB / ("criar_imagem.conf" if imagem == IMAGEM_C else f"criar_{imagem.stem}.conf")
     conf.write_text("\n".join(linhas) + "\n", encoding="latin-1")
-    subprocess.run([str(DOSBOX), "-conf", str(conf), "-nopromptfolder"], cwd=RAIZ, timeout=300)
+    subprocess.run([str(DOSBOX), "-conf", str(conf), "-nopromptfolder"] + (["-silent"] if silencioso else []),
+                   cwd=RAIZ, timeout=300)
+
+
+# Driver de vídeo livre para VBE (github.com/PluMGMK/vbesvga.drv, release v1.0-beta4, vbesvga-release.zip
+# extraído). Só os arquivos do Windows vão para a imagem da VM; nada dele roda no host.
+DRIVERS_VBESVGA = RAIZ / "re_trabalho" / "downloads" / "vbesvga" / "x"
+ARQUIVOS_VBESVGA = ("VBESVGA.DRV", "VDDVBE.386", "VBEVMDIB.3GR")
+
+
+def preparar_svga(largura, altura, bpp=8, imagem=None, drivers=DRIVERS_VBESVGA):
+    """Disco C: à parte com o driver vbesvga.drv em LARGURA×ALTURA×BPP sobre o VBE do `-vga std`.
+    Não toca DISCO_C, IMAGEM_C nem o overlay padrão; usa a pasta TRAB/svga_c_LxA e a imagem
+    TRAB/svga_c_LxA.img (ou `imagem`). Overlays sobre a imagem antiga ficam inválidos: apague-os."""
+    nome = f"svga_c_{largura}x{altura}" + ("" if bpp == 8 else f"x{bpp}")
+    imagem = caminho_raiz(imagem) if imagem else TRAB / f"{nome}.img"
+    pasta = TRAB / imagem.stem
+    if not pasta.name.startswith("svga"):
+        raise ValueError("a imagem SVGA deve ter nome começando com 'svga' (protege c.img e c/)")
+    if pasta.exists():
+        shutil.rmtree(pasta)
+    origem = RAIZ / "SimAnt-T"
+    for sub in ("WINDOWS", "MAXIS"):
+        shutil.copytree(origem / sub, pasta / sub)
+    (pasta / "WINDOWS" / "TEMP").mkdir(exist_ok=True)
+    for arq in ARQUIVOS_VBESVGA:
+        shutil.copyfile(Path(drivers) / arq, pasta / "WINDOWS" / "SYSTEM" / arq)
+    ini = pasta / "WINDOWS" / "SYSTEM.INI"
+    substituir_ini(ini, {
+        "display.drv=S3TRIO.DRV": "display.drv=vbesvga.drv",
+        "386grabber=VGA_ENG.3GR": "386grabber=vbevmdib.3gr",
+        "display=VDDS3764.386": "display=vddvbe.386",
+        "device=vshare.386": ";device=vshare.386",
+        "[386Enh]": "[386Enh]\r\nInDOSPolling=TRUE",
+    })
+    with open(ini, "ab") as f:
+        f.write(f"\r\n[VBESVGA.DRV]\r\nWidth={largura}\r\nHeight={altura}\r\nDepth={bpp}\r\n".encode("latin-1"))
+    substituir_ini(pasta / "WINDOWS" / "WIN.INI", {
+        "[windows]": "[windows]\r\nMouseSpeed=0\r\nMouseThreshold1=0\r\nMouseThreshold2=0",
+    })
+    if not DISQUETE.exists():
+        gravar_disquete()
+    criar_imagem_c(pasta, imagem, None, silencioso=True)
+    print(f"preparado: {imagem} ({largura}x{altura}x{bpp}, vbesvga.drv)")
 
 
 def porta_livre():
@@ -641,9 +690,9 @@ def caminho_raiz(p):
     return p if p.is_absolute() else RAIZ / p
 
 
-def garantir_overlay(overlay: Path):
+def garantir_overlay(overlay: Path, base: Path = IMAGEM_C):
     if not overlay.exists():
-        subprocess.run([str(QEMU_IMG), "create", "-f", "qcow2", "-b", str(IMAGEM_C), "-F", "raw", str(overlay)],
+        subprocess.run([str(QEMU_IMG), "create", "-f", "qcow2", "-b", str(base), "-F", "raw", str(overlay)],
                        check=True, capture_output=True)
         print(f"overlay criado: {overlay}", flush=True)
 
@@ -932,19 +981,21 @@ class Bancada:
     """Uma VM do QEMU com o SimAnt, controlada por QMP (e gdbstub). Usada pelos roteiros e por
     tools/gerar_vetores_tick.py."""
 
-    def __init__(self, overlay=None, mem=16, extra=None):
+    def __init__(self, overlay=None, mem=16, extra=None, imagem=None):
         """`extra`: argumentos a mais para o QEMU (lista ou texto; padrão: a variável de ambiente
-        SIMANT_QEMU_ARGS), por exemplo "-icount shift=5,sleep=on" ou a placa de som (bancada-qemu.md)."""
+        SIMANT_QEMU_ARGS), por exemplo "-icount shift=5,sleep=on" ou a placa de som (bancada-qemu.md).
+        `imagem`: disco C: raw no lugar da c.img (ex.: o de `preparar_svga`); base do overlay novo."""
         if extra is None:
             extra = os.environ.get("SIMANT_QEMU_ARGS", "")
         if isinstance(extra, str):
             extra = shlex.split(extra, posix=True)
+        imagem = caminho_raiz(imagem) if imagem else IMAGEM_C
         if overlay is not None:
             overlay = caminho_raiz(overlay)
-            garantir_overlay(overlay)
+            garantir_overlay(overlay, imagem)
             disco = f"file={overlay},format=qcow2,if=ide,index=0"
         else:
-            disco = f"file={IMAGEM_C},format=raw,if=ide,index=0"
+            disco = f"file={imagem},format=raw,if=ide,index=0"
         porta_qmp, porta_gdb = porta_livre(), porta_livre()
         args = [
             str(QEMU), "-M", "pc", "-cpu", "486", "-m", str(mem),
@@ -1115,12 +1166,14 @@ class Bancada:
         return True
 
 
-def roteiro(arquivo, overlay=None, mem=16, extra=None):
+def roteiro(arquivo, overlay=None, mem=16, extra=None, imagem=None):
     linhas = Path(arquivo).read_text(encoding="utf-8").splitlines()
     usa_snap = any(ln.split()[:1] in (["snapshot_salvar"], ["snapshot_carregar"]) for ln in linhas)
     if usa_snap and overlay is None:
+        if imagem is not None:  # o overlay padrão nasceu da c.img: não serve para outro disco
+            sys.exit("com --disco e snapshots, dê também --overlay (um overlay próprio desse disco)")
         overlay = OVERLAY_PADRAO
-    b = Bancada(overlay, mem, extra)
+    b = Bancada(overlay, mem, extra, imagem)
     try:
         for linha in linhas:
             if not b.executar(linha):
@@ -1129,11 +1182,11 @@ def roteiro(arquivo, overlay=None, mem=16, extra=None):
         b.fechar()
 
 
-def extrair(caminho_dos, destino, overlay=None):
-    """Copia um arquivo do disco C: da bancada (c.img, ou o overlay qcow2 convertido para raw)."""
+def extrair(caminho_dos, destino, overlay=None, disco=None):
+    """Copia um arquivo do disco C: da bancada (c.img ou `disco`, ou o overlay qcow2 convertido para raw)."""
     from fat16_extrair import ler
     if overlay is None:
-        imagem = IMAGEM_C.read_bytes()
+        imagem = (caminho_raiz(disco) if disco else IMAGEM_C).read_bytes()
     else:
         with tempfile.TemporaryDirectory() as t:
             raw = Path(t) / "c.img"
@@ -1159,14 +1212,20 @@ if __name__ == "__main__":
     ov = opcao(args, "--overlay")
     mb = int(opcao(args, "--mem", "16"))
     qa = opcao(args, "--qemu-args")
+    dc = opcao(args, "--disco")
+    dr = opcao(args, "--drivers", str(DRIVERS_VBESVGA))
     if not args:
         sys.exit(__doc__)
     if args[0] == "preparar":
+        if dc:
+            sys.exit("preparar recria só a c.img padrão; para outro disco use preparar_svga --disco")
         preparar()
+    elif args[0] == "preparar_svga":
+        preparar_svga(int(args[1]), int(args[2]), int(args[3]) if len(args) > 3 else 8, dc, dr)
     elif args[0] == "roteiro":
-        roteiro(args[1], ov, mb, qa)
+        roteiro(args[1], ov, mb, qa, dc)
     elif args[0] == "extrair":
-        extrair(args[1], args[2], ov)
+        extrair(args[1], args[2], ov, dc)
     else:
         sys.exit(__doc__)
 

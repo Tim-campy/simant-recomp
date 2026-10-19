@@ -1,5 +1,5 @@
 {
-  "_comentario": "Como o original escolhe o layout pela resolução do Windows (docs/spec/telas/resolucao.md; engine/src/core/resolucao.rs). A janela principal abre maximizada (_InitInstance, SW_SHOWMAXIMIZED): a área cliente é a tela menos linhas_acima_da_area_cliente (barra de título + barra de menus; 38 medidas em 640x480 na bancada e em 800x600 no DOSBox-X; 1024x768 [hipótese]). _win_LoadAllWindows escolhe a tabela de posições (objeto tipo 9) só pela altura da tela: até 480 linhas a 9/0, senão a 9/8 (no modo mono, MWINNT, seriam 9/5 e 9/7). resolucoes: as aceitas em data/video.json (resolucao_virtual) e em --resolucao.",
+  "_comentario": "Como o original escolhe o layout pela resolução do Windows (docs/spec/telas/resolucao.md; engine/src/core/resolucao.rs). A janela principal abre maximizada (_InitInstance, SW_SHOWMAXIMIZED): a área cliente é a tela menos linhas_acima_da_area_cliente (barra de título + barra de menus; 38 medidas em 640x480, 800x600 e 1024x768 na bancada QEMU e no DOSBox-X). _win_LoadAllWindows escolhe a tabela de posições (objeto tipo 9) só pela altura da tela: até 480 linhas a 9/0, senão a 9/8 (no modo mono, MWINNT, seriam 9/5 e 9/7). resolucoes: as aceitas em data/video.json (resolucao_virtual) e em --resolucao.",
   "linhas_acima_da_area_cliente": 38,
   "tabelas_posicoes": [
     {"ate_altura": 480, "tabela": 0},

@@ -187,10 +187,10 @@ Geração de mundo
 Jogo ao vivo
 - Taxa de fast/ultra em máquina real: só limitada por emulação (`-icount`, ~3 ticks/s em fast por milhão de instruções/s; `regras/simulacao-visao-geral.md` §3.3); cadência sem foco 170 → 220 ms.
 - `mac_por_tick` fora da bancada (`regras/quintal.md`).
-- `_editWidth` = 25 também em outras resoluções (`testes-tick.md`, [hipótese]).
+- `_editWidth` = 25 também em outras resoluções (`testes-tick.md`, [hipótese]; a janela de edição fica no mesmo lugar e tamanho em 640×480, 800×600 e 1024×768, `telas/resolucao.md` §5).
 
 Telas
-- Rainha amarela 0xFE e outras resoluções (`telas/jogo.md`, "Não verificado"). Navegação, superfície e ninho vermelho na edição: verificados em 2026-10-18 (`telas/jogo.md`, "Verificação").
+- Rainha amarela 0xFE (`telas/jogo.md`, "Não verificado"). Outras resoluções: tela virtual 640×480/800×600/1024×768 feita e conferida em 2026-10-19 contra a bancada SVGA (`telas/resolucao.md` §5–6); faltam caixas de mensagem, WinHelp, quadro da amarela, Info, fim de jogo e quintal nas telas maiores. Navegação, superfície e ninho vermelho na edição: verificados em 2026-10-18 (`telas/jogo.md`, "Verificação").
 - Desenho da aranha: o recorte das retas na borda da vista (`_os_ClipLine`, 8 pixels de diferença numa captura) [hipótese]. (Corpo, pernas, palpos e agonia conferidos em 2026-10-18, 18 capturas 99,91–100%, `telas/jogo.md`.)
 - Altura mínima da edição e clique comido na janela de trás (`telas/janelas.md` §8, [hipótese]).
 - Cores do mapa (`_ConvColor`) (`telas/mapa.md`, [hipótese]).
@@ -256,14 +256,14 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 | Item | Esforço |
 |---|---|
 | ~~Desenho dentro do tick (`_DrawPalps`/`_SpiderDialog`) para fechar `amarela_morte_aranha`~~ (feito em 2026-10-18) | — |
-| Capturas: cartões 127 e 129 do Info, rainha amarela 0xFE, outras resoluções (navegação, Examine, menus, History, triângulo, 51 cartões e abertura feitos em 2026-10-18) | P |
+| Capturas: cartões 127 e 129 do Info, rainha amarela 0xFE, diálogos e janelas secundárias em 800×600/1024×768 (navegação, Examine, menus, History, triângulo, 51 cartões e abertura feitos em 2026-10-18; abertura e Quick Game nas três resoluções em 2026-10-19, bancada SVGA) | P |
 | Comparação de áudio com o original: DOSBox-X com SB16/OPL3 e captura de WAV (a bancada QEMU com SB16 foi tentada e não serve, `regras/som.md`) | M |
 | Ritmo fast/ultra numa máquina real (com `-icount` feito: `simulacao-visao-geral.md` §3.3) | P |
 
 ## 5. Riscos e dívidas técnicas
 
 1. ~~**Tabelas duplicadas nos JSON.**~~ **Resolvido em 2026-10-18 (API de mods 0.20).** A revisão achou 30 tabelas numéricas repetidas, 28 em arquivos diferentes; as que são a mesma tabela do original (14: `dx8`/`dy8`, `dx9`/`dy9`, `turn_tab`, `grupo_sem_carga`, `modos_operaria`/`modos_soldado`/`modo_por_grupo`, `sow_tab`, `classe_luta`, `matriz_luta`, `borda_buraco`, `borda_formiga_leao`) ficam agora só em `data/comum.json`, com o endereço de cada uma. As outras coincidências são tabelas diferentes do original com os mesmos valores (`boca_aranha_x/y` = `_SeatX/_SeatY`, roteiros de `quintal.json` e `casa.json`, bordas de `dialogos.json`) e ficaram. Um mod antigo com a cópia numa parte vale só para aquela parte, com aviso (decisoes.md).
-2. **Ajustes de pixel medidos sem causa conhecida** ([causa em aberto] em `divergencias.md`): texto da faixa e janela do fim de jogo 1 pixel à esquerda (`mensagens.json`, `ajuste`); gato 1 pixel abaixo nos quadros 0–12 (`quintal_mapa.json`, `ajuste_medido`); título, triângulo e barras das janelas de controle; Info 1 pixel à direita e popup deslocado (`info.json`). Funcionam em 640×480 e podem errar em outras resoluções ou se a causa for outra.
+2. **Ajustes de pixel medidos sem causa conhecida** ([causa em aberto] em `divergencias.md`): texto da faixa e janela do fim de jogo 1 pixel à esquerda (`mensagens.json`, `ajuste`); gato 1 pixel abaixo nos quadros 0–12 (`quintal_mapa.json`, `ajuste_medido`); título, triângulo e barras das janelas de controle; Info 1 pixel à direita e popup deslocado (`info.json`). Funcionam em 640×480 e podem errar em outras resoluções ou se a causa for outra. A bancada SVGA (2026-10-19) mostrou que parte deles depende do driver, não da resolução: em 256 cores a janela de edição fica 4 pixels à esquerda e as de controle 1 à direita, em todas as resoluções (`divergencias.md`).
 3. **Hipóteses no relógio.** O relógio do Mac ao vivo começa no maior prazo do save (o port não sabe há quanto tempo o Windows está ligado); `mac_por_tick` = 9 só vale na bancada; sem relógio, `_GameTime × 6` [hipótese] em `quintal.json`. O gato, o cachorro e o balão do menino dependem disso, e com o gato e o cachorro **o consumo de sorteios** também: uma partida ao vivo não reproduz exatamente uma do original.
 4. **Ritmo de fast/ultra dependente da CPU no original.** O port fixa 5 e 7 voltas por período (decisão registrada). `_BirdDelay` depende de `_gameCycles` e é a única entrada não determinística do tick.
 5. **Desenho que consome o gerador S no original e não no port** (chuva e enxame do quintal, `rules/desenho.rs`; sorteios de `_DrawSpider` não medidos). Com essas janelas abertas, a sequência de sorteios pode se afastar do original. Os vetores com a Yard View na frente (`full_600`) passam porque o port faz os sorteios à parte, entre os ticks.

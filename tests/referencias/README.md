@@ -34,6 +34,19 @@ Cenários de `tools/cenarios_tick.py` (cópia própria do overlay; capturas e es
 | History com dados (4 gráficos e um quinto que empurra o mais velho) | `gravar historico` com `CLIQUES` | **99,0–99,6%** na janela com as cores e o deslocamento medidos (antes 97,4–99,0%) |
 | Arrasto no triângulo das castas | `gravar triangulo` com `ARRASTO` | níveis, `_CasteAuto` e `_IdealCaste` iguais (teste `arrasto_no_triangulo_igual_a_bancada`, depois de o clique passar a usar o triângulo do botão); janela **99,80%** |
 
+## Tela virtual: 640×480, 800×600 e 1024×768 (2026-10-19)
+
+Bancada SVGA (QEMU + `vbesvga.drv`, 256 cores; `docs/bancada-qemu.md`, "Bancada SVGA"), roteiros `roteiros/qemu_svga*_*.txt`, capturas em `re_trabalho/svga/`. Port: `simant --resolucao LxA --exportar-telas DIR` e `--resolucao LxA --novo-jogo --semente 1 --exportar-tela-jogo ARQ.png`; `tools/comparar_captura.py --mapear`.
+
+| Tela | 640×480 | 800×600 | 1024×768 | Diferenças |
+|---|---|---|---|---|
+| Título | 99,89% | 99,98% | 99,99% | só o cursor; o título SVGA 800×600 é idêntico ao do DOSBox-X (`tools/png_diff6.py`) |
+| Select a Game | 96,19% | 97,60% | 98,56% | conteúdo da janela 2 1 pixel à esquerda na SVGA; botões configuráveis da faixa |
+| Quick Game (área cliente) | 87,97% | 91,23% | 94,94% | outro mundo (aleatório no original); x da janela de edição (−4) e das de controle (+1), dependentes do driver; cor do título |
+| Quick Game, linhas 380 em diante | 89,84% | 93,39% | 97,32% | as janelas de controle: y iguais nas três resoluções (127 linhas entre 9/0 e 9/8) |
+
+O teste `engine/tests/resolucao_reais.rs` confere que a abertura em 800×600 pela regra é a validada contra o DOSBox-X; `simant/src/sessao.rs` (`testes_tela_virtual`), as posições das janelas de controle e o tamanho da tela nas três resoluções. Especificação: `docs/spec/telas/resolucao.md`.
+
 ## Casos de teste de regras (bancada QEMU)
 
 Cada caso é um JSON em `casos/` (save de partida, patch de `tools/ant_editar.py`, tick alvo, resultado esperado e conferências automáticas). Para rodar: `python tools/caso_ant.py rodar tests/referencias/casos/ID.json` (com `SIMANT_RAIZ` apontando para a raiz com `referencia/` e `re_trabalho/`). Injeção, passos do Load e o que o load muda: [docs/bancada-qemu.md](../../docs/bancada-qemu.md#casos-de-teste-injetar-um-save-e-rodar). O estado final de cada caso observado fica em `saves/` para comparação com o port. Conferência nova em `caso_ant.py`: `{"celula": "MapA", "x": X, "y": Y, ...}`.

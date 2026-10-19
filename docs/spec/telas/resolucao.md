@@ -9,7 +9,7 @@ Legenda: **[código]** = visto no pseudocódigo do Ghidra (`re_trabalho/decomp/`
 - `_InitInstance` (`1000:3c8a`) cria a janela principal e chama `ShowWindow(..., nCmdShow | 3)`: com o 3 (`SW_SHOWMAXIMIZED`) ela abre **maximizada** em qualquer resolução [código]. A moldura da janela maximizada fica fora da tela; sobram a barra de título e a barra de menus.
 - Logo depois, o `GetClientRect` da janela principal dá `_screenWidth`/`_screenHeight` e são criadas duas janelas filhas: a **faixa** (`_ribbonBarWnd`), com a largura toda da área cliente, e a **raiz** (`_rootWnd`), onde ficam as janelas do jogo [código].
 - No `WM_SIZE` da janela principal (`MAINWNDPROC`, `1000:2930`), a faixa é redimensionada para (largura da área cliente × altura da faixa) e a raiz para (largura × altura da área cliente − altura da faixa); `_screenWidth`/`_screenHeight` passam a ser o tamanho da raiz [código].
-- A área cliente começa na **linha 38** da tela: barra de título (linhas 0–18) e barra de menus (19–36, mais a linha preta 37). **Medido** em 640×480 (bancada QEMU, `VGA.DRV`; `data/barra_menus.json`) e em 800×600 (DOSBox-X, `S3TRIO.DRV`; `formatos/janela.md`, "Posicionamento na tela"). Em 1024×768 é [hipótese]: as alturas vêm de `GetSystemMetrics` (`SM_CYCAPTION`, `SM_CYMENU`), que dependem da fonte do sistema do driver; com fontes pequenas (as do VGA e do S3 a 800×600) dão as mesmas 38 linhas.
+- A área cliente começa na **linha 38** da tela: barra de título (linhas 0–18) e barra de menus (19–36, mais a linha preta 37). **Medido** em 640×480 (bancada QEMU, `VGA.DRV`; `data/barra_menus.json`), em 800×600 (DOSBox-X, `S3TRIO.DRV`; `formatos/janela.md`, "Posicionamento na tela") e em 640×480, 800×600 e 1024×768 na bancada SVGA (seção 5). As alturas vêm de `GetSystemMetrics` (`SM_CYCAPTION`, `SM_CYMENU`), que dependem da fonte do sistema do driver; com fontes grandes seriam outras [hipótese].
 
 Logo, para uma tela de L × A:
 
@@ -17,9 +17,9 @@ Logo, para uma tela de L × A:
 |---|---|---|---|
 | 640×480 | 640 × 442 | 640 × 73 | 640 × 369 |
 | 800×600 | 800 × 562 | 800 × 73 | 800 × 489 |
-| 1024×768 | 1024 × 730 [hipótese: 38 linhas] | 1024 × 73 | 1024 × 657 |
+| 1024×768 | 1024 × 730 | 1024 × 73 | 1024 × 657 |
 
-A faixa tem fundo cinza claro na largura toda; os objetos da janela 34 (`mapRibbon`, 640 pixels de largura) ficam encostados à esquerda e o resto é só fundo [medido em 800×600: `titulo_800x600.png`, colunas 640–799 das linhas 38–110].
+A faixa tem fundo cinza claro na largura toda; os objetos da janela 34 (`mapRibbon`, 640 pixels de largura) ficam encostados à esquerda e o resto é só fundo [medido em 800×600: `titulo_800x600.png`, colunas 640–799 das linhas 38–110; e em 1024×768, `svga1024_quick.png`].
 
 ## 2. Tabela de posições das janelas (objeto tipo 9)
 
@@ -69,12 +69,29 @@ O port não muda a resolução do monitor: desenha uma **tela virtual** do Windo
 
 ## 5. Verificação
 
-- 800×600: a abertura composta pela regra (tela virtual 800×600 → 800×562, tabela 8) é **idêntica** (mesmo SHA-256) às telas validadas contra o DOSBox-X: título 99,98% e "Select a Game" 99,87% dos pixels iguais (formatos/janela.md, "Validação"; teste `engine/tests/resolucao_reais.rs`).
-- 640×480: a abertura pela regra (640×442, tabela 0) foi comparada com as capturas da bancada `qi_01_titulo.png` e `qi_05_selecao.png` (seção 6).
-- Tela de jogo em 800×600 e 1024×768: ver seção 6.
+Referências do original: a captura antiga do DOSBox-X (800×600, `S3TRIO.DRV`, 256 cores), a bancada QEMU padrão (640×480, `VGA.DRV`, 16 cores) e a **bancada SVGA** (QEMU com o driver `vbesvga.drv`, 256 cores, em 640×480, 800×600 e 1024×768; [bancada-qemu.md](../../bancada-qemu.md), "Bancada SVGA"). Capturas da SVGA em `re_trabalho/svga/` (fora do git).
+
+**Fatos verificados (2026-10-19):**
+
+- A área cliente começa na linha 38 também em 1024×768 (barra de título 0–18, menus 19–37), e a faixa vai das linhas 38 a 110 com fundo cinza até a coluna 1023; o resto da área cliente, até a linha 767, tem o fundo creme (`svga1024_quick.png`). As 38 linhas deixam de ser hipótese.
+- O título de 800×600 da bancada SVGA é idêntico ao do DOSBox-X (0 pixels diferentes em 6 bits por canal): os dois ambientes de 256 cores dão a mesma tela.
+- As janelas de controle (Caste/Behavior) ficam na linha 522 (caixa "Soldiers", área cliente) em 800×600 e 1024×768 e na 395 em 640×480: **127 linhas** acima, a diferença entre as tabelas 9/8 e 9/0 (285 − 158). O port dá as mesmas linhas nas três resoluções. A janela de edição fica no mesmo lugar nas três (contorno externo na linha 97).
+- O "Select a Game" e o título têm a mesma posição em 800×600 e 1024×768 (tabela 9/8); em 640×480 o título sobe (tabela 9/0).
+- A abertura composta pela regra em 800×600 é idêntica (mesmo SHA-256) às telas já validadas contra o DOSBox-X (teste `engine/tests/resolucao_reais.rs`); o teste `simant/src/sessao.rs` (`testes_tela_virtual`) trava as posições das janelas de controle e o tamanho da tela em 640, 800 e 1024.
+
+**Diferenças que vêm do driver, não da resolução** (iguais em 640×480, 800×600 e 1024×768 na bancada SVGA): a janela de edição tem o contorno externo em x = 16 em 256 cores e em x = 20 na bancada VGA de 16 cores (o port usa 20, `tela_jogo.json`); as janelas de controle, em x + 2 em 256 cores e x + 1 na VGA (o port usa + 1); o título da abertura, 3 pixels à direita e com moldura 1 + 5 + 1 só na VGA. As cores do sistema também mudam com o driver (título ativo azul-claro em 256 cores, azul-escuro na VGA). Ver `docs/divergencias.md`.
 
 ## 6. Comparações registradas
 
-Ver a tabela em `tests/referencias/README.md` ("Tela virtual") e `docs/divergencias.md`.
+Port (`--resolucao LxA --exportar-telas`, `--novo-jogo --semente 1 --exportar-tela-jogo`) contra a bancada SVGA, `tools/comparar_captura.py --mapear` (pixels iguais na área cliente):
 
-**Não verificado:** a altura da barra de título e de menus em 1024×768 (38 linhas é [hipótese]); a posição das caixas de mensagem do Windows, do visor de ajuda (WinHelp) e do quadro da amarela (janela 26) fora de 640×480 — no port essas três vêm de medidas da bancada em 640×480 (`data/dialogos.json`, `data/ajuda.json`, `data/mensagens.json`) e não se adaptam.
+| Tela | 640×480 | 800×600 | 1024×768 |
+|---|---|---|---|
+| Título | 99,89% | 99,98% | 99,99% |
+| Select a Game | 96,19% | 97,60% | 98,56% |
+| Quick Game, área cliente inteira | 87,97% | 91,23% | 94,94% |
+| Quick Game, abaixo da linha 380 (janelas de controle) | 89,84% | 93,39% | 97,32% |
+
+- Título: só o cursor difere. Select a Game: o conteúdo da janela 2 sai 1 pixel à esquerda na SVGA (nas três resoluções), e os botões configuráveis da faixa diferem. Quick Game: o jogo do original é outro (mundo aleatório; o port usa a semente 1), além do x da janela de edição (−4) e das de controle (+1) e da cor do título acima; a porcentagem cresce com a resolução porque sobra mais fundo igual. A mesma tela do port em 640×480 contra a bancada VGA: título 84,88%, Select a Game 99,25% (`qi_01_titulo.png`, `qi_05_selecao.png`).
+
+**Não verificado:** a posição das caixas de mensagem do Windows, do visor de ajuda (WinHelp) e do quadro da amarela (janela 26) fora de 640×480 — no port essas três vêm de medidas da bancada em 640×480 (`data/dialogos.json`, `data/ajuda.json`, `data/mensagens.json`) e não se adaptam; Info, fim de jogo, About, Quit e quintal nas telas maiores (seguem a tabela 9/8, sem captura).
