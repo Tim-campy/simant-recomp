@@ -279,6 +279,8 @@ impl Sessao<'_> {
             self.tela.selecao_da_faixa.push((nome.clone(), n == modo));
         }
         self.sincronizar_janelas();
+        let tempo = self.partida.estado.partida.tempo;
+        self.modos.janela.acompanhar_faixa(tempo);
         if self.janelas.aberta(Controle::Info) {
             self.info.carregar(self.recursos);
         }
@@ -772,6 +774,27 @@ mod testes_tela_virtual {
         let _ = std::fs::remove_dir_all(&mods);
     }
 
+    /// Cores do sistema do perfil `svga256` além do título e do fundo (resolucao.md §7): o título da
+    /// janela de edição sai azul-claro com o texto preto, como na bancada SVGA (ag640_quick); na VGA,
+    /// azul-escuro com o texto branco. Com `SIMANT_SAIDA_TESTE`, grava `quick_svga256.png`.
+    #[test]
+    fn cores_do_sistema_do_perfil_no_titulo_da_edicao() {
+        for (perfil, fundo, texto) in [("svga256", [0xa4, 0xc8, 0xf0], [0, 0, 0]), ("vga", [0, 0, 0x80], [0xff, 0xff, 0xff])] {
+            quick2_com_perfil([640, 480], perfil, |s, _| {
+                let rgb = s.quadro_rgb().unwrap();
+                let l = s.tela.cfg.largura as usize;
+                if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+                    crate::salvar_png(&PathBuf::from(saida).join(format!("quick_{perfil}.png")), s.tela.cfg.largura, s.tela.cfg.altura, &rgb).unwrap();
+                }
+                let m = s.tela.cfg.edicao.moldura.externo;
+                let y = m[1] as usize + 12;
+                let linha: Vec<[u8; 3]> = (m[0] as usize + 30..m[2] as usize - 30).map(|x| [rgb[(y * l + x) * 3], rgb[(y * l + x) * 3 + 1], rgb[(y * l + x) * 3 + 2]]).collect();
+                assert!(linha.contains(&fundo), "{perfil}: fundo do título");
+                assert!(linha.contains(&texto), "{perfil}: texto do título");
+            });
+        }
+    }
+
     /// Posições que dependem da tela virtual e do driver (telas/resolucao.md §3 e §7), medidas na
     /// bancada VGA (640×480) e na SVGA (`re_trabalho/svga/ag*`, 640/800/1024): caixa "SimAnt Quit",
     /// diálogo de arquivo, janela de edição, Info, fim de jogo, About (178 e 170 na SVGA), visor de
@@ -810,7 +833,7 @@ mod testes_tela_virtual {
                 v.na_tela(s.tela.cfg.largura as i16, s.tela.cfg.altura as i16);
                 assert_eq!((v.externo().esq, v.externo().dir), ajuda, "{perfil} {r:?}: ajuda");
                 let c = s.partida.avisos.cfg.quadro_amarela.clone().unwrap();
-                assert_eq!(c.imagem_em[0] + s.partida.avisos.ajuste_janela_imagem(&c, [0, 0])[0], amarela, "{perfil} {r:?}: janela 26");
+                assert_eq!(c.imagem_em[0] + s.partida.avisos.ajuste_janela_imagem(&c, [0, 0], true)[0], amarela, "{perfil} {r:?}: janela 26");
             });
         }
     }

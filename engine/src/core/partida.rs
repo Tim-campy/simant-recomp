@@ -30,6 +30,7 @@ use crate::rules::amarela::{
 use crate::rules::desenho::{self, ContadoresRedesenho, JanelasDesenho};
 use crate::rules::estado::{AnimacaoDaAmarela, ConfigSimulacao, Estado, Evento, QuadroAnimacao};
 use crate::rules::tick::{tick, Regras, RegrasOriginais, Relogio};
+use crate::rules::troca_patch::{ResultadoTroca, TransferenciaNoTick};
 use crate::rules::trapacas::{self, letra_da_tecla, AnelTrapaca, EfeitoTrapaca, TabelasTrapaca};
 use crate::scripts::{Gancho, PedidoMod, RegrasComScripts, Scripts};
 
@@ -213,6 +214,14 @@ pub fn camada_do_modo_de_cheiro(n: i16) -> i16 {
     }
 }
 
+/// O começo de um tick que parou na escolha de `_SpecialXfer`.
+struct FotoColonia {
+    estado: Estado,
+    memoria_tutor: crate::rules::conselhos::MemoriaTutor,
+    /// Pedidos do tick até a escolha (já entregues à interface na primeira passada).
+    eventos: usize,
+}
+
 /// Resultado de [`Partida::avancar`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Avanco {
@@ -289,6 +298,9 @@ pub struct Partida {
     pub contadores_redesenho: ContadoresRedesenho,
     /// `_SpecialXfer` pedido pelo tick e ainda não escolhido (a simulação fica parada).
     pub escolher_colonia: bool,
+    /// O tick que pediu a escolha de `_SpecialXfer`, guardado do começo: com a colônia escolhida, ele
+    /// roda de novo com a escolha e a troca acontece DENTRO dele (`concluir_transferencia_especial`).
+    foto_colonia: Option<Box<FotoColonia>>,
     /// A interface está num laço modal do original que para a simulação (`_StopSimulation`), como o
     /// PLACE esperando o clique (`_PlaceQueenInYard`).
     pub parada_pela_interface: bool,
@@ -367,6 +379,7 @@ impl Partida {
             contadores_redesenho: ContadoresRedesenho::default(),
             ultimo_misterio: None,
             escolher_colonia: false,
+            foto_colonia: None,
             parada_pela_interface: false,
             scripts: None,
             registro_scripts: Vec::new(),
@@ -553,6 +566,12 @@ impl Partida {
 
     /// Um tick da simulação (`_DoAntSim`), sem olhar relógio nem pausa, e o que o original faz em
     /// seguida na interface (redesenho, vista).
+    ///
+    /// `_SpecialXfer` (telas/quintal.md §8): o original espera a escolha da colônia DENTRO do tick. No
+    /// Jogo Completo com mais de uma colônia preta o port guarda o estado do começo do tick; se o tick
+    /// pedir a escolha, só os pedidos até ela vão para a interface e o resto do tick fica esperando:
+    /// escolhida a colônia, o tick roda de novo a partir da foto, com a escolha, e a troca acontece no
+    /// mesmo ponto (os pedidos repetidos até ali são descartados).
     pub fn rodar_tick(&mut self) {
         self.vistas_para_estado();
         // `_MacTickCount` (1000:9694) = ⌊GetTickCount / 55⌋ × 3: tempo real (quintal.md, "Relógios").
@@ -562,6 +581,60 @@ impl Partida {
             self.aplicar_pedidos_dos_mods();
         }
         self.preparar_edicao_no_tick();
+        let e = &self.estado;
+        let foto = (e.partida.tipo_jogo == 2 && e.preta.total_colonias > 1)
+            .then(|| (e.clone(), self.regras.memoria_tutor));
+        self.nucleo_do_tick();
+        if let Some((estado, memoria_tutor)) = foto {
+            if let Some(n) = self.estado.eventos.iter().position(|ev| matches!(ev, Evento::EscolherColonia)) {
+                self.estado.eventos.truncate(n + 1);
+                self.foto_colonia = Some(Box::new(FotoColonia { estado, memoria_tutor, eventos: n }));
+                self.vistas_do_estado();
+                self.tratar_eventos();
+                return;
+            }
+        }
+        self.terminar_tick();
+    }
+
+    /// Há um tick parado na escolha de `_SpecialXfer` (guardado por `rodar_tick`).
+    pub fn tick_esperando_colonia(&self) -> bool {
+        self.foto_colonia.is_some()
+    }
+
+    /// A colônia de `_SpecialXfer` foi escolhida (o patch já conferido com
+    /// `troca_patch::conferir_colonia`): o tick parado roda de novo da foto, com a escolha, e a troca
+    /// acontece dentro dele. Devolve o que `_XferPatch` fez; `None` se não havia tick parado.
+    pub fn concluir_transferencia_especial(&mut self, x: i16, y: i16) -> Option<Result<ResultadoTroca, String>> {
+        let foto = self.foto_colonia.take()?;
+        let Some(geracao) = self.regras.geracao.clone() else {
+            return Some(Err("tabelas de geração não carregadas (troca de patch)".into()));
+        };
+        let FotoColonia { estado, memoria_tutor, eventos } = *foto;
+        self.estado = estado;
+        self.regras.memoria_tutor = memoria_tutor;
+        self.estado.transferencia_no_tick = Some(Box::new(TransferenciaNoTick {
+            patch: (x, y),
+            geracao: std::sync::Arc::new(geracao),
+            cfg: self.cfg_simulacao.clone(),
+            resultado: None,
+        }));
+        self.nucleo_do_tick();
+        let r = self.estado.transferencia_no_tick.take().and_then(|t| t.resultado);
+        let n = eventos.min(self.estado.eventos.len());
+        self.estado.eventos.drain(..n);
+        self.escolher_colonia = false;
+        if let Some(Ok(ResultadoTroca::Trocou { .. })) = r {
+            // _RandWorld passo 18: pontos lembrados; o port leva a vista até a amarela [decisão do port].
+            self.estado.pedir_centralizar_na_amarela();
+        }
+        self.terminar_tick();
+        self.redesenhar = true;
+        Some(r.unwrap_or_else(|| Err("o tick repetido não chegou a _SpecialXfer".into())))
+    }
+
+    /// O tick pelas regras, com os ganchos de parte dos scripts quando há.
+    fn nucleo_do_tick(&mut self) {
         match self.scripts.as_mut().filter(|s| s.tem_ganchos_do_tick()) {
             // Ganchos de parte (API 0.26): as mesmas regras, com os ganchos entre as partes; as
             // ações pedidas neles rodam logo depois do tick.
@@ -572,6 +645,10 @@ impl Partida {
             }
             None => tick(&mut self.estado, &mut self.regras as &mut dyn Regras),
         }
+    }
+
+    /// O que a interface faz depois do tick: gancho "depois", vistas, pedidos e redesenho.
+    fn terminar_tick(&mut self) {
         if let Some(s) = self.scripts.as_mut().filter(|s| s.tem_gancho(Gancho::DepoisDoTick)) {
             s.depois_do_tick(&mut self.estado);
             self.aplicar_pedidos_dos_mods();

@@ -42,8 +42,8 @@
   "cores": {
     "linha": 0,
     "moldura": 8,
-    "titulo": 4,
-    "texto_titulo": 15,
+    "titulo": 16,
+    "texto_titulo": 18,
     "menu": 15,
     "texto_menu": 0,
     "botao": 8,
@@ -90,6 +90,8 @@
     },
     "historico": {
       "externo": [0, 158, 212, 317],
+      "divisor_tela": 3,
+      "topo_do_visor_na_tela": 2,
       "titulo": "Windows Help History",
       "maximo": 40
     },
@@ -104,6 +106,6 @@
     "altura_item_lista": 13,
     "recuo_texto_lista": 3,
     "largura_barra_lista": 17,
-    "cores": {"linha": 0, "selecao": 4, "texto_selecao": 15, "sombra_menu": 8, "face": 8, "luz": 15, "sombra": 7, "fundo": 15, "texto": 0, "borda_dialogo": 4, "titulo_inativo": 15, "texto_titulo_inativo": 0, "foco": 11}
+    "cores": {"linha": 0, "selecao": 19, "texto_selecao": 20, "sombra_menu": 8, "face": 8, "luz": 15, "sombra": 7, "fundo": 15, "texto": 0, "borda_dialogo": 16, "titulo_inativo": 15, "texto_titulo_inativo": 0, "foco": 11}
   }
 }

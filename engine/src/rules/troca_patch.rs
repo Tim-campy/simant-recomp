@@ -120,21 +120,69 @@ pub fn iniciar_transferencia_especial(e: &mut Estado) {
 /// Um clique de `_SpecialXfer` no patch (x, y): só uma colônia preta encerra a escolha, com a música
 /// da rainha, `_YMapPnt` = patch e `_XferPatch`; depois a faixa é limpa.
 pub fn escolher_colonia(e: &mut Estado, tab: &TabelasGeracao, cfg: &ConfigSimulacao, x: i16, y: i16) -> Result<ResultadoColonia, String> {
-    let Some(i) = indice_patch(x, y) else {
-        e.eventos.push(Evento::Som(ids::SOM_ERRO));
-        faixa(e, ids::FORA_DOS_LIMITES, ids::DURACAO_AVISO);
-        return Ok(ResultadoColonia::ForaDoQuintal);
-    };
-    if e.preta.populacao_quintal.0[i] == 0 {
-        e.eventos.push(Evento::Som(ids::SOM_ERRO));
-        faixa(e, ids::SEM_COLONIA_ALI, ids::DURACAO_AVISO);
-        return Ok(ResultadoColonia::SemColonia);
+    if let Err(r) = conferir_colonia(e, x, y) {
+        return Ok(r);
     }
     e.eventos.push(Evento::Musica(ids::MUSICA_RAINHA));
     e.vistas.ponto_quintal = (x, y);
     let r = trocar_patch(e, tab, cfg)?;
     limpar_faixa(e);
     Ok(ResultadoColonia::Trocou(r))
+}
+
+/// Confere um clique de `_SpecialXfer` sem trocar de patch: `Ok(())` se há colônia preta no patch;
+/// senão o som de erro, o aviso na faixa e o resultado da recusa (o laço do original continua).
+pub fn conferir_colonia(e: &mut Estado, x: i16, y: i16) -> Result<(), ResultadoColonia> {
+    let Some(i) = indice_patch(x, y) else {
+        e.eventos.push(Evento::Som(ids::SOM_ERRO));
+        faixa(e, ids::FORA_DOS_LIMITES, ids::DURACAO_AVISO);
+        return Err(ResultadoColonia::ForaDoQuintal);
+    };
+    if e.preta.populacao_quintal.0[i] == 0 {
+        e.eventos.push(Evento::Som(ids::SOM_ERRO));
+        faixa(e, ids::SEM_COLONIA_ALI, ids::DURACAO_AVISO);
+        return Err(ResultadoColonia::SemColonia);
+    }
+    Ok(())
+}
+
+/// A escolha de `_SpecialXfer` já conhecida antes do tick, para a troca acontecer DENTRO dele, no
+/// ponto em que o original a faz (a busca de corpo de `_YellowDeath`), e o resto do tick rodar no
+/// patch novo (telas/quintal.md §8). Quem roda o tick põe em `Estado::transferencia_no_tick`; a
+/// amarela a usa e devolve o resultado em `resultado`.
+#[derive(Clone, Debug)]
+pub struct TransferenciaNoTick {
+    /// Patch escolhido (`_YMapPnt`). Precisa ter colônia preta (a interface confere antes).
+    pub patch: (i16, i16),
+    /// Tabelas de `_RandWorld` (a troca gera o patch novo).
+    pub geracao: std::sync::Arc<TabelasGeracao>,
+    pub cfg: ConfigSimulacao,
+    /// Preenchido pela troca: o que `_XferPatch` fez (ou o erro da geração).
+    pub resultado: Option<Result<ResultadoTroca, String>>,
+}
+
+impl PartialEq for TransferenciaNoTick {
+    fn eq(&self, o: &TransferenciaNoTick) -> bool {
+        self.patch == o.patch && self.cfg == o.cfg && self.resultado == o.resultado && std::sync::Arc::ptr_eq(&self.geracao, &o.geracao)
+    }
+}
+
+impl Eq for TransferenciaNoTick {}
+
+/// `_SpecialXfer` inteiro com a escolha já conhecida (`1000:7eb6`): começo (colônia do patch atual
+/// zerada, Strategic View, `_SetMapPlane(0)`, mensagem), o desenho do quintal que aparece na frente
+/// com o patch ainda antigo (`_DrawSimSwarms`/`_DrawSimColonies`: os sorteios do enxame), a música da
+/// rainha, `_XferPatch` e a faixa limpa. [hipótese: um só redesenho do quintal durante a espera; é o
+/// que bate na bancada, `acoes/special_xfer`]
+pub fn transferir_com_escolha(e: &mut Estado, t: &TransferenciaNoTick) -> Result<ResultadoTroca, String> {
+    iniciar_transferencia_especial(e);
+    super::desenho::desenhar_enxame(e);
+    super::desenho::desenhar_colonias(e);
+    let (x, y) = t.patch;
+    match escolher_colonia(e, &t.geracao, &t.cfg, x, y)? {
+        ResultadoColonia::Trocou(r) => Ok(r),
+        outro => Err(format!("patch ({x}, {y}) recusado na troca dentro do tick: {outro:?}")),
+    }
 }
 
 /// Índice do patch nos mapas `_YMapPop*` (`x * 16 + y`), se está no quintal.

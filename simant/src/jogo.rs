@@ -133,6 +133,13 @@ pub(crate) fn aplicar_preferencias(s: &mut Sessao, o: &Opcoes, de_save: bool) {
         },
         (arq, _) => arq.as_deref().map(preferencias::Preferencias::ler),
     };
+    // O WinHelp guarda no WIN.INI a posição da janela History (não é preferência do SimAnt: lida
+    // sempre que há um WIN.INI, nunca gravada).
+    if let Some(ini) = &o.win_ini {
+        if let Ok(bytes) = std::fs::read(ini) {
+            s.ajuda.historico_guardado = preferencias::posicao_historico_ajuda(&String::from_utf8_lossy(&bytes));
+        }
+    }
     if let Some(p) = &prefs {
         if !de_save {
             p.aplicar_opcoes(&mut s.partida.estado.partida.opcoes);
@@ -173,6 +180,9 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         audio.musica_jogo_novo(true);
     }
     let mut repeticao = Repeticao::default();
+    // Tecla que repete a rolagem (Ctrl+seta, `MAINWNDPROC` 0xFDA6–0xFDA9) e se a ação exige Ctrl: a
+    // repetição vale enquanto ela (e o Ctrl) continuarem apertados; a repetição do sistema é ignorada.
+    let mut tecla_repetida: Option<(Scancode, bool)> = None;
     let mut redesenhar = true;
     // Posição do cursor em coordenadas lógicas (para Espaço/Insert/Delete) e a última tecla-clique.
     let mut cursor = (0, 0);
@@ -353,9 +363,21 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                         redesenhar = true;
                     }
                 }
-                Event::KeyDown { keycode: Some(k), keymod, .. } => {
+                Event::KeyDown { keycode: Some(k), keymod, repeat, scancode, .. } => {
                     let tab = eventos.keyboard_state().is_scancode_pressed(Scancode::Tab);
                     let ev = evento_de_tecla(k, keymod);
+                    // Rolagem por linha pelo teclado: o primeiro passo agora e a repetição no ritmo do
+                    // redesenho enquanto a tecla fica apertada (navegacao.json, `repeticao`), não a
+                    // repetição de teclas do sistema.
+                    if let (Some(a), Some(sc)) = (s.nav_cfg.acao_da_tecla(&ev).filter(|a| a.repete()), scancode) {
+                        if !repeat && !s.modos.escolhendo {
+                            s.partida.navegar(a);
+                            repeticao.pressionar(a);
+                            tecla_repetida = Some((sc, matches!(ev, EventoNav::Tecla { ctrl: true, .. })));
+                            redesenhar = true;
+                        }
+                        continue;
+                    }
                     // Menu de sistema aberto e aceleradores de janela (Ctrl+F4, Ctrl+F6…).
                     if s.tecla_de_janela(&ev) {
                         redesenhar = true;
@@ -506,7 +528,9 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                         redesenhar = true;
                     }
                     redesenhar |= s.soltar_nas_janelas(x, y);
-                    repeticao.soltar();
+                    if tecla_repetida.is_none() {
+                        repeticao.soltar();
+                    }
                     s.janelas.soltar();
                     // Popup de definição do Info: só enquanto o botão fica apertado.
                     redesenhar |= s.info.soltar();
@@ -539,6 +563,15 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 redesenhar = true;
             }
         }
+        if let Some((sc, ctrl)) = tecla_repetida {
+            // GetAsyncKeyState da seta (e do Ctrl) no laço do original.
+            let k = eventos.keyboard_state();
+            let ctrl_ok = !ctrl || k.is_scancode_pressed(Scancode::LCtrl) || k.is_scancode_pressed(Scancode::RCtrl);
+            if !(k.is_scancode_pressed(sc) && ctrl_ok) {
+                repeticao.soltar();
+                tecla_repetida = None;
+            }
+        }
         if let Some((a, n)) = repeticao.passar_tempo(ms, &s.nav_cfg.repeticao) {
             for _ in 0..n {
                 s.partida.navegar(a);
@@ -554,7 +587,10 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
             && !modos::segurando(s)
             && s.menu_mod.is_none()
             && !s.menus.prende_simulacao()
+            && !repeticao.ativa()
         {
+            // A rolagem repetida é um laço dentro de MAINWNDPROC: nenhuma WM_TIMER é tratada e a
+            // simulação para enquanto ela dura (bancada, qemu_ritmo_rolagem.txt).
             s.partida.avancar(ms);
         }
         // _SpecialXfer: fechado o quadro 10058, o quintal vem para a frente na Strategic View e

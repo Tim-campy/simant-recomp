@@ -23,6 +23,6 @@
     "ribToBNest": "ninho_preto",
     "ribToRNest": "ninho_vermelho"
   },
-  "_repeticao": "Escolha do port: o original repete enquanto o botão do mouse fica apertado, na velocidade do redesenho, sem intervalo fixo.",
-  "repeticao": {"atraso_ms": 300, "intervalo_ms": 50}
+  "_repeticao": "O original repete o clique nas setas das barras e Ctrl+seta num laço dentro de MAINWNDPROC enquanto o botão (ou Ctrl e a seta) continua apertado, um passo por redesenho da janela de edição, sem espera antes da repetição e com a simulação parada (nenhuma WM_TIMER é tratada no laço). O ritmo depende da CPU: na bancada QEMU (TCG) foram 22, 25 e 35 passos em 1, 1 e 1,5 s, ~23 por segundo (qemu_ritmo_rolagem.txt, 2026-10-19). O port usa um passo a cada intervalo_ms, a partir de atraso_ms depois do primeiro.",
+  "repeticao": {"atraso_ms": 43, "intervalo_ms": 43}
 }

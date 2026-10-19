@@ -72,7 +72,17 @@ pub struct GeometriaBusca {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct GeometriaHistorico {
+    /// Retângulo [x0, y0, x1, y1] (inclusivo) relativo ao canto do visor, usado quando a tela não é
+    /// conhecida ou sem `divisor_tela`.
     pub externo: [i16; 4],
+    /// Lugar padrão do WinHelp para a History, sem `H_WindowPosition`: x = L / d, y = A / d, tamanho
+    /// L / d × A / d da tela (213, 160, 213 × 160 em 640×480, medido). Opcional (API 0.32).
+    #[serde(default)]
+    pub divisor_tela: Option<i16>,
+    /// Linha da tela em que o WinHelp põe o topo do visor (2): o port desenha o visor a partir da
+    /// linha 0 da área cliente e desloca a History do mesmo tanto.
+    #[serde(default)]
+    pub topo_do_visor_na_tela: i16,
     pub titulo: String,
     /// Entradas guardadas [hipótese].
     pub maximo: usize,
@@ -329,7 +339,24 @@ impl VisorAjuda {
     }
 
     fn externo_historico(&self) -> Option<Retangulo> {
-        Some(r4(self.externo(), self.cj()?.historico.externo))
+        let h = &self.cj()?.historico;
+        let padrao = match (self.tela, h.divisor_tela) {
+            (Some((l, a)), Some(d)) if d > 0 => Some([l / d, a / d, l / d, a / d]),
+            _ => None,
+        };
+        // `H_WindowPosition` (WIN.INI) vale sobre o padrão: [x, y, largura, altura] na tela.
+        match self.historico_guardado.filter(|_| self.tela.is_some()).or(padrao) {
+            Some([x, y, w, alt]) => {
+                let y = y - h.topo_do_visor_na_tela + self.externo().topo;
+                Some(ret(x, y, x + w, y + alt))
+            }
+            None => Some(r4(self.externo(), h.externo)),
+        }
+    }
+
+    /// Retângulo externo da janela History (para os testes e a interface).
+    pub fn retangulo_historico(&self) -> Option<Retangulo> {
+        self.externo_historico()
     }
 
     fn cliente_historico(&self) -> Option<Retangulo> {

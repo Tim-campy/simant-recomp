@@ -42,9 +42,14 @@ pub struct ConfigStatus {
     pub objeto_continuar: String,
     pub lista_continuar: u16,
     pub indice_continuar: usize,
-    /// Deslocamento da janela medido na bancada.
+    /// Deslocamento da janela medido na bancada. [0, 0] desde 2026-10-19: os −3 medidos eram o
+    /// alinhamento ao byte da área cliente, que `Interface::posicionar` já faz.
     pub ajuste: [i16; 2],
     pub moldura: MolduraDialogo,
+    /// Fundo da área cliente entre a moldura e o bitmap (o fundo da janela 24, branco em n02: 3
+    /// pixels em volta do `antEffPic`). Opcional (API 0.32); sem ele, fica a cor da borda.
+    #[serde(default)]
+    pub cor_fundo_janela: Option<u8>,
 }
 
 /// `%d`, `%ld`, `%s` e `%%` de um formato do original, com um argumento.
@@ -151,6 +156,17 @@ pub fn desenhar(q: &mut Quadro, recursos: &Recursos, interface: &Interface, cfg:
     }
     let mut pendentes = desenhar_janela_deslocada(q, recursos, interface, cfg.janela, &janela, (cfg.ajuste[0], cfg.ajuste[1]))?;
     pintar_moldura(q, interface, cfg.janela, &janela, cfg.ajuste, cfg.moldura);
+    if let (Some(cor), Some(g), Some(fig)) = (cfg.cor_fundo_janela, interface.posicionar(cfg.janela, &janela), janela.objetos.get(1)) {
+        // A faixa entre a área cliente e o primeiro objeto (o bitmap), no fundo da janela.
+        if let Some(i) = g.interno {
+            let o = janela.objetos[0].retangulo;
+            let margem = (fig.retangulo.esq - o.esq).min(fig.retangulo.topo - o.topo);
+            let i = Retangulo { esq: i.esq + cfg.ajuste[0], topo: i.topo + cfg.ajuste[1], dir: i.dir + cfg.ajuste[0], base: i.base + cfg.ajuste[1] };
+            for k in 0..margem.max(0) {
+                q.contorno(Retangulo { esq: i.esq + k, topo: i.topo + k, dir: i.dir - 1 - k, base: i.base - 1 - k }, cor);
+            }
+        }
+    }
     let janela = carregar_janela(recursos, cfg.janela)?;
     let Some(fonte) = interface.fontes.get(cfg.fonte).and_then(|f| f.as_ref()) else {
         pendentes.push(format!("fonte {}", cfg.fonte));

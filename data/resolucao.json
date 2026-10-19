@@ -6,11 +6,11 @@
     {"tabela": 8}
   ],
   "resolucoes": [[640, 480], [800, 600], [1024, 768]],
-  "_perfis_driver": "O que muda com o driver de vídeo do Windows 3.1, não com a resolução (telas/resolucao.md §7). alinhamento_x: pixels por byte da memória de vídeo; o Windows arredonda ao byte mais próximo o x da área cliente das janelas do jogo (classe GenericWindow com CS_BYTEALIGNCLIENT, visto em _InitApplication) e o x das caixas de diálogo e de mensagem (CS_BYTEALIGNWINDOW) [medido]. ajuste_x_contorno: pixel a mais em x no conteúdo das janelas com contorno, só no S3 do DOSBox-X [hipótese: recorte do driver]. cores_sistema: as cores padrão do driver (recurso OEMBIN 1 do .DRV; o WIN.INI do usuário não tem [colors]) nos índices 16 (título ativo e moldura de diálogo) e 17 (fundo da aplicação) de data/paleta.json. perfil_driver: o imitado; 'vga' = Windows 3.1 VGA padrão (VGA.DRV, 16 cores), a referência do port (docs/decisoes.md).",
+  "_perfis_driver": "O que muda com o driver de vídeo do Windows 3.1, não com a resolução (telas/resolucao.md §7). alinhamento_x: pixels por byte da memória de vídeo; o Windows arredonda ao byte mais próximo o x da área cliente das janelas do jogo (classe GenericWindow com CS_BYTEALIGNCLIENT, visto em _InitApplication) e o x das caixas de diálogo e de mensagem (CS_BYTEALIGNWINDOW) [medido]. ajuste_x_contorno: pixel a mais em x no conteúdo das janelas com contorno, só no S3 do DOSBox-X [hipótese: recorte do driver]. cores_sistema: as cores padrão do driver (recurso OEMBIN 1 do .DRV; o WIN.INI do usuário não tem [colors]) nos índices 16 (título ativo e moldura de diálogo), 17 (fundo da aplicação), 18 (texto do título ativo), 19 (realce de menus e listas) e 20 (texto realçado) de data/paleta.json. As barras de rolagem medem 17 × 17 nos dois drivers da bancada (o OEMBIN do S3/vbesvga traz 22 × 21, mas a bancada SVGA mostrou 17, 2026-10-19). perfil_driver: o imitado; 'vga' = Windows 3.1 VGA padrão (VGA.DRV, 16 cores), a referência do port (docs/decisoes.md).",
   "perfil_driver": "vga",
   "perfis_driver": {
-    "vga": {"alinhamento_x": 8, "ajuste_x_contorno": 0, "cores_sistema": {"16": "#000080", "17": "#ffffff"}},
-    "svga256": {"alinhamento_x": 1, "ajuste_x_contorno": 0, "cores_sistema": {"16": "#a4c8f0", "17": "#fffbf0"}},
-    "s3_dosbox": {"alinhamento_x": 1, "ajuste_x_contorno": 1, "cores_sistema": {"16": "#a4c8f0", "17": "#fffbf0"}}
+    "vga": {"alinhamento_x": 8, "ajuste_x_contorno": 0, "cores_sistema": {"16": "#000080", "17": "#ffffff", "18": "#ffffff", "19": "#000080", "20": "#ffffff"}},
+    "svga256": {"alinhamento_x": 1, "ajuste_x_contorno": 0, "cores_sistema": {"16": "#a4c8f0", "17": "#fffbf0", "18": "#000000", "19": "#a4c8f0", "20": "#000000"}},
+    "s3_dosbox": {"alinhamento_x": 1, "ajuste_x_contorno": 1, "cores_sistema": {"16": "#a4c8f0", "17": "#fffbf0", "18": "#000000", "19": "#a4c8f0", "20": "#000000"}}
   }
 }

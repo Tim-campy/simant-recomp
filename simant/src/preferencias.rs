@@ -154,6 +154,18 @@ impl Preferencias {
     }
 }
 
+/// `[Windows Help] H_WindowPosition` de um `WIN.INI`: a posição em que o WinHelp abre a janela
+/// **History** (não a principal), `[x, y, largura, altura, maximizada]` em pixels da tela (bancada
+/// SVGA, 2026-10-19: com `[100,50,300,250,0]` a History abriu em (100, 50) com 300 × 250 e a
+/// janela principal no lugar padrão). Devolve `[x, y, largura, altura]`; formato inválido = `None`.
+pub fn posicao_historico_ajuda(texto: &str) -> Option<[i16; 4]> {
+    let secao = secao_ini(texto, "Windows Help");
+    let (_, v) = secao.iter().find(|(k, _)| k.eq_ignore_ascii_case("H_WindowPosition"))?;
+    let dentro = v.trim().strip_prefix('[')?.strip_suffix(']')?;
+    let n: Vec<i16> = dentro.split(',').map(|p| p.trim().parse::<i16>()).collect::<Result<_, _>>().ok()?;
+    (n.len() >= 4 && n[2] > 0 && n[3] > 0).then(|| [n[0], n[1], n[2], n[3]])
+}
+
 /// Pares (chave, valor) de uma seção de um arquivo `.INI` (a primeira com esse nome, sem diferença de
 /// maiúsculas). Linhas sem `=` e comentários (`;`) são ignorados.
 fn secao_ini<'a>(texto: &'a str, nome: &str) -> Vec<(&'a str, &'a str)> {
@@ -217,6 +229,15 @@ mod testes {
         let mut f = vec![15, 0, 1, 3, 7, 6, 5, 10];
         p.aplicar_botoes(&mut f);
         assert_eq!(f, vec![15, 0, 1, 3, 7, 6, 5, 10], "sem botões no arquivo, ficam os do port");
+    }
+
+    #[test]
+    fn posicao_da_history_do_winhelp() {
+        let ini = "[windows]\r\nload=\r\n[Windows Help]\r\nH_WindowPosition=[266,200,266,200,0]\r\n[SimAnt]\r\nmusic=1\r\n";
+        assert_eq!(posicao_historico_ajuda(ini), Some([266, 200, 266, 200]));
+        assert_eq!(posicao_historico_ajuda("[windows help]\nh_windowposition= [ 1, 2, 3, 4, 1 ]"), Some([1, 2, 3, 4]));
+        assert_eq!(posicao_historico_ajuda("[Windows Help]\nH_WindowPosition=266,200"), None);
+        assert_eq!(posicao_historico_ajuda("[SimAnt]\nmusic=0"), None);
     }
 
     #[test]

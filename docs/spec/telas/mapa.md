@@ -53,6 +53,8 @@ Só para um ponto dentro de `mapTileArea` [código]:
 
 Testes: `core/janela_mapa.rs` (tabelas convertidas; formiga por cima na superfície e trilhas que acumulam; feromônio em blocos 2 × 2, ninho centrado com faixas; célula do clique; alternância do botão de cheiro).
 
+**Mapa atrás depois do Load ou de um jogo novo (bancada, 2026-10-19, `qemu_load_abertura.txt`, `a4_carregado.png`):** `_SetDefaultWindows` abre o mapa atrás da janela de edição e ele já sai desenhado (o ninho em cinza e azul), sem esperar tick. **Port:** a primeira geração de `JanelaMapa` (sem tempo anterior) vai para a tela como a de fora do tick (`gerar`); antes a área ficava preta até o redesenho alternado. Exportação `--save QUICK2.ANT` 100% na região do mapa (443–503 × 157–393 da tela).
+
 ## 6. Verificação contra o original (2026-10-18)
 
 Bancada: `tools/cenarios_tick.py capturas` e `capturas_mapa` (snapshot rico pausado; Ctrl+M abre o mapa no plano mostrado; os botões de cheiro da faixa em (418, 46), (482, 46), (450, 57), (418, 70), (482, 70) dão os modos 4, 6, 8, 5, 7). Port: `tools/comparar_capturas.py` (`simant --save <estado do original> --janela-mapa N --exportar-tela-jogo`, `comparar_captura.py --mapear` na janela, (118, 60)–(634, 376) da área cliente):

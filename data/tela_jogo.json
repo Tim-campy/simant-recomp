@@ -20,13 +20,13 @@
       "barra_rolagem": 16,
       "cor_linha": 0,
       "cor_moldura": 8,
-      "cor_titulo": 4,
+      "cor_titulo": 16,
       "cor_botao": 8,
       "cor_relevo_claro": 15,
       "cor_relevo_escuro": 7,
       "cor_trilho": 8,
       "fontes_titulo": [6, 0],
-      "cor_texto_titulo": 15
+      "cor_texto_titulo": 18
     }
   },
   "barras_faixa": {

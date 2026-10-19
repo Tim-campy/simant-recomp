@@ -1,0 +1,19 @@
+# WinHelp com a posição guardada no WIN.INI ([Windows Help] H_WindowPosition=[266,200,266,200,0], a da
+# instalação do usuário): disco SVGA preparado SEM --ajuda-padrao; boot, Quick Game e F1.
+# python tools/qemu_bancada.py preparar_svga 640 480 --disco re_trabalho/qemu/svga_ag4_640x480.img
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_svga_ajuda_guardada.txt --disco re_trabalho/qemu/svga_ag4_640x480.img
+# (o mesmo em 800x600 com svga_ag4_800x600.img; as saídas levam o prefixo do disco pela variável ALVO
+#  não existir: troque o nome das capturas à mão.)
+esperar 70
+teclas spc
+esperar 4
+teclas spc
+esperar 6
+clicar_em 345 228
+esperar 20
+teclas shift+0
+esperar 3
+teclas f1
+esperar 10
+capturar re_trabalho/agente_itens4/ajuda_guardada.png
+fim
