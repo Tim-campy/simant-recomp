@@ -49,6 +49,12 @@ pub struct MolduraMini {
     /// `alinhamento_x` do perfil de driver (`MiniMapa::aplicar_driver`); um mod pode fixá-lo.
     #[serde(default)]
     pub alinhamento_ao_criar: Option<i16>,
+    /// Pixels somados ao x na primeira abertura, no lugar do alinhamento (API 0.35): a bancada SVGA
+    /// de 256 cores (1 byte por pixel, sem alinhamento) também abre a primeira 1 pixel à esquerda
+    /// (155 e depois 156, como na VGA), então o deslocamento não é o `CS_BYTEALIGNCLIENT` [causa em
+    /// aberto]. Ausente: o alinhamento de antes.
+    #[serde(default)]
+    pub ajuste_primeira_abertura: Option<i16>,
     pub largura_borda: i16,
     pub cor_borda: u8,
     pub cor_contorno: u8,
@@ -129,7 +135,12 @@ impl MiniMapa {
         let b = m.largura_borda;
         let mut esq = botao.esq + (botao.dir - botao.esq) / 2 - w / 2 + m.ajuste_x;
         if !self.reaberto {
-            esq = super::gerenciador::alinhar_cliente_ao_criar(i32::from(esq + b), i32::from(m.alinhamento_ao_criar.unwrap_or(1))) as i16 - b;
+            esq = match m.ajuste_primeira_abertura {
+                Some(d) => esq + d,
+                None => {
+                    super::gerenciador::alinhar_cliente_ao_criar(i32::from(esq + b), i32::from(m.alinhamento_ao_criar.unwrap_or(1))) as i16 - b
+                }
+            };
         }
         self.reaberto = true;
         self.externo = Some(Retangulo { esq, topo: m.topo, dir: esq + w + b, base: m.topo + h + b });
@@ -296,8 +307,12 @@ mod testes {
         m.fechar();
         m.abrir(Retangulo { esq: 207, topo: 41, dir: 232, base: 59 }, &e, &mapa(), false, true, false);
         assert_eq!(m.externo.map(|r| r.esq), Some(156));
-        // Em 256 cores (perfil svga256, 1 byte por pixel) não há alinhamento: já na primeira, 156.
+        // Em 256 cores (perfil svga256, 1 byte por pixel) a primeira abertura também é 155 e as
+        // seguintes 156 (bancada SVGA, qemu_svga640_mini.txt, 2026-10-19): o −1 não é alinhamento.
         let mut s = mini_com(1);
+        s.abrir(Retangulo { esq: 207, topo: 41, dir: 232, base: 59 }, &e, &mapa(), false, true, false);
+        assert_eq!(s.externo.map(|r| r.esq), Some(155));
+        s.fechar();
         s.abrir(Retangulo { esq: 207, topo: 41, dir: 232, base: 59 }, &e, &mapa(), false, true, false);
         assert_eq!(s.externo.map(|r| r.esq), Some(156));
     }

@@ -67,7 +67,9 @@ impl Sessao<'_> {
         let edicao = g.janela(ID_EDICAO);
         self.tela.estado_moldura = engine::core::tela_jogo::EstadoMoldura {
             aberta: edicao.is_some(),
-            ativa: g.topo() == Some(ID_EDICAO),
+            // O mini mapa aberto (uma janela do jogo, modal) desativa o título da edição: branco na
+            // bancada VGA (m02) e SVGA (c07_mini_aberto, 2026-10-19).
+            ativa: g.topo() == Some(ID_EDICAO) && !self.mini.aberto(),
             maximizada: edicao.is_some_and(|j| j.maximizada()),
             rolagem: [h, vv],
         };

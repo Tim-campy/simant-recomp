@@ -50,6 +50,8 @@ Geometria medida na bancada (tela 640×480, área cliente a partir de y = 38; co
 
 - Os rótulos, botões e listas usam **MS Sans Serif 8 (altura 13) em negrito simulado** — cada glifo desenhado duas vezes com um pixel de deslocamento, avanço + 1; o título usa a fonte **System** [bancada: glifos com traço de 2 pixels e a altura de linha de 13 da lista]. Letras sublinhadas (mnemônicos) na linha de base + 2.
 - Barras de rolagem sem polegar (a lista cabe) com as setas desabilitadas: cinza escuro com o relevo branco deslocado (+1, +1); setas de 7 colunas nas linhas 4 a 10 do botão [bancada].
+- **Lista que não cabe** (bancada, 2026-10-19, 18 arquivos, 8 visíveis; §6): trilho cinza-claro (a cor dos botões), setas pretas e um polegar quadrado (o mesmo botão em relevo das setas, 15 × 15) entre duas linhas pretas. A linha de cima do polegar vai da linha de baixo da seta de cima (posição 0) até 16 linhas acima da linha de cima da seta de baixo (posição máxima = arquivos − visíveis), proporcional e **arredondada** (posições 2, 8 e 9 de 10: 11, 46 e 51 linhas de um curso de 57). Seta: um item; trilho acima ou abaixo do polegar: uma página de visíveis − 1 (de 2 para 9). Um clique num item põe o nome no campo, sem seleção (o foco sai do campo), e realça o item com o retângulo de foco pontilhado.
+- **Troca de unidade e de pasta:** "a:" e Enter no campo leva à unidade A: (o campo volta a `*.ant` selecionado, "Drives:" mostra "a:" com o ícone de disquete, a árvore só "a:\"); "c:" e Enter volta à pasta corrente do C: (`c:\maxis\antwin`, a do DOS para a unidade); duplo clique num item da árvore abre a pasta (o item fica realçado em toda a largura, com o retângulo de foco; o campo mostra `*.ant` sem seleção). Na raiz do C: a árvore mostra `c:\`, `maxis` e `windows` e a lista fica vazia, com a barra desabilitada [bancada d00–d09].
 - Botões: contorno preto de cantos cortados (dois contornos no padrão), luz branca de 2 pixels em cima e à esquerda, sombra cinza escura de 2 pixels embaixo e à direita, em escada nos cantos [bancada].
 
 ## 4. A caixa de mensagem (`MessageBox`)
@@ -60,7 +62,8 @@ Medida com "SimAnt Load" [bancada l1]: 348×129 em (144, 138) da área cliente, 
 
 - `engine/src/core/dialogos.rs` desenha e trata a caixa de mensagem e o diálogo de arquivo; `data/dialogos.json` tem a geometria, as cores, os textos e as fontes (índices de `interface.json`: 6 = `VGASYS.FON#System`, 7 = `SSERIFE.FON#MS Sans Serif@13+negrito`, ambas lidas da instalação do Windows do usuário; sem elas, a fonte 0 do jogo).
 - `simant/src/arquivos.rs`: o fluxo (pergunta → Save As → "Saved correctly" → Load; Save; Save As) e a nova sessão do Load. Os diálogos são modais: a simulação não anda com um deles aberto [hipótese: o laço de mensagens do diálogo do Windows poderia despachar o `WM_TIMER`; nas capturas o jogo estava pausado]. Teclas: Ctrl+L (Load, extensão do port, que não tem barra de menus), Ctrl+S, Ctrl+A; no diálogo, Enter = OK/padrão, Esc = Cancel, letras sublinhadas nos botões da caixa, digitação no campo do nome, clique duplo na lista.
-- A árvore de pastas mostra o caminho real (ancestrais e subpastas) com ícones próprios; a unidade é sempre "c:"; "Read Only" e as combinações não fazem nada.
+- A árvore de pastas mostra o caminho real (ancestrais e subpastas) com ícones próprios; "Drives:" mostra a letra da unidade do caminho (ou "c:" quando o caminho não tem uma); "Read Only" e as combinações não fazem nada.
+- **Desde 2026-10-19:** a lista de arquivos rola como a do original (polegar, setas, página; `PartesRolagem` em `core/dialogos.rs`); a árvore também rola quando não cabe [hipótese: o original não foi rolado na árvore]; um nome de pasta no campo ("..", "sub", "d:", um caminho) e Enter troca de pasta; duplo clique na árvore abre a pasta e a deixa realçada. O port não guarda a pasta corrente de cada unidade: "a:" vai à raiz de A:. Sem janela: `--clique-dialogo X,Y[,duplo]` (repetível) clica no diálogo aberto por `--dialogo` antes de exportar.
 - Sem janela: `--dialogo load|pergunta|salvar_como|salvo` abre o diálogo antes de `--exportar-tela-jogo`.
 
 ## 6. Verificação (2026-10-18)
@@ -84,7 +87,9 @@ Como não passa por `_NewGame`, o que `_RandYard` não escreve fica como estava 
 
 **Port:** `carregar::estado_do_tutorial` (com `data/tutorial_arquivo.json`: nome, título, os 30 patches e os valores de `_InitSimVars`), usado pelo Load do diálogo e pelo `--save` com esse nome (`Origem::Tutorial`). **Conferido:** `engine/tests/load_tutorial.rs` parte do estado de antes do vetor `tests/referencias/load_tutorial` (copiado de `re_trabalho/cen/load_tut`) e chega ao de depois com **307/307 blocos e R igual** (S vem do relógio: o teste usa o gravado).
 
-**Não verificado:** o comportamento com muitos arquivos (rolagem), a mudança de pasta ou de unidade no diálogo.
+**Muitos arquivos e troca de pasta (bancada, 2026-10-19, `roteiros/qemu_dialogo_muitos.txt`, capturas `re_trabalho/ag_fecha/dlg/d00`–`d09`):** um disquete com 18 `.ANT` (`caso_ant.montar_disquete`) no A:, Load, "a:" e Enter, setas e trilho da barra, um item, "c:" e Enter, duplo clique no "c:\" da árvore. Port numa pasta com os mesmos 18 nomes (`--dialogo load` e os mesmos cliques com `--clique-dialogo`; `comparar_captura.py --mapear`, metade esquerda (56, 15)–(250, 262)): lista no começo **99,97%**, depois de duas setas **99,81%**, depois da página **99,74%** (só o cursor do mouse sobre a barra), com um item escolhido **99,56%** (o retângulo de foco pontilhado, que o port não desenha) e a raiz do C: **100%** (lista vazia, barra desabilitada, campo sem seleção). A árvore do port mostra o caminho real do computador, não o da bancada.
+
+**Não verificado:** a árvore com mais pastas do que cabem (a rolagem dela) e a pasta corrente por unidade.
 
 ## 7. File → Quit (`_MenuQuit`)
 

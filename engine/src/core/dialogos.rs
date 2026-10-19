@@ -301,19 +301,80 @@ fn seta(q: &mut Quadro, c: &Cores, r: Retangulo, para_baixo: bool, barra: bool, 
     }
 }
 
-/// Barra de rolagem vertical sem polegar (a lista cabe), à direita de `r` (contorno incluído).
-fn rolagem(q: &mut Quadro, c: &Cores, r: Retangulo, largura: i16) {
-    let x = r.dir - largura;
+/// Partes da barra de rolagem vertical à direita de `r` (contorno incluído): os botões das setas e
+/// a linha de cima do polegar, que anda de `cima.base` (posição 0) a `baixo.topo − 1 − (lado + 1)`.
+struct PartesRolagem {
+    x: i16,
+    cima: Retangulo,
+    baixo: Retangulo,
+}
+
+impl PartesRolagem {
+    fn de(r: Retangulo, largura: i16) -> PartesRolagem {
+        let x = r.dir - largura;
+        let lado = largura - 2;
+        let cima = Retangulo { esq: x + 1, topo: r.topo + 1, dir: r.dir - 1, base: r.topo + 1 + lado };
+        let baixo = Retangulo { topo: r.base - 1 - lado, base: r.base - 1, ..cima };
+        PartesRolagem { x, cima, baixo }
+    }
+
+    fn lado(&self) -> i16 {
+        self.cima.base - self.cima.topo
+    }
+
+    /// Linha de cima do polegar na posição `pos` de `0..=max`: o curso inteiro vezes `pos / max`,
+    /// arredondado (bancada, 18 arquivos: posições 2, 8 e 9 de 10 em 11, 46 e 51 linhas).
+    fn linha_polegar(&self, pos: usize, max: usize) -> i16 {
+        let curso = i64::from(self.baixo.topo - 1 - self.cima.base - (self.lado() + 1));
+        let (p, m) = (pos.min(max) as i64, max.max(1) as i64);
+        self.cima.base + ((2 * curso * p + m) / (2 * m)) as i16
+    }
+
+    /// Clique na barra na linha `y`: setas, um item; trilho acima ou abaixo do polegar, uma página
+    /// (os visíveis − 1; bancada: de 2 para 9 com 8 visíveis). Devolve o primeiro item novo.
+    fn rolar(&self, pos: usize, max: usize, visiveis: usize, y: i32) -> usize {
+        let linha = i32::from(self.linha_polegar(pos, max));
+        let pagina = visiveis.saturating_sub(1).max(1);
+        let novo = if y < i32::from(self.cima.base) {
+            pos.saturating_sub(1)
+        } else if y >= i32::from(self.baixo.topo) {
+            pos + 1
+        } else if y < linha {
+            pos.saturating_sub(pagina)
+        } else if y > linha + i32::from(self.lado()) + 1 {
+            pos + pagina
+        } else {
+            pos
+        };
+        novo.min(max)
+    }
+}
+
+/// Barra de rolagem vertical à direita de `r` (contorno incluído). `barra` = (posição, máximo) com
+/// máximo > 0 quando a lista não cabe: trilho cinza, setas pretas e o polegar (um botão quadrado
+/// entre duas linhas pretas); sem ela, trilho branco, sem polegar e setas desabilitadas [bancada,
+/// diálogo de arquivo com 18 arquivos, 2026-10-19].
+fn rolagem(q: &mut Quadro, c: &Cores, r: Retangulo, largura: i16, barra: Option<(usize, usize)>) {
+    let p = PartesRolagem::de(r, largura);
+    let (x, cima, baixo) = (p.x, p.cima, p.baixo);
+    let barra = barra.filter(|&(_, max)| max > 0);
     q.preencher(Retangulo { esq: x, dir: x + 1, ..r }, c.linha, c.linha);
-    let lado = largura - 2;
-    let cima = Retangulo { esq: x + 1, topo: r.topo + 1, dir: r.dir - 1, base: r.topo + 1 + lado };
     relevo(q, c, cima, 1);
-    seta(q, c, cima, false, false, true);
+    seta(q, c, cima, false, false, barra.is_none());
     q.linha(i32::from(x), i32::from(cima.base), i32::from(r.dir) - 1, i32::from(cima.base), c.linha);
-    let baixo = Retangulo { topo: r.base - 1 - lado, base: r.base - 1, ..cima };
     relevo(q, c, baixo, 1);
-    seta(q, c, baixo, true, false, true);
+    seta(q, c, baixo, true, false, barra.is_none());
     q.linha(i32::from(x), i32::from(baixo.topo) - 1, i32::from(r.dir) - 1, i32::from(baixo.topo) - 1, c.linha);
+    if let Some((pos, max)) = barra {
+        let trilho = Retangulo { topo: cima.base + 1, base: baixo.topo - 1, ..cima };
+        q.preencher(trilho, c.botao, c.botao);
+        let y = p.linha_polegar(pos, max);
+        let lado = p.lado();
+        for l in [y, y + lado + 1] {
+            q.linha(i32::from(x), i32::from(l), i32::from(r.dir) - 1, i32::from(l), c.linha);
+        }
+        relevo(q, c, Retangulo { topo: y + 1, base: y + 1 + lado, ..cima }, 1);
+    }
 }
 
 /// Ícone próprio da caixa de mensagem (círculo com "?" ou "i"; o do Windows não é reproduzido).
@@ -512,6 +573,15 @@ pub enum RespostaArquivo {
     Cancelar,
 }
 
+/// Um item da árvore "Directories:": os ancestrais da pasta (abertos) e as subpastas dela.
+#[derive(Clone, Debug)]
+struct ItemPasta {
+    nivel: usize,
+    nome: String,
+    aberta: bool,
+    caminho: PathBuf,
+}
+
 /// "Load Ant Hill" / "Save Ant Hill As" (`_FileSelect`, diálogo comum do Windows).
 #[derive(Clone, Debug)]
 pub struct DialogoArquivo {
@@ -521,30 +591,79 @@ pub struct DialogoArquivo {
     pub arquivos: Vec<String>,
     pub selecionado: Option<usize>,
     pub primeiro: usize,
+    /// Primeiro item visível da árvore de pastas (rola como a lista; [hipótese]: só a lista de
+    /// arquivos foi rolada na bancada).
+    pub primeira_pasta: usize,
+    /// Item realçado na árvore de pastas (o clique; depois do clique duplo, a pasta nova).
+    pub pasta_realcada: Option<usize>,
+    /// O texto inicial do campo aparece selecionado só com o foco nele (ao abrir e depois de trocar
+    /// de pasta pelo campo); depois de um clique na lista ou na árvore, não [bancada].
+    pub foco_no_campo: bool,
 }
 
 impl DialogoArquivo {
     pub fn new(salvar: bool, pasta: &Path, cfg: &ConfigDialogos) -> DialogoArquivo {
-        let arquivos = arquivos_ant(pasta)
+        let mut d = DialogoArquivo {
+            salvar,
+            pasta: pasta.to_path_buf(),
+            campo: String::new(),
+            arquivos: Vec::new(),
+            selecionado: None,
+            primeiro: 0,
+            primeira_pasta: 0,
+            pasta_realcada: None,
+            foco_no_campo: true,
+        };
+        d.trocar_pasta(pasta, cfg);
+        d
+    }
+
+    /// Lê os `.ANT` da pasta e volta a lista ao começo, com o campo no texto inicial (`*.ant`).
+    fn trocar_pasta(&mut self, pasta: &Path, cfg: &ConfigDialogos) {
+        self.pasta = pasta.to_path_buf();
+        self.arquivos = arquivos_ant(pasta)
             .iter()
             .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().to_lowercase()))
             .collect();
-        DialogoArquivo {
-            salvar,
-            pasta: pasta.to_path_buf(),
-            campo: cfg.arquivo.campo_inicial.clone(),
-            arquivos,
-            selecionado: None,
-            primeiro: 0,
-        }
+        self.campo = cfg.arquivo.campo_inicial.clone();
+        self.selecionado = None;
+        self.primeiro = 0;
+        self.primeira_pasta = 0;
     }
 
     fn linhas_visiveis(&self, cfg: &ConfigDialogoArquivo) -> usize {
         ((cfg.lista[3] - 2) / cfg.altura_item).max(1) as usize
     }
 
-    /// OK: o nome do campo vira caminho (com curinga, nada).
-    fn ok(&self) -> RespostaArquivo {
+    fn pastas_visiveis(&self, cfg: &ConfigDialogoArquivo) -> usize {
+        ((cfg.pastas[3] - 2) / cfg.altura_item_pasta).max(1) as usize
+    }
+
+    /// Maior primeiro item visível (0 quando a lista cabe).
+    fn primeiro_maximo(&self, cfg: &ConfigDialogoArquivo) -> usize {
+        self.arquivos.len().saturating_sub(self.linhas_visiveis(cfg))
+    }
+
+    /// Pasta que o texto do campo nomeia ("a:", "c:\", "..", um caminho), se existir.
+    fn pasta_do_campo(&self) -> Option<PathBuf> {
+        let t = self.campo.trim();
+        if t.is_empty() || t.contains('*') || t.contains('?') {
+            return None;
+        }
+        // "a:" sozinho é a raiz da unidade (o original volta à pasta corrente dela; o port não a guarda).
+        let t = if t.len() == 2 && t.ends_with(':') { format!("{t}\\") } else { t.to_string() };
+        let p = self.pasta.join(&t);
+        p.is_dir().then(|| std::path::absolute(&p).unwrap_or(p))
+    }
+
+    /// OK: uma pasta no campo troca de pasta; senão o nome vira caminho (com curinga, nada).
+    fn ok(&mut self, cfg: &ConfigDialogos) -> RespostaArquivo {
+        if let Some(p) = self.pasta_do_campo() {
+            self.trocar_pasta(&p, cfg);
+            self.pasta_realcada = None;
+            self.foco_no_campo = true;
+            return RespostaArquivo::Nada;
+        }
         if self.campo.contains('*') || self.campo.contains('?') {
             return RespostaArquivo::Nada;
         }
@@ -554,24 +673,55 @@ impl DialogoArquivo {
         }
     }
 
-    /// Clique em (x, y); `duplo` = clique duplo (na lista, escolhe o arquivo).
+    /// Clique em (x, y); `duplo` = clique duplo (na lista, escolhe o arquivo; na árvore, abre a
+    /// pasta). Setas e trilho da barra da lista rolam um item ou uma página (os visíveis − 1).
     pub fn clicar(&mut self, cfg: &ConfigDialogos, x: i32, y: i32, duplo: bool) -> RespostaArquivo {
         let a = &cfg.arquivo;
         if contem(ret(a.ok), x, y) {
-            return self.ok();
+            return self.ok(cfg);
         }
         if contem(ret(a.cancelar), x, y) {
             return RespostaArquivo::Cancelar;
         }
         let lista = ret(a.lista);
+        let barra = Retangulo { esq: lista.dir - a.largura_rolagem, ..lista };
+        let max = self.primeiro_maximo(a);
+        if contem(barra, x, y) && max > 0 {
+            let p = PartesRolagem::de(lista, a.largura_rolagem);
+            self.primeiro = p.rolar(self.primeiro, max, self.linhas_visiveis(a), y);
+            return RespostaArquivo::Nada;
+        }
+        let pastas = ret(a.pastas);
+        let max_pastas = self.pastas().len().saturating_sub(self.pastas_visiveis(a));
+        if contem(Retangulo { esq: pastas.dir - a.largura_rolagem, ..pastas }, x, y) && max_pastas > 0 {
+            let p = PartesRolagem::de(pastas, a.largura_rolagem);
+            self.primeira_pasta = p.rolar(self.primeira_pasta, max_pastas, self.pastas_visiveis(a), y);
+            return RespostaArquivo::Nada;
+        }
         if contem(Retangulo { dir: lista.dir - a.largura_rolagem, ..lista }, x, y) {
             let k = ((y - i32::from(lista.topo) - 1) / i32::from(a.altura_item)).max(0) as usize;
             let i = k + self.primeiro;
             if i < self.arquivos.len() && k < self.linhas_visiveis(a) {
                 self.selecionado = Some(i);
                 self.campo = self.arquivos[i].clone();
+                self.foco_no_campo = false;
                 if duplo {
-                    return self.ok();
+                    return self.ok(cfg);
+                }
+            }
+        }
+        if contem(Retangulo { dir: pastas.dir - a.largura_rolagem, ..pastas }, x, y) {
+            let v = ((y - i32::from(pastas.topo) - 1) / i32::from(a.altura_item_pasta)).max(0) as usize;
+            let k = v + self.primeira_pasta;
+            let lista_pastas = self.pastas();
+            if let Some(item) = lista_pastas.get(k).filter(|_| v < self.pastas_visiveis(a)) {
+                self.pasta_realcada = Some(k);
+                self.foco_no_campo = false;
+                if duplo {
+                    let destino = item.caminho.clone();
+                    self.trocar_pasta(&destino, cfg);
+                    // A pasta aberta fica realçada: é o último ancestral da lista nova.
+                    self.pasta_realcada = self.pastas().iter().rposition(|p| p.aberta);
                 }
             }
         }
@@ -581,7 +731,7 @@ impl DialogoArquivo {
     /// Tecla: Enter = OK, Esc = Cancelar, Backspace apaga.
     pub fn tecla(&mut self, nome: &str, cfg: &ConfigDialogos) -> RespostaArquivo {
         match nome {
-            "Return" | "Keypad Enter" => return self.ok(),
+            "Return" | "Keypad Enter" => return self.ok(cfg),
             "Escape" => return RespostaArquivo::Cancelar,
             "Backspace" => {
                 if self.campo == cfg.arquivo.campo_inicial {
@@ -599,6 +749,7 @@ impl DialogoArquivo {
         if self.campo == cfg.arquivo.campo_inicial {
             self.campo.clear();
         }
+        self.foco_no_campo = true;
         for c in texto.chars().filter(|c| c.is_ascii_graphic()) {
             if self.campo.len() < 64 {
                 self.campo.push(c);
@@ -611,24 +762,37 @@ impl DialogoArquivo {
     }
 
     /// Pastas mostradas: os ancestrais da pasta (da raiz até ela, abertos) e as subpastas dela.
-    fn pastas(&self) -> Vec<(usize, String, bool)> {
+    fn pastas(&self) -> Vec<ItemPasta> {
         let caminho = self.caminho_absoluto();
-        let mut v: Vec<(usize, String, bool)> = Vec::new();
+        let mut v: Vec<ItemPasta> = Vec::new();
+        let mut ate_aqui = PathBuf::new();
         for comp in caminho.components() {
+            ate_aqui.push(comp.as_os_str());
             let nome = match comp {
                 std::path::Component::Prefix(p) => format!("{}\\", p.as_os_str().to_string_lossy()),
-                std::path::Component::RootDir if !v.is_empty() => continue,
+                std::path::Component::RootDir if !v.is_empty() => {
+                    // "c:" + "\": o item da unidade é a raiz dela.
+                    if let Some(u) = v.last_mut() {
+                        u.caminho = ate_aqui.clone();
+                    }
+                    continue;
+                }
                 std::path::Component::RootDir => "\\".into(),
                 c => c.as_os_str().to_string_lossy().into_owned(),
             };
-            v.push((v.len(), nome.to_lowercase(), true));
+            v.push(ItemPasta { nivel: v.len(), nome: nome.to_lowercase(), aberta: true, caminho: ate_aqui.clone() });
         }
         let nivel = v.len();
-        let mut sub: Vec<String> = std::fs::read_dir(&caminho)
-            .map(|it| it.flatten().filter(|e| e.path().is_dir()).map(|e| e.file_name().to_string_lossy().to_lowercase()).collect())
+        let mut sub: Vec<(String, PathBuf)> = std::fs::read_dir(&caminho)
+            .map(|it| {
+                it.flatten()
+                    .filter(|e| e.path().is_dir())
+                    .map(|e| (e.file_name().to_string_lossy().to_lowercase(), e.path()))
+                    .collect()
+            })
             .unwrap_or_default();
         sub.sort();
-        v.extend(sub.into_iter().map(|n| (nivel, n, false)));
+        v.extend(sub.into_iter().map(|(nome, caminho)| ItemPasta { nivel, nome, aberta: false, caminho }));
         v
     }
 
@@ -649,11 +813,11 @@ impl DialogoArquivo {
         for (texto, [x, y]) in rotulos {
             escrever(q, f, i32::from(*x), i32::from(*y), texto, c.texto);
         }
-        // Campo do nome; o texto inicial vem selecionado.
+        // Campo do nome; o texto inicial vem selecionado (com o foco no campo).
         let campo = ret(a.campo);
         caixa_branca(q, c, campo);
         let (tx, ty) = (i32::from(campo.esq) + 3, (i32::from(campo.topo) + i32::from(campo.base) - f.altura() as i32) / 2);
-        if self.campo == a.campo_inicial {
+        if self.campo == a.campo_inicial && self.foco_no_campo {
             let w = largura(f, &self.campo);
             let r = Retangulo { esq: tx as i16, topo: ty as i16, dir: (tx + w) as i16, base: (ty + f.altura() as i32) as i16 + 1 };
             q.preencher(r, c.selecao, c.selecao);
@@ -664,7 +828,7 @@ impl DialogoArquivo {
         // Lista de arquivos (cinza no Save As, como no original).
         let lista = ret(a.lista);
         caixa_branca(q, c, lista);
-        rolagem(q, c, lista, a.largura_rolagem);
+        rolagem(q, c, lista, a.largura_rolagem, Some((self.primeiro, self.primeiro_maximo(a))));
         let cor = if self.salvar { c.desabilitado } else { c.texto };
         for (k, nome) in self.arquivos.iter().skip(self.primeiro).take(self.linhas_visiveis(a)).enumerate() {
             let y = i32::from(lista.topo) + 1 + k as i32 * i32::from(a.altura_item);
@@ -685,23 +849,34 @@ impl DialogoArquivo {
         escrever(q, f, i32::from(cx), i32::from(cy), &caminho, c.texto);
         q.recorte = antes;
         caixa_branca(q, c, pastas);
-        rolagem(q, c, pastas, a.largura_rolagem);
+        let itens = self.pastas();
+        let max_pastas = itens.len().saturating_sub(self.pastas_visiveis(a));
+        rolagem(q, c, pastas, a.largura_rolagem, Some((self.primeira_pasta, max_pastas)));
         let dentro = Retangulo { esq: pastas.esq + 1, topo: pastas.topo + 1, dir: pastas.dir - a.largura_rolagem, base: pastas.base - 1 };
         let antes = q.recorte.replace(dentro);
-        for (k, (nivel, nome, aberta)) in self.pastas().iter().enumerate() {
-            let y = pastas.topo + 1 + k as i16 * a.altura_item_pasta;
-            let x = pastas.esq + 5 + *nivel as i16 * a.recuo_pasta;
+        for (k, p) in itens.iter().enumerate().skip(self.primeira_pasta) {
+            let y = pastas.topo + 1 + (k - self.primeira_pasta) as i16 * a.altura_item_pasta;
+            let x = pastas.esq + 5 + p.nivel as i16 * a.recuo_pasta;
+            let realcada = self.pasta_realcada == Some(k);
+            if realcada {
+                q.preencher(Retangulo { topo: y, base: y + a.altura_item_pasta, ..dentro }, c.selecao, c.selecao);
+            }
             let r = Retangulo { esq: x, topo: y + 3, dir: x + 16, base: y + 13 };
             q.preencher(r, c.pasta, c.pasta);
             q.contorno(Retangulo { dir: r.dir - 1, base: r.base - 1, ..r }, c.linha);
-            if *aberta {
+            if p.aberta {
                 q.linha(i32::from(x) + 2, i32::from(y) + 7, i32::from(x) + 15, i32::from(y) + 7, c.linha);
             }
-            escrever(q, f, i32::from(x + a.texto_pasta), i32::from(y), nome, c.texto);
+            let cor = if realcada { c.texto_selecao } else { c.texto };
+            escrever(q, f, i32::from(x + a.texto_pasta), i32::from(y), &p.nome, cor);
         }
         q.recorte = antes;
-        // Combinações: tipo e unidade.
-        for (caixa, texto) in [(a.tipo, &a.texto_tipo), (a.unidades, &a.texto_unidade)] {
+        // Combinações: tipo e unidade (a letra da unidade da pasta, quando o caminho tem uma).
+        let unidade = match self.caminho_absoluto().components().next() {
+            Some(std::path::Component::Prefix(p)) => p.as_os_str().to_string_lossy().to_lowercase(),
+            _ => a.texto_unidade.clone(),
+        };
+        for (caixa, texto) in [(a.tipo, &a.texto_tipo), (a.unidades, &unidade)] {
             let r = ret(caixa);
             caixa_branca(q, c, r);
             let x = r.dir - a.largura_rolagem;
@@ -741,6 +916,57 @@ mod testes {
         assert_eq!(d.tecla("Escape", &c), RespostaArquivo::Cancelar);
         let ok = ret(c.arquivo.ok);
         assert_eq!(d.clicar(&c, i32::from(ok.esq) + 5, i32::from(ok.topo) + 5, false), esperado);
+    }
+
+    /// Bancada (2026-10-19, `qemu_dialogo_muitos.txt`, 18 arquivos, 8 visíveis): seta de baixo duas
+    /// vezes (primeiro 2, polegar 11 linhas abaixo da seta de cima), trilho abaixo do polegar (9:
+    /// uma página de 7), seta de cima (8, polegar 46 abaixo; arredondado) e o clique num item.
+    #[test]
+    fn lista_com_muitos_arquivos_rola_como_o_original() {
+        let c = cfg();
+        let mut d = DialogoArquivo::new(false, Path::new("nao_existe"), &c);
+        d.arquivos = (0..18).map(|i| format!("a{i:02}.ant")).collect();
+        let a = &c.arquivo;
+        let lista = ret(a.lista);
+        let p = PartesRolagem::de(lista, a.largura_rolagem);
+        let x = i32::from(lista.dir) - 8;
+        let (cima, baixo) = (i32::from(lista.topo) + 8, i32::from(lista.base) - 8);
+        assert_eq!(d.primeiro_maximo(a), 10);
+        assert_eq!(p.linha_polegar(0, 10), p.cima.base);
+        d.clicar(&c, x, baixo, false);
+        d.clicar(&c, x, baixo, false);
+        assert_eq!(d.primeiro, 2);
+        assert_eq!(p.linha_polegar(2, 10) - p.cima.base, 11);
+        d.clicar(&c, x, i32::from(lista.topo) + 77, false);
+        assert_eq!(d.primeiro, 9);
+        assert_eq!(p.linha_polegar(9, 10) - p.cima.base, 51);
+        d.clicar(&c, x, cima, false);
+        assert_eq!(d.primeiro, 8);
+        assert_eq!(p.linha_polegar(8, 10) - p.cima.base, 46);
+        assert_eq!(p.linha_polegar(10, 10) + p.lado() + 1, p.baixo.topo - 1, "no fim, o polegar encosta na seta de baixo");
+        d.clicar(&c, i32::from(lista.esq) + 40, i32::from(lista.topo) + 1 + 13 + 6, false);
+        assert_eq!((d.selecionado, d.campo.as_str(), d.foco_no_campo), (Some(9), "a09.ant", false));
+        for _ in 0..5 {
+            d.clicar(&c, x, baixo, false);
+        }
+        assert_eq!(d.primeiro, 10, "não passa do fim");
+    }
+
+    /// Um nome de pasta no campo e Enter troca de pasta (o original troca de unidade com "a:").
+    #[test]
+    fn pasta_no_campo_troca_de_pasta() {
+        let c = cfg();
+        let raiz = std::env::temp_dir().join(format!("simant_dlg_{}", std::process::id()));
+        std::fs::create_dir_all(raiz.join("sub")).unwrap();
+        std::fs::write(raiz.join("sub").join("x.ant"), b"").unwrap();
+        let mut d = DialogoArquivo::new(false, &raiz, &c);
+        assert!(d.arquivos.is_empty());
+        d.digitar("sub", &c);
+        assert_eq!(d.tecla("Return", &c), RespostaArquivo::Nada);
+        assert_eq!(d.arquivos, vec!["x.ant".to_string()]);
+        assert_eq!(d.campo, "*.ant");
+        assert!(d.pastas().iter().any(|p| p.aberta && p.nome == "sub"));
+        std::fs::remove_dir_all(&raiz).unwrap();
     }
 
     #[test]

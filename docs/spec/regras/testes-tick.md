@@ -383,6 +383,17 @@ Gravações brutas inteiras comparadas antes da seleção (fora do git): `estrat
 
 Achados: nenhuma divergência de regra. A mensagem de `_GstrR` ("The red ants are attacking!") vai para a faixa, sem caixa modal (o tick não parou). Na cozinha e nos ladrilhos nenhum tile do patch faz a comida cair (superficie.md 8.2). Fora do tick (bancada, sem vetor): Cancel do "Load Ant Hill" e do "Select a Game" na abertura (menus.md §7, abertura.md), Status no Full Game e no Experimental (menus.md §6) e a vista depois de `_XferPatch` (divergencias.md; o port deixou de centralizar na amarela).
 
+### Nona rodada (2026-10-19): alimentação periódica (rodada de fechamento)
+
+`tools/cenarios_fecha.py` (cenários `alimentacao` e `alimentacao_casa`), sobre cópias dos overlays `ov_r` (`rico`) e `ov_full` (`full`) em `re_trabalho/ag_fecha/`. Na entrada do tick: `_NextFeed` = 30000 (acima de qualquer `_FoodA`) e `_Cycle` levado ao fim de um período de 64; o tick chama `_AddFood(150, 1)` (superficie.md 8.3). A regra nunca tinha rodado num vetor (em todos os gravados `_FoodA` ≥ `_NextFeed` nos ticks ≡ 0 mod 64, inclusive em `volta_cycle`).
+
+| Subpasta | Ticks | O que exercita |
+|---|---|---|
+| `alimentacao` | 1711 | `_AddFood(150, 1)` no quintal: centro (S128, S64) = (85, 31), raio S8 + 5, 0x48 nos chãos < 0x18 e +1 nas comidas 0x48–0x4A, `_FoodA` 122 → 237, `_NextFeed` = S1(50) + 1 = 50 |
+| `alimentacao_casa` | 31 | o mesmo depois de `_XferPatch` para o carpete esquerdo (0, 4) do Jogo Completo: a comida pela regra do chão da casa (geracao-mundo.md 3.E) |
+
+Achado: sem as tabelas do banco (os testes rodam com `RegrasOriginais::default()`), o `adicionar_comida` do port **não fazia nada**: o tick dava 291/307 (sem a comida, com `_NextFeed` e S diferentes). Agora usa o seno calculado, igual ao objeto 9/1000 (como o laser), e os dois vetores dão 307/307 com S, R e vida (reconstrução da vida dispensada pelo motivo de `volta_cycle`: vagas mortas paradas nos buracos). Placar: 2 vetores novos, 2 exigidos.
+
 ### Sétima rodada (2026-10-19): ramos raros
 
 `tools/cenarios_raros.py` (mesma interface de `cenarios_regras.py`; snapshots `rico`, `full` e `exp`). A preparação escreve a memória na entrada de um tick; onde a regra é rara demais para esperar, a semente S da entrada foi **escolhida no port** (busca sobre o vetor do mesmo tick sem a semente) e escrita na bancada antes do estado de antes. Os 31 vetores novos (16 cenários, 3,9 MB) batem 307/307 com S, R e vida e são exigidos por `ticks_originais.rs`; a ação nova (`acoes/exp_leao_m1`) por `acoes_originais.rs`.

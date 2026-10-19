@@ -269,7 +269,7 @@ Fora daí, `_SimQueenB` mostra 10015 ("The black queen in this patch starves…"
 | 0 | saúde média | média de `_H_BHeal` nas últimas `_HistCnt` amostras |
 | 1 | comida relativa | 100 × Σ`_H_BFood` / Σ`_H_RFood` (0 se não há comida vermelha) |
 | 2 | ovos que vingaram | 100 × (`_TotalEggsLaidB` − `_TotalEggsDiedB`) / `_TotalEggsLaidB` (100 se nenhum foi posto) |
-| 3 | baixas | 100 × `_BlackLost` / (`_BlackLost` + `_RedLost`) (100 se não houve luta) [em aberto: o sinal do peso; do jeito que está, perder mais formigas pretas aumentaria a nota] |
+| 3 | baixas | 100 × `_BlackLost` / (`_BlackLost` + `_RedLost`) (100 se não houve luta). **Conferido no original (2026-10-19, sete GAME OVER, mensagens.md §4.1):** é essa a conta; sem pretas perdidas a nota é 0, e perder mais formigas pretas a aumenta [hipótese: defeito do original; o port segue] |
 | 4 | colônias fundadas | só Full e Experimental: 100 × `_BColoniesStarted` / (B + R fundadas) |
 | 5 | colônias sobreviventes | só Full e Experimental: 100 × fundadas / (fundadas + `_BColoniesKilled`) |
 | 6 | quintal ocupado | só Full e Experimental: 100 × (células não nulas de `_YMapPopB` na área do quintal) / 155. Área do quintal: colunas 0–4, linhas 3–11, e colunas 5–15, linhas 2–11; 5×9 + 11×10 = 155 |
@@ -282,7 +282,7 @@ Total = `_MeHealth` + Σ peso[i] × nota[i] × 51, com pesos `13, 17, 19, 23, 29
 - Full: se `_GameTime` < 8100, total = total × max(1, `_GameTime`/100) / 81; depois × 5.
 - Outros tipos: total = total × 29/10; se `_GameTime` < 4100, × max(1, `_GameTime`/100) / 41.
 
-[em aberto] O Ghidra mostra o retorno como `_GameTime + total`, o que provavelmente é erro de leitura do retorno de 32 bits (DX:AX). Os dois limites (8100 e 4100) aparecem no pseudocódigo como "ponteiro de string + deslocamento" (`s_NetBIOS__Delete_Name__1048_1f96 + 0xe` = 0x1FA4 e `s_DeltaTime___lu_1048_0ff5 + 0xf` = 0x1004); é o Ghidra interpretando constantes como endereços. O valor exibido deve ser conferido contra a tela de pontuação do original.
+**Conferido no original (2026-10-19):** o retorno é mesmo `_GameTime` + total, em 32 bits (sete fins de jogo com pontos de 331894 a 1946265, iguais no port; mensagens.md §4.1). Os dois limites (8100 e 4100) aparecem no pseudocódigo como "ponteiro de string + deslocamento" (`s_NetBIOS__Delete_Name__1048_1f96 + 0xe` = 0x1FA4 e `s_DeltaTime___lu_1048_0ff5 + 0xf` = 0x1004); é o Ghidra interpretando constantes como endereços. Os limites ficaram conferidos nos mesmos casos (Quick com 2001 e 4101; Full com 3001, 8100 e 9001).
 
 ## 9. Pontos de atenção para o determinismo do port
 
@@ -362,5 +362,5 @@ Não verificado: nenhuma parte do tick foi comparada passo a passo com o origina
 - Taxa de fast/ultra numa máquina real: só limitada por emulação (§3.1 TCG livre; §3.3 com `-icount`, ~3 ticks/s por milhão de instruções/s); nenhuma máquina real medida. Cadência sem foco: medida igual à com foco (2026-10-19); o mecanismo fica em aberto.
 - Detalhes de `_SimColonies`, `_DoSimYard` (menino, cachorro, gato, pássaro, cortador), `_DoAntLions`, `_MoveSpider`, `_DoPillar`/`_DoSow`, `_DoWater`: só a cadência está descrita aqui.
 - `_Feedback`: regras do tutorial e das mensagens de conselho.
-- Retorno exato de `_CalcScore` e o sentido da nota 3.
+- ~~Retorno exato de `_CalcScore` e o sentido da nota 3~~ (conferidos em 2026-10-19, mensagens.md §4.1).
 - Rede (`_NetworkSend`/`_ProcessPost`): fora do escopo do port inicial.

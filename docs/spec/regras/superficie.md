@@ -468,7 +468,7 @@ Usada pela amarela e pela aranha morta. Quintal: tile > 0x4A → falha (devolve 
 
 ### 8.3 `_AddFood(n, som)` (`1030:6a58`) e alimentação periódica
 
-O algoritmo de espalhamento (centro, raio, seno/cosseno de `_FracSineTab`) está em [geracao-mundo.md](geracao-mundo.md) (seção 3.E), e vale igual durante o jogo. Durante o jogo ele é chamado pela alimentação periódica (corpo de `_FeedAnts` `1028:0474`, embutido em `_DoAntSim` a cada 64 ticks): fora do modo Experimental, se `_FoodA < _NextFeed` (`8:8a62`), `_AddFood(150, 1)` (toca som, centro `(S128(), S64())`) e `_NextFeed = S1(50) + 1`. A ordem dos sorteios dentro de `_AddFood` é: centro (`S128`, `S64`, ou `S1(48)` no caso inicial), raio `S8()`, e por unidade `S256()` e `S1(raio)`. Grava `_LastFoodDrop` (`8:836a`), usado pela líder vermelha (9.2). Fato visto no código.
+O algoritmo de espalhamento (centro, raio, seno/cosseno de `_FracSineTab`) está em [geracao-mundo.md](geracao-mundo.md) (seção 3.E), e vale igual durante o jogo. Durante o jogo ele é chamado pela alimentação periódica (corpo de `_FeedAnts` `1028:0474`, embutido em `_DoAntSim` a cada 64 ticks): fora do modo Experimental, se `_FoodA < _NextFeed` (`8:8a62`), `_AddFood(150, 1)` (toca som, centro `(S128(), S64())`) e `_NextFeed = S1(50) + 1`. A ordem dos sorteios dentro de `_AddFood` é: centro (`S128`, `S64`, ou `S1(48)` no caso inicial), raio `S8()`, e por unidade `S256()` e `S1(raio)`. Grava `_LastFoodDrop` (`8:836a`), usado pela líder vermelha (9.2). Fato visto no código. **Conferido na bancada (2026-10-19, vetores `alimentacao` e `alimentacao_casa`, `tools/cenarios_fecha.py`):** com `_NextFeed` = 30000 e `_Cycle` levado ao fim de um período de 64 na entrada, o tick chama `_AddFood(150, 1)`: no quintal (`rico`), centro (85, 31), `_FoodA` 122 → 237, `_NextFeed` = 50; na casa (Jogo Completo, patch (0, 4), carpete esquerdo), a comida pela regra do chão da casa (geracao-mundo.md 3.E). Os dois 307/307 com S, R e vida.
 
 ## 9. Estratégia
 
@@ -670,7 +670,7 @@ Código: `engine/src/rules/superficie.rs`. Dados: `data/superficie.json`, gerado
 | Original | Port |
 |---|---|
 | `_DoAntSimA` e os modos | `simular_superficie` (trait: `RegrasSuperficie::simular_superficie`) |
-| `_AddFood` | `adicionar_comida` (precisa das `TabelasGeracao`, por causa do seno) |
+| `_AddFood` | `adicionar_comida` (o seno das `TabelasGeracao`; sem elas, o calculado, igual ao do banco) |
 | `_GetStrategy`, `_GstrR`, `_SetCasteProd`, `_SetModeProd` | `escolher_estrategia` |
 | `_MakeRedInitiator` | `criar_lider_vermelha` |
 | `_GetNewMode`, `_GetWinner`, `_DeadAntHere` | `modo_novo`, `vencedor_da_luta`, `cadaver_aqui` (públicas; implementação em `comum.rs`, a mesma do ninho, da amarela, do quintal e dos inimigos) |
@@ -683,6 +683,6 @@ Código: `engine/src/rules/superficie.rs`. Dados: `data/superficie.json`, gerado
 Decisões do port:
 
 - A implementação da trait usa `RegrasOriginais::superficie` e `RegrasOriginais::feromonios` (carregados com mods); `tabelas_padrao()` devolve as cópias embutidas, para testes. As funções públicas recebem as tabelas explícitas.
-- Sem `TabelasGeracao` (sem os arquivos do jogo), `adicionar_comida` da trait não faz nada.
+- Sem `TabelasGeracao` (sem os arquivos do jogo, como nos testes de vetores), `adicionar_comida` usa o seno calculado `trunc(sin(i·π/128)·32767)`, igual aos 64 valores do objeto 9/1000, como o laser (`inimigos::seno_calculado`). Até 2026-10-19 ela não fazia nada sem as tabelas; nenhum vetor exercitava a alimentação, e o primeiro (`alimentacao`) mostrou a falta.
 - Leituras fora do mapa (que o original faria em memória vizinha) contam como obstáculo; índices de tabela fora da faixa: modo estratégico > 5 usa a última linha da tabela (a mesma escolha do ninho; antes da unificação a superfície devolvia o modo 0), modo ≥ 20 na contagem é ignorado.
 - O som de `_AddFood` e o `_EditMessage` do ataque vermelho não geram evento (falta variante em `Evento`); a música 0x2B0A gera `Evento::Musica`.
