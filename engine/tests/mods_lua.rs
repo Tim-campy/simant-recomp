@@ -1,4 +1,4 @@
-//! Scripts Lua de mods (docs/api-mods.md, "Scripts Lua"): sandbox, limites, erro que desliga só o
+﻿//! Scripts Lua de mods (docs/api-mods.md, "Scripts Lua"): sandbox, limites, erro que desliga só o
 //! mod, o mod de exemplo (`exemplos/mods/exemplo-lua`) e a garantia de que, sem scripts, o tick não muda.
 
 use std::fs;
@@ -207,7 +207,7 @@ fn mod_de_exemplo_chove_comida_a_cada_500_ticks() {
     e.ambiente.proxima_comida = -1; // sem a alimentação periódica do jogo, para isolar o script
     let mut regras = RegrasOriginais::default();
     s.ao_iniciar(&mut e);
-    assert!(s.retirar_registro()[0].contains("chuva de comida ligada; API 0.24, jogo rapido"));
+    assert!(s.retirar_registro()[0].contains("chuva de comida ligada; API 0.25, jogo rapido"));
     let mut sem_script = e.clone();
     for _ in 0..499 {
         s.antes_do_tick(&mut e);

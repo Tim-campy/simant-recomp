@@ -1,0 +1,42 @@
+# WinHelp do SimAnt: diálogo Search (botão), Show Topics, Go To; History depois de vários tópicos.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_ajuda3.txt --overlay re_trabalho/qemu/ov_winhelp.qcow2
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+teclas f1
+esperar 6
+# --- Search pelo botão ---
+clicar_em 305 54
+esperar 3
+capturar re_trabalho/agente_ui/winhelp/s01_search_aberto.png
+digitar queen
+esperar 2
+capturar re_trabalho/agente_ui/winhelp/s02_search_queen.png
+teclas ret
+esperar 3
+capturar re_trabalho/agente_ui/winhelp/s03_search_show_topics.png
+teclas alt+g
+esperar 4
+capturar re_trabalho/agente_ui/winhelp/s04_search_goto.png
+# --- History: Contents, Glossary, Contents, Types Of Ants ---
+clicar_em 245 54
+esperar 3
+clicar_em 250 317
+esperar 3
+capturar re_trabalho/agente_ui/winhelp/s05_glossary.png
+clicar_em 245 54
+esperar 3
+clicar_em 260 221
+esperar 3
+capturar re_trabalho/agente_ui/winhelp/s06_types_of_ants.png
+clicar_em 422 54
+esperar 3
+capturar re_trabalho/agente_ui/winhelp/s07_history.png
+teclas alt+s
+esperar 3
+capturar re_trabalho/agente_ui/winhelp/s08_alt_s.png
+teclas esc
+esperar 2
+capturar re_trabalho/agente_ui/winhelp/s09_depois_esc.png
+fim

@@ -2,6 +2,7 @@
 
 pub mod acoes_mods;
 pub mod ajuda;
+pub mod ajuda_janelas;
 pub mod aranha_edicao;
 pub mod ajuda_contexto;
 pub mod avisos;
@@ -25,6 +26,7 @@ pub mod navegacao;
 pub mod partida;
 pub mod popup_castas;
 pub mod quadro;
+pub mod quadros_animados;
 pub mod menu_ferramentas;
 pub mod quintal_mapa;
 pub mod selecao;

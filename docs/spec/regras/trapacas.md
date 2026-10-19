@@ -72,5 +72,6 @@ Desmontagem de `1018:691c`: o tipo `RRand(6) + 1` (ou `+ 0x81`) é empilhado pri
 
 - Regras e anel: `engine/src/rules/trapacas.rs`. Tabela e nome de cada efeito: `data/codigos_trapaca.json` (mod-ável: um mod pode trocar os códigos ou tirar um código da lista).
 - A tecla chega por `Partida::tecla_de_trapaca` (`engine/src/core/partida.rs`) depois de `_YellowCommandKey`, como no original; Enter limpa o anel.
-- Efeitos sem equivalente no port: `fred` (a animação `_DrawSimPayoff` ainda não existe), `data`, `serv` e `clie` (DDE e NetBIOS). O port registra o código no console e não muda nada [divergência registrada]. `joke` mostra os dois quadros como o Mystery (não forçados: só com Options → Events).
+- `fred` pede `Evento::AnimacaoVitoria` (2026-10-18): a interface mostra `_DrawSimPayoff` (telas/mensagens.md §11.3; conferido na bancada, cenário `payoff`).
+- Efeitos sem equivalente no port: `data`, `serv` e `clie` (DDE e NetBIOS). O port registra o código no console e não muda nada [divergência registrada]. `joke` mostra os dois quadros como o Mystery (não forçados: só com Options → Events).
 - O quadro 10020 do `FUND` é não forçado (terceiro parâmetro 0 de `_PictStrnDialog`): entrou em `nao_forcadas` de `data/mensagens.json`.

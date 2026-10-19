@@ -967,13 +967,20 @@ grupo_do_save! {
 pub enum Evento {
     /// Texto de SHARED tipo 4 (`_PictStrnDialog`), pelo id decimal (ex.: 10010).
     Mensagem(u16),
-    /// `_YellowDialog(bitmap)` (`1000:8262`): quadro com imagem da amarela (trofalaxia: 9110). A
-    /// interface só o mostra com Options → Events.
-    QuadroAmarela(u16),
+    /// `_YellowDialog(bitmap, índice)` (`1000:8262`): quadro com imagem da amarela (trofalaxia 9110
+    /// com índice −1; morte pela aranha ou formiga-leão 9100 com 0; renascimento 9101 com 1, ou 2
+    /// ao fundar uma colônia). O índice escolhe o texto (lista 1010, 23 + índice). A interface só o
+    /// mostra com Options → Events.
+    QuadroAmarela { imagem: u16, indice: i16 },
     /// `_SpiderDialog` (`1000:673a`): a aranha comeu a amarela (só com Options → Events). O original
     /// mostra a animação da aranha (bitmap 12000 e os quadros seguintes) e depois o quadro com o texto
     /// `texto` (SHARED tipo 4), escolhido por um `S1(2)` dentro do tick (as regras já sortearam).
     DialogoAranha { texto: u16 },
+    /// `_LionDialog` (`1000:80a0`): a formiga-leão comendo a amarela. Só pedido com Options → Events.
+    QuadroFormigaLeao,
+    /// `_DrawSimPayoff` (`1000:cda8`): animação da vitória sobre o quintal (vitória do Jogo Completo,
+    /// trapaça `fred`).
+    AnimacaoVitoria,
     /// `_SpecialXfer` (`1000:7eb6`): depois do quadro 10058, o jogador escolhe outra colônia preta no
     /// mapa do quintal. A interface chama `troca_patch::iniciar_transferencia_especial` e, no clique,
     /// `troca_patch::escolher_colonia` (no original, dentro do tick; no port, logo depois).

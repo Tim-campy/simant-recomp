@@ -319,8 +319,8 @@ Põe `_LessonTemp` (`9:9fb0`) = 1 e chama `_DoLifeExchange`. Sucesso: desliga a 
 | Código | Quem chama | Mensagem (se "Events") | Contador |
 |---|---|---|---|
 | 0 | `_YellowFight` (perdeu) | 10030 "Your brave attack…" se a amarela atacou (`_MeStartedFight`), senão 10032 "The enemy ant has attacked you!…" | — (já contado em `_GetWinner`) |
-| 1 | aranha a comeu | quadro da aranha (`_SpiderDialog`) | `_BAntsEaten` |
-| 2 | formiga-leão | quadro da formiga-leão (`_LionDialog`) | `_BAntsEaten` |
+| 1 | aranha a comeu | quadro da aranha (`_SpiderDialog`, com o sorteio `S1(2)` do texto) e, depois da luta, `_YellowDialog(9100)` | `_BAntsEaten` |
+| 2 | formiga-leão | quadro da formiga-leão (`_LionDialog`) e, depois da luta, `_YellowDialog(9100)` | `_BAntsEaten` |
 | 3 | jogador-aranha cercado | 10026 "You have been overcome by the massive onslaught of ants!…" | `_BAntsKilled` |
 | 4 | jogador-aranha saiu do mapa | 10028 "Due to a latent fear of being eaten by ants, you go insane…" | `_BAntsKilled` |
 | 5 | pisada (`_FootFall`) | 10034 "The inconsiderate human has stepped on you!…" | `_BAntsKilled` |

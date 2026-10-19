@@ -212,6 +212,15 @@ pub struct Topico {
     pub paragrafos: Vec<Paragrafo>,
 }
 
+/// Uma palavra-chave da busca (Search do WinHelp) e as posições dos tópicos que a têm.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PalavraChave {
+    /// Como está no arquivo (Latin-1).
+    pub palavra: String,
+    /// Posições no |TOPIC (como as do |CTXOMAP: `ArquivoAjuda::topico_da_posicao`).
+    pub topicos: Vec<u32>,
+}
+
 /// Figura decodificada (RGB, de cima para baixo).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Figura {
@@ -287,6 +296,45 @@ impl ArquivoAjuda {
         let &o = self.arquivos.get(nome).ok_or_else(|| format!("arquivo interno {nome} não existe"))?;
         let usado = i32_em(&self.dados, o + 4)? as usize;
         self.dados.get(o + 9..o + 9 + usado).ok_or_else(|| format!("{nome} truncado"))
+    }
+
+    /// Palavras-chave da busca (`|KWBTREE` + `|KWDATA`), na ordem da árvore (a alfabética do
+    /// arquivo): cada uma com as posições dos tópicos (`|KWDATA`, deslocamentos de 4 bytes).
+    /// Sem os arquivos internos, a lista vem vazia.
+    pub fn palavras_chave(&self) -> Result<Vec<PalavraChave>, String> {
+        let (Ok(k), Ok(dados)) = (self.interno("|KWBTREE"), self.interno("|KWDATA")) else { return Ok(Vec::new()) };
+        if u16_em(k, 0)? != 0x293B {
+            return Err("|KWBTREE inválido".into());
+        }
+        let pagina = u16_em(k, 4)? as usize;
+        let raiz = i16_em(k, 26)?;
+        let niveis = i16_em(k, 32)?;
+        let mut p = raiz;
+        for _ in 1..niveis {
+            p = i16_em(k, 38 + p as usize * pagina + 4)?;
+        }
+        let mut saida = Vec::new();
+        let mut voltas = 0;
+        // Folhas: u16 livre, i16 entradas, i16 anterior, i16 seguinte; entradas = palavra (ASCIIZ),
+        // u16 quantidade, i32 deslocamento no |KWDATA.
+        while p >= 0 && voltas < 10_000 {
+            voltas += 1;
+            let b = 38 + p as usize * pagina;
+            let n = i16_em(k, b + 2)?;
+            let prox = i16_em(k, b + 6)?;
+            let mut e = b + 8;
+            for _ in 0..n {
+                let fim = k.get(e..).and_then(|s| s.iter().position(|&c| c == 0)).ok_or("palavra sem fim no |KWBTREE")? + e;
+                let palavra = k[e..fim].iter().map(|&c| c as char).collect();
+                let quantos = u16_em(k, fim + 1)? as usize;
+                let desl = i32_em(k, fim + 3)? as usize;
+                let topicos = (0..quantos).map(|i| u32_em(dados, desl + 4 * i)).collect::<Result<Vec<_>, _>>()?;
+                saida.push(PalavraChave { palavra, topicos });
+                e = fim + 7;
+            }
+            p = prox;
+        }
+        Ok(saida)
     }
 
     /// Nomes dos arquivos internos.
