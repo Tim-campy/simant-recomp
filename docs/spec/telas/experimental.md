@@ -206,7 +206,7 @@ A vista do Experimental novo em `_MapPnt` = (52, 23) (seção acima) fecha com `
 
 ## 10. Lacunas e divergências
 
-- `_KillAntLion(_FindInLionList(x, y))` com um tile de formiga-leão sem entrada na lista recebe −1 e grava fora da tabela no original; o port não faz nada [divergência registrada para docs/divergencias.md].
+- `_KillAntLion(_FindInLionList(x, y))` com um tile de formiga-leão sem entrada na lista recebe −1 e grava fora da tabela no original: o que acontece e o que o port reproduz está em [../regras/inimigos.md](../regras/inimigos.md) §1.4 (desde 2026-10-19 o port tira a formiga-leão 0 da lista e grava os bytes de `_BoyMsgCnt` e `_LastThemeSong`, como o original; o `_SetMap` com x vindo de um seletor de memória não).
 - O número de voltas do arrasto por segundo (cheiro e inseticida parados) depende do redesenho do original; o port deixa o ritmo para a interface.
 - Os textos do quadro de exame (listas 4/1100–1103) e dos avisos (4/1010) vêm do banco; o port desenha os dois (exame: §4.0; avisos na faixa). Sem captura dos avisos na faixa.
 - `_ELayerMode`, cursores, bitmaps do botão e título da janela são interface.

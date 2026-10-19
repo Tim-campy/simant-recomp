@@ -11,6 +11,7 @@
 //!   --resolucao 800x600 ou 1024x768 muda o layout como o original, docs/spec/telas/resolucao.md)
 //!   som (simant/src/som): [--sem-som] [--soundfont ARQ.sf2] [--exportar-som DIR]
 //!   preferências do jogador (simant/src/preferencias.rs): [--preferencias ARQ] [--sem-preferencias]
+//!   [--win-ini ARQ] (origem enquanto não há preferências gravadas; padrão: WINDOWS/WIN.INI acima do jogo)
 //!
 //! Padrões: --jogo $SIMANT_DIR ou SimAnt-T/MAXIS/ANTWIN, --dados data, --mods mods (relativos à
 //! pasta atual). Sem --save nem --novo-jogo, mostra a abertura. Com um deles, a simulação roda ao
@@ -496,8 +497,12 @@ fn principal() -> Result<(), String> {
         if o.preferencias.is_none() && !o.sem_preferencias {
             o.preferencias = preferencias::Preferencias::caminho_padrao();
         }
+        if o.win_ini.is_none() && !o.sem_preferencias {
+            o.win_ini = preferencias::procurar_win_ini(&o.jogo);
+        }
         if o.sem_preferencias {
             o.preferencias = None;
+            o.win_ini = None;
         }
         return executar_partida(s, &format!("SimAnt - {nome}"), &o, jogo_novo, de_save);
     }

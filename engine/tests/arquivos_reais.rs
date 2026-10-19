@@ -82,8 +82,29 @@ fn todos_os_bitmaps_coloridos_decodificam() {
     }
     eprintln!("WINGANT: {} de {} bitmaps não decodificam: {:?}", falhas.len(), total, falhas);
     assert_eq!(total, 352);
-    // Decodificar sem erro não garante imagem correta: o grupo ~7100 sai com faixas (bitmap.md, Em aberto).
     assert!(falhas.is_empty(), "{falhas:?}");
+}
+
+/// bitmap.md: os três bancos inteiros, inclusive o planar de 19 pixels (MWINNT 2/8905, planos sem
+/// alinhar) e os empacotados (`kind` 0xFFFF: MWINNT 2/2000, 2/2500 e 2/7002).
+#[test]
+fn todos_os_bitmaps_dos_bancos_decodificam() {
+    let Some(d) = dir_jogo() else { return };
+    for (nome, n) in [("WINGANT", 352), ("SHARED", 58), ("MWINNT", 343)] {
+        let b = Banco::abrir(&d.join(nome)).unwrap();
+        let mut total = 0;
+        for e in b.entradas().iter().filter(|e| e.chave.tipo == TIPO_BITMAP) {
+            total += 1;
+            let dados = b.objeto(e.chave).unwrap().unwrap();
+            Bitmap::decodificar(&dados).unwrap_or_else(|err| panic!("{nome} {}: {err}", e.chave.id));
+        }
+        assert_eq!(total, n, "{nome}");
+    }
+    let m = Banco::abrir(&d.join("MWINNT")).unwrap();
+    for (id, larg, alt) in [(2000, 455, 320), (2500, 315, 258), (7002, 514, 226), (8905, 19, 35)] {
+        let bm = Bitmap::decodificar(&m.objeto(Chave { tipo: TIPO_BITMAP, id }).unwrap().unwrap()).unwrap();
+        assert_eq!((bm.largura, bm.altura), (larg, alt), "MWINNT {id}");
+    }
 }
 
 /// Bits de um texto renderizado, como string de '#' e '.' por linha.

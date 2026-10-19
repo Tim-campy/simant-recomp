@@ -235,6 +235,9 @@ pub struct Partida {
     pub relogio: Relogio,
     /// Chamada de `MYTIMERFUNC` em andamento.
     laco: LacoTimer,
+    /// Bit 0 de `GetAsyncKeyState(VK_LBUTTON)`: o botão esquerdo foi apertado desde a última
+    /// consulta (simulacao-visao-geral.md §2).
+    clique_esquerdo_pendente: bool,
     /// Tempo real acumulado que ainda não completou uma mensagem.
     resto_ms: u64,
     /// Tempo real total passado a `avancar` (o `GetTickCount` do port, ms).
@@ -338,6 +341,7 @@ impl Partida {
             cfg,
             relogio: Relogio::default(),
             laco: LacoTimer::default(),
+            clique_esquerdo_pendente: false,
             resto_ms: 0,
             ms_total: 0,
             mac_inicial,
@@ -531,12 +535,20 @@ impl Partida {
             }
             l.drenadas += std::mem::take(&mut l.pendentes);
             l.voltas += 1;
-            if l.drenadas > 1 && (l.voltas > 2 || l.drenadas > 2) {
-                l.dentro = false;
+            // Teste de saída do original, na mesma ordem: o botão esquerdo só é consultado (e o
+            // bit "apertado desde a última consulta" consumido) se as mensagens não bastaram.
+            if (l.drenadas > 1 && (l.voltas > 2 || l.drenadas > 2)) || std::mem::take(&mut self.clique_esquerdo_pendente) {
+                self.laco.dentro = false;
                 break;
             }
         }
         ticks
+    }
+
+    /// O jogador apertou o botão esquerdo do mouse (em qualquer lugar): o laço de `MYTIMERFUNC`
+    /// em andamento devolve o controle no fim da volta seguinte (`GetAsyncKeyState(VK_LBUTTON)`).
+    pub fn botao_esquerdo_apertado(&mut self) {
+        self.clique_esquerdo_pendente = true;
     }
 
     /// Um tick da simulação (`_DoAntSim`), sem olhar relógio nem pausa, e o que o original faz em
@@ -1623,6 +1635,19 @@ mod testes {
 
     fn ticks_em(p: &mut Partida, n: u32) -> u32 {
         (0..n).map(|_| p.mensagem_de_timer()).sum()
+    }
+
+    #[test]
+    fn clique_esquerdo_encerra_o_laco_de_mytimerfunc() {
+        // Fast: sem clique a primeira mensagem roda as 5 voltas (5 ticks); com o botão esquerdo
+        // apertado antes, o teste de saída da primeira volta consulta o botão e devolve o controle.
+        let mut sem = partida(2);
+        assert_eq!(sem.mensagem_de_timer(), 5);
+        let mut com = partida(2);
+        com.botao_esquerdo_apertado();
+        assert_eq!(com.mensagem_de_timer(), 1);
+        // O bit foi consumido: a mensagem seguinte abre outra chamada com as 5 voltas.
+        assert_eq!(com.mensagem_de_timer(), 5);
     }
 
     #[test]
