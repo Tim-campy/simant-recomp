@@ -10,6 +10,7 @@ pub mod baloes;
 pub mod barra_menus;
 pub mod barras_faixa;
 pub mod carregar;
+pub mod controles;
 pub mod dialogos;
 pub mod edicao;
 pub mod gerenciador;

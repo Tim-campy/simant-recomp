@@ -2,8 +2,22 @@
 
 use super::*;
 
+/// Entrada no diálogo aberto por `--dialogo`, sem janela (na ordem da linha de comando).
+#[derive(Clone, Debug)]
+pub(crate) enum EntradaDialogo {
+    /// X, Y (área cliente), duplo.
+    Clique(i32, i32, bool),
+    /// Aperta em (X0, Y0), move até (X1, Y1) e, com `true`, solta.
+    Arrasto(i32, i32, i32, i32, bool),
+    /// Tecla do SDL com Shift, Ctrl, Alt.
+    Tecla(String, bool, bool, bool),
+    /// Texto digitado.
+    Texto(String),
+}
+
 #[derive(Clone)]
 pub(crate) struct Opcoes {
+
     pub(crate) jogo: PathBuf,
     pub(crate) dados: PathBuf,
     pub(crate) mods: PathBuf,
@@ -67,7 +81,7 @@ pub(crate) struct Opcoes {
     /// Sem janela: abre um diálogo antes de exportar (load, pergunta, salvar_como, salvo).
     pub(crate) dialogo: Option<String>,
     /// Sem janela, com --dialogo: cliques no diálogo (x, y na área cliente; duplo) antes de exportar.
-    pub(crate) cliques_dialogo: Vec<(i32, i32, bool)>,
+    pub(crate) cliques_dialogo: Vec<EntradaDialogo>,
     /// Sem janela: abre a janela do mapa antes de exportar, no `_MapMode` dado (1 a 8).
     pub(crate) janela_mapa: Option<i16>,
     /// Sem janela: liga as trilhas (`_showTrails`) antes dos `--ticks`.
@@ -190,8 +204,27 @@ pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
                 if p.len() < 2 {
                     return Err(format!("{a}: X,Y[,duplo]"));
                 }
-                o.cliques_dialogo.push((n(p[0])?, n(p[1])?, p.get(2) == Some(&"duplo")));
+                o.cliques_dialogo.push(EntradaDialogo::Clique(n(p[0])?, n(p[1])?, p.get(2) == Some(&"duplo")));
             }
+            "--arrastar-dialogo" => {
+                // X0,Y0,X1,Y1[,solto]: aperta, move e (com "solto") solta.
+                let v = valor()?;
+                let p: Vec<&str> = v.split(',').collect();
+                let n = |s: &str| s.parse::<i32>().map_err(|_| format!("{a}: X0,Y0,X1,Y1[,solto]"));
+                if p.len() < 4 {
+                    return Err(format!("{a}: X0,Y0,X1,Y1[,solto]"));
+                }
+                o.cliques_dialogo.push(EntradaDialogo::Arrasto(n(p[0])?, n(p[1])?, n(p[2])?, n(p[3])?, p.get(4) == Some(&"solto")));
+            }
+            "--tecla-dialogo" => {
+                // NOME[+shift][+ctrl][+alt] (nome do SDL).
+                let v = valor()?;
+                let mut p = v.split('+');
+                let nome = p.next().unwrap_or_default().to_string();
+                let m: Vec<&str> = p.collect();
+                o.cliques_dialogo.push(EntradaDialogo::Tecla(nome, m.contains(&"shift"), m.contains(&"ctrl"), m.contains(&"alt")));
+            }
+            "--digitar-dialogo" => o.cliques_dialogo.push(EntradaDialogo::Texto(valor()?)),
             "--janela-mapa" => o.janela_mapa = Some(valor()?.parse().ok().filter(|m| (1..=8).contains(m)).ok_or(format!("{a}: modo 1 a 8"))?),
             "--trilhas" => o.trilhas = true,
             "--mini-mapa" => o.mini_mapa = valor()?.parse().map_err(|_| format!("{a}: número de aberturas"))?,

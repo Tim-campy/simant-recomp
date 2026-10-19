@@ -287,12 +287,30 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 // Diálogo do Windows aberto: modal, recebe toda a entrada.
                 let r = match ev {
                     Event::Quit { .. } => return Ok(()),
-                    Event::MouseMotion { x, y, .. } => {
+                    Event::MouseMotion { x, y, mousestate, .. } => {
                         cursor = (x, y);
+                        if mousestate.left() && s.mover_no_dialogo(x, y) {
+                            redesenhar = true;
+                        }
                         continue;
                     }
-                    Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => s.clicar_no_dialogo(x, y, clicks >= 2),
-                    Event::KeyDown { keycode: Some(k), .. } => s.tecla_no_dialogo(&k.name()),
+                    Event::MouseButtonUp { mouse_btn: MouseButton::Left, .. } => {
+                        redesenhar |= s.soltar_no_dialogo();
+                        continue;
+                    }
+                    Event::MouseWheel { y: dy, .. } => {
+                        redesenhar |= s.rolar_no_dialogo(cursor.0, cursor.1, dy);
+                        continue;
+                    }
+                    Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => {
+                        s.clicar_no_dialogo_com(x, y, clicks >= 2, shift_apertado(&eventos))
+                    }
+                    Event::KeyDown { keycode: Some(k), keymod, .. } => s.tecla_no_dialogo_com(
+                        &k.name(),
+                        keymod.intersects(sdl2::keyboard::Mod::LSHIFTMOD | sdl2::keyboard::Mod::RSHIFTMOD),
+                        keymod.intersects(sdl2::keyboard::Mod::LCTRLMOD | sdl2::keyboard::Mod::RCTRLMOD),
+                        keymod.intersects(sdl2::keyboard::Mod::LALTMOD | sdl2::keyboard::Mod::RALTMOD),
+                    ),
                     Event::TextInput { text, .. } => {
                         s.digitar_no_dialogo(&text);
                         arquivos::RespostaDialogo::Nada
@@ -600,7 +618,10 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 tecla_repetida = None;
             }
         }
+        // Seta ou trilho segurados numa lista do diálogo de arquivo: repete.
+        redesenhar |= s.avancar_dialogo(ms as u32);
         if let Some((a, n)) = repeticao.passar_tempo(ms, &s.nav_cfg.repeticao) {
+
             for _ in 0..n {
                 s.partida.navegar(a);
             }

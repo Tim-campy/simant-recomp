@@ -233,7 +233,7 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
                 return Ok(None);
             }
             if let Some(l) = load.as_mut() {
-                match l.evento(&ev) {
+                match l.evento(&ev, interface) {
                     Some(engine::core::dialogos::RespostaArquivo::Escolher(p)) => return Ok(Some(SaidaAbertura::Carregar(p))),
                     Some(_) => load = None,
                     None => {}
@@ -537,9 +537,27 @@ fn principal(o: Opcoes) -> Result<(), String> {
             Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como, salvo, sair, sobre ou status")),
             None => {}
         }
-        for &(x, y, duplo) in &o.cliques_dialogo {
-            s.clicar_no_dialogo(x, y, duplo);
+        for e in &o.cliques_dialogo {
+            use opcoes::EntradaDialogo as E;
+            match e {
+                E::Clique(x, y, duplo) => {
+                    s.clicar_no_dialogo(*x, *y, *duplo);
+                    s.soltar_no_dialogo();
+                }
+                E::Arrasto(x0, y0, x1, y1, solto) => {
+                    s.clicar_no_dialogo(*x0, *y0, false);
+                    s.mover_no_dialogo(*x1, *y1);
+                    if *solto {
+                        s.soltar_no_dialogo();
+                    }
+                }
+                E::Tecla(nome, shift, ctrl, alt) => {
+                    s.tecla_no_dialogo_com(nome, *shift, *ctrl, *alt);
+                }
+                E::Texto(t) => s.digitar_no_dialogo(t),
+            }
         }
+
         if let Some((x, y)) = o.examinar {
             s.janela_exame.ja_aberta = o.exame_ja_aberto;
             let plano = i32::from(s.partida.nav.plano_mapa);

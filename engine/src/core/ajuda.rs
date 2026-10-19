@@ -1,9 +1,9 @@
-//! Visor de ajuda (o WinHelp 3.x que o original chama com `WinHelp(â€¦, "SIMANT.HLP", â€¦)`), sem SDL:
-//! tÃ³pico atual, histÃ³rico (Back), sequÃªncia de navegaÃ§Ã£o (<< >>), rolagem, layout dos parÃ¡grafos
+//! Visor de ajuda (o WinHelp 3.x que o original chama com `WinHelp(…, "SIMANT.HLP", …)`), sem SDL:
+//! tópico atual, histórico (Back), sequência de navegação (<< >>), rolagem, layout dos parágrafos
 //! com as fontes do port, desenho num `Quadro` e teste de clique.
 //!
-//! EspecificaÃ§Ã£o: docs/spec/telas/ajuda.md. Formato do arquivo: docs/spec/formatos/hlp.md
-//! (`formats::hlp`). AparÃªncia e textos: data/ajuda.json.
+//! Especificação: docs/spec/telas/ajuda.md. Formato do arquivo: docs/spec/formatos/hlp.md
+//! (`formats::hlp`). Aparência e textos: data/ajuda.json.
 
 use std::collections::HashMap;
 
@@ -21,7 +21,7 @@ use crate::recursos::Recursos;
 
 pub const ARQUIVO_CONFIG: &str = "ajuda.json";
 
-/// Fonte do arquivo de ajuda (meios pontos e negrito) â†’ Ã­ndice de fonte do port (`interface.json`).
+/// Fonte do arquivo de ajuda (meios pontos e negrito) → índice de fonte do port (`interface.json`).
 #[derive(Clone, Debug, Deserialize)]
 pub struct MapaFonte {
     pub meios_pontos: u8,
@@ -50,7 +50,7 @@ pub struct BotaoAjuda {
 #[derive(Clone, Debug, Deserialize)]
 pub struct ItemMenuAjuda {
     pub texto: String,
-    /// Coluna da cÃ©lula do texto a partir da borda interna esquerda.
+    /// Coluna da célula do texto a partir da borda interna esquerda.
     pub x: i16,
 }
 
@@ -72,87 +72,87 @@ pub struct CoresAjuda {
     pub trilho: u8,
 }
 
-/// Regra da posiÃ§Ã£o padrÃ£o do visor (telas/resolucao.md Â§3).
+/// Regra da posição padrão do visor (telas/resolucao.md §3).
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub struct PosicaoAjuda {
     pub divisor_x: i16,
     pub margem_direita: i16,
 }
 
-/// ConteÃºdo de data/ajuda.json.
+/// Conteúdo de data/ajuda.json.
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigAjuda {
     /// Arquivo de ajuda na pasta do jogo.
     pub arquivo: String,
-    /// Texto do tÃ­tulo da janela.
+    /// Texto do título da janela.
     pub titulo: String,
-    /// Contorno externo da janela na Ã¡rea cliente do port [esq, topo, dir, base) .
+    /// Contorno externo da janela na área cliente do port [esq, topo, dir, base) .
     pub externo: [i16; 4],
-    /// PosiÃ§Ã£o padrÃ£o do WinHelp (sem `H_WindowPosition` no `WIN.INI`) para a tela virtual: x de
-    /// `largura / divisor_x` a `largura âˆ’ margem_direita`; do topo Ã  base da Ã¡rea cliente. Opcional
+    /// Posição padrão do WinHelp (sem `H_WindowPosition` no `WIN.INI`) para a tela virtual: x de
+    /// `largura / divisor_x` a `largura − margem_direita`; do topo à base da área cliente. Opcional
     /// (API 0.29); sem ela, `externo`.
     #[serde(default)]
     pub posicao_padrao: Option<PosicaoAjuda>,
     pub espessura_moldura: i16,
     pub altura_titulo: i16,
     pub altura_menu: i16,
-    /// Altura da barra de botÃµes sem a linha preta de baixo.
+    /// Altura da barra de botões sem a linha preta de baixo.
     pub altura_botoes: i16,
     pub largura_botao: i16,
-    /// Topo da cÃ©lula do texto dos botÃµes a partir do topo do botÃ£o.
+    /// Topo da célula do texto dos botões a partir do topo do botão.
     pub topo_texto_botao: i16,
     pub menu: Vec<ItemMenuAjuda>,
     pub botoes: Vec<BotaoAjuda>,
-    /// Coluna do texto do tÃ³pico a partir da borda interna esquerda.
+    /// Coluna do texto do tópico a partir da borda interna esquerda.
     pub margem_texto: i16,
-    /// Passo das tabulaÃ§Ãµes sem tabulaÃ§Ã£o definida no parÃ¡grafo [hipÃ³tese].
+    /// Passo das tabulações sem tabulação definida no parágrafo [hipótese].
     pub passo_tab: i32,
     /// Largura da barra de rolagem vertical (com a linha preta da esquerda).
     pub largura_barra: i16,
     /// Pixels por clique nas setas da barra e por linha das teclas.
     pub passo_rolagem: i32,
-    /// Fonte do tÃ­tulo e do menu (System do Windows), dos botÃµes e de reserva.
+    /// Fonte do título e do menu (System do Windows), dos botões e de reserva.
     pub fonte_sistema: usize,
     pub fonte_botoes: usize,
     pub fonte_padrao: usize,
     pub fontes: Vec<MapaFonte>,
-    /// `WinHelp(â€¦, HELP_CONTEXT, n)` do Ã­ndice (F1 no original abre o Ã­ndice com HELP_INDEX).
+    /// `WinHelp(…, HELP_CONTEXT, n)` do índice (F1 no original abre o índice com HELP_INDEX).
     pub contexto_indice: u32,
     pub cores: CoresAjuda,
     /// Menus, Search, History e popups (core/ajuda_janelas.rs). Opcional (API 0.25): sem ele, os
-    /// botÃµes Search e History nÃ£o fazem nada e os popups trocam o tÃ³pico, como antes.
+    /// botões Search e History não fazem nada e os popups trocam o tópico, como antes.
     #[serde(default)]
     pub janelas: Option<super::ajuda_janelas::ConfigJanelasAjuda>,
-    /// A janela do WinHelp como janela de nÃ­vel superior do Windows 3.1 (menu de sistema, mover,
+    /// A janela do WinHelp como janela de nível superior do Windows 3.1 (menu de sistema, mover,
     /// redimensionar, minimizar, maximizar), pelo gerenciador de janelas (`core/gerenciador.rs`).
-    /// Opcional (API 0.37): sem ela, a interface usa o menu e o tamanho mÃ­nimo das janelas filhas.
+    /// Opcional (API 0.37): sem ela, a interface usa o menu e o tamanho mínimo das janelas filhas.
     #[serde(default)]
     pub janela: Option<ConfigJanelaAjuda>,
 }
 
-/// O que muda, na configuraÃ§Ã£o do gerenciador das janelas filhas (`janelas.json` â†’
+/// O que muda, na configuração do gerenciador das janelas filhas (`janelas.json` →
 /// `gerenciador`), para a janela do WinHelp [bancada h01, k01/k02].
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigJanelaAjuda {
-    /// Menor contorno externo (`SM_CXMINTRACK` Ã— `SM_CYMINTRACK` do Windows 3.1 a 640Ã—480: 103 Ã— 26,
-    /// o tÃ­tulo com a moldura).
+    /// Menor contorno externo (`SM_CXMINTRACK` × `SM_CYMINTRACK` do Windows 3.1 a 640×480: 103 × 26,
+    /// o título com a moldura).
     pub tamanho_minimo: [i16; 2],
-    /// Itens do menu de sistema de uma janela de nÃ­vel superior: Restore, Move, Size, Minimize,
-    /// Maximize, â€”, Close Alt+F4, â€”, Switch To... Ctrl+Esc.
+    /// Itens do menu de sistema de uma janela de nível superior: Restore, Move, Size, Minimize,
+    /// Maximize, —, Close Alt+F4, —, Switch To... Ctrl+Esc.
     pub itens: Vec<super::gerenciador::ItemMenuSistema>,
     pub largura_menu: i16,
     pub coluna_atalho: i16,
     /// Cor da sombra de 1 pixel do menu (cinza-claro).
     #[serde(default)]
     pub sombra_menu: Option<u8>,
-    /// Fase do pontilhado do contorno de arrasto (o Windows o alinha Ã  tela; ver
+    /// Fase do pontilhado do contorno de arrasto (o Windows o alinha à tela; ver
     /// `Gerenciador::fase_pontilhado`).
     #[serde(default)]
     pub fase_pontilhado: i32,
 }
 
 impl ConfigJanelaAjuda {
-    /// A configuraÃ§Ã£o do gerenciador das janelas filhas com o que Ã© da janela do WinHelp.
+    /// A configuração do gerenciador das janelas filhas com o que é da janela do WinHelp.
     pub fn aplicar(&self, cfg: &mut super::gerenciador::ConfigGerenciador) {
         cfg.tamanho_minimo = self.tamanho_minimo;
         let m = &mut cfg.menu_sistema;
@@ -168,7 +168,7 @@ impl ConfigJanelaAjuda {
 /// O que a interface faz depois de uma entrada no visor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RespostaAjuda {
-    /// O ponto nÃ£o Ã© da janela de ajuda.
+    /// O ponto não é da janela de ajuda.
     Fora,
     /// Tratado (redesenhar).
     Nada,
@@ -198,7 +198,7 @@ pub(crate) struct Linha {
     pub(crate) pecas: Vec<Peca>,
 }
 
-/// O visor aberto: o arquivo lido, o tÃ³pico e a rolagem.
+/// O visor aberto: o arquivo lido, o tópico e a rolagem.
 pub struct VisorAjuda {
     pub cfg: ConfigAjuda,
     pub arquivo: ArquivoAjuda,
@@ -212,18 +212,18 @@ pub struct VisorAjuda {
     pub(crate) sobreposta: Option<Sobreposta>,
     /// Janela History aberta.
     pub(crate) janela_historico: Option<JanelaHistorico>,
-    /// TÃ³picos mostrados, do mais antigo ao mais recente (a lista do History).
+    /// Tópicos mostrados, do mais antigo ao mais recente (a lista do History).
     pub(crate) visitados: Vec<usize>,
-    /// Tamanho da tela imitada (largura, altura com as linhas acima da Ã¡rea cliente), para a posiÃ§Ã£o
+    /// Tamanho da tela imitada (largura, altura com as linhas acima da área cliente), para a posição
     /// da janela History (`definir_tela`).
     pub(crate) tela: Option<(i16, i16)>,
-    /// PosiÃ§Ã£o guardada da janela History (`WIN.INI`, `[Windows Help] H_WindowPosition` =
+    /// Posição guardada da janela History (`WIN.INI`, `[Windows Help] H_WindowPosition` =
     /// `[x, y, largura, altura, maximizada]` em pixels da tela).
     pub(crate) historico_guardado: Option<[i16; 4]>,
-    /// A janela estÃ¡ maximizada (o botÃ£o da direita do tÃ­tulo Ã© o de restaurar). Quem move,
-    /// redimensiona e maximiza Ã© o gerenciador de janelas da interface (`core/gerenciador.rs`).
+    /// A janela está maximizada (o botão da direita do título é o de restaurar). Quem move,
+    /// redimensiona e maximiza é o gerenciador de janelas da interface (`core/gerenciador.rs`).
     pub maximizada: bool,
-    /// O WinHelp Ã© a aplicaÃ§Ã£o ativa (tÃ­tulo azul); com o foco no jogo, o tÃ­tulo fica inativo.
+    /// O WinHelp é a aplicação ativa (título azul); com o foco no jogo, o título fica inativo.
     pub ativa_no_sistema: bool,
 }
 
@@ -237,11 +237,11 @@ pub(crate) fn contem(r: Retangulo, x: i32, y: i32) -> bool {
 
 fn cor_mais_proxima(c: [u8; 3], cores: &[[u8; 3]]) -> u8 {
     let d = |p: &[u8; 3]| (0..3).map(|k| (i32::from(c[k]) - i32::from(p[k])).pow(2)).sum::<i32>();
-    // SÃ³ as 16 cores do Windows (as seguintes sÃ£o cores do sistema do port).
+    // Só as 16 cores do Windows (as seguintes são cores do sistema do port).
     cores.iter().take(16).enumerate().min_by_key(|(_, p)| d(p)).map_or(0, |(i, _)| i as u8)
 }
 
-/// Texto transparente com a cÃ©lula em (x, y).
+/// Texto transparente com a célula em (x, y).
 pub(crate) fn escrever(q: &mut Quadro, f: &Fonte, x: i32, y: i32, texto: &[u8], cor: u8) {
     let img = f.imagem(texto);
     for j in 0..img.altura {
@@ -254,7 +254,7 @@ pub(crate) fn escrever(q: &mut Quadro, f: &Fonte, x: i32, y: i32, texto: &[u8], 
 }
 
 /// Texto com `&`: escreve sem o `&` e sublinha a letra seguinte (linha de base + 2). Acinzentado
-/// (`GrayString`): sÃ³ os pixels com x + y par [medido no Back
+/// (`GrayString`): só os pixels com x + y par [medido no Back
 /// desabilitado de a06].
 pub(crate) fn escrever_mnemonico(q: &mut Quadro, f: &Fonte, x: i32, y: i32, texto: &str, cor: u8, cinza: bool) {
     let bytes: Vec<u8> = texto.bytes().filter(|&b| b != b'&').collect();
@@ -289,7 +289,7 @@ pub(crate) fn largura_sem_e(f: &Fonte, texto: &str) -> i32 {
 }
 
 impl VisorAjuda {
-    /// LÃª `data/ajuda.json` e o arquivo de ajuda; as figuras viram Ã­ndices da paleta `cores`.
+    /// Lê `data/ajuda.json` e o arquivo de ajuda; as figuras viram índices da paleta `cores`.
     pub fn carregar(recursos: &Recursos, cores: &[[u8; 3]]) -> Result<VisorAjuda, String> {
         let cfg: ConfigAjuda = recursos.dados(ARQUIVO_CONFIG)?;
         let arquivo = ArquivoAjuda::ler(recursos.arquivo(&cfg.arquivo)?)?;
@@ -345,8 +345,8 @@ impl VisorAjuda {
         self.visitar(i);
     }
 
-    /// `HELP_CONTEXT n`: vai para o tÃ³pico do contexto (false se o contexto nÃ£o existe; fica onde
-    /// estava). O histÃ³rico Ã© zerado, como numa chamada nova do WinHelp [hipÃ³tese].
+    /// `HELP_CONTEXT n`: vai para o tópico do contexto (false se o contexto não existe; fica onde
+    /// estava). O histórico é zerado, como numa chamada nova do WinHelp [hipótese].
     pub fn abrir_contexto(&mut self, n: u32) -> bool {
         match self.arquivo.topico_do_contexto(n) {
             Some(i) => {
@@ -361,14 +361,14 @@ impl VisorAjuda {
         }
     }
 
-    /// Vai para o tÃ³pico `i` da lista (como um salto: entra no histÃ³rico).
+    /// Vai para o tópico `i` da lista (como um salto: entra no histórico).
     pub fn abrir_topico(&mut self, i: usize) {
         if i < self.arquivo.topicos.len() {
             self.ir_para(i);
         }
     }
 
-    /// `HELP_INDEX` (F1): o Ã­ndice.
+    /// `HELP_INDEX` (F1): o índice.
     pub fn abrir_indice(&mut self) {
         self.abrir_contexto(self.cfg.contexto_indice);
     }
@@ -417,14 +417,14 @@ impl VisorAjuda {
     // Geometria
     // ------------------------------------------------------------------------------------------
 
-    /// O visor na Ã¡rea cliente de `largura` Ã— `altura` (a tela virtual), pela `posicao_padrao`.
+    /// O visor na área cliente de `largura` × `altura` (a tela virtual), pela `posicao_padrao`.
     pub fn na_tela(&mut self, largura: i16, altura: i16) {
         if let Some(p) = self.cfg.posicao_padrao {
             self.cfg.externo = [largura / p.divisor_x.max(1), 0, largura - p.margem_direita, altura];
         }
     }
 
-    /// A tela imitada (largura e altura inteiras, com o tÃ­tulo e a barra de menus) e a posiÃ§Ã£o da
+    /// A tela imitada (largura e altura inteiras, com o título e a barra de menus) e a posição da
     /// janela History guardada no `WIN.INI`, se houver (telas/ajuda.md, "History").
     pub fn definir_tela(&mut self, largura: i16, altura: i16, historico_guardado: Option<[i16; 4]>) {
         self.tela = Some((largura, altura));
@@ -454,9 +454,9 @@ impl VisorAjuda {
         ret(t.esq, t.base + 1, t.dir, t.base + 1 + n * self.cfg.altura_menu + (n - 1))
     }
 
-    /// Largura da cÃ©lula de cada item da barra de menus e o x do texto dentro dela: as faixas
-    /// realÃ§adas medidas (`janelas.menus[k].destaque`, File 40, Edit 41, Bookmark 81, Help 46); sem
-    /// elas, a distÃ¢ncia entre os textos.
+    /// Largura da célula de cada item da barra de menus e o x do texto dentro dela: as faixas
+    /// realçadas medidas (`janelas.menus[k].destaque`, File 40, Edit 41, Bookmark 81, Help 46); sem
+    /// elas, a distância entre os textos.
     fn larguras_menu(&self) -> Vec<(i16, i16)> {
         let k = self.cfg.espessura_moldura;
         let n = self.cfg.menu.len();
@@ -475,8 +475,8 @@ impl VisorAjuda {
             .collect()
     }
 
-    /// CÃ©lulas da barra de menus (o retÃ¢ngulo realÃ§ado de cada item e a linha), da esquerda para a
-    /// direita; um item que nÃ£o cabe na linha vai para a seguinte, como a barra de menus do Windows
+    /// Células da barra de menus (o retângulo realçado de cada item e a linha), da esquerda para a
+    /// direita; um item que não cabe na linha vai para a seguinte, como a barra de menus do Windows
     /// numa janela estreita (bancada k01: "File Edit" / "Bookmark" / "Help", linhas de 18 + 1).
     pub(crate) fn celulas_menu(&self) -> Vec<(Retangulo, usize, i16)> {
         let t = self.faixa_titulo();
@@ -495,15 +495,15 @@ impl VisorAjuda {
         v
     }
 
-    /// BotÃµes por linha da barra de botÃµes: os que cabem na largura (pelo menos 1; bancada k01, um
+    /// Botões por linha da barra de botões: os que cabem na largura (pelo menos 1; bancada k01, um
     /// por linha numa janela de 103 pixels).
     fn botoes_por_linha(&self) -> usize {
         let i = self.interno();
         (((i.dir - i.esq) / self.cfg.largura_botao.max(1)) as usize).max(1)
     }
 
-    /// Faixa dos botÃµes, da linha preta de cima (topo) atÃ© a de baixo (base âˆ’ 1); com vÃ¡rias linhas
-    /// de botÃµes, cada uma tem a altura de um botÃ£o (21).
+    /// Faixa dos botões, da linha preta de cima (topo) até a de baixo (base − 1); com várias linhas
+    /// de botões, cada uma tem a altura de um botão (21).
     fn faixa_botoes(&self) -> Retangulo {
         let m = self.faixa_menu();
         let n = self.cfg.botoes.len().div_ceil(self.botoes_por_linha()).max(1) as i16;
@@ -519,7 +519,7 @@ impl VisorAjuda {
         ret(x0, y0, x0 + self.cfg.largura_botao, y0 + self.cfg.altura_botoes + 1)
     }
 
-    /// Ãrea do texto do tÃ³pico (com a barra, se houver); vazia se a janela Ã© baixa demais.
+    /// Área do texto do tópico (com a barra, se houver); vazia se a janela é baixa demais.
     pub(crate) fn area_texto(&self) -> Retangulo {
         let b = self.faixa_botoes();
         let i = self.interno();
@@ -531,7 +531,7 @@ impl VisorAjuda {
         ret(t.esq, t.topo, t.esq + self.cfg.altura_titulo, t.base)
     }
 
-    /// O ponto estÃ¡ na janela de ajuda ou numa janela dela (popup, Search, History).
+    /// O ponto está na janela de ajuda ou numa janela dela (popup, Search, History).
     pub fn contem(&self, x: i32, y: i32) -> bool {
         contem(self.externo(), x, y) || self.contem_janelas(x, y)
     }
@@ -559,12 +559,12 @@ impl VisorAjuda {
     // Layout
     // ------------------------------------------------------------------------------------------
 
-    /// Linhas do tÃ³pico atual para a largura Ãºtil `largura` (a partir da margem).
+    /// Linhas do tópico atual para a largura útil `largura` (a partir da margem).
     fn layout(&self, interface: &Interface, largura: i32) -> Vec<Linha> {
         self.layout_topico(interface, self.topico, i32::from(self.cfg.margem_texto), largura)
     }
 
-    /// Linhas do tÃ³pico `topico` com a margem e a largura Ãºtil dadas.
+    /// Linhas do tópico `topico` com a margem e a largura útil dadas.
     pub(crate) fn layout_topico(&self, interface: &Interface, topico: usize, margem: i32, largura: i32) -> Vec<Linha> {
         let mut linhas: Vec<Linha> = Vec::new();
         let mut y = 0;
@@ -659,7 +659,7 @@ impl VisorAjuda {
         linhas
     }
 
-    /// Linhas e se a barra de rolagem aparece (o texto nÃ£o cabe na Ã¡rea).
+    /// Linhas e se a barra de rolagem aparece (o texto não cabe na área).
     fn layout_com_barra(&self, interface: &Interface) -> (Vec<Linha>, bool) {
         let a = self.area_texto();
         let largura = i32::from(a.dir - a.esq) - 2 * i32::from(self.cfg.margem_texto);
@@ -693,9 +693,9 @@ impl VisorAjuda {
     // Entrada
     // ------------------------------------------------------------------------------------------
 
-    /// Clique esquerdo em (x, y) da Ã¡rea cliente do port.
+    /// Clique esquerdo em (x, y) da área cliente do port.
     pub fn clicar(&mut self, interface: &Interface, x: i32, y: i32, duplo: bool) -> RespostaAjuda {
-        // Com popup ou menu aberto, qualquer clique Ã© deles (fecham sem seguir o clique).
+        // Com popup ou menu aberto, qualquer clique é deles (fecham sem seguir o clique).
         let prende = matches!(self.sobreposta, Some(Sobreposta::Popup { .. }) | Some(Sobreposta::Menu { .. }));
         if !self.contem(x, y) && !prende {
             if let Some(h) = self.janela_historico.as_mut() {
@@ -710,7 +710,7 @@ impl VisorAjuda {
             return RespostaAjuda::Nada;
         }
         if contem(self.caixa_menu_sistema(), x, y) {
-            // Duplo clique na caixa do menu de sistema fecha (o menu em si nÃ£o Ã© desenhado).
+            // Duplo clique na caixa do menu de sistema fecha (o menu em si não é desenhado).
             return if duplo { RespostaAjuda::Fechar } else { RespostaAjuda::Nada };
         }
         for (k, b) in self.cfg.botoes.clone().iter().enumerate() {
@@ -743,7 +743,7 @@ impl VisorAjuda {
         let dx = x - i32::from(a.esq);
         let alvo = linhas.iter().find(|l| dy >= l.topo && dy < l.topo + l.altura).and_then(|l| {
             l.pecas.iter().find(|p| p.salto.is_some() && dx >= p.x && dx < p.x + p.largura).and_then(|p| {
-                // Ponto quente: a peÃ§a; uma figura vai atÃ© a linha de base (onde ela termina).
+                // Ponto quente: a peça; uma figura vai até a linha de base (onde ela termina).
                 let altura = if matches!(p.conteudo, Conteudo::Figura(_)) { l.base } else { l.altura };
                 p.salto.map(|s| (s, l.topo, altura, p.x, p.largura))
             })
@@ -751,7 +751,7 @@ impl VisorAjuda {
         if let Some((s, topo, altura, px, pl)) = alvo {
             if let Some(i) = self.arquivo.topico_do_numero(s.numero_topico) {
                 if s.popup && self.cfg.janelas.is_some() {
-                    // Popup (0xE0): janela pequena abaixo do ponto quente (a peÃ§a na linha).
+                    // Popup (0xE0): janela pequena abaixo do ponto quente (a peça na linha).
                     let (ax, ay) = (i32::from(a.esq), i32::from(a.topo) - self.rolagem);
                     let quente = ret((ax + px) as i16, (ay + topo) as i16, (ax + px + pl) as i16, (ay + topo + altura) as i16);
                     self.abrir_popup(interface, i, quente);
@@ -764,12 +764,12 @@ impl VisorAjuda {
     }
 
     /// Tecla (nome do SDL). Esc fecha; setas, PageUp/PageDown, Home/End rolam; Backspace = Back;
-    /// a letra sublinhada de um botÃ£o (com ou sem Alt) aciona o botÃ£o.
+    /// a letra sublinhada de um botão (com ou sem Alt) aciona o botão.
     pub fn tecla(&mut self, interface: &Interface, nome: &str) -> RespostaAjuda {
         self.tecla_com(interface, nome, false, false)
     }
 
-    /// Como [`VisorAjuda::tecla`], com Alt (abre os menus pela letra) e Shift (maiÃºsculas no Search).
+    /// Como [`VisorAjuda::tecla`], com Alt (abre os menus pela letra) e Shift (maiúsculas no Search).
     pub fn tecla_com(&mut self, interface: &Interface, nome: &str, alt: bool, shift: bool) -> RespostaAjuda {
         if let Some(sair) = self.tecla_janelas(nome, alt, shift) {
             return if sair { RespostaAjuda::Fechar } else { RespostaAjuda::Nada };
@@ -823,7 +823,7 @@ impl VisorAjuda {
             q.linha(ed - i32::from(k) + 1, y, ed, y, c.linha);
         }
         let sistema = self.fonte(interface, self.cfg.fonte_sistema);
-        // TÃ­tulo: caixa do menu de sistema, faixa azul com o nome, botÃµes de minimizar e maximizar.
+        // Título: caixa do menu de sistema, faixa azul com o nome, botões de minimizar e maximizar.
         let t = self.faixa_titulo();
         let inativas = self.cfg.janelas.as_ref().map(|j| (j.cores.titulo_inativo, j.cores.texto_titulo_inativo));
         let (cor_titulo, cor_texto_titulo) = match inativas {
@@ -843,7 +843,7 @@ impl VisorAjuda {
         for (b, cima) in [(min, false), (max, true)] {
             self.desenhar_botao_titulo(q, b);
             if cima && self.maximizada {
-                // Maximizada: o botÃ£o de restaurar (as duas setas; w13).
+                // Maximizada: o botão de restaurar (as duas setas; w13).
                 super::gerenciador::desenhar_glifo_restaurar(q, b, c.linha);
                 continue;
             }
@@ -859,7 +859,7 @@ impl VisorAjuda {
         if let Some(f) = sistema {
             let w = f.largura_texto(self.cfg.titulo.as_bytes()) as i32;
             let (x0, x1) = (i32::from(caixa.dir) + 1, i32::from(min.esq) - 1);
-            // O Windows centraliza o tÃ­tulo; se ele nÃ£o cabe, alinha Ã  esquerda (bancada k01).
+            // O Windows centraliza o título; se ele não cabe, alinha à esquerda (bancada k01).
             let x = ((x0 + x1 - w) / 2).max(x0 + 1);
             q.recorte = Some(ret(x0 as i16, t.topo, x1 as i16, t.base));
             escrever(q, f, x, i32::from(t.topo) + (i32::from(h) - f.altura() as i32) / 2, self.cfg.titulo.as_bytes(), cor_texto_titulo);
@@ -877,7 +877,7 @@ impl VisorAjuda {
             q.recorte = None;
         }
         q.linha(i32::from(i.esq), i32::from(m.base), i32::from(i.dir) - 1, i32::from(m.base), c.linha);
-        // Barra de botÃµes: fundo escuro, botÃµes com relevo, linha preta embaixo. Tudo recortado ao
+        // Barra de botões: fundo escuro, botões com relevo, linha preta embaixo. Tudo recortado ao
         // interior (a janela pode ser mais baixa que as barras).
         q.recorte = Some(i);
         let fb = self.faixa_botoes();
@@ -890,7 +890,7 @@ impl VisorAjuda {
             for (cx, cy) in [(x0, y0), (x1, y0), (x0, y1), (x1, y1)] {
                 q.ponto(cx, cy, c.fundo_botoes);
             }
-            // Contorno preto sem os quatro cantos (botÃ£o do Windows 3.1).
+            // Contorno preto sem os quatro cantos (botão do Windows 3.1).
             q.linha(x0 + 1, y0, x1 - 1, y0, c.linha);
             q.linha(x0 + 1, y1, x1 - 1, y1, c.linha);
             q.linha(x0, y0 + 1, x0, y1 - 1, c.linha);
@@ -904,14 +904,14 @@ impl VisorAjuda {
             if let Some(f) = self.fonte(interface, self.cfg.fonte_botoes) {
                 let w = largura_sem_e(f, &b.texto);
                 // Centrado com o pixel a mais do negrito simulado (o "overhang" do Windows)
-                // [medido nos seis botÃµes de a06].
+                // [medido nos seis botões de a06].
                 let x = (x0 + x1 - 1 - w - i32::from(f.negrito())) / 2;
                 escrever_mnemonico(q, f, x, y0 + i32::from(self.cfg.topo_texto_botao), &b.texto, c.linha, !self.habilitado(b.acao));
             }
         }
         q.recorte = None;
 
-        // Texto do tÃ³pico.
+        // Texto do tópico.
         let a = self.area_texto();
         q.preencher(a, c.fundo, c.fundo);
         let (linhas, com_barra) = self.layout_com_barra(interface);
@@ -992,8 +992,8 @@ impl VisorAjuda {
     }
 }
 
-/// Palavras com os espaÃ§os que as seguem ("ab  cd" â†’ "ab  ", "cd"); espaÃ§os no inÃ­cio formam uma
-/// palavra prÃ³pria.
+/// Palavras com os espaços que as seguem ("ab  cd" → "ab  ", "cd"); espaços no início formam uma
+/// palavra própria.
 fn palavras(t: &[u8]) -> Vec<&[u8]> {
     let mut v = Vec::new();
     let mut i = 0;

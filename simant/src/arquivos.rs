@@ -151,29 +151,84 @@ impl Sessao<'_> {
         RespostaDialogo::Nada
     }
 
+    /// O diálogo de arquivo aberto, se houver.
+    fn dialogo_de_arquivo(&mut self) -> Option<&mut DialogoArquivo> {
+        match &mut self.dialogo {
+            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d) | Dialogo::SalvarAntesDeSair(d)) => Some(d),
+            _ => None,
+        }
+    }
+
     /// Clique esquerdo com um diálogo aberto.
     pub(crate) fn clicar_no_dialogo(&mut self, x: i32, y: i32, duplo: bool) -> RespostaDialogo {
+        self.clicar_no_dialogo_com(x, y, duplo, false)
+    }
+
+    /// Como [`Sessao::clicar_no_dialogo`], com Shift (estende a seleção do campo do nome).
+    pub(crate) fn clicar_no_dialogo_com(&mut self, x: i32, y: i32, duplo: bool, shift: bool) -> RespostaDialogo {
         let cfg = self.dialogos_cfg.clone();
         let r = match &mut self.dialogo {
             Some(Dialogo::PerguntaLoad(m) | Dialogo::Salvo(m, _) | Dialogo::PerguntaSair(m)) => match m.botao_em(&self.interface, &cfg, x, y) {
                 Some(i) => return self.escolher_botao(i),
                 None => return RespostaDialogo::Nada,
             },
-            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d) | Dialogo::SalvarAntesDeSair(d)) => d.clicar(&cfg, x, y, duplo),
+            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d) | Dialogo::SalvarAntesDeSair(d)) => {
+                d.clicar(&cfg, Some(&self.interface), x, y, duplo, shift)
+            }
             None => return RespostaDialogo::Nada,
         };
         self.responder_arquivo(r)
     }
 
+    /// Mouse andando com o botão apertado (arrasto do título, do polegar, seleção do campo).
+    pub(crate) fn mover_no_dialogo(&mut self, x: i32, y: i32) -> bool {
+        let cfg = self.dialogos_cfg.clone();
+        let interface = &self.interface;
+        match &mut self.dialogo {
+            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d) | Dialogo::SalvarAntesDeSair(d)) => d.mover_mouse(&cfg, Some(interface), x, y),
+            _ => false,
+        }
+    }
+
+    /// Botão solto com um diálogo aberto.
+    pub(crate) fn soltar_no_dialogo(&mut self) -> bool {
+        let cfg = self.dialogos_cfg.clone();
+        let interface = &self.interface;
+        match &mut self.dialogo {
+            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d) | Dialogo::SalvarAntesDeSair(d)) => d.soltar(&cfg, Some(interface)),
+            _ => false,
+        }
+    }
+
+    /// Roda do mouse com um diálogo aberto.
+    pub(crate) fn rolar_no_dialogo(&mut self, x: i32, y: i32, linhas: i32) -> bool {
+        let cfg = self.dialogos_cfg.clone();
+        self.dialogo_de_arquivo().is_some_and(|d| d.rolar(&cfg, x, y, linhas))
+    }
+
+    /// Tempo passando com um diálogo aberto (repetição da seta segurada).
+    pub(crate) fn avancar_dialogo(&mut self, ms: u32) -> bool {
+        let cfg = self.dialogos_cfg.clone();
+        self.dialogo_de_arquivo().is_some_and(|d| d.avancar(&cfg, ms))
+    }
+
     /// Tecla com um diálogo aberto (nome do SDL).
+    #[cfg(test)]
     pub(crate) fn tecla_no_dialogo(&mut self, nome: &str) -> RespostaDialogo {
+        self.tecla_no_dialogo_com(nome, false, false, false)
+    }
+
+    /// Como [`Sessao::tecla_no_dialogo`], com Shift, Ctrl e Alt.
+    pub(crate) fn tecla_no_dialogo_com(&mut self, nome: &str, shift: bool, ctrl: bool, alt: bool) -> RespostaDialogo {
         let cfg = self.dialogos_cfg.clone();
         let r = match &mut self.dialogo {
             Some(Dialogo::PerguntaLoad(m) | Dialogo::Salvo(m, _) | Dialogo::PerguntaSair(m)) => match m.tecla(nome) {
                 Some(i) => return self.escolher_botao(i),
                 None => return RespostaDialogo::Nada,
             },
-            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d) | Dialogo::SalvarAntesDeSair(d)) => d.tecla(nome, &cfg),
+            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d) | Dialogo::SalvarAntesDeSair(d)) => {
+                d.tecla_com(nome, shift, ctrl, alt, &cfg)
+            }
             None => return RespostaDialogo::Nada,
         };
         self.responder_arquivo(r)
@@ -215,13 +270,35 @@ impl LoadNaAbertura {
     }
 
     /// Evento do SDL (coordenadas da tela). `Some` = respondido (arquivo ou Cancel).
-    pub(crate) fn evento(&mut self, ev: &sdl2::event::Event) -> Option<RespostaArquivo> {
+    pub(crate) fn evento(&mut self, ev: &sdl2::event::Event, interface: &Interface) -> Option<RespostaArquivo> {
         use sdl2::event::Event;
+        use sdl2::keyboard::Mod;
         use sdl2::mouse::MouseButton;
         let topo = i32::from(self.cfg.topo_na_tela);
         let r = match ev {
-            Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => self.dialogo.clicar(&self.cfg, *x, *y - topo, *clicks >= 2),
-            Event::KeyDown { keycode: Some(k), .. } => self.dialogo.tecla(&k.name(), &self.cfg),
+            Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => {
+                self.dialogo.clicar(&self.cfg, Some(interface), *x, *y - topo, *clicks >= 2, false)
+            }
+            Event::MouseMotion { x, y, mousestate, .. } if mousestate.left() => {
+                self.dialogo.mover_mouse(&self.cfg, Some(interface), *x, *y - topo);
+                RespostaArquivo::Nada
+            }
+            Event::MouseButtonUp { mouse_btn: MouseButton::Left, .. } => {
+                self.dialogo.soltar(&self.cfg, Some(interface));
+                RespostaArquivo::Nada
+            }
+            Event::MouseWheel { y, mouse_x, mouse_y, .. } => {
+                self.dialogo.rolar(&self.cfg, *mouse_x, *mouse_y - topo, *y);
+                RespostaArquivo::Nada
+            }
+            Event::KeyDown { keycode: Some(k), keymod, .. } => self.dialogo.tecla_com(
+                &k.name(),
+                keymod.intersects(Mod::LSHIFTMOD | Mod::RSHIFTMOD),
+                keymod.intersects(Mod::LCTRLMOD | Mod::RCTRLMOD),
+                keymod.intersects(Mod::LALTMOD | Mod::RALTMOD),
+                &self.cfg,
+            ),
+
             Event::TextInput { text, .. } => {
                 self.dialogo.digitar(text, &self.cfg);
                 RespostaArquivo::Nada

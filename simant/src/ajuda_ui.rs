@@ -1,9 +1,9 @@
 //! Ajuda na interface SDL: modo de ajuda (`_bHelp`) pelo clique direito, Shift+F1 ou Delete; o
-//! clique seguinte num objeto abre a ajuda do contexto dele; F1 abre o Ã­ndice; os botÃµes "?" das
-//! faixas (`ribHelp`, `ribHelp2`) abrem a ajuda da faixa; e os cursores do executÃ¡vel (modo de ajuda
-//! e ferramentas do Experimental). A tabela de contextos estÃ¡ em `engine::core::ajuda_contexto`.
+//! clique seguinte num objeto abre a ajuda do contexto dele; F1 abre o índice; os botões "?" das
+//! faixas (`ribHelp`, `ribHelp2`) abrem a ajuda da faixa; e os cursores do executável (modo de ajuda
+//! e ferramentas do Experimental). A tabela de contextos está em `engine::core::ajuda_contexto`.
 //!
-//! EspecificaÃ§Ã£o: docs/spec/telas/ajuda-contexto.md.
+//! Especificação: docs/spec/telas/ajuda-contexto.md.
 
 use std::collections::HashMap;
 
@@ -20,28 +20,28 @@ use super::Sessao;
 
 pub struct AjudaUi {
     pub cfg: ConfigAjudaContexto,
-    /// `_bHelp`: o prÃ³ximo clique num objeto abre a ajuda dele.
+    /// `_bHelp`: o próximo clique num objeto abre a ajuda dele.
     pub modo: bool,
-    /// Cursores lidos do executÃ¡vel (vazio se ele nÃ£o existe).
+    /// Cursores lidos do executável (vazio se ele não existe).
     pub cursores: HashMap<String, ne::Cursor>,
-    /// Ãšltimo contexto pedido (para os testes e o terminal).
+    /// Último contexto pedido (para os testes e o terminal).
     pub ultimo_contexto: Option<u32>,
     /// Visor de ajuda (core/ajuda.rs), carregado na primeira vez; `aberto` = na tela.
     pub visor: Option<VisorAjuda>,
     pub aberto: bool,
-    /// PosiÃ§Ã£o guardada da janela History do WinHelp (`WIN.INI` do usuÃ¡rio, `[Windows Help]
+    /// Posição guardada da janela History do WinHelp (`WIN.INI` do usuário, `[Windows Help]
     /// H_WindowPosition`), lida ao abrir a partida.
     pub historico_guardado: Option<[i16; 4]>,
-    /// O visor recebe as teclas (foi aberto ou clicado por Ãºltimo), como a janela do WinHelp com o
+    /// O visor recebe as teclas (foi aberto ou clicado por último), como a janela do WinHelp com o
     /// foco.
     pub foco: bool,
-    /// A janela do WinHelp no gerenciador de janelas (`core/gerenciador.rs`), como janela de nÃ­vel
-    /// superior: menu de sistema, mover, redimensionar, minimizar e maximizar (telas/ajuda.md Â§2.1).
-    /// A "Ã¡rea de trabalho" Ã© a Ã¡rea cliente do port. Criado com o visor.
+    /// A janela do WinHelp no gerenciador de janelas (`core/gerenciador.rs`), como janela de nível
+    /// superior: menu de sistema, mover, redimensionar, minimizar e maximizar (telas/ajuda.md §2.1).
+    /// A "área de trabalho" é a área cliente do port. Criado com o visor.
     pub gerente: Option<Gerenciador>,
 }
 
-/// NÃºmero da janela do WinHelp no gerenciador prÃ³prio dela.
+/// Número da janela do WinHelp no gerenciador próprio dela.
 pub const ID_AJUDA: u16 = 0xFFFE;
 
 impl AjudaUi {
@@ -57,12 +57,12 @@ impl AjudaUi {
         Ok(AjudaUi { cfg, modo: false, cursores, ultimo_contexto: None, visor: None, aberto: false, historico_guardado: None, foco: false, gerente: None })
     }
 
-    /// A janela do WinHelp minimizada (um Ã­cone escondido atrÃ¡s do SimAnt maximizado: bancada h11).
+    /// A janela do WinHelp minimizada (um ícone escondido atrás do SimAnt maximizado: bancada h11).
     pub fn minimizada(&self) -> bool {
         self.gerente.as_ref().and_then(|g| g.janela(ID_AJUDA)).is_some_and(|j| j.minimizada)
     }
 
-    /// A janela de ajuda estÃ¡ na tela (aberta e nÃ£o minimizada).
+    /// A janela de ajuda está na tela (aberta e não minimizada).
     pub fn na_tela(&self) -> bool {
         self.aberto && !self.minimizada()
     }
@@ -79,8 +79,8 @@ impl AjudaUi {
     }
 }
 
-/// O gerenciador com a janela do WinHelp: o menu e o tamanho mÃ­nimo de `ajuda.json` â†’ `janela`
-/// por cima da configuraÃ§Ã£o das janelas filhas.
+/// O gerenciador com a janela do WinHelp: o menu e o tamanho mínimo de `ajuda.json` → `janela`
+/// por cima da configuração das janelas filhas.
 fn criar_gerente(s: &Sessao, v: &VisorAjuda) -> Gerenciador {
     let mut cfg = s.janelas.gerente.cfg.clone();
     if let Some(j) = &v.cfg.janela {
@@ -95,8 +95,8 @@ fn criar_gerente(s: &Sessao, v: &VisorAjuda) -> Gerenciador {
     g
 }
 
-/// Abre a ajuda no tÃ³pico do contexto `ctx` (`WinHelp(HELP_CONTEXT)`). Um contexto que o arquivo
-/// nÃ£o tem (0x1900 do `yardHelpBut`) abre o Ã­ndice [hipÃ³tese: o WinHelp avisa e mostra o Ã­ndice].
+/// Abre a ajuda no tópico do contexto `ctx` (`WinHelp(HELP_CONTEXT)`). Um contexto que o arquivo
+/// não tem (0x1900 do `yardHelpBut`) abre o índice [hipótese: o WinHelp avisa e mostra o índice].
 pub fn abrir_contexto(s: &mut Sessao, ctx: u32) {
     s.ajuda.ultimo_contexto = Some(ctx);
     if s.ajuda.visor.is_none() {
@@ -115,7 +115,7 @@ pub fn abrir_contexto(s: &mut Sessao, ctx: u32) {
     }
     let Some(v) = s.ajuda.visor.as_mut() else { return };
     if !v.abrir_contexto(ctx) {
-        println!("ajuda: contexto 0x{ctx:X} nÃ£o existe no arquivo; Ã­ndice");
+        println!("ajuda: contexto 0x{ctx:X} não existe no arquivo; índice");
         v.abrir_indice();
     }
     println!("ajuda: contexto 0x{ctx:X}: {}", v.topico_atual().titulo);
@@ -146,14 +146,14 @@ fn tratar_clique(s: &mut Sessao, c: Clique) {
 }
 
 /// Clique esquerdo com o visor aberto: dentro dele, vai para o visor (e ele fica com o foco);
-/// fora, o foco volta ao jogo e o clique segue. A moldura (caixa e menu de sistema, tÃ­tulo,
-/// bordas, botÃµes de minimizar e maximizar) Ã© do gerenciador. Devolve se tratou.
+/// fora, o foco volta ao jogo e o clique segue. A moldura (caixa e menu de sistema, título,
+/// bordas, botões de minimizar e maximizar) é do gerenciador. Devolve se tratou.
 pub fn clique_no_visor(s: &mut Sessao, x: i32, y: i32, duplo: bool) -> bool {
     if !s.ajuda.na_tela() {
         return false;
     }
     if let Some(g) = s.ajuda.gerente.as_mut() {
-        // Com o menu de sistema aberto, o clique Ã© dele (fora dele, fecha o menu).
+        // Com o menu de sistema aberto, o clique é dele (fora dele, fecha o menu).
         if g.menu.is_some() || g.arrasto.is_some() {
             let c = g.pressionar(x, y, duplo);
             s.ajuda.foco = true;
@@ -162,7 +162,7 @@ pub fn clique_no_visor(s: &mut Sessao, x: i32, y: i32, duplo: bool) -> bool {
         }
     }
     let Some(v) = s.ajuda.visor.as_mut() else { return false };
-    // Menus, Search, popup e History do WinHelp recebem o clique antes da moldura (o Search Ã© modal).
+    // Menus, Search, popup e History do WinHelp recebem o clique antes da moldura (o Search é modal).
     let da_moldura = v.sobreposta().is_none() && !v.contem_janelas(x, y);
     if da_moldura {
         if let Some(g) = s.ajuda.gerente.as_mut() {
@@ -198,18 +198,18 @@ pub fn clique_no_visor(s: &mut Sessao, x: i32, y: i32, duplo: bool) -> bool {
 }
 
 /// Mouse andando: o arrasto (mover, redimensionar) e o realce do menu de sistema da ajuda.
-/// Devolve se tratou (e Ã© preciso redesenhar).
+/// Devolve se tratou (e é preciso redesenhar).
 pub fn mover_mouse(s: &mut Sessao, x: i32, y: i32) -> bool {
     let Some(g) = s.ajuda.gerente.as_mut().filter(|g| g.arrasto.is_some() || g.menu.is_some()) else { return false };
     g.mover_mouse(x, y);
     true
 }
 
-/// BotÃ£o solto: termina o arrasto da janela de ajuda (ou escolhe o item do menu de sistema).
+/// Botão solto: termina o arrasto da janela de ajuda (ou escolhe o item do menu de sistema).
 /// Devolve se tratou.
 pub fn soltar(s: &mut Sessao, x: i32, y: i32) -> bool {
     let Some(g) = s.ajuda.gerente.as_mut().filter(|g| g.arrasto.is_some() || g.menu.is_some()) else { return false };
-    // Um Move/Size escolhido no menu termina no clique, nÃ£o ao soltar o botÃ£o do item.
+    // Um Move/Size escolhido no menu termina no clique, não ao soltar o botão do item.
     if g.arrasto.is_some_and(|a| matches!(a, gerenciador::Arrasto::Mover { por_teclado: true, .. } | gerenciador::Arrasto::Redimensionar { por_teclado: true, .. })) {
         return true;
     }
@@ -224,20 +224,20 @@ pub fn tecla_no_visor(s: &mut Sessao, nome: &str) -> bool {
     tecla_no_visor_com(s, nome, false, false)
 }
 
-/// Como [`tecla_no_visor`], com Alt (menus do WinHelp) e Shift (maiÃºsculas no Search).
+/// Como [`tecla_no_visor`], com Alt (menus do WinHelp) e Shift (maiúsculas no Search).
 pub fn tecla_no_visor_com(s: &mut Sessao, nome: &str, alt: bool, shift: bool) -> bool {
     if !(s.ajuda.na_tela() && s.ajuda.foco) {
         return false;
     }
     if let Some(g) = s.ajuda.gerente.as_mut() {
-        // Menu de sistema aberto, ou Move/Size pelo teclado: as teclas sÃ£o do gerenciador.
+        // Menu de sistema aberto, ou Move/Size pelo teclado: as teclas são do gerenciador.
         if g.menu.is_some() || g.arrasto.is_some() {
             if let Some(c) = g.tecla(nome) {
                 tratar_clique(s, c);
             }
             return true;
         }
-        // Alt+EspaÃ§o abre o menu de sistema; Alt+F4 fecha (os atalhos da janela de nÃ­vel superior).
+        // Alt+Espaço abre o menu de sistema; Alt+F4 fecha (os atalhos da janela de nível superior).
         if alt && nome == "Space" {
             g.abrir_menu(ID_AJUDA);
             return true;
@@ -266,12 +266,12 @@ pub fn rolar_visor(s: &mut Sessao, x: i32, y: i32, linhas: i32) -> bool {
     true
 }
 
-/// O ponto estÃ¡ sobre a janela de ajuda aberta (outra aplicaÃ§Ã£o no original: o jogo nÃ£o recebe).
+/// O ponto está sobre a janela de ajuda aberta (outra aplicação no original: o jogo não recebe).
 pub fn sobre_visor(s: &Sessao, x: i32, y: i32) -> bool {
     s.ajuda.na_tela() && s.ajuda.visor.as_ref().is_some_and(|v| v.contem(x, y))
 }
 
-/// Fecha o WinHelp. O lugar e o tamanho da janela ficam para a prÃ³xima abertura (bancada k03).
+/// Fecha o WinHelp. O lugar e o tamanho da janela ficam para a próxima abertura (bancada k03).
 pub fn fechar(s: &mut Sessao) {
     s.ajuda.aberto = false;
     s.ajuda.foco = false;
@@ -281,7 +281,7 @@ pub fn fechar(s: &mut Sessao) {
     }
 }
 
-/// Desenha o visor por cima do jogo, se aberto e nÃ£o minimizado, com o menu de sistema e o
+/// Desenha o visor por cima do jogo, se aberto e não minimizado, com o menu de sistema e o
 /// contorno do arrasto da janela dele.
 pub fn desenhar(s: &Sessao, q: &mut Quadro) {
     if !s.ajuda.na_tela() {
@@ -296,7 +296,7 @@ pub fn desenhar(s: &Sessao, q: &mut Quadro) {
     }
 }
 
-/// BotÃ£o "?" da faixa sob o ponto (`ribHelp` 0x2208 na 34, `ribHelp2` 0x2308 na 35): abre a ajuda
+/// Botão "?" da faixa sob o ponto (`ribHelp` 0x2208 na 34, `ribHelp2` 0x2308 na 35): abre a ajuda
 /// da faixa (`_DoWinHelp`). Devolve se tratou.
 pub fn botao_da_faixa(s: &mut Sessao, x: i32, y: i32) -> bool {
     let nomes: Vec<String> = if s.modos.janela.na_frente {
@@ -312,7 +312,7 @@ pub fn botao_da_faixa(s: &mut Sessao, x: i32, y: i32) -> bool {
     true
 }
 
-/// BotÃ£o "?" de uma janela de controle (Caste, Behavior, History, quintal) sob o ponto, na janela da
+/// Botão "?" de uma janela de controle (Caste, Behavior, History, quintal) sob o ponto, na janela da
 /// frente: abre a ajuda dela (`_DoWinHelp`). Devolve se tratou.
 pub fn botao_de_janela(s: &mut Sessao, x: i32, y: i32) -> bool {
     let Some(id) = s.janelas.gerente.janela_em(x, y) else { return false };
@@ -331,8 +331,8 @@ pub fn alternar_modo(s: &mut Sessao) {
     println!("modo de ajuda {}", if s.ajuda.modo { "ligado" } else { "desligado" });
 }
 
-/// Teclas da ajuda (`_HelpKeyDown`): F1 abre o Ã­ndice; Shift+F1 e Delete alternam o modo; Esc o
-/// desliga (sÃ³ quando ligado). Devolve se tratou.
+/// Teclas da ajuda (`_HelpKeyDown`): F1 abre o índice; Shift+F1 e Delete alternam o modo; Esc o
+/// desliga (só quando ligado). Devolve se tratou.
 pub fn tecla(s: &mut Sessao, ev: &EventoNav) -> bool {
     match s.ajuda.cfg.tecla(ev) {
         Some(TeclaAjuda::Indice) => {
@@ -352,8 +352,8 @@ pub fn tecla(s: &mut Sessao, ev: &EventoNav) -> bool {
     }
 }
 
-/// Id do objeto (janela Ã— 256 + Ã­ndice) sob o ponto, como `_win_FindObject`: a janela da frente sob
-/// o cursor, senÃ£o a faixa. `None` fora de tudo.
+/// Id do objeto (janela × 256 + índice) sob o ponto, como `_win_FindObject`: a janela da frente sob
+/// o cursor, senão a faixa. `None` fora de tudo.
 pub fn objeto_em(s: &Sessao, x: i32, y: i32) -> Option<u16> {
     if let Some(id) = s.janelas.gerente.janela_em(x, y) {
         if id == ID_EDICAO {
@@ -389,8 +389,8 @@ pub fn clique(s: &mut Sessao, x: i32, y: i32) -> bool {
 }
 
 /// Nome do cursor que o original mostraria em (x, y) (`WM_SETCURSOR` em `MAINWNDPROC`): o de ajuda
-/// no modo de ajuda; no Experimental, o da ferramenta sobre a Ã¡rea cliente da janela de ediÃ§Ã£o quando
-/// ela Ã© a da frente; senÃ£o a seta (`None`).
+/// no modo de ajuda; no Experimental, o da ferramenta sobre a área cliente da janela de edição quando
+/// ela é a da frente; senão a seta (`None`).
 pub fn cursor_em(s: &Sessao, x: i32, y: i32) -> Option<String> {
     let c = &s.ajuda.cfg.cursores;
     if s.ajuda.na_tela() && s.ajuda.visor.as_ref().is_some_and(|v| v.contem(x, y)) {
@@ -413,7 +413,7 @@ pub fn cursor_em(s: &Sessao, x: i32, y: i32) -> Option<String> {
     c.ferramentas.get(f).cloned()
 }
 
-/// Cursores do SDL criados a partir dos do executÃ¡vel, e o que estÃ¡ na tela.
+/// Cursores do SDL criados a partir dos do executável, e o que está na tela.
 pub struct CursoresSdl {
     mapa: HashMap<String, sdl2::mouse::Cursor>,
     seta: Option<sdl2::mouse::Cursor>,
@@ -474,15 +474,15 @@ mod testes {
     }
 
     /// Bancada (qemu_ui_ajuda.txt, qemu_ui_barras_direito.txt, 2026-10-18): o clique direito liga e
-    /// desliga `_bHelp`; com ele ligado, o clique no mapa da ediÃ§Ã£o abre "Edit Window" (4) e o modo
-    /// desliga; o botÃ£o de estatÃ­sticas abre "Status Window Button" (0x2209); o "?" da faixa abre
-    /// "Patch Ribbon Bar" (0x2200); F1 abre o Ã­ndice (0x100). Tela âˆ’ 37 = Ã¡rea cliente do port.
+    /// desliga `_bHelp`; com ele ligado, o clique no mapa da edição abre "Edit Window" (4) e o modo
+    /// desliga; o botão de estatísticas abre "Status Window Button" (0x2209); o "?" da faixa abre
+    /// "Patch Ribbon Bar" (0x2200); F1 abre o índice (0x100). Tela − 37 = área cliente do port.
     #[test]
     fn ajuda_por_contexto_como_no_original() {
         let raiz = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz.join("SimAnt-T/MAXIS/ANTWIN"));
         if !jogo.join("SHARED.NDX").is_file() {
-            eprintln!("AVISO: arquivos do jogo nÃ£o encontrados; teste ignorado");
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
             return;
         }
         let dados = raiz.join("data");
@@ -512,7 +512,7 @@ mod testes {
         assert!(!super::tecla(&mut s, &tecla("Escape", false)), "Esc sem o modo segue adiante");
         assert!(super::tecla(&mut s, &tecla("F1", true)));
         assert!(s.ajuda.modo);
-        // O visor abriu no Ãºltimo contexto pedido e fecha com Esc (tem o foco).
+        // O visor abriu no último contexto pedido e fecha com Esc (tem o foco).
         assert!(s.ajuda.aberto);
         abrir_contexto(&mut s, 0x2200);
         assert_eq!(s.ajuda.visor.as_ref().unwrap().topico_atual().titulo, "Patch Ribbon Bar");
@@ -528,7 +528,7 @@ mod testes {
         let raiz = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz.join("SimAnt-T/MAXIS/ANTWIN"));
         if !jogo.join("SHARED.NDX").is_file() {
-            eprintln!("AVISO: arquivos do jogo nÃ£o encontrados; teste ignorado");
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
             return None;
         }
         let dados = raiz.join("data");
@@ -540,10 +540,10 @@ mod testes {
         s.ajuda.visor.as_ref().unwrap().cfg.externo
     }
 
-    /// A janela do WinHelp como janela de nÃ­vel superior (bancada qemu_ajuda_janela*.txt): clique na
-    /// caixa abre o menu de sistema (Esc fecha), duplo clique fecha; o tÃ­tulo arrasta (o contorno
-    /// segue e a janela sÃ³ vai ao soltar); a borda redimensiona atÃ© o mÃ­nimo de 103 Ã— 26; maximizar
-    /// ocupa a Ã¡rea com a moldura de fora e o duplo clique no tÃ­tulo restaura; minimizar a esconde, e
+    /// A janela do WinHelp como janela de nível superior (bancada qemu_ajuda_janela*.txt): clique na
+    /// caixa abre o menu de sistema (Esc fecha), duplo clique fecha; o título arrasta (o contorno
+    /// segue e a janela só vai ao soltar); a borda redimensiona até o mínimo de 103 × 26; maximizar
+    /// ocupa a área com a moldura de fora e o duplo clique no título restaura; minimizar a esconde, e
     /// um pedido novo de ajuda a restaura no mesmo lugar; fechada e aberta de novo, fica onde estava.
     #[test]
     fn janela_de_ajuda_move_redimensiona_minimiza_e_maximiza() {
@@ -554,45 +554,45 @@ mod testes {
         abrir_contexto(&mut s, 0x100);
         let [e, t, d, b] = externo(&s);
         assert_eq!((e, t, d, b), (213, 0, 638, 442));
-        // Caixa do menu de sistema: (217, 4)â€“(235, 22).
+        // Caixa do menu de sistema: (217, 4)–(235, 22).
         assert!(clique_no_visor(&mut s, 225, 12, false));
         let m = s.ajuda.gerente.as_ref().unwrap().menu.expect("o clique simples abre o menu");
-        assert_eq!((m.x, m.y), (217, 22), "o menu abre com o canto na caixa, embaixo do tÃ­tulo");
+        assert_eq!((m.x, m.y), (217, 22), "o menu abre com o canto na caixa, embaixo do título");
         assert!(tecla_no_visor(&mut s, "Escape"));
         assert!(s.ajuda.gerente.as_ref().unwrap().menu.is_none() && s.ajuda.aberto);
-        // Arrastar o tÃ­tulo: (400, 12) â†’ (340, 42).
+        // Arrastar o título: (400, 12) → (340, 42).
         assert!(clique_no_visor(&mut s, 400, 12, false));
         assert!(mover_mouse(&mut s, 340, 42));
-        assert_eq!(externo(&s), [213, 0, 638, 442], "a janela sÃ³ vai ao soltar");
+        assert_eq!(externo(&s), [213, 0, 638, 442], "a janela só vai ao soltar");
         let rgb = s.quadro_rgb().unwrap();
         assert!(!rgb.is_empty());
         assert!(soltar(&mut s, 340, 42));
         assert_eq!(externo(&s), [153, 30, 578, 472]);
-        // Borda esquerda para a direita atÃ© o mÃ­nimo de largura.
+        // Borda esquerda para a direita até o mínimo de largura.
         assert!(clique_no_visor(&mut s, 154, 200, false));
         mover_mouse(&mut s, 620, 200);
         soltar(&mut s, 620, 200);
         assert_eq!(externo(&s)[2] - externo(&s)[0], 102);
         assert_eq!(externo(&s)[2], 578, "o lado oposto fica");
         let [e, t, d, _] = externo(&s);
-        // Maximizar (botÃ£o da direita do tÃ­tulo).
+        // Maximizar (botão da direita do título).
         let (mx, my) = (i32::from(d) - 4 - 9, i32::from(t) + 4 + 9);
         assert!(clique_no_visor(&mut s, mx, my, false));
         assert!(soltar(&mut s, mx, my));
         assert_eq!(externo(&s), [-4, -4, 644, 446]);
         assert!(s.ajuda.visor.as_ref().unwrap().maximizada);
         s.quadro_rgb().unwrap();
-        // Duplo clique no tÃ­tulo restaura.
+        // Duplo clique no título restaura.
         assert!(clique_no_visor(&mut s, 300, 9, false));
         soltar(&mut s, 300, 9);
         assert!(clique_no_visor(&mut s, 300, 9, true));
         assert_eq!(externo(&s)[0], e);
-        // Minimizar (botÃ£o Ã  esquerda do de maximizar): some, e o pedido de ajuda a traz de volta.
+        // Minimizar (botão à esquerda do de maximizar): some, e o pedido de ajuda a traz de volta.
         let (nx, ny) = (i32::from(d) - 4 - 18 - 1 - 9, i32::from(t) + 4 + 9);
         assert!(clique_no_visor(&mut s, nx, ny, false));
         assert!(soltar(&mut s, nx, ny));
         assert!(s.ajuda.minimizada() && !s.ajuda.na_tela() && !s.ajuda.foco);
-        assert!(!clique_no_visor(&mut s, nx, ny, false), "minimizada, nÃ£o recebe cliques");
+        assert!(!clique_no_visor(&mut s, nx, ny, false), "minimizada, não recebe cliques");
         abrir_contexto(&mut s, 0x2200);
         assert!(s.ajuda.na_tela());
         assert_eq!(externo(&s)[0], e);
@@ -603,7 +603,7 @@ mod testes {
         assert!(!s.ajuda.aberto);
         abrir_contexto(&mut s, 0x100);
         assert_eq!(externo(&s)[0], e);
-        // Alt+EspaÃ§o abre o menu; "n" (Minimize) minimiza.
+        // Alt+Espaço abre o menu; "n" (Minimize) minimiza.
         assert!(tecla_no_visor_com(&mut s, "Space", true, false));
         assert!(tecla_no_visor_com(&mut s, "n", false, false));
         assert!(s.ajuda.minimizada());
