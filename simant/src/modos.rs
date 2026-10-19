@@ -781,7 +781,8 @@ mod testes {
 
     /// Bancada (cenários `morte_aranha` e `morte_leao`, 2026-10-18): a janela 26 com os bitmaps da
     /// aranha (12000), da formiga-leão (9200), da vitória (16200), e os quadros 9100 e 9101 (2 pixels
-    /// à esquerda; o 9101 com "You have been reborn!" em amarelo no alto). Com `SIMANT_SAIDA_TESTE`,
+    /// à esquerda: a janela 26 só se alinha ao byte na criação, e a formiga-leão a criou antes; o 9101
+    /// com "You have been reborn!" em amarelo no alto). Com `SIMANT_SAIDA_TESTE`,
     /// grava as telas para `tools/comparar_captura.py --mapear --regiao` contra as capturas.
     #[test]
     fn janela_26_como_no_original() {
@@ -800,7 +801,7 @@ mod testes {
         let leao1 = s.quadro_rgb().unwrap();
         gravar_teste(&s, "janela26_leao_9201", &leao1);
         assert_eq!(s.partida.avisos.passar_tempo(1113), Some(Modal::Animado(TipoAnimado::FormigaLeao)));
-        // 9100 e 9101: 2 pixels à esquerda.
+        // 9100 e 9101: a janela já existe (criada pela formiga-leão) e reabre sem alinhar, em 158.
         assert!(s.partida.avisos.receber_quadro_amarela(9100, 0));
         s.partida.avisos.passar_tempo(2000);
         let morte = s.quadro_rgb().unwrap();
@@ -820,7 +821,9 @@ mod testes {
         s.partida.avisos.passar_tempo(4000);
         let aranha = s.quadro_rgb().unwrap();
         gravar_teste(&s, "janela26_aranha", &aranha);
-        assert_eq!(pixel(&aranha, w, 350, 300), [0, 0, 128], "189 pixels de largura: contorno até 351");
+        // A janela 26 já foi criada (formiga-leão): reabre sem o alinhamento, 2 pixels à esquerda.
+        assert_eq!(pixel(&aranha, w, 348, 300), [0, 0, 128], "189 pixels de largura: contorno até 349");
+        assert_eq!(pixel(&aranha, w, 350, 300), [0, 0, 0], "linha preta por fora");
         s.partida.avisos.passar_tempo(4003);
         let aranha1 = s.quadro_rgb().unwrap();
         gravar_teste(&s, "janela26_aranha_12002", &aranha1);
@@ -831,13 +834,13 @@ mod testes {
         gravar_teste(&s, "janela26_aranha_texto", &texto);
         assert_eq!(pixel(&texto, w, 157, 300), [255, 255, 255], "contorno branco com o texto por cima");
         s.partida.avisos.fechar_modal();
-        // Vitória: 254 × 199, os olhos em seis lugares.
+        // Vitória: 254 × 199, os olhos em seis lugares (janela já criada: sem alinhar, 2 à esquerda).
         assert!(s.partida.avisos.receber_animado(TipoAnimado::Vitoria, None));
         for (t, nome) in [(5000, "janela26_vitoria"), (5003, "janela26_vitoria_16211"), (5006, "janela26_vitoria_16212"), (5009, "janela26_vitoria_16210")] {
             s.partida.avisos.passar_tempo(t);
             let rgb = s.quadro_rgb().unwrap();
             gravar_teste(&s, nome, &rgb);
-            assert_eq!(pixel(&rgb, w, 415, 300), [0, 0, 128], "contorno até 416");
+            assert_eq!(pixel(&rgb, w, 413, 300), [0, 0, 128], "contorno até 414");
         }
     }
 }

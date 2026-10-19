@@ -831,7 +831,7 @@ mod testes_tela_virtual {
                 v.na_tela(s.tela.cfg.largura as i16, s.tela.cfg.altura as i16);
                 assert_eq!((v.externo().esq, v.externo().dir), ajuda, "{perfil} {r:?}: ajuda");
                 let c = s.partida.avisos.cfg.quadro_amarela.clone().unwrap();
-                assert_eq!(c.imagem_em[0] + s.partida.avisos.ajuste_janela_imagem(&c, [0, 0])[0], amarela, "{perfil} {r:?}: janela 26");
+                assert_eq!(c.imagem_em[0] + s.partida.avisos.ajuste_janela_imagem(&c, [0, 0], true)[0], amarela, "{perfil} {r:?}: janela 26");
             });
         }
     }
