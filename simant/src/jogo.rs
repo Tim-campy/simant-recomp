@@ -110,7 +110,10 @@ pub(crate) fn tratar_modal(s: &mut Sessao, ev: &sdl2::event::Event) -> Option<Mo
 /// simant/src/preferencias.rs): lidas ao abrir — as opções só fora de um `.ANT` (`de_save`), que
 /// traz as suas; os botões configuráveis sempre — e gravadas ao sair com o que estiver valendo.
 /// Sem o arquivo do port (primeira partida), a origem é o `WIN.INI` do usuário, se houver.
-pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool, de_save: bool) -> Result<(), String> {
+/// Lê as preferências (arquivo do port ou, sem ele, o `[SimAnt]` do `WIN.INI`) e aplica: as opções
+/// só fora de um `.ANT`; os botões configuráveis das duas faixas sempre. Também usada pelas
+/// exportações sem janela (`--exportar-tela-jogo`), para a faixa sair com os botões do jogador.
+pub(crate) fn aplicar_preferencias(s: &mut Sessao, o: &Opcoes, de_save: bool) {
     let prefs = match (&o.preferencias, &o.win_ini) {
         (Some(arq), Some(ini)) if !arq.exists() => match std::fs::read(ini) {
             Ok(bytes) => {
@@ -137,6 +140,10 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
         p.aplicar_botoes(&mut s.partida.funcoes_botoes);
         p.aplicar_botoes_quintal(&mut s.partida.funcoes_botoes_quintal);
     }
+}
+
+pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool, de_save: bool) -> Result<(), String> {
+    aplicar_preferencias(&mut s, o, de_save);
     let r = laco_partida(&mut s, titulo, o, jogo_novo);
     if let Some(caminho) = &o.preferencias {
         let p = preferencias::Preferencias::do_momento(&s.partida.estado.partida.opcoes, &s.partida.funcoes_botoes, &s.partida.funcoes_botoes_quintal);

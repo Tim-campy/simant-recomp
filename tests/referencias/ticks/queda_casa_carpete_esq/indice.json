@@ -1,0 +1,84 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-19",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "full",
+ "descricao": "Comida que cai na casa (superficie.md 8.2): Jogo Completo no patch (0, 4) (_CarpetFloorL, _DROPdir = 1, lido nos extras); a aranha em agonia sobre um fiapo (0x3F) em (105, 44) vira 3 comidas por _DropFoodA: cada uma cai para a direita até o primeiro carpete (106, 107 e 108, 44 = 0x24) e _FoodA + 3",
+ "passos": [
+  "teclas shift+0",
+  "ColonyTotalBlack <- 2",
+  "teclas ctrl+y",
+  "antes: {'SementeS': 34791, 'SementeR': 4186687430, 'gameCycles': 2661, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 0, 'GameTime': 19, 'Cycle': 19, 'posicao': 'livre'}",
+  "duplo clique em (257, 267)",
+  "depois: {'SementeS': 5867, 'SementeR': 4186687430, 'gameCycles': 3928, 'Tindex': 0, 'GlobalKey': 0, 'TimeTemp': 0, 'DROPdir': 1, 'GameTime': 19, 'Cycle': 0, 'posicao': 'livre'}",
+  "teclas ctrl+e",
+  "teclas ctrl+8",
+  "teclas shift+0",
+  "_CurYardPnt = 0x40000; aranha em agonia em (105, 44) tile 0x3f",
+  "SpidOn <- 1",
+  "SpidX <- 1688",
+  "SpidY <- 712",
+  "SMode <- 5",
+  "Starg <- -2",
+  "EatCnt <- 0",
+  "DeathCnt <- 3"
+ ],
+ "primeira_entrada": {
+  "SementeS": 60730,
+  "SementeR": 2578188780,
+  "gameCycles": 271,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "DROPdir": 0,
+  "GameTime": 17,
+  "Cycle": 17,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ],
+  "DROPdir": [
+   "DROPdir",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_000034"
+ ],
+ "selecao": [
+  "34"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}

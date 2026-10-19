@@ -80,10 +80,10 @@ Medido pixel a pixel nas capturas m00–m11 e n05 (bancada, 640×480):
 
 ## 7. Load Game do "Select a Game"
 
-`_NewGame(0)` com Load Game faz o mesmo que File → Load (`_LoadGame`); sem jogo (na abertura, `_CurGameType` = −1), se o Load falha ou é cancelado, `_DoMenuEntry` chama `_NewGame(0)` de novo [código]. Port: na partida, o File → Load (com a pergunta, se a partida mudou); na abertura, o "Load Ant Hill" por cima do "Select a Game" (Cancel volta a ele; o arquivo escolhido abre como o `--save`). Não conferido na bancada.
+`_NewGame(0)` com Load Game faz o mesmo que File → Load (`_LoadGame`); sem jogo (na abertura, `_CurGameType` = −1), se o Load falha ou é cancelado, `_DoMenuEntry` chama `_NewGame(0)` de novo [código]. Port: na partida, o File → Load (com a pergunta, se a partida mudou); na abertura, o "Load Ant Hill" sobre o fundo da abertura (Cancel volta ao "Select a Game"; o arquivo escolhido abre como o `--save`). **Bancada (2026-10-19, `roteiros/qemu_load_abertura.txt`, capturas `re_trabalho/raros/load/a1`–`a5`):** o clique em Load Game (345, 375) **fecha** o "Select a Game" antes de abrir o "Load Ant Hill", que fica no mesmo lugar do File → Load da partida, sobre o fundo vazio; QUICK2 carrega pausado ("Game Paused", `_GamePaused` = 1), título QUICK2.ANT, vista do ninho. O port desenhava o diálogo por cima do "Select a Game" e passou a tirar a janela 2 (`simant/src/main.rs`). A tela carregada bate com `--save QUICK2.ANT` em 99,94% da janela de edição (o cursor); fora dela, a janela do mapa atrás difere (divergencias.md, 2026-10-19). Cancel não foi conferido.
 
 ## 8. O que não foi feito
 
 - O menu de sistema da janela principal (minimizar, Switch To…) e o título dela: o port usa a janela do sistema operacional.
 - Os submenus de `_ms_LoadPopUpResource` (sem uso no objeto 6/0).
-- Status no Full Game e no Experimental, Load Game da abertura e a ajuda dos itens com o modo de ajuda (`_ProcMenuHelp`) não foram conferidos na bancada.
+- Status no Full Game e no Experimental, o Cancel do Load Game da abertura e a ajuda dos itens com o modo de ajuda (`_ProcMenuHelp`) não foram conferidos na bancada.

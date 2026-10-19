@@ -1,0 +1,46 @@
+{
+ "antes": {
+  "SementeS": 25055,
+  "SementeR": 62299139,
+  "gameCycles": 1522,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 4,
+  "Cycle": 4,
+  "posicao": "livre"
+ },
+ "depois": {
+  "SementeS": 25055,
+  "SementeR": 62299139,
+  "gameCycles": 2365,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 4,
+  "Cycle": 4,
+  "posicao": "livre"
+ },
+ "acao": {
+  "exp": [
+   {
+    "f": 6,
+    "sub": 1,
+    "pontos": [
+     [
+      59,
+      33
+     ]
+    ],
+    "ctrl": false,
+    "plano": 1,
+    "mappnt": [
+     52,
+     23
+    ]
+   }
+  ],
+  "leao_x_vaga_menos_1": 20,
+  "_comentario": "_KillAntLion(-1) pelo inseticida em jato (8 jatos) num tile 0x38 sem entrada na lista, com 2 formigas-leão na lista (snapshot exp, cenarios_raros.py exp_leao_m1). leao_x_vaga_menos_1 = 20: byte alto do seletor de _EggStr nesta sessão da bancada (0x14xx), deduzido do 0x3F que o 1º jato gravou em (20, 0) (Y = byte alto de _LastThemeSong = 0)"
+ }
+}
