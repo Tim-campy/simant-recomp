@@ -32,6 +32,9 @@ pub struct Recursos {
     dir_dados: PathBuf,
     /// Em ordem de aplicação: um mod posterior sobrescreve um anterior.
     mods: Vec<Mod>,
+    /// Valores mesclados por cima de `data/<nome>` depois dos mods (opções da linha de comando do
+    /// executável, como `--perfil-driver`; [`Recursos::sobrepor_dados`]).
+    sobreposicoes: Vec<(String, serde_json::Value)>,
 }
 
 impl Recursos {
@@ -43,15 +46,34 @@ impl Recursos {
         dir_dados: &Path,
         dir_mods: Option<&Path>,
     ) -> Result<Recursos, String> {
+        Recursos::abrir_sem(dir_jogo, nomes_bancos, dir_dados, dir_mods, &[])
+    }
+
+    /// Como [`Recursos::abrir`], sem os mods cujo `nome` (do `mod.json`) está em `desligados` (o
+    /// launcher e a opção `--desligar-mods` do executável). Nomes que não existem são ignorados.
+    pub fn abrir_sem(
+        dir_jogo: &Path,
+        nomes_bancos: &[String],
+        dir_dados: &Path,
+        dir_mods: Option<&Path>,
+        desligados: &[String],
+    ) -> Result<Recursos, String> {
         let bancos = nomes_bancos
             .iter()
             .map(|n| Banco::abrir(&dir_jogo.join(n)))
             .collect::<Result<Vec<_>, _>>()?;
         let mods = match dir_mods {
-            Some(d) if d.is_dir() => carregar_mods(d)?,
+            Some(d) if d.is_dir() => carregar_mods_sem(d, desligados)?,
             _ => Vec::new(),
         };
-        Ok(Recursos { bancos, dir_jogo: dir_jogo.to_path_buf(), dir_dados: dir_dados.to_path_buf(), mods })
+        Ok(Recursos { bancos, dir_jogo: dir_jogo.to_path_buf(), dir_dados: dir_dados.to_path_buf(), mods, sobreposicoes: Vec::new() })
+    }
+
+    /// Mescla `valor` por cima de `data/<nome>` (depois dos mods, com as regras de [`mesclar`]) em
+    /// toda leitura seguinte. Para opções do executável que trocam uma chave de dados, como
+    /// `--perfil-driver` (`resolucao.json` → `perfil_driver`).
+    pub fn sobrepor_dados(&mut self, nome: &str, valor: serde_json::Value) {
+        self.sobreposicoes.push((nome.to_string(), valor));
     }
 
     pub fn mods(&self) -> &[Mod] {
@@ -130,6 +152,14 @@ impl Recursos {
         }
         if !dos_mods.is_empty() {
             origem = format!("{origem} (mesclado com os mods {})", dos_mods.join(", "));
+        }
+        for (n, v) in &self.sobreposicoes {
+            if n == nome {
+                if let Some(atual) = valor.as_mut() {
+                    mesclar(atual, v.clone());
+                    origem = format!("{origem} (com opções da linha de comando)");
+                }
+            }
         }
         let valor = valor.ok_or_else(|| format!("{}: arquivo de dados não encontrado", base.display()))?;
         Ok((valor, origem))
@@ -225,6 +255,12 @@ fn achar_sem_caixa(base: &Path, nome: &str) -> Option<PathBuf> {
 
 /// Lê todos os subdiretórios com `mod.json` e ordena por dependências (e por nome, para ser determinístico).
 pub fn carregar_mods(dir: &Path) -> Result<Vec<Mod>, String> {
+    carregar_mods_sem(dir, &[])
+}
+
+/// Como [`carregar_mods`], deixando de fora os mods cujo nome está em `desligados`. Um mod ligado
+/// que depende de um desligado é erro (como uma dependência não instalada).
+pub fn carregar_mods_sem(dir: &Path, desligados: &[String]) -> Result<Vec<Mod>, String> {
     let mut encontrados: HashMap<String, Mod> = HashMap::new();
     let mut leitura = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?
         .filter_map(|e| e.ok())
@@ -239,10 +275,16 @@ pub fn carregar_mods(dir: &Path) -> Result<Vec<Mod>, String> {
         if encontrados.contains_key(&manifesto.nome) {
             return Err(format!("mod duplicado: {}", manifesto.nome));
         }
+        if desligados.contains(&manifesto.nome) {
+            continue;
+        }
         encontrados.insert(manifesto.nome.clone(), Mod { manifesto, dir: p });
     }
     for m in encontrados.values() {
         for d in &m.manifesto.dependencias {
+            if desligados.contains(d) {
+                return Err(format!("mod {} depende de {d}, que está desligado", m.manifesto.nome));
+            }
             if !encontrados.contains_key(d) {
                 return Err(format!("mod {} depende de {d}, que não está instalado", m.manifesto.nome));
             }

@@ -2,8 +2,9 @@
 # Linux x64 e cria um release em RASCUNHO (draft) para revisão; nada é publicado sem aprovação manual
 # na página de releases do GitHub. Checklist e decisões pendentes: docs/lancamento.md.
 #
-# O pacote leva só o que é do projeto: executável, data/, exemplos/mods/, LICENSE, LEIAME, CHANGELOG e
-# os avisos de terceiros (e o SDL2.dll oficial no Windows). Nunca leva arquivos do jogo original
+# O pacote leva só o que é do projeto: executável (com o launcher dentro: aberto sem opções, ele escolhe
+# a pasta do jogo e as opções), data/, exemplos/mods/, LICENSE, LEIAME, CHANGELOG e os avisos de
+# terceiros (e, no Windows, o SDL2.dll oficial e o simant-console.bat). Nunca leva arquivos do jogo original
 # (SimAnt-T, *.DAT, *.NDX, *.HLP, *.ANT...), re_trabalho, capturas, referencia/qemu, WAVs nem MIDIs:
 # o passo "Conferir o conteúdo" falha o build se algo assim aparecer.
 name: Lançamento
@@ -96,11 +97,15 @@ jobs:
           if [ "${{ runner.os }}" = "Windows" ]; then
             cp "vendor/SDL2-${SDL2_VERSAO}/lib/x64/SDL2.dll" "$dir/"
             cp "vendor/SDL2-${SDL2_VERSAO}/README-SDL.txt" "$dir/README-SDL.txt"
+            # O simant.exe de lançamento não abre console (docs/decisoes.md); este .bat roda com um,
+            # para ver as mensagens (mods, erros) na hora.
+            printf '%s\r\n' '@echo off' 'rem Roda o SimAnt recomp com console (mensagens dos mods e erros na tela).' \
+              '"%~dp0simant.exe" --console %*' 'pause' > "$dir/simant-console.bat"
             python tools/gerar_avisos_terceiros.py --alvo ${{ matrix.alvo }} --saida "$dir/AVISOS-TERCEIROS.txt" \
               --sdl2 "vendor/SDL2-${SDL2_VERSAO}/COPYING.txt"
           else
             python3 tools/gerar_avisos_terceiros.py --alvo ${{ matrix.alvo }} --saida "$dir/AVISOS-TERCEIROS.txt"
-            printf '%s\n' '#!/bin/sh' '# Roda o SimAnt recomp a partir da pasta do pacote (data/ e mods/ são procurados na pasta atual).' \
+            printf '%s\n' '#!/bin/sh' '# Roda o SimAnt recomp (o simant acha data/ e mods/ ao lado dele; este atalho só entra na pasta).' \
               'cd "$(dirname "$0")" && exec ./simant "$@"' > "$dir/simant.sh"
             chmod +x "$dir/simant.sh" "$dir/simant"
           fi
@@ -119,18 +124,30 @@ jobs:
           find . -type f | sort
 
       - name: Smoke test sem janela
-        if: runner.os == 'Linux'
         run: |
-          cd "pacote/$NOME_PACOTE"
+          # De fora da pasta do pacote: data/ é achado ao lado do executável. A saída vai para arquivos
+          # (com ela redirecionada, o simant.exe sem console não mostra caixa de mensagem).
+          exe="$PWD/pacote/$NOME_PACOTE/${{ matrix.exe }}"
+          mkdir -p smoke && cd smoke
           # Sem os arquivos do jogo (o CI não os tem) o executável deve terminar com o erro "não encontrei
           # .../SHARED.ndx" e código 1, sem pânico (101). Com eles, `--novo-jogo --ticks 5` imprime
           # "5 ticks: GameTime 0 -> 5" (conferido localmente; ver docs/lancamento.md).
           codigo=0
-          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./simant --novo-jogo --ticks 5 --sem-som --jogo /nao/existe \
-            2> erro.txt || codigo=$?
-          cat erro.txt; rm erro.txt
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy "$exe" --sem-config --novo-jogo --ticks 5 --sem-som --jogo /nao/existe \
+            > saida.txt 2> erro.txt || codigo=$?
+          cat saida.txt erro.txt
           echo "código de saída: $codigo"
           test "$codigo" -eq 1
+          grep -q "SHARED" erro.txt
+          # O launcher desenhado sem janela (fora do pacote: nenhum .png entra nele).
+          "$exe" --sem-config --capturar-launcher launcher.png > saida.txt 2> erro.txt
+          cat saida.txt erro.txt
+          test -s launcher.png
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-${{ matrix.so }}
+          path: smoke/launcher.png
 
       - name: Compactar
         run: |
