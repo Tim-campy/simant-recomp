@@ -178,7 +178,7 @@ Ferramenta: `tools/som_dosbox.py` (`capturar`, `niveis`, `comparar`, `harmonicos
 - **Duração e andamento:** batem. O som do original dura 102,90 s para 102,99 s de notas no MIDI (razão 0,999); a escala que melhor alinha o port (0,9975) melhora a croma em menos de 0,01, dentro da resolução do teste [verificado].
 - **Notas e ordem:** a croma do port alinhada ao original dá 0,82–0,85, contra 0,39–0,43 com o port deslocado: as notas estão na mesma ordem e no mesmo tempo, com o original 6,20 s depois do início da gravação [verificado na abertura]. A percussão do canal 10 usa notas fora do mapa GM (85, 86, 89, 91, 95 nos `.MID`): nas janelas em que só a 89 soa, o original não mostra som próprio dela [observado em duas janelas; o banco do port as deixa em silêncio, hipótese para as demais].
 - **Timbre:** no original o baixo (programa 34) tem o 2.º harmônico como o mais forte, o 1.º 10 dB e o 3.º 6 dB abaixo e os 4.º–12.º planos entre −17 e −24 dB (27 notas isoladas, `som_dosbox.py harmonicos`); o piano (programa 3) começa com os 5 primeiros harmônicos quase iguais e os agudos caem mais rápido que a fundamental; o tom 43 soa como um tom grave de ~69 Hz com a altura caindo; não há ruído na percussão (espectrograma). O sintetizador simples é claro demais (ondas serra/quadrada e percussão de ruído branco: 18 % da energia acima de 4 kHz, contra 6 %); o FM chega mais perto no espectro médio e na distribuição por faixa, mas ainda fica escuro entre 2 e 4 kHz (5 % contra 12 %). O banco FM foi ajustado nos programas de `gamethme` e, desde a captura das outras músicas, no 59 (seção seguinte) (baixo 34: perfil −2/0/−6/−11/−12/−13… no port, contra −10/0/−6/−22/−17/−17… no original). Os demais programas usados pelas músicas foram comparados em 2026-10-19 (seção seguinte).
-- **Volume relativo:** com o simples, a música ficava 3,7 dB mais baixa em relação aos efeitos do que no original; o banco FM tem `ganho` 2,25, calibrado para a abertura dar −19,8 dB (contra −20,0 dB medidos). As outras músicas ficam no nível relativo que o banco der [não medido].
+- **Volume relativo:** com o simples, a música ficava 3,7 dB mais baixa em relação aos efeitos do que no original; o banco FM tinha `ganho` 2,25, calibrado para a abertura dar −19,8 dB (contra −20,0 dB medidos); desde o ajuste de 2026-10-19 (seção "Ajuste do banco FM"), 1,65 e −20,0 dB. As outras músicas ficam no nível relativo que o banco der [não medido].
 
 ## As outras músicas do original, sem input (2026-10-19)
 
@@ -217,11 +217,88 @@ Ferramenta: `tools/som_dosbox.py` (`capturar`, `niveis`, `comparar`, `harmonicos
 
 Leitura (fato medido nas gravações; "controle" = o port deslocado 0,9–4 s):
 
-- **Notas, ordem e andamento batem em todas.** A croma alinhada fica acima do controle em todas as músicas melódicas (0,50–0,96 contra 0,18–0,60), e o envelope de energia quadro a quadro dá 0,6–0,97 na maioria; a duração do som bate (diferenças até ~1 s vêm das caudas de liberação das notas). As exceções são de timbre, não de notas: `antthme1–3` são só percussão (canal 10; a croma não se aplica, o envelope dá 0,37–0,75 contra controle ≤ 0,16); `badnews` e `victqndd` (programa 95, Pad 8) e `sad4`/`qn4day` têm envelope baixo porque no original o pad e as cordas soam com outro envelope.
-- **Programa 49 (String Ensemble 2):** no original um ataque forte e, meio segundo depois, a sustentação ~17 dB abaixo, com as notas seguintes (curtas, 0,23 s, mesma velocidade, sem controladores no `.MID`) baixas (`sad2`: som "útil" de 1,2 s contra 7,5 s no port). Um decaimento na portadora do banco do port não mudou a medida (as notas são curtas demais) e foi desfeito [em aberto: provavelmente o timbre e a alocação de vozes do driver da Creative].
+- **Notas, ordem e andamento batem em todas.** A croma alinhada fica acima do controle em todas as músicas melódicas (0,50–0,96 contra 0,18–0,60), e o envelope de energia quadro a quadro dá 0,6–0,97 na maioria; a duração do som bate (diferenças até ~1 s vêm das caudas de liberação das notas). As exceções são de timbre, não de notas: `antthme1–3` são só percussão (canal 10; a croma não se aplica, o envelope dá 0,37–0,75 contra controle ≤ 0,16); `badnews` e `victqndd` (programa 95, Pad 8) e `sad4`/`qn4day` têm envelope baixo porque no original o pad e as cordas soam com outro envelope. **Revisto em 2026-10-19 (seção seguinte):** o envelope baixo vinha quase todo da componente contínua que o DOSBox-X grava (cauda subsônica depois das notas); tirada com um passa-altas de 20 Hz nas duas gravações, `badnews`/`victqndd` dão 0,95/0,93 com o banco antigo.
+- **Programa 49 (String Ensemble 2):** no original um ataque forte e, meio segundo depois, a sustentação ~17 dB abaixo, com as notas seguintes (curtas, 0,23 s, mesma velocidade, sem controladores no `.MID`) baixas (`sad2`: som "útil" de 1,2 s contra 7,5 s no port). Um decaimento na portadora do banco do port não mudou a medida (as notas são curtas demais) e foi desfeito [em aberto: provavelmente o timbre e a alocação de vozes do driver da Creative]. **Explicado em 2026-10-19 (seção seguinte):** a nota forte não é do 49: no `.MID` a primeira nota vem antes da troca de programa e toca com o programa 0; o 49 do original tem ataque lento (~0,5 s), e as notas de 0,23 s não chegam ao nível cheio.
 - **Programa 59 (Muted Trumpet):** ~10–12 dB alto demais no port em relação à abertura (`happy2`, só com ele: +10,2 dB). **Corrigido no banco** (`tools/gerar_banco_opl.py`, portadora 16 passos de TL mais baixa): `happy2` +0,1 dB.
-- **Nível:** com o 59 corrigido, as outras músicas ficam em média ~4 dB acima do original em relação à abertura (mediana 4,1; de −1,3 a +8,6, fora `happy1`, +11,6, e `sad4`, +7,6, que misturam o 49). A abertura está calibrada (−19,8 dB contra um efeito de ganho 1); não foi mexido no ganho geral, porque a diferença é por programa [em aberto: um ganho por programa, medido música a música].
-- **Timbre:** o centróide do original fica entre 340 e 1600 Hz; no port, perto nas músicas de baixo e cordas e mais escuro nas `jolly*` (programas 19 e 69: 282–346 Hz contra ~1000 Hz) e mais claro nas `antthme*` (percussão). Os programas 19, 21, 25, 31, 33, 35, 49, 57, 69 e 95 continuam com o timbre do banco próprio, sem ajuste fino.
+- **Nível:** com o 59 corrigido, as outras músicas ficam em média ~4 dB acima do original em relação à abertura (mediana 4,1; de −1,3 a +8,6, fora `happy1`, +11,6, e `sad4`, +7,6, que misturam o 49). A abertura está calibrada (−19,8 dB contra um efeito de ganho 1); não foi mexido no ganho geral, porque a diferença é por programa [em aberto: um ganho por programa, medido música a música]. **Feito em 2026-10-19** (seção seguinte: `NIVEL_TL`).
+- **Timbre:** o centróide do original fica entre 340 e 1600 Hz; no port, perto nas músicas de baixo e cordas e mais escuro nas `jolly*` (programas 19 e 69: 282–346 Hz contra ~1000 Hz) e mais claro nas `antthme*` (percussão). Os programas 19, 21, 25, 31, 33, 35, 49, 57, 69 e 95 continuam com o timbre do banco próprio, sem ajuste fino. **Revisto em 2026-10-19:** o "escuro" das `jolly*` era a componente contínua do 19 do port (aditivo com meias senoides, +5 dB de CC em `jolly2`); sem ela o port estava claro demais (2–4 kHz 28–37 % contra 8 %).
+
+## Ajuste do banco FM contra as 28 músicas (2026-10-19)
+
+Rota: as mesmas gravações (`re_trabalho/som/musicas/`, seção anterior), o port exportado com `--exportar-som` e `som_dosbox.py comparar_todas`, mais dois comandos novos: `perfil ORIGINAIS PORT PROGRAMA músicas` (perfil harmônico médio de um programa nas janelas em que nenhuma outra nota começa, pulando os parciais que coincidem com os de outra nota) e `percussao ORIGINAIS PORT músicas` (nível, frequência dominante e centróide de cada nota do canal 10 nos inícios isolados). O banco sai de `tools/gerar_banco_opl.py` (`medidos()`, `NIVEL_TL`, `percussao()`, `CURVA_VOLUME_DB`, `GANHO`, com o valor do original comentado em cada timbre).
+
+**Mudança na medida (fato medido):** o DOSBox-X grava a componente contínua das ondas do OPL (as meias senoides e as ondas 2–7 têm média diferente de zero; uma placa real tem a saída acoplada por capacitor) e, depois das notas, uma cauda subsônica que decai ~8 dB/s (`badnews`: com passa-altas de 40 Hz a nota acaba em menos de 0,2 s; sem ele, "dura" mais 3 s com a frequência dominante em 0 Hz). O port também gera componente contínua (no 19 antigo, +5 dB no RMS de `jolly2`). Desde esta data `comparar` passa as duas gravações por um passa-altas de 20 Hz e grava também `energia_alinhada_db` (a energia nos mesmos quadros alinhados, que não depende de onde cada gravação acha o fim do som). Com isso, parte do que a seção anterior via mudou: o "envelope diferente" do 95 e de `sad4`/`qn4day` era a cauda subsônica (envelope 0,85–0,95 com o banco antigo) e as `jolly*` estavam claras demais, não escuras.
+
+**Achados (fatos medidos nas gravações):**
+
+1. **Curva de velocidade.** `sad2` toca 32 notas do 49, uma por vez, com a velocidade caindo de 126 a 20: no original o nível cai ~23–29 dB por década de velocidade (110 → 68: −4,8 dB; 110 → 52: −7,4 dB), contra 40 no banco anterior. `curva_volume_db` = 25.
+2. **Programa antes da troca.** Em 13 dos 29 `.MID` a primeira nota de um canal vem antes do Program Change no mesmo instante (ordem dos eventos na trilha); essa nota toca com o programa que o canal tinha. Na gravação (Windows recém-iniciado) soa como piano (programa 0): é o "ataque forte" do 49 em `sad2` e `omnious1`. O port faz o mesmo (o canal começa no programa 0 a cada música). [hipótese] numa partida o driver da Creative guardaria o programa da música anterior; não há como gravar duas músicas seguidas sem input.
+3. **Perfis harmônicos** (harmônicos 1–12, dB; "." = coberto por outra nota): 0 `0 -10 -21 -8 -9 -11 -16 -17 -25 -28 -43 -42` (o anterior morria em ~1,5 s; o original decai ~12 dB/s e depois ~5 dB/s); 19 `0 -10 -27 -3 -5 -40 -5 -17 -41 -18 -17 -49` (faltam os múltiplos de 3: FM com o modulador em 3×); 21 `0 -71 -9 -64 -9 -69 … -18` (só ímpares); 33 `0 -11 -7 -21 -25 -16 -14 -13 -14 -15 -17 -18`; 35 `-3 0 -5 -13 -22 -31 -37 -47 -51 -56 -57 -60`; 49 `0 -2 -5 -9 -15 -20 -22 . -34 -34 -40 -37`; 57 `. . 0 0 -10 -7 -10 . -17 -38 -27 -42`; 59 `0 -6 -1 -1 -2 -3 -5 0 -5 -7 -10 -15` (todos fortes; o anterior só tinha ímpares); 95 `0 -85 -64 -88 -69 -96 …` (quase um seno puro, contra −27…−101 no anterior). Com o banco novo, o 19 do port dá `0 -7 -59 -3 -5 -57 -6 -14 -58 -16 -18 -55`. Os programas 3, 25, 26, 31 e 69 não têm janelas isoladas suficientes: ajustados pelo espectro por oitava das músicas (`gamethme`: o piano 3 deixava a faixa de 2–4 kHz 5–6 dB abaixo nos trechos em que toca; sem KSR nos dois operadores, as notas agudas, 70–101, sustentam como no original).
+4. **Envelopes:** 49 com ataque de ~0,5 s até o nível cheio (acorde final de `omnious1`; as notas de 0,23 s de `sad2` ficam ~13 dB abaixo do cheio); 95 com ataque imediato, sustentação plana e soltura curta (mais de 30 dB em 0,2 s).
+5. **Nível por programa** (passos de TL de 0,75 dB, `NIVEL_TL`): 0 +6, 19 +8, 21 +4, 25 +4, 31 +6, 33 +4, 35 +3, 57 +6, 59 −14 (sobre os 16 passos de antes), 69 +6, 95 −2. O `ganho` geral foi recalibrado de 2,25 para 1,65: a abertura exportada (volume 0,5) dá −26,0 dBFS, isto é, **−20,0 dB** em relação a um efeito de ganho 1, como no original.
+6. **Percussão** (canal 10, inícios isolados; nível em dB relativos ao RMS da abertura, frequência dominante dos primeiros 55 ms; tabela inteira com `som_dosbox.py percussao`):
+
+| Nota | Original | Port antes | Port depois | O que mudou |
+|---|---|---|---|---|
+| 36 | −6,2 dB; 91 Hz; centróide 576 Hz | −6,1; 64 Hz; 65 Hz | −9,4; fundamental 92 Hz; 359 Hz | portadora na nota 42 (era ½ × nota 26, subsônica) |
+| 39 | −3,9; 1950 Hz (tonal) | −2,8; ruído (centróide 9,2 kHz) | −5,8; 1977 Hz | tom na nota 95 |
+| 40 | −6,8; ruído (9,7 kHz) | −1,8 | −9,0 | 8 passos mais baixo |
+| 43 | −2,1; 68 Hz; 281 Hz | −6,8; 68 Hz; 137 Hz | −4,2; 68 Hz; 156 Hz | sem o modulador em ½; estalo de ruído no ataque |
+| 47 | −2,6 (3 inícios); ~100 Hz | −8,7 | −7,2; 100 Hz | nota 43 |
+| 48 | −2,5; 91 Hz; 452 Hz | −8,1; 245 Hz | −4,8; 95 Hz; 515 Hz | nota 42 |
+| 49 | −12,4; ruído (7,9 kHz) | −4,9; 9,4 kHz | −15,1; 8,6 kHz | 13 passos, portadora em 1× |
+| 50 | −4,4; 123 Hz; 624 Hz | −14,1; 145 Hz (bandas em 0,5× e 1,5×) | −4,6; 123 Hz | nota 47, modulador em 1× |
+| 58 | −17,7; centróide 2,5 kHz | −7,3; 9,2 kHz | −19,2 | 19 passos |
+| 59, 77, 80 | **sem som** (67, 18 e 9 inícios) | soavam (−6,5 a −9,2) | sem timbre | mudas |
+| 60 | −4,5; ruído (8,7 kHz) | −5,2; tom de 586 Hz | −6,4; ruído | ruído |
+| 67 | sem aumento em nenhuma faixa nos 12 inícios isolados de `gamethme` | soava | sem timbre | muda |
+| 68 | −1,4; tom de 2081 Hz que dura a nota | −3,3; 786 Hz curto | −5,6; 2095 Hz sustentado | nota 96, sustentado |
+| 70 | inconclusivo (`gamethme`, música densa) | já inaudível (nota 98) | sem timbre | muda |
+| 76 | −7,4; 823 Hz | −3,3; 700 Hz | −8,1 | nota 80 |
+| 85, 86, 89, 91, 95 | **sem som** (86, 89, 91: 5–26 inícios; 86 e 95 juntos em `hmanawar`, 4,38 s: silêncio; 85 só aparece com outras) | sem timbre | sem timbre | — |
+
+Os níveis "depois" ficam 1–3 dB abaixo do original nesta tabela porque a abertura do port (a referência) ficou mais clara e mais cheia; as músicas só de percussão ficaram entre +0,4 e +1,4 dB (tabela seguinte). Notas não medidas (35, 37, 42, 46, 51, 65, 72, 75: até 2 inícios isolados) ficaram com o timbre do modelo, com o nível acertado pelo das vizinhas.
+
+**Antes e depois** (`comparar_todas` com o passa-altas; nível = `energia_alinhada_db` da música menos o da abertura, port contra original; envelope = correlação da energia por quadro em dB; espectro = correlação do espectro médio 60 Hz–8 kHz; "antes" = o banco de 2026-10-19 com o 59 já corrigido, o da seção anterior):
+
+| Música | Nível do original em relação à abertura (dB) | Port − original (dB): antes / depois | Envelope: antes / depois | Espectro: antes / depois | Centróide (Hz): original / antes / depois | 2–4 kHz (%): original / antes / depois |
+|---|---|---|---|---|---|---|
+| antthme1 | -9,2 | +1,4 / +0,7 | 0,40 / 0,65 | 0,59 / 0,73 | 1281 / 2095 / 1289 | 35 / 11 / 17 |
+| antthme2 | -8,2 | +2,9 / +1,4 | 0,52 / 0,87 | 0,47 / 0,41 | 1766 / 4023 / 2434 | 31 / 14 / 30 |
+| antthme3 | -8,1 | -0,2 / +0,4 | 0,62 / 0,90 | 0,72 / 0,70 | 348 / 494 / 502 | 1 / 2 / 2 |
+| attack | -7,6 | +0,3 / -0,5 | 0,72 / 0,95 | 0,90 / 0,96 | 623 / 309 / 588 | 1 / 0 / 1 |
+| badnews | +3,9 | +4,9 / +0,5 | 0,95 / 0,94 | 0,82 / 0,89 | 162 / 259 / 120 | 0 / 0 / 0 |
+| blackq | -12,4 | -1,4 / +0,3 | 0,96 / 0,96 | 0,64 / 0,88 | 464 / 703 / 416 | 0 / 6 / 0 |
+| call2arm | +4,1 | +4,1 / -0,7 | 0,90 / 0,97 | 0,40 / 0,91 | 379 / 604 / 367 | 0 / 2 / 0 |
+| defeat | -0,8 | +1,9 / -1,2 | 0,96 / 0,97 | 0,61 / 0,77 | 623 / 895 / 794 | 5 / 6 / 6 |
+| gamethme | +0,0 | +0,0 / +0,0 | 0,83 / 0,85 | 0,68 / 0,63 | 1056 / 852 / 1296 | 12 / 5 / 7 |
+| happy1 | -9,0 | +11,4 / +1,8 | 0,92 / 0,98 | 0,64 / 0,70 | 1996 / 1433 / 1694 | 21 / 25 / 24 |
+| happy2 | -5,9 | -0,8 / -1,0 | 0,97 / 0,98 | 0,69 / 0,75 | 1153 / 778 / 1171 | 13 / 8 / 12 |
+| hmanawar | -0,2 | +3,6 / -0,5 | 0,96 / 0,95 | 0,66 / 0,69 | 956 / 1112 / 1126 | 6 / 4 / 11 |
+| hmanthme | -0,3 | +3,4 / -0,1 | 0,97 / 0,95 | 0,56 / 0,69 | 916 / 1143 / 1005 | 8 / 4 / 9 |
+| jolly1 | -9,8 | -1,1 / -0,2 | 0,95 / 0,96 | 0,58 / 0,74 | 959 / 1543 / 1121 | 8 / 37 / 13 |
+| jolly2 | -3,6 | +3,5 / +0,4 | 0,97 / 0,96 | 0,60 / 0,73 | 1012 / 1501 / 1194 | 8 / 28 / 12 |
+| jolly3 | -8,8 | -0,2 / +0,1 | 0,23 / 0,98 | 0,59 / 0,70 | 1073 / 1586 / 1273 | 9 / 31 / 13 |
+| jolly4 | -11,7 | +3,9 / +2,2 | 0,93 / 0,94 | 0,63 / 0,70 | 960 / 1389 / 1028 | 6 / 6 / 7 |
+| newbody | -2,7 | +5,8 / -1,2 | 0,92 / 0,93 | 0,55 / 0,88 | 732 / 915 / 915 | 3 / 6 / 6 |
+| newcoln2 | -4,7 | +2,9 / -1,0 | 0,98 / 0,99 | 0,75 / 0,76 | 787 / 1527 / 1189 | 4 / 13 / 3 |
+| omnious1 | -5,1 | +5,0 / -1,5 | 0,88 / 0,92 | 0,88 / 0,90 | 359 / 351 / 385 | 0 / 0 / 0 |
+| qn4day | +1,7 | +4,1 / -0,4 | 0,85 / 0,97 | 0,57 / 0,76 | 922 / 1173 / 770 | 4 / 4 / 0 |
+| redq | +1,6 | +2,6 / -1,4 | 0,88 / 0,98 | 0,71 / 0,96 | 601 / 641 / 612 | 0 / 0 / 0 |
+| sad1 | -7,4 | +6,1 / -1,8 | 0,93 / 0,97 | 0,62 / 0,72 | 950 / 1189 / 1146 | 5 / 15 / 13 |
+| sad2 | -9,3 | +15,0 / +1,5 | 0,95 / 0,97 | 0,89 / 0,92 | 425 / 456 / 339 | 0 / 0 / 0 |
+| sad3 | -5,0 | +0,2 / -1,0 | 0,87 / 0,94 | 0,89 / 0,94 | 670 / 359 / 737 | 2 / 0 / 2 |
+| sad4 | -5,8 | +7,5 / +0,7 | 0,88 / 0,95 | 0,68 / 0,73 | 832 / 603 / 892 | 8 / 1 / 5 |
+| victory | -3,0 | +3,2 / -0,6 | 0,93 / 0,90 | 0,86 / 0,87 | 471 / 779 / 556 | 1 / 1 / 0 |
+| victqndd | +4,3 | +4,3 / -0,1 | 0,93 / 0,98 | 0,51 / 0,82 | 606 / 807 / 456 | 1 / 2 / 0 |
+| **Média** | | **+3,4 / −0,1** (média do módulo: 3,6 / 0,8) | 0,85 / 0,94 | 0,67 / 0,78 | módulo de log₂(port/original): 0,53 / 0,24 | 6,8 / 8,2 / 6,8 |
+
+- **Nível:** de +3,4 dB em média (o "~4 dB acima" da seção anterior, que sem o passa-altas dava +4,0) para −0,1 dB; nenhuma música passa de ±2,2 dB (`jolly4` +2,2, `sad1` −1,8). A abertura continua −20,0 dB abaixo de um efeito de ganho 1.
+- **Timbre:** o espectro médio sobe de 0,67 para 0,78 de correlação e a diferença média cai de 14,3 para 10,2 dB; o centróide fica a 18 % do original em média (era 44 %). A faixa de 2–4 kHz fica igual em média (6,8 %), mas por música ainda há desvios: a abertura tem 7 % contra 12 % e o centróide dela passou do original (1296 contra 1056 Hz, pelos 8 kHz da percussão); `antthme1` 17 % contra 35 %; `sad1`, `hmanawar` e as `jolly*` 4–8 pontos acima.
+- **Envelope:** de 0,85 para 0,94 de média (`jolly3` 0,23 → 0,98, `attack` 0,72 → 0,95, `antthme2` 0,52 → 0,87).
+- **Croma alinhada** (notas): 0,78 → 0,83 de média.
+
+**Continua diferente [em aberto]:** o banco da Creative não foi lido (a imitação é por medida, com timbres próprios de 2 operadores); `antthme1` (35 % da energia em 2–4 kHz no original contra 17 %) e `antthme2` (espectro 0,41): a percussão do original tem componentes que o modelo de 2 operadores por nota não reproduz bem (o 47 e o 60 são tom + ruído); o 26 (guitarra de `gamethme`) só tem 2 janelas isoladas e ficou como estava; as notas da tabela de percussão com menos de 3 inícios isolados.
 
 **Efeitos dentro do jogo: continuam sem captura.** Tentado (2026-10-19): o `AUTOTYPE` do DOSBox-X **funciona com a janela minimizada e sem foco** quando o layout de teclado do DOS é US (`[dos] keyboardlayout = us`, agora no `som_dosbox.py`): com o layout automático desta máquina (BR) não entregava nada, que era a falha registrada antes. No DOS (`mkdir` digitado) passa; **no Windows 3.1 em modo 386 avançado nenhuma tecla chega**: Espaço no título aos 25–27 s não o fecha (continua aos 38 s, quadros do vídeo), Enter e Alt no "Select a Game" não fazem nada [hipótese: o `AUTOTYPE` põe as teclas no buffer do BIOS, que o Windows não lê]. A bancada QEMU (alternativa a) segue sem servir para isso: o `sb16` do QEMU toca os efeitos com a taxa e o buffer errados e não há OPL3 (seção abaixo); a instalação do usuário não tem driver para AC97/ES1370. Rotas que sobram: entrada pela porta serial (mouse serial emulado via `nullmodem`) no DOSBox-X, ou um driver de teclado no Windows da cópia [não tentadas].
 
