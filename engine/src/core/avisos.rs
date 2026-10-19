@@ -694,7 +694,10 @@ pub fn desenhar_faixa(q: &mut Quadro, recursos: &Recursos, interface: &Interface
         _ => bytes_da_faixa(recursos, t),
     };
     let antes = q.recorte.replace(r);
-    q.texto(Retangulo { dir: r.dir - 1, ..r }, f, &bytes, 3, c.frente, c.fundo);
+    // `_gr_CenterStrInRectClear` no retângulo do objeto depois de `_win_Recalc` (a direita − 1; o +1
+    // de `_win_PrintfAtObj` não aparece na bancada; `Retangulo::do_recalc`). A base fica a do layout
+    // (com a altura das fontes da faixa, as duas contas dão a mesma linha).
+    q.texto(Retangulo { base: r.base, ..r.do_recalc() }, f, &bytes, 3, c.frente, c.fundo);
     q.recorte = antes;
 }
 
@@ -851,9 +854,10 @@ pub fn desenhar_fim_de_jogo(
     for (nome, t) in textos {
         // _win_PrintfAtObj: com faixa, o retângulo ganha 1 pixel à direita e embaixo; texto
         // centrado e o resto do objeto na cor de fundo, recortado ao objeto. Medido na captura m8
-        // (fim de jogo): o texto bate melhor sem o pixel a mais à direita [causa em aberto].
+        // (fim de jogo): a direita é a do `_win_Recalc` (`Retangulo::do_recalc`); a base + 1 é medida
+        // [o +1 da base contra o − 1 da regra fica em aberto].
         let (r, cor) = objeto_na_tela(interface, cfg.janela, &janela, nome, cfg.ajuste)?;
-        let r = Retangulo { dir: r.dir - 1, base: r.base + 1, ..r };
+        let r = Retangulo { base: r.base + 1, ..r.do_recalc() };
         let c = interface.cores.get(cor as usize).copied().unwrap_or(crate::formats::janela::Cor { frente: 0, fundo: 15, fundo2: 15 });
         let antes = q.recorte.replace(r);
         q.texto(r, fonte, &t, 3, c.frente, c.fundo);

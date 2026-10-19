@@ -184,8 +184,9 @@ pub fn desenhar(q: &mut Quadro, recursos: &Recursos, interface: &Interface, cfg:
             })
             .unwrap_or(fonte);
         // _win_PrintfAtObj: texto centrado e o resto do objeto na cor de fundo, recortado ao objeto
-        // (uma linha mais acima que no fim de jogo: medido em n02 [causa em aberto]).
-        let r = Retangulo { dir: r.dir - 1, base: r.base - 1, ..r };
+        // no retângulo do `_win_Recalc` (direita e base − 1, `Retangulo::do_recalc`; medido em n02).
+        // O fim de jogo fica uma linha abaixo dessa regra [em aberto].
+        let r = r.do_recalc();
         let c = interface.cores.get(cor as usize).copied().unwrap_or(Cor { frente: 0, fundo: 15, fundo2: 15 });
         let antes = q.recorte.replace(r);
         q.texto(r, fonte_obj, t, 3, c.frente, c.fundo);

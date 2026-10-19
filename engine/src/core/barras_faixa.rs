@@ -181,7 +181,7 @@ pub fn desenhar(
         let c = cor_de(c);
         q.preencher(r, c.fundo, c.fundo);
         // Centralizado como a mensagem da faixa (`avisos::desenhar_faixa`): na largura `dir − 1 − esq`.
-        let texto = Retangulo { dir: r.dir - 1, ..r };
+        let texto = Retangulo { base: r.base, ..r.do_recalc() };
         q.texto(texto, f, v.inteiro(n.valor).to_string().as_bytes(), 0, c.frente, c.fundo);
     }
     faltam
