@@ -5,3 +5,4 @@ members = ["engine", "simant"]
 [workspace.package]
 edition = "2021"
 version = "0.1.0"
+license = "MIT OR Apache-2.0"

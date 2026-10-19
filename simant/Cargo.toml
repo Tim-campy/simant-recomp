@@ -2,6 +2,7 @@
 name = "simant"
 edition.workspace = true
 version.workspace = true
+license.workspace = true
 
 [dependencies]
 engine = { path = "../engine" }
