@@ -4,7 +4,7 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 
 **Medições desta revisão** (comandos rodados nesta data):
 
-- `cargo test --workspace` com `SIMANT_DIR` = `SimAnt-T/MAXIS/ANTWIN`: **591 testes passaram, 0 falharam, 0 ignorados**, em 36 binários de teste (603 depois da sétima rodada de vetores e do merge do áudio FM, mesma data) (unitários de `engine` e `simant` e 33 arquivos de integração em `engine/tests/`). `cargo clippy --workspace --all-targets -- -D warnings`: sem avisos.
+- `cargo test --workspace` com `SIMANT_DIR` = `SimAnt-T/MAXIS/ANTWIN`: **591 testes passaram, 0 falharam, 0 ignorados**, em 36 binários de teste (603 depois da sétima rodada de vetores e do merge do áudio FM; **614** depois da oitava rodada e do merge da API 0.33, mesma data) (unitários de `engine` e `simant` e 33 arquivos de integração em `engine/tests/`). `cargo clippy --workspace --all-targets -- -D warnings`: sem avisos.
 - Vetores do original no repositório (`tests/referencias/`, contados nas pastas e na saída dos testes):
   - **221 vetores de tick** (5 na raiz e 216 em 77 subpastas de `ticks/`; eram 173 antes da sétima rodada e 204 antes da oitava, `regras/testes-tick.md`): **220 exigidos 307/307** blocos, com extras e vida, por `engine/tests/ticks_originais.rs`; o restante (`inseticida_morte/21`, fim de jogo) é conferido pela interface (`fim_de_jogo_interface.rs`), 307/307 com S e R. Nenhum vetor pendente.
   - **2 sequências longas** (`ticks_longos/rico_200`, 200 ticks; `full_600`, 600 ticks do Jogo Completo com a Yard View na frente, inclusive os 17.650 passos de S do desenho entre os ticks): iguais ao original.
