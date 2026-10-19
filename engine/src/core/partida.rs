@@ -249,6 +249,14 @@ pub struct Partida {
     quadros: u64,
     /// Contador do redesenho do mapa em fast/ultra (DGROUP `0x9B00`).
     contador_mapa: u32,
+    /// A janela do mapa aberta e na frente (a interface informa, como `janelas_desenho`).
+    pub mapa_aberto: bool,
+    pub mapa_na_frente: bool,
+    /// `DGROUP:0x72f0`: alternância `_DrawMap`/`_DrawMapData` com o mapa atrás; os `_Goto*` no mesmo
+    /// plano a zeram.
+    alterna_mapa: bool,
+    /// Algum tick desde o último quadro mostrou o mapa (`_DrawMap`).
+    mapa_na_tela: bool,
     /// Algo mudou na tela desde a última vez que a interface perguntou.
     redesenhar: bool,
     /// O pedido de `_EndGameDialog` já foi repassado (enquanto `_IsGameOver` ≠ 0).
@@ -336,6 +344,10 @@ impl Partida {
             ativo: true,
             quadros: 0,
             contador_mapa: 0,
+            mapa_aberto: false,
+            mapa_na_frente: false,
+            alterna_mapa: false,
+            mapa_na_tela: false,
             redesenhar: true,
             fim_anunciado: false,
             eventos: VecDeque::new(),
@@ -573,6 +585,17 @@ impl Partida {
             desenha &= self.quadros.is_multiple_of(u64::from(self.cfg.relogio.redesenho_sem_foco_a_cada.max(1)));
         }
         self.redesenhar |= desenha;
+        // _UpdateWindows com o mapa aberto: na frente (ou em ultra), _DrawMap e a alternância zera;
+        // atrás, _DrawMap e _DrawMapData se revezam (telas/mapa.md §4).
+        if desenha && self.mapa_aberto {
+            if self.mapa_na_frente || self.estado.partida.velocidade == 3 {
+                self.mapa_na_tela = true;
+                self.alterna_mapa = false;
+            } else {
+                self.mapa_na_tela |= self.alterna_mapa;
+                self.alterna_mapa = !self.alterna_mapa;
+            }
+        }
     }
 
     /// A janela de edição para os desenhos de dentro do tick (`desenho::EdicaoNoTick`): aberta ou não
@@ -996,6 +1019,11 @@ impl Partida {
         self.ir_para_amarela(plano, x, y);
     }
 
+    /// Se algum `_UpdateWindows` desde a última chamada mostrou o mapa (`_DrawMap`), e zera.
+    pub fn tomar_mapa_na_tela(&mut self) -> bool {
+        std::mem::take(&mut self.mapa_na_tela)
+    }
+
     /// Parte de vista de `_GotoMyAnt`: no Experimental só toca o som de erro; senão leva a vista
     /// até a amarela.
     fn ir_para_amarela(&mut self, plano: i16, x: i16, y: i16) {
@@ -1004,6 +1032,10 @@ impl Partida {
                 self.eventos.push_back(Evento::Som(id));
             }
             return;
+        }
+        // _GotoMyAnt zera a alternância do mapa quando a amarela está no plano mostrado.
+        if plano > 0 && plano == self.nav.plano_mapa {
+            self.alterna_mapa = false;
         }
         self.redesenhar |= self.nav.ir_para_amarela(plano, i32::from(x), i32::from(y));
         self.vistas_para_estado();
@@ -1130,6 +1162,10 @@ impl Partida {
             self.avisos.mensagem_literal(&f.marcador_posto, f.duracao_botao, agora);
         } else if let Some((plano, x, y)) = slot {
             let (w, h) = (self.nav.vista.largura, self.nav.vista.altura);
+            // _GotoMapPoint: no plano mostrado, zera a alternância do mapa (DGROUP 0x72f0)
+            if plano == self.nav.plano_mapa {
+                self.alterna_mapa = false;
+            }
             self.nav.ir_para_amarela(plano, w / 2 + x, h / 2 + y);
             self.vistas_para_estado();
         } else {

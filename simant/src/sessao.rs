@@ -257,7 +257,8 @@ impl Sessao<'_> {
             self.info.carregar(self.recursos);
         }
         if self.janelas.aberta(Controle::Mapa) {
-            self.mapa.atualizar(&self.partida.estado, self.partida.mostrar_trilhas);
+            let na_tela = self.partida.tomar_mapa_na_tela();
+            self.mapa.atualizar_no_timer(&self.partida.estado, self.partida.mostrar_trilhas, na_tela);
         }
         // Janelas na ordem do gerenciador (janelas.md §8): as de baixo da de edição são desenhadas
         // entre a faixa e ela, as outras depois. As janelas filhas ficam dentro da área cliente da
@@ -604,6 +605,9 @@ impl Sessao<'_> {
         j.quintal_aberto = g.aberta(quintal);
         j.quintal_na_frente = topo == Some(quintal);
         j.edicao_aberta = g.aberta(janelas::ID_EDICAO);
+        let mapa = self.janelas.cfg.id(Controle::Mapa);
+        self.partida.mapa_aberto = g.aberta(mapa);
+        self.partida.mapa_na_frente = topo == Some(mapa);
         j.edicao_na_frente = topo == Some(janelas::ID_EDICAO);
         // `_win_IsWinInFront(0)` das animações de morte e de loucura da amarela (quantos quadros e
         // sorteios): a ordem real do gerenciador, no lugar do valor fixo de amarela.json.
