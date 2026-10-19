@@ -48,7 +48,7 @@ pub struct ConfigMapa {
 
 impl ConfigMapa {
     /// `_ConvColor(c)`.
-    fn conv(&self, c: usize) -> u8 {
+    pub fn conv(&self, c: usize) -> u8 {
         self.conv[c & 15]
     }
 }
@@ -83,7 +83,85 @@ fn cor_ninho(cfg: &ConfigMapa, terreno: u8, vida: u8) -> Option<u8> {
     }
 }
 
+/// Gera o buffer de 128 × 64 células do `modo` (`_GenOverMap`, `_GenNestMap` ou o feromônio). Com
+/// `acumula` (trilhas com o mesmo modo), parte de `celulas` e só escreve as células com vida. Usada
+/// pela janela do mapa e pelo mini mapa (`core/mini_mapa.rs`).
+pub fn gerar_celulas(cfg: &ConfigMapa, e: &Estado, modo: i16, acumula: bool, celulas: &mut [u8]) {
+    if !acumula {
+        celulas.iter_mut().for_each(|c| *c = 0);
+    }
+    match modo {
+        2 | 3 => {
+            let n = if modo == 2 { &e.ninho_b } else { &e.ninho_r };
+            let faixa = cfg.conv(0xF);
+            for y in 0..LINHAS {
+                for x in 0..COLUNAS {
+                    let i = indice(x, y);
+                    if !(32..96).contains(&x) {
+                        celulas[i] = faixa;
+                        continue;
+                    }
+                    let (nx, ny) = ((x - 32) as i32, y as i32);
+                    let vida = n.vida.em(nx, ny).unwrap_or(0);
+                    if vida == 0 && acumula {
+                        continue;
+                    }
+                    if let Some(c) = cor_ninho(cfg, n.mapa.em(nx, ny).unwrap_or(0), vida) {
+                        celulas[i] = c;
+                    }
+                }
+            }
+        }
+        4..=8 => {
+            let f = &e.feromonios;
+            let g: &Grade = match modo {
+                4 => &f.ninho_b,
+                5 => &f.trilha_b,
+                6 => &f.ninho_r,
+                7 => &f.trilha_r,
+                _ => &f.alarme,
+            };
+            for y in 0..LINHAS {
+                for x in 0..COLUNAS {
+                    let v = g.em((x / 2) as i32, (y / 2) as i32).unwrap_or(0);
+                    celulas[indice(x, y)] = if v == 0 { cfg.conv(0xB) } else { 0x10 + (v >> 4) };
+                }
+            }
+        }
+        _ => {
+            let casa = crate::rules::comum::em_casa(e);
+            let tab = if casa { &cfg.htab } else { &cfg.ctab };
+            for y in 0..LINHAS {
+                for x in 0..COLUNAS {
+                    let (cx, cy) = (x as i32, y as i32);
+                    let vida = e.superficie.vida.em(cx, cy).unwrap_or(0);
+                    let c = if vida != 0 {
+                        cfg.ltab.get(usize::from(vida >> 3)).copied()
+                    } else if acumula {
+                        None
+                    } else {
+                        tab.get(usize::from(e.superficie.mapa.em(cx, cy).unwrap_or(0))).copied()
+                    };
+                    if let Some(c) = c {
+                        celulas[indice(x, y)] = c;
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl JanelaMapa {
+    /// Modo da última geração (`_lastMapGenMode`).
+    pub fn ultimo_modo(&self) -> Option<i16> {
+        self.ultimo_modo
+    }
+
+    /// Sem bitmaps nem títulos (testes e ferramentas sem o banco do jogo).
+    pub fn sem_banco(cfg: ConfigMapa) -> JanelaMapa {
+        JanelaMapa { cfg, celulas: vec![0; COLUNAS * LINHAS], ultimo_modo: None, ultimo_tempo: None, ultimo_plano: None, bitmaps: HashMap::new(), titulos: Vec::new() }
+    }
+
     pub fn carregar(recursos: &Recursos) -> Result<JanelaMapa, String> {
         let cfg: ConfigMapa = recursos.dados(ARQUIVO_CONFIG)?;
         let mut bitmaps = HashMap::new();
@@ -123,69 +201,7 @@ impl JanelaMapa {
             e.vistas.modo_mapa
         };
         let acumula = trilhas && self.ultimo_modo == Some(modo);
-        if !acumula {
-            self.celulas.iter_mut().for_each(|c| *c = 0);
-        }
-        let cfg = &self.cfg;
-        match modo {
-            2 | 3 => {
-                let n = if modo == 2 { &e.ninho_b } else { &e.ninho_r };
-                let faixa = cfg.conv(0xF);
-                for y in 0..LINHAS {
-                    for x in 0..COLUNAS {
-                        let i = indice(x, y);
-                        if !(32..96).contains(&x) {
-                            self.celulas[i] = faixa;
-                            continue;
-                        }
-                        let (nx, ny) = ((x - 32) as i32, y as i32);
-                        let vida = n.vida.em(nx, ny).unwrap_or(0);
-                        if trilhas && vida == 0 && acumula {
-                            continue;
-                        }
-                        if let Some(c) = cor_ninho(cfg, n.mapa.em(nx, ny).unwrap_or(0), vida) {
-                            self.celulas[i] = c;
-                        }
-                    }
-                }
-            }
-            4..=8 => {
-                let f = &e.feromonios;
-                let g: &Grade = match modo {
-                    4 => &f.ninho_b,
-                    5 => &f.trilha_b,
-                    6 => &f.ninho_r,
-                    7 => &f.trilha_r,
-                    _ => &f.alarme,
-                };
-                for y in 0..LINHAS {
-                    for x in 0..COLUNAS {
-                        let v = g.em((x / 2) as i32, (y / 2) as i32).unwrap_or(0);
-                        self.celulas[indice(x, y)] = if v == 0 { cfg.conv(0xB) } else { 0x10 + (v >> 4) };
-                    }
-                }
-            }
-            _ => {
-                let casa = crate::rules::comum::em_casa(e);
-                let tab = if casa { &cfg.htab } else { &cfg.ctab };
-                for y in 0..LINHAS {
-                    for x in 0..COLUNAS {
-                        let (cx, cy) = (x as i32, y as i32);
-                        let vida = e.superficie.vida.em(cx, cy).unwrap_or(0);
-                        let c = if vida != 0 {
-                            cfg.ltab.get(usize::from(vida >> 3)).copied()
-                        } else if acumula {
-                            None
-                        } else {
-                            tab.get(usize::from(e.superficie.mapa.em(cx, cy).unwrap_or(0))).copied()
-                        };
-                        if let Some(c) = c {
-                            self.celulas[indice(x, y)] = c;
-                        }
-                    }
-                }
-            }
-        }
+        gerar_celulas(&self.cfg, e, modo, acumula, &mut self.celulas);
         self.ultimo_modo = Some(modo);
         self.ultimo_plano = Some(plano);
         self.ultimo_tempo = Some(tempo);
@@ -277,7 +293,7 @@ mod testes {
     }
 
     fn janela() -> JanelaMapa {
-        JanelaMapa { cfg: cfg(), celulas: vec![0; COLUNAS * LINHAS], ultimo_modo: None, ultimo_tempo: None, ultimo_plano: None, bitmaps: HashMap::new(), titulos: Vec::new() }
+        JanelaMapa::sem_banco(cfg())
     }
 
     #[test]

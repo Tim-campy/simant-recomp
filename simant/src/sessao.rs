@@ -45,6 +45,8 @@ pub(crate) struct Sessao<'a> {
     pub(crate) dialogo: Option<arquivos::Dialogo>,
     /// Janela do mapa (core/janela_mapa.rs): buffer das células e trilhas.
     pub(crate) mapa: engine::core::janela_mapa::JanelaMapa,
+    /// Mini mapa (core/mini_mapa.rs, simant/src/mini_ui.rs): aberto pelo `ribToYellow`, modal.
+    pub(crate) mini: engine::core::mini_mapa::MiniMapa,
     /// Examine (janela 29) e o exame aberto agora, com o canto da janela.
     pub(crate) janela_exame: engine::core::exame::JanelaExame,
     pub(crate) exame: Option<(engine::rules::experimental::Exame, (i32, i32))>,
@@ -184,6 +186,7 @@ impl Sessao<'_> {
             dialogos_cfg,
             dialogo: None,
             mapa,
+            mini: engine::core::mini_mapa::MiniMapa::carregar(recursos)?,
             janela_exame,
             exame: None,
             info,
@@ -267,6 +270,7 @@ impl Sessao<'_> {
             self.tela.desenhar_mensagem_da_faixa(&mut q, self.recursos, &self.interface, &mut self.partida.avisos, agora)?;
         }
         pendentes.extend(modos::desenhar(self, &mut q)?);
+        mini_ui::desenhar(self, &mut q);
         // O aviso modal fica por cima de todas as janelas (e do resto dos modos): o quadro de recusa
         // da troca de patch (10000/10002/10004) sai de um duplo clique no quintal.
         // Durante uma animação da amarela o quadro modal pedido no mesmo tick ainda não apareceu.
@@ -340,14 +344,52 @@ impl Sessao<'_> {
         self.janelas.trazer_para_frente(Some(Controle::Info));
     }
 
-    /// `_MapAreaEvent`: o clique ou o arrasto na área do mapa centraliza a vista de edição na célula.
+    /// `_MapAreaEvent`: o clique ou o arrasto na área do mapa centraliza a vista de edição na célula;
+    /// no duplo clique, a janela de edição vem depois para a frente (`_OpenEditWindow`). Shift+clique
+    /// é o clique da janela de edição naquela célula (`_processEdit`), sem centralizar.
     pub(crate) fn centralizar_pelo_mapa(&mut self) {
+        if let Some((x, y, duplo)) = self.janelas.ordem_mapa.take() {
+            self.ordem_pelo_mapa(x, y, duplo);
+        }
         let Some((x, y)) = self.janelas.clique_mapa.take() else { return };
         let Some(area) = self.janelas.area_do_mapa(self.recursos) else { return };
         if let Some((cx, cy)) = self.mapa.celula_em(area, &self.partida.estado, x, y) {
-            if self.partida.nav.vista.centralizar(cx, cy) {
-                self.partida.processar_eventos_do_estado();
-            }
+            self.centralizar_vista(cx, cy);
+        }
+        if std::mem::take(&mut self.janelas.clique_mapa_duplo) {
+            self.janelas.trazer_para_frente(None);
+        }
+    }
+
+    /// `_CenterEdit(cx, cy)`: a vista de edição vai até a célula.
+    pub(crate) fn centralizar_vista(&mut self, cx: i32, cy: i32) {
+        if self.partida.nav.vista.centralizar(cx, cy) {
+            self.partida.processar_eventos_do_estado();
+        }
+    }
+
+    /// Shift+clique no mapa (`_MapAreaEvent` → `_processEdit` com o ponto convertido para a célula):
+    /// no Experimental, a ferramenta; senão a ordem à amarela (ou a ferramenta 10/11). A janela de
+    /// edição não está na frente, então não há a espera do clique simples, e com Shift apertado não
+    /// há menu da amarela nem Examine [código `1000:6a38`; bancada q01/q04 e p05].
+    fn ordem_pelo_mapa(&mut self, x: i32, y: i32, duplo: bool) {
+        let Some(area) = self.janelas.area_do_mapa(self.recursos) else { return };
+        let Some((cx, cy)) = self.mapa.celula_em(area, &self.partida.estado, x, y) else { return };
+        if self.partida.estado.partida.tipo_jogo == 3 {
+            modos::ferramenta_na_celula(self, cx, cy, self.janelas.ctrl, false);
+            return;
+        }
+        let r = if duplo { self.partida.clicar(cx, cy, true) } else { self.partida.clicar_depois_da_espera(cx, cy, false) };
+        println!("Shift+clique {} no mapa em ({cx}, {cy}), plano {}: {r:?}", if duplo { "duplo" } else { "simples" }, self.partida.nav.plano_mapa);
+    }
+
+    /// `_OpenMapYard` (Window → Map/Yard, Ctrl+M, mini mapa): com o quintal aberto, ele vem para a
+    /// frente; senão a janela do mapa (aberta na superfície, se estava fechada).
+    pub(crate) fn abrir_mapa_ou_quintal(&mut self) {
+        if self.janelas.aberta(Controle::Quintal) {
+            modos::aplicar_acao_quintal(self, AcaoQuintal::Abrir, true);
+        } else {
+            self.abrir_mapa();
         }
     }
 

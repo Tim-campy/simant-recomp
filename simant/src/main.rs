@@ -32,6 +32,7 @@ use sessao::*;
 
 mod janelas_ui;
 mod menus_ui;
+mod mini_ui;
 mod mods_ui;
 mod modos;
 
@@ -366,6 +367,27 @@ fn principal() -> Result<(), String> {
             }
             s.registrar_eventos();
             println!("{n} ticks: GameTime {antes} -> {}", s.partida.estado.partida.tempo);
+        }
+        for k in 0..o.mini_mapa {
+            // O clique no ribToYellow, solto fora do mini mapa: fica aberto; antes de reabrir, um
+            // clique fora fecha.
+            if k > 0 {
+                mini_ui::evento(&mut s, &sdl2::event::Event::MouseButtonDown {
+                    timestamp: 0,
+                    window_id: 0,
+                    which: 0,
+                    mouse_btn: sdl2::mouse::MouseButton::Left,
+                    clicks: 1,
+                    x: -1,
+                    y: -1,
+                });
+            }
+            let r = s.tela.retangulo_da_faixa(&s.mini.cfg.botao).ok_or("--mini-mapa: botão sem retângulo")?;
+            let (x, y) = (i32::from(r.esq + r.dir) / 2, i32::from(r.topo + r.base) / 2);
+            if !mini_ui::abrir_pelo_botao(&mut s, x, y) {
+                return Err("--mini-mapa: o botão não abriu o mini mapa".into());
+            }
+            s.mini.soltar(-1, -1);
         }
         if let Some(ms) = o.avancar_ms {
             let av = s.partida.avancar(ms);
