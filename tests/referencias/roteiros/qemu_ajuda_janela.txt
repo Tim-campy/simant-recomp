@@ -1,0 +1,85 @@
+# Janela do WinHelp como janela de nível superior do Windows 3.1 (telas/ajuda.md §2.1): menu de sistema,
+# arrasto pelo título, maximizar/restaurar, redimensionar pela borda, duplo clique no título, minimizar e
+# o que acontece com o ícone, e F1 com a ajuda minimizada. Coordenadas da tela 640x480.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ajuda_janela.txt --overlay <cópia do c_overlay.qcow2>
+snapshot_carregar quick
+esperar 3
+teclas f1
+esperar 6
+capturar re_trabalho/ag_dlgaj/aj/h00_aberta.png
+# Clique simples na caixa do menu de sistema
+clicar_em 225 14
+esperar 2
+capturar re_trabalho/ag_dlgaj/aj/h01_menu_sistema.png
+teclas esc
+esperar 1
+capturar re_trabalho/ag_dlgaj/aj/h02_menu_fechado.png
+# Arrastar pelo título
+ir_para 400 14
+apertar
+mover -30 15
+mover -30 15
+esperar 1
+capturar re_trabalho/ag_dlgaj/aj/h03_arrasto.png
+soltar
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/h04_movida.png
+# Maximizar (botão da direita do título, agora em x 555-573)
+clicar_em 564 44
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/h05_max.png
+# Restaurar (maximizada: botão no canto de cima à direita da tela)
+clicar_em 630 9
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/h06_restaurada.png
+# Redimensionar pela borda esquerda
+ir_para 154 200
+apertar
+mover -20 0
+mover -20 0
+esperar 1
+capturar re_trabalho/ag_dlgaj/aj/h07_redim.png
+soltar
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/h08_redim_fim.png
+# Duplo clique no título
+clicar_em 350 40
+clicar
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/h09_duplo_titulo.png
+clicar_em 300 9
+clicar
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/h10_duplo_de_novo.png
+# Minimizar (botão da esquerda dos dois, x 536-554)
+clicar_em 545 44
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/h11_min.png
+# Alt+Tab com a ajuda minimizada
+apertar_tecla alt
+teclas tab
+esperar 1
+capturar re_trabalho/ag_dlgaj/aj/h12_alt_tab.png
+soltar_tecla alt
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/h13_depois_alt_tab.png
+# F1 de novo
+teclas f1
+esperar 5
+capturar re_trabalho/ag_dlgaj/aj/h14_f1_de_novo.png
+# Alt+Espaço na ajuda: menu de sistema pelo teclado
+teclas alt+spc
+esperar 2
+capturar re_trabalho/ag_dlgaj/aj/h15_alt_espaco.png
+teclas esc
+esperar 1
+# Minimizar pelo menu de sistema (clique na caixa, depois "n")
+teclas alt+spc
+esperar 1
+teclas n
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/h16_min_menu.png
+teclas alt+f4
+esperar 2
+capturar re_trabalho/ag_dlgaj/aj/h17_fim.png
+fim

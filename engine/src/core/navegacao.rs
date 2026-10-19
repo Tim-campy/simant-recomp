@@ -72,6 +72,21 @@ pub struct ConfigNavegacao {
     /// Objeto da faixa (janela 34) → ação do clique.
     pub botoes_faixa: std::collections::HashMap<String, Acao>,
     pub repeticao: ConfigRepeticao,
+    /// Outros botões fixos da faixa 34 (`_ProcMapRibbonEvent`): `ribToSpider` (0x2207,
+    /// `_GotoSpider`) e `ribStats` (0x2209, `_ScoreDialog`). Opcional (API 0.37): sem ele, os dois
+    /// não fazem nada, como antes.
+    #[serde(default)]
+    pub botoes_faixa_outros: std::collections::HashMap<String, BotaoFaixa>,
+}
+
+/// Botão fixo da faixa que não é de navegação por plano.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BotaoFaixa {
+    /// `_GotoSpider`: a vista vai à aranha.
+    Aranha,
+    /// `_ScoreDialog`: a janela Status (a mesma de Window → Status, Ctrl+T).
+    Status,
 }
 
 /// Evento de entrada já sem SDL.

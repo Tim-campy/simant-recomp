@@ -376,7 +376,21 @@ pub fn clique_na_faixa(s: &mut Sessao, x: i32, y: i32) -> Resposta {
         aplicar_acao_quintal(s, AcaoQuintal::Abrir, true);
         return Resposta::Tratada;
     }
-    Resposta::Seguir
+    let outro = objetos.iter().find_map(|n| s.nav_cfg.botoes_faixa_outros.get(*n).copied());
+    match outro {
+        Some(engine::core::navegacao::BotaoFaixa::Aranha) => {
+            // _GotoSpider (ribToSpider, 0x2207).
+            let foi = s.partida.ir_para_aranha();
+            println!("botão da aranha: {}", if foi { "vista na aranha" } else { "sem aranha (som de erro)" });
+            Resposta::Tratada
+        }
+        Some(engine::core::navegacao::BotaoFaixa::Status) => {
+            // _ScoreDialog (ribStats, 0x2209): a janela Status, como Window → Status.
+            s.menus.status = true;
+            Resposta::Tratada
+        }
+        None => Resposta::Seguir,
+    }
 }
 
 /// Área das barras da faixa (`mapRibCaste` / `yardRibCaste`): o clique na barra de saúde da amarela
