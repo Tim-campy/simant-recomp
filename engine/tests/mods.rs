@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use engine::formats::banco::Chave;
-use engine::recursos::{carregar_mods, Recursos};
+use engine::recursos::{carregar_mods, carregar_mods_sem, Recursos};
 
 fn tmp(nome: &str) -> PathBuf {
     let d = std::env::temp_dir().join(format!("simant_teste_{nome}_{}", std::process::id()));
@@ -85,6 +85,42 @@ fn dependencia_ausente_e_erro() {
 }
 
 /// Banco com um único objeto (tipo, id) sem compressão, no mesmo formato de [`banco_minimo`].
+/// Mods desligados (launcher, `--desligar-mods`) ficam de fora; um ligado que depende de um desligado é erro.
+#[test]
+fn mods_desligados_ficam_de_fora() {
+    let dir = tmp("desligados");
+    criar_mod(&dir, "a", &[]);
+    criar_mod(&dir, "b", &["a"]);
+    criar_mod(&dir, "c", &[]);
+    let nomes = |v: Vec<engine::recursos::Mod>| v.into_iter().map(|m| m.manifesto.nome).collect::<Vec<_>>();
+    assert_eq!(nomes(carregar_mods_sem(&dir, &["c".into(), "nenhum".into()]).unwrap()), vec!["a", "b"]);
+    assert_eq!(nomes(carregar_mods_sem(&dir, &["b".into()]).unwrap()), vec!["a", "c"]);
+    let erro = carregar_mods_sem(&dir, &["a".into()]).unwrap_err();
+    assert!(erro.contains("desligado"), "{erro}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// `sobrepor_dados` mescla por cima dos mods (opções do executável como `--perfil-driver`).
+#[test]
+fn sobreposicao_vence_os_mods() {
+    let raiz = tmp("sobreposicao");
+    let (jogo, dados, mods) = (raiz.join("jogo"), raiz.join("data"), raiz.join("mods"));
+    for d in [&jogo, &dados, &mods] {
+        fs::create_dir_all(d).unwrap();
+    }
+    fs::write(dados.join("x.json"), r#"{"a": 1, "b": 1}"#).unwrap();
+    let m = criar_mod(&mods, "m", &[]);
+    fs::create_dir_all(m.join("data")).unwrap();
+    fs::write(m.join("data/x.json"), r#"{"a": 2}"#).unwrap();
+    let mut r = Recursos::abrir(&jogo, &[], &dados, Some(&mods)).unwrap();
+    r.sobrepor_dados("x.json", serde_json::json!({"b": 3}));
+    let v: serde_json::Value = r.dados("x.json").unwrap();
+    assert_eq!((v["a"].as_i64(), v["b"].as_i64()), (Some(2), Some(3)));
+    let r = Recursos::abrir_sem(&jogo, &[], &dados, Some(&mods), &["m".into()]).unwrap();
+    assert_eq!(r.dados::<serde_json::Value>("x.json").unwrap()["a"], 1);
+    let _ = fs::remove_dir_all(&raiz);
+}
+
 fn banco_com(dir: &Path, nome: &str, tipo: u8, id: u16, conteudo: &[u8]) {
     let mut dat = Vec::new();
     dat.extend_from_slice(&0x1234_5678u32.to_le_bytes());

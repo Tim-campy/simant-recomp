@@ -2,30 +2,45 @@
 //! se traduzem eventos do SDL em eventos do engine e se mostra o quadro composto.
 //!
 //! Uso:
-//!   simant [--jogo DIR] [--dados DIR] [--mods DIR] [--exportar-telas DIR]
+//!   simant                     sem opções: abre o launcher (opções de inicialização, launcher/), ou
+//!                              vai direto ao jogo se a configuração dele pedir (`mostrar_launcher`)
+//!   simant [--jogo DIR] [--dados DIR] [--mods DIR] [--desligar-mods A,B] [--exportar-telas DIR]
 //!   simant (--save ARQ.ANT | --novo-jogo [--semente N]) [--acoes a,b,...]
 //!          [--ticks N] [--avancar-ms MS] [--botoes F,F,...] [--historico B,B,...] [--fechar-avisos N] [--exportar-tela-jogo ARQ.png]
 //!          [--salvar ARQ.ANT]
 //!   opções da janela: [--resolucao LxA] [--escala N] [--janela LxA] [--moldura | --sem-moldura]
-//!     [--sair-apos-ms N [--capturar-janela ARQ.png]]
+//!     [--perfil-driver vga|svga256|s3_dosbox] [--sair-apos-ms N [--capturar-janela ARQ.png]]
 //!   (padrões em data/video.json: tela virtual 640×480 em escala 1, como a bancada; simant/src/video.rs;
 //!   --resolucao 800x600 ou 1024x768 muda o layout como o original, docs/spec/telas/resolucao.md)
-//!   som (simant/src/som): [--sem-som] [--soundfont ARQ.sf2] [--sintetizador simples|soundfont|fm]
+//!   som (simant/src/som): [--sem-som | --com-som] [--soundfont ARQ.sf2] [--sintetizador simples|soundfont|fm]
 //!     [--exportar-som DIR [--exportar-musica ID]]
 //!   preferências do jogador (simant/src/preferencias.rs): [--preferencias ARQ] [--sem-preferencias]
 //!   [--win-ini ARQ] (origem enquanto não há preferências gravadas; padrão: WINDOWS/WIN.INI acima do jogo)
+//!   launcher e saída (config_launcher.rs, registro.rs): [--launcher] [--config ARQ | --sem-config]
+//!     [--console] [--capturar-launcher ARQ.png] [--launcher-jogar-apos-ms N (teste)]
 //!
-//! Padrões: --jogo $SIMANT_DIR ou SimAnt-T/MAXIS/ANTWIN, --dados data, --mods mods (relativos à
-//! pasta atual). Sem --save nem --novo-jogo, mostra a abertura. Com um deles, a simulação roda ao
+//! Padrões: --jogo (a configuração do launcher, `SIMANT_DIR` ou SimAnt-T/MAXIS/ANTWIN), --dados data,
+//! --mods mods, relativos à pasta base do port: a do executável, se tiver `data/`, senão a atual
+//! (pastas.rs). A configuração do launcher (`launcher.json` na pasta de dados do usuário) entra antes
+//! das opções da linha de comando, que vencem (config_launcher::combinar). Sem --save nem
+//! --novo-jogo, mostra a abertura. Com um deles, a simulação roda ao
 //! vivo (engine::core::partida); com --ticks, --exportar-tela-jogo ou --salvar, roda sem janela e
 //! sai (--salvar grava o .ANT do estado no fim). Na janela, Ctrl+S salva no arquivo da partida e
 //! Ctrl+A ("Save As") num nome novo (o de --salvar, ou SALVO01.ANT, SALVO02.ANT… na pasta atual).
 
+// Sem console no Windows no executável de lançamento (o de depuração, do `cargo run`, mantém o
+// console); a saída vai para o log (registro.rs) e `--console` liga um. docs/decisoes.md, 2026-10-19.
+#![cfg_attr(all(windows, not(debug_assertions), not(test)), windows_subsystem = "windows")]
+
 mod ajuda_ui;
 mod arquivos;
+mod config_launcher;
 mod jogo;
+mod launcher;
 mod opcoes;
+mod pastas;
 mod preferencias;
+mod registro;
 mod sessao;
 mod som;
 mod video;
@@ -302,12 +317,16 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
     Ok(None)
 }
 
-fn principal() -> Result<(), String> {
-    let o = ler_opcoes()?;
+fn principal(o: Opcoes) -> Result<(), String> {
     // data/jogo.json diz quais bancos abrir; um mod pode trocá-lo (API 0.20), então ele é lido com os
     // mods antes de abrir os bancos.
-    let config: ConfigJogo = Recursos::abrir(&o.jogo, &[], &o.dados, Some(&o.mods))?.dados("jogo.json")?;
-    let recursos = Recursos::abrir(&o.jogo, &config.bancos, &o.dados, Some(&o.mods))?;
+    let config: ConfigJogo = Recursos::abrir_sem(&o.jogo, &[], &o.dados, Some(&o.mods), &o.mods_desligados)?.dados("jogo.json")?;
+    let mut recursos = Recursos::abrir_sem(&o.jogo, &config.bancos, &o.dados, Some(&o.mods), &o.mods_desligados)?;
+    if let Some(p) = &o.perfil_driver {
+        // --perfil-driver: por cima de data/resolucao.json (e dos mods), conferido já aqui.
+        recursos.sobrepor_dados(engine::core::resolucao::ARQUIVO, serde_json::json!({ "perfil_driver": p }));
+        recursos.dados::<engine::core::resolucao::ConfigResolucao>(engine::core::resolucao::ARQUIVO)?.perfil(None)?;
+    }
     for m in recursos.mods() {
         println!("mod carregado: {} {}", m.manifesto.nome, m.manifesto.versao);
     }
@@ -571,9 +590,101 @@ fn principal() -> Result<(), String> {
     }
 }
 
+/// Opções do programa em si (launcher, configuração, saída), tiradas antes das do jogo.
+#[derive(Debug, Default, PartialEq)]
+struct OpcoesPrograma {
+    config: Option<PathBuf>,
+    sem_config: bool,
+    launcher: bool,
+    console: bool,
+    capturar_launcher: Option<PathBuf>,
+    /// Teste: abre o launcher e aperta Jogar depois de N ms.
+    launcher_jogar_apos_ms: Option<u64>,
+}
+
+fn separar_opcoes(args: Vec<String>) -> Result<(OpcoesPrograma, Vec<String>), String> {
+    let mut p = OpcoesPrograma::default();
+    let mut resto = Vec::new();
+    let mut it = args.into_iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--config" => p.config = Some(it.next().ok_or("falta o valor de --config")?.into()),
+            "--sem-config" => p.sem_config = true,
+            "--launcher" => p.launcher = true,
+            "--console" => p.console = true,
+            "--capturar-launcher" => p.capturar_launcher = Some(it.next().ok_or("falta o valor de --capturar-launcher")?.into()),
+            "--launcher-jogar-apos-ms" => {
+                let v = it.next().ok_or("falta o valor de --launcher-jogar-apos-ms")?;
+                p.launcher_jogar_apos_ms = Some(v.parse().map_err(|_| "--launcher-jogar-apos-ms: número inválido")?);
+                p.launcher = true;
+            }
+            _ => resto.push(a),
+        }
+    }
+    Ok((p, resto))
+}
+
+/// A pasta do jogo que a configuração do launcher faria o jogo usar tem os arquivos do SimAnt?
+fn jogo_da_config_valido(c: &config_launcher::ConfigLauncher, base: &Path) -> bool {
+    let pasta = match &c.jogo {
+        Some(j) => pastas::resolver(Path::new(j), base),
+        None => pasta_jogo_padrao(base),
+    };
+    config_launcher::validar_pasta_jogo(&pasta).ok
+}
+
+/// Configuração do launcher, launcher (se for o caso) e o jogo.
+fn iniciar(p: OpcoesPrograma, cli: Vec<String>) -> Result<(), String> {
+    use config_launcher::ConfigLauncher;
+    let caminho = if p.sem_config { None } else { p.config.clone().or_else(ConfigLauncher::caminho_padrao) };
+    let (cfg, mut aviso) = match caminho.as_deref().map(ConfigLauncher::ler) {
+        Some(Ok(c)) => (c, None),
+        Some(Err(e)) => {
+            eprintln!("aviso: configuração do launcher ignorada: {e}");
+            (None, Some(format!("Configuração ignorada (inválida): {e}")))
+        }
+        None => (None, None),
+    };
+    let base = pastas::base();
+    if let Some(png) = &p.capturar_launcher {
+        let mut e = launcher::Estado::novo(cfg, caminho, base);
+        launcher::capturar(&mut e, png)?;
+        println!("{}", png.display());
+        return Ok(());
+    }
+    // Sem opções de jogo: o launcher, salvo se a configuração pede o jogo direto e a pasta vale.
+    let sem_opcoes = cli.is_empty() && !p.sem_config;
+    let direto = cfg.as_ref().is_some_and(|c| !c.mostrar_launcher && jogo_da_config_valido(c, &base));
+    if p.launcher || (sem_opcoes && !direto) {
+        if cfg.as_ref().is_some_and(|c| !c.mostrar_launcher) && !direto {
+            aviso.get_or_insert("A pasta do jogo da configuração não tem os arquivos do SimAnt; escolha outra.".into());
+        }
+        let mut e = launcher::Estado::novo(cfg, caminho, base);
+        return match launcher::executar(&mut e, aviso, p.launcher_jogar_apos_ms)? {
+            launcher::Saida::Jogar(mut args) => {
+                println!("launcher: simant {}", config_launcher::formatar_linha(&args));
+                // Opções dadas junto com --launcher vêm depois (e vencem).
+                args.extend(cli);
+                principal(ler_opcoes(args)?)
+            }
+            launcher::Saida::Sair => Ok(()),
+        };
+    }
+    principal(ler_opcoes(config_launcher::combinar(cfg.as_ref(), &cli))?)
+}
+
 fn main() {
-    if let Err(e) = principal() {
-        eprintln!("erro: {e}");
+    let (p, cli) = match separar_opcoes(std::env::args().skip(1).collect()) {
+        Ok(x) => x,
+        Err(e) => {
+            eprintln!("erro: {e}");
+            std::process::exit(1);
+        }
+    };
+    let saida = registro::preparar(p.console, cli.is_empty());
+    registro::avisar_panico(&saida);
+    if let Err(e) = iniciar(p, cli) {
+        registro::erro_fatal(&saida, &e);
         std::process::exit(1);
     }
 }
