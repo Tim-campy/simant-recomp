@@ -988,6 +988,14 @@ impl Partida {
         self.redesenhar = true;
     }
 
+    /// `_CenterEdit(_MeLocX, _MeLocY)` do fim de `_NewGame`, depois de a interface mudar o tamanho da
+    /// janela de edição (no Tutorial ela é maximizada): a vista volta a centralizar na amarela.
+    pub fn centralizar_edicao_na_amarela(&mut self) {
+        let a = &self.estado.amarela;
+        let (plano, x, y) = (a.plano, a.x, a.y);
+        self.ir_para_amarela(plano, x, y);
+    }
+
     /// Parte de vista de `_GotoMyAnt`: no Experimental só toca o som de erro; senão leva a vista
     /// até a amarela.
     fn ir_para_amarela(&mut self, plano: i16, x: i16, y: i16) {

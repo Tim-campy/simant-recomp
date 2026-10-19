@@ -203,6 +203,17 @@ impl Sessao<'_> {
             s.depois_de_abrir(a);
         }
         s.sincronizar_janelas();
+        // _NewGame (`1000:d6dc`): no Tutorial (tipo 0, escolhido no "Select a Game"; não no Load de
+        // Tutorial.Ant) a janela de edição é maximizada (`_win_Zoom(0)` = ShowWindow SW_MAXIMIZE) antes
+        // do _CenterEdit na amarela (telas/janelas.md §8).
+        if matches!(origem, Origem::Novo(_, TipoJogo::Tutorial) | Origem::NovoNaPartida(_, TipoJogo::Tutorial))
+            && !s.janelas.gerente.janela(janelas::ID_EDICAO).is_some_and(|j| j.maximizada())
+            && s.janelas.gerente.maximizar(janelas::ID_EDICAO)
+        {
+            s.sincronizar_janelas();
+            s.partida.centralizar_edicao_na_amarela();
+            s.sincronizar_janelas();
+        }
         mods_ui::avisar_teclas_ocupadas(&s);
         Ok(s)
     }
