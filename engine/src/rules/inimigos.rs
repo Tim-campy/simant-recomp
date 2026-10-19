@@ -800,6 +800,7 @@ fn aranha_perseguir(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmarela, cx
                 if e.amarela.modo_aranha == 6 {
                     e.amarela.modo_aranha = 0;
                 }
+                autotrack(e);
             }
             return false;
         }
@@ -824,6 +825,7 @@ fn aranha_perseguir(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmarela, cx
         if e.amarela.modo == 1 {
             e.amarela.x = e.aranha.x >> 4;
             e.amarela.y = e.aranha.y >> 4;
+            autotrack(e);
         }
         return true;
     }
@@ -843,6 +845,7 @@ fn aranha_comer(e: &mut Estado, t: &TabelasInimigos, ta: &TabelasAmarela, cx: i3
         if e.amarela.modo_aranha == 6 {
             e.amarela.modo_aranha = 0;
         }
+        autotrack(e);
     }
     let d = (e.aranha.dir & 7) as usize;
     let bx = (cx + t.boca_aranha_x[d] as i32) & 0x7F;
@@ -962,6 +965,16 @@ fn aranha_do_jogador(e: &mut Estado, t: &TabelasInimigos, seno: &Seno) {
     }
     e.amarela.x = e.aranha.x >> 4;
     e.amarela.y = e.aranha.y >> 4;
+    autotrack(e);
+}
+
+/// A aranha do jogador com AutoTrack (`_OptionStates[0]`): `_MoveSpider` chama `_GotoMyAnt` depois de
+/// pôr `_MeLoc` na célula da aranha (2.7, estados 2 e 3): a vista segue a aranha e, dentro do tick, o
+/// `_CenterEdit` que move a vista redesenha a janela de edição (rng.md, "Desenho dentro do tick").
+fn autotrack(e: &mut Estado) {
+    if e.partida.opcoes[0] != 0 {
+        amarela::centralizar(e);
+    }
 }
 
 /// `_SFoundAnt` (2.6): índice da presa na lista A, −1 = a amarela, −2 = nada. Sem sorteio.

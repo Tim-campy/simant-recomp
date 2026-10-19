@@ -616,8 +616,9 @@ pub(crate) fn encerrar_ordem(e: &mut Estado, plano: i32, x: i32, y: i32) {
 
 /// `_GotoMyAnt`/`_CenterAnt`: a parte que não é desenho (`_LessonTemp = 1`). Mover a vista é da interface.
 /// `_GotoMyAnt` (`1000:a764`): grava `_LessonTemp = 1` e pede à interface que leve a vista até a
-/// amarela (o movimento da vista é da interface: `core::partida`).
-fn centralizar(e: &mut Estado) {
+/// amarela (o movimento da vista é da interface: `core::partida`). Também chamado pela aranha do
+/// jogador com AutoTrack (`_MoveSpider`, `rules::inimigos`).
+pub(crate) fn centralizar(e: &mut Estado) {
     e.tutorial.temporario = 1;
     e.pedir_centralizar_na_amarela();
     // Dentro do tick, `_CenterEdit` que move a vista redesenha a janela de edição (rng.md).
