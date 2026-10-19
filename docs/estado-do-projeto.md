@@ -81,7 +81,8 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 | Gerenciador de janelas | 85% | 70% | ordem, foco, arrasto, maximizar, menu de sistema; contorno XOR e menu de sistema aproximados; altura mínima [hipótese] |
 | Caste / Behavior / History | 95% | 80% | 98,72–98,92% (só o título); arrasto no triângulo e gráficos com dados não conferidos |
 | Menus de segurar (amarela, ícones) | 100% | 80% | `_AntMenu` 100%, ícones 99,93%; menus da rainha e da aranha não conferidos |
-| Mapa (`mapWin`) | 90% | 75% | 93,78–99,89% por modo; `_ELayerMode` da edição e `_win_Swap` ligados; faltam Shift+clique dar ordem e o redesenho alternado atrás (o port gera a cada tick); cores de `_ConvColor` [hipótese] |
+| Mapa (`mapWin`) | 95% | 85% | 93,78–99,89% por modo; cliques, Shift+cliques, duplo clique, arrasto e troca com o quintal (no lugar do mapa movido) conferidos na bancada; `_ELayerMode` completo (o menu `_EditScentMenu` é inalcançável no Windows); falta o redesenho alternado atrás (o port gera a cada tick); cores de `_ConvColor` [hipótese] |
+| Mini mapa (`miniMapWin`, botão `ribToYellow`) | 100% | 95% | 99,99% (superfície) e 100% (ninho) na bancada; pausa, clique, arrasto, fechar e o botão solto dentro conferidos; teclas com ele aberto não conferidas |
 | Quintal (Yard View, faixa 35) | 90% | 85% | 99,27–99,59% nos três modos, faixa 93,09%; botões configuráveis da faixa 35 não existem |
 | Info (cartões) | 90% | 70% | 11 de 53 cartões contra capturas (96,36–99,75%); os outros 42 só por conferência automática |
 | Examine (`_MagnifyMenu`) | 95% | 90% | conferido na bancada (2026-10-18): 97,6–99,4% na região da janela, inclusive o deslocamento de 3 pixels da primeira abertura da sessão |
@@ -153,12 +154,12 @@ Método: cada nome de função dos segmentos 1–7 de `re_trabalho/symbols.tsv` 
 | Impressão | 0 | — | — | — | o `.SYM` não tem funções de impressão |
 | Runtime C (`_TEXT`) | 256 | 10 | 8 | 238 | não se aplica |
 | `SIMANT_MODULE` (resto) | 146 | 82 | 23 | 41 | faltam `_AboutDialog`, `_ScoreDialog`, `_Quit`/`_MenuQuit`, `_ProcMenuHelp`, `_CheckItem` (barra de menus), `_GotoQueen`/`_GotoSpider`, `_DoDebugWin` |
-| `ANTEDIT_MODULE` (resto) | 112 | 43 | 13 | 56 | balões (`_EggBalloons`, `_QueenBalloons`, `_AddMsgBalloon`), minimapa (`_Mini_*`, `_OpenMiniMapWin` [em aberto: talvez sem uso no Windows]), `_clip_*`/`_ed_*` (infraestrutura) |
+| `ANTEDIT_MODULE` (resto) | 112 | 43 | 13 | 56 | balões (`_EggBalloons`, `_QueenBalloons`, `_AddMsgBalloon`), minimapa (`_Mini_*`, `_OpenMiniMapWin`: **usado** pelo botão `ribToYellow`, no port desde 2026-10-18), `_clip_*`/`_ed_*` (infraestrutura) |
 | `SIMONE_MODULE` (resto) | 169 | 101 | 53 | 15 | quase tudo coberto; faltantes são variantes R ou utilitários |
 | `SIMANT1_MODULE` (resto) | 123 | 83 | 27 | 13 | os 13 são variantes R implementadas por rotina comum |
 | `SIMTWO_MODULE` (resto) | 141 | 68 | 30 | 43 | `_goStep*`/`_Finish*Step` (sem chamador, provável resto do Mac), índice/pack do banco (infraestrutura) |
 
-Conclusão: **na lógica do jogo, não há grupo grande de funções sem equivalente**. O que falta de fato é interface: barra de menus e seus diálogos, balões, gráficos de saúde da edição, `_DrawSimPayoff`, placar, About, minimapa (se for usado) e rede.
+Conclusão: **na lógica do jogo, não há grupo grande de funções sem equivalente**. O que falta de fato é interface: barra de menus e seus diálogos, balões, gráficos de saúde da edição, `_DrawSimPayoff`, placar, About e rede (o minimapa, que o Windows usa, foi feito em 2026-10-18).
 
 ## 3. Não verificado contra o original (lista consolidada)
 
@@ -208,6 +209,8 @@ Diálogos
 
 **Feito depois desta revisão (2026-10-18, branch dos balões; detalhes nas specs citadas):** balões "Silly" da janela de edição (anotação no tick, sorteios do redesenho na ordem do original, desenho; sorteios e desenho conferidos na bancada, 100% nas regiões dos balões do ovo e da rainha: `telas/baloes.md`); `_DrawEditGraphs` não desenha nos modos do Windows (`_displayType` 9/10), então não há o que fazer (`telas/baloes.md` §3); quadro da trofalaxia (`_YellowDialog` 9110, 100% na bancada: `telas/mensagens.md` §10); PLACE parando a simulação e repetindo com Shift (`telas/quintal.md` §5.3); `_SpecialXfer` ao vivo, logo depois do tick (a troca dentro do tick continua sendo divergência registrada); comida que cai na casa (`_DropFoodA` com `_DROPdir`, `regras/superficie.md` 8.2, sem caso na bancada); avisos do Experimental na faixa; botões configuráveis da faixa 35; animações da amarela com a ordem real das janelas; segunda metade da rainha amarela na reconstrução da vida. API de mods 0.22.
 
+**Feito depois desta revisão (2026-10-18, branch da janela do mapa; detalhes em `telas/mapa.md` §§1, 4, 7–9):** mini mapa (existe no Windows: botão `ribToYellow`; modal, pausa, 1 pixel por célula; 99,99–100% na bancada); Shift+clique no mapa dá a ordem (ou a ferramenta) sem centralizar, duplo clique traz a janela de edição, arrasto centraliza durante o movimento (todos conferidos na bancada); `_win_Swap` conferido com o mapa movido; `_ELayerMode` completo e `_EditScentMenu` documentado como inalcançável no Windows; `_DrawMapData` completo. API de mods 0.23 (`data/mini_mapa.json`).
+
 Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; **G** = uma semana ou mais.
 
 ### Alto impacto para quem joga
@@ -227,7 +230,7 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 |---|---|---|
 | Diálogo da trofalaxia (`_YellowDialog`) | P | `rules/amarela.rs` l. 1212 |
 | Ajuda: Search, History, menus e popups pequenos | M | `telas/ajuda.md`, `divergencias.md` |
-| Mapa: Shift+clique dá ordem e redesenho alternado atrás | P | `telas/mapa.md`, `divergencias.md` |
+| Mapa: redesenho alternado com a janela atrás (Shift+clique, duplo clique e arrasto feitos em 2026-10-18) | P | `telas/mapa.md`, `divergencias.md` |
 | Textos do quadro de exame e avisos do Experimental (listas 4/1010, 4/1100–1103) | P | `telas/experimental.md` §10 |
 | PLACE parando a simulação e Shift para outra rainha | P | `divergencias.md` (`_PlaceQueenInYard`) |
 | `_SpecialXfer` na partida ao vivo (hoje só nos vetores) e dentro do tick (ordem do original) | M | `divergencias.md`, `rules/amarela.rs` |
@@ -241,7 +244,6 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 
 | Item | Esforço | Referência |
 |---|---|---|
-| Minimapa (`_Mini_*`, `_OpenMiniMapWin`): descobrir se o Windows usa | P (investigar) | símbolos |
 | `_ExitHole` com a lista A cheia (vaga 1000) e `_KillAntLion(-1)` | P | `regras/ninho.md`, `divergencias.md` |
 | Descarte de efeito pedido no mesmo milissegundo | P | `regras/som.md` |
 | Bitmaps ~7100 e `kind`/byte 3 | P–M | `formatos/bitmap.md` |
