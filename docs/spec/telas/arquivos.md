@@ -85,3 +85,7 @@ Como não passa por `_NewGame`, o que `_RandYard` não escreve fica como estava 
 **Port:** `carregar::estado_do_tutorial` (com `data/tutorial_arquivo.json`: nome, título, os 30 patches e os valores de `_InitSimVars`), usado pelo Load do diálogo e pelo `--save` com esse nome (`Origem::Tutorial`). **Conferido:** `engine/tests/load_tutorial.rs` parte do estado de antes do vetor `tests/referencias/load_tutorial` (copiado de `re_trabalho/cen/load_tut`) e chega ao de depois com **307/307 blocos e R igual** (S vem do relógio: o teste usa o gravado).
 
 **Não verificado:** o comportamento com muitos arquivos (rolagem), a mudança de pasta ou de unidade no diálogo.
+
+## 7. File → Quit (`_MenuQuit`)
+
+A mesma caixa da pergunta do Load com o título "SimAnt Quit", sempre (sem olhar `_gGameNeedsSaving`); Yes = Save As e sai se salvou, No = sai, Cancel = volta. Ver [menus.md](menus.md) §4.

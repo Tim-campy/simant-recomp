@@ -827,7 +827,7 @@ impl Partida {
 
     /// `_SetPause(pausado)` / Speed → Pause: ao despausar encerra as ferramentas 10 e 11; põe ou
     /// tira a mensagem de pausa da faixa (importante).
-    fn definir_pausa(&mut self, pausado: bool) {
+    pub fn definir_pausa(&mut self, pausado: bool) {
         let agora = self.agora();
         let p = &mut self.estado.partida;
         if !pausado && (p.ferramenta == 10 || p.ferramenta == 11) {
