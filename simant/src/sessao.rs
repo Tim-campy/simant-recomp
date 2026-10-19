@@ -161,6 +161,10 @@ impl Sessao<'_> {
         // Scripts Lua dos mods ativos (docs/api-mods.md, "Scripts Lua"): recomeçam a cada partida.
         if let Some(scripts) = engine::scripts::Scripts::carregar(recursos, Default::default())? {
             partida.ligar_scripts(scripts);
+            // Load: o estado que os scripts gravaram em NOME.ANT.mods.json (API 0.26), se houver.
+            if let Origem::Save(p, ..) = origem {
+                partida.ler_estado_dos_mods(p);
+            }
         }
         let arquivo = match origem {
             Origem::Save(p, ..) => Some(p.to_path_buf()),
@@ -232,6 +236,8 @@ impl Sessao<'_> {
                 .ok_or("nenhum nome livre para salvar")?,
         };
         self.partida.estado.para_save(&self.layout)?.gravar(&caminho)?;
+        // Estado dos scripts dos mods no arquivo lateral (API de mods 0.26); o .ANT não muda.
+        self.partida.gravar_estado_dos_mods(&caminho)?;
         self.arquivo = Some(caminho.clone());
         Ok(caminho)
     }

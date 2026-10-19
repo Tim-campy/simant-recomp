@@ -60,9 +60,9 @@ A lista completa, com as opções de depuração, está no comentário do topo d
 
 ## Mods
 
-Um mod é uma pasta em `mods/` com um `mod.json` (`nome`, `versao`, `dependencias`, `scripts`). Ele pode trocar objetos do banco original (`objetos/<tipo>/<id>.bin`), arquivos de dados do port (`data/<nome>.json`), arquivos soltos do jogo (`arquivos/<nome>`) e trazer scripts Lua em sandbox com ganchos (`ao_iniciar`, `depois_do_tick`, `ao_evento`, `ao_menu`...). A API, a lista de arquivos sobrescrevíveis e o histórico de compatibilidade estão em [`docs/api-mods.md`](docs/api-mods.md) (versão atual no topo).
+Um mod é uma pasta em `mods/` com um `mod.json` (`nome`, `versao`, `dependencias`, `scripts`). Ele pode trocar objetos do banco original (`objetos/<tipo>/<id>.bin`), arquivos de dados do port (`data/<nome>.json`, mesclados por chave: o mod traz só o que muda), arquivos soltos do jogo (`arquivos/<nome>`) e trazer scripts Lua em sandbox com ganchos (`ao_iniciar`, `depois_do_tick`, `ao_evento`, `ao_menu`, ganchos dentro do tick como `antes_superficie`...), escritas validadas (comida, cheiros, castas, formigas nos ninhos) e estado próprio guardado ao lado do save (`JOGO.ANT.mods.json`; o `.ANT` continua o do original). A API, a lista de arquivos sobrescrevíveis e o histórico de compatibilidade estão em [`docs/api-mods.md`](docs/api-mods.md) (versão atual no topo).
 
-Exemplos em `exemplos/mods/` (fora de `mods/`, para não mudar o jogo por padrão): `exemplo-lua/` (chuva de comida a cada 500 ticks) e `trapacas/` (menu **F12** para provocar chuva, revoada, menino, gato, fim de jogo, avançar ticks, painel de depuração). Para ligar: `--mods exemplos/mods`.
+Exemplos em `exemplos/mods/` (fora de `mods/`, para não mudar o jogo por padrão): `exemplo-lua/` (chuva de comida a cada 500 ticks) e `trapacas/` (menu **F12** para provocar chuva, revoada, menino, gato, fim de jogo, castas, alarme, soldados no ninho, avançar ticks, painel de depuração; a contagem de trapaças vai para o save). Para ligar: `--mods exemplos/mods`.
 
 ## Testes
 

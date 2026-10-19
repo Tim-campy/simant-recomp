@@ -1,6 +1,6 @@
 # API de mods
 
-Versão da API: **0.26**. Mods sobrescrevem dados (objetos do banco, `data/*.json`, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua"); desde a 0.17, os scripts podem ter menu, painel e ações sobre o jogo (para testes, como o mod de trapaças de `exemplos/mods/trapacas/`).
+Versão da API: **0.27**. Mods sobrescrevem dados (objetos do banco, `data/*.json` — desde a 0.26 **por chave** —, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua"); desde a 0.17, os scripts podem ter menu, painel e ações sobre o jogo (para testes, como o mod de trapaças de `exemplos/mods/trapacas/`); desde a 0.26, ganchos dentro do tick, escritas de cheiro, castas, formigas e comida nos ninhos, e estado guardado ao lado do save.
 
 ## Estrutura
 
@@ -11,7 +11,7 @@ mods/
   meu-mod/
     mod.json
     objetos/<tipo>/<id>.bin     (opcional) substitui um objeto do banco original
-    data/<arquivo>.json         (opcional) substitui um arquivo de data/ do port
+    data/<arquivo>.json         (opcional) mesclado por chave sobre um arquivo de data/ do port (API 0.26)
     <arquivo>.lua               (opcional, API 0.12) script listado em "scripts" no mod.json
 ```
 
@@ -26,7 +26,15 @@ mods/
 ## Regras
 
 - **Objetos do banco:** `objetos/<tipo>/<id>.bin` substitui o objeto (tipo, id) de qualquer banco original. O conteúdo deve estar **descomprimido**, no formato descrito em `docs/spec/formatos/`. Exemplo: `objetos/2/2000.bin` troca a metade de cima do logotipo (bitmap, ver `bitmap.md`).
-- **Arquivos de dados:** `data/<nome>` substitui o arquivo inteiro de mesmo nome em `data/`. Arquivos disponíveis no marco 1:
+- **Arquivos de dados:** `data/<nome>` do mod é **mesclado por chave** sobre o arquivo de mesmo nome em `data/` (API 0.26; até a 0.25 substituía o arquivo inteiro). Regras da mesclagem (`Recursos::dados`, `engine/src/recursos.rs`):
+  - **objetos mesclam:** cada chave que o mod traz é mesclada na chave de mesmo nome, em qualquer profundidade; as chaves que o mod não traz ficam como no port. Um mod pode trazer só o que muda, por exemplo `data/quintal.json` = `{"regras": {"gato_chance": 64}}`;
+  - **listas substituem:** uma lista do mod troca a lista inteira (não há mesclagem item a item: listas de teclas, tabelas como `turn_tab`, `dx8`...);
+  - **valores substituem:** números, textos, booleanos e `null` trocam o valor; um tipo diferente (objeto no lugar de número, etc.) também troca;
+  - **`"_substituir": true`** dentro de um objeto do mod troca o objeto inteiro em vez de mesclar (a marca é tirada antes de o port ler). Serve para **tirar** chaves: remover uma tecla de um mapa nome → ação, ou voltar ao comportamento antigo de arquivo inteiro com `"_substituir": true` no topo;
+  - **vários mods:** na ordem dos mods (dependências primeiro, depois alfabética), cada um é mesclado sobre o resultado do anterior; um arquivo que só existe no mod entra inteiro.
+  - Erros de formato depois da mesclagem citam o arquivo e os mods que o mesclaram.
+
+  Arquivos disponíveis no marco 1:
   - `paleta.json`: as 16 cores;
   - `telas.json`: sequência de abertura (janelas, bitmaps soltos, duração em ticks, gatilhos de fechamento);
   - `interface.json`: geometria da área cliente (faixa, borda das janelas, cores do sistema);
@@ -59,8 +67,8 @@ mods/
   - `mapa.json` (API 0.11): janela do mapa — tabelas `ctab`/`htab`/`ltab`/`ctab_r` (índices da paleta), `blocos` das cores 16–31, `conv` (`_ConvColor`), bitmaps da aranha, do pé e do cortador, `botoes_cheiro` (objeto da faixa → `_MapMode`). Ver `docs/spec/telas/mapa.md`.
   - `mini_mapa.json` (API 0.23): mini mapa (janela 20) — `janela`, `botao` (objeto da faixa 34 que o abre, `ribToYellow`), `moldura` (`topo`, `ajuste_x`, `ajuste_x_reaberto`, `largura_borda`, `cor_borda`, `cor_contorno`), `escala` (pixels por célula), `espessura_cursor` e `area` (largura e altura do mapa). As cores das células vêm de `mapa.json`. Ver `docs/spec/telas/mapa.md` §7.
   - `som.json` (API 0.6): som e música. `musicas` (id do cabeçalho tipo 18 → nome do `.mid` sem extensão, a tabela do original), `pasta_musicas`, `fonte_musica` (`arquivos` = `.MID` pela tabela, como o MCI; `banco` = objeto tipo 20 com a transposição do cabeçalho, como o modo Sound Blaster), `exigir_cabecalho`, `canais_midi`, `canal_percussao`, `taxa_efeitos` (Hz dos efeitos tipo 5), `taxa_saida`, `volume_musica`, `volume_efeitos` (0–1), `soundfont` (caminho de uma `.sf2` ou `null`), `musica_abertura`, `musica_jogo_novo`, `cauda_exportacao_s`. Ver `docs/spec/regras/som.md`.
-  - `video.json` (API 0.16, opcional): vídeo do port — `resolucao_virtual` (desde a 0.26: `[largura, altura]` da tela do Windows imitada, `[640, 480]` por padrão, ou `[800, 600]`, `[1024, 768]`; muda a área cliente e a tabela de posições das janelas como o original, docs/spec/telas/resolucao.md), `escala` (inteira; 0 = a maior que cabe no monitor; padrão 1 = 640×480), `janela` (`[largura, altura]` inicial ou `null`), `redimensionavel`, `escala_inteira`. Todas as chaves são opcionais. A linha de comando (`--resolucao`, `--escala`, `--janela`) vence o arquivo. Ver `docs/decisoes.md` e o README.
-  - `resolucao.json` (API 0.26): a regra do original para a tela virtual — `linhas_acima_da_area_cliente` (38: barra de título + menus), `tabelas_posicoes` (lista em ordem de `{ate_altura, tabela}`; a primeira cuja `ate_altura` comporta a altura da tela dá o objeto tipo 9; sem `ate_altura`, qualquer altura) e `resolucoes` (as aceitas em `resolucao_virtual`). Desde a 0.26 o executável tira daqui a tabela de posições e o tamanho da área cliente da abertura e da partida: `jogo.json` → `tabela_posicoes` e `tela_jogo.json` → `largura`, `altura`, `tabela_posicoes` só valem para os testes e exemplos do engine.
+  - `video.json` (API 0.16, opcional): vídeo do port — `resolucao_virtual` (desde a 0.27: `[largura, altura]` da tela do Windows imitada, `[640, 480]` por padrão, ou `[800, 600]`, `[1024, 768]`; muda a área cliente e a tabela de posições das janelas como o original, docs/spec/telas/resolucao.md), `escala` (inteira; 0 = a maior que cabe no monitor; padrão 1 = 640×480), `janela` (`[largura, altura]` inicial ou `null`), `redimensionavel`, `escala_inteira`. Todas as chaves são opcionais. A linha de comando (`--resolucao`, `--escala`, `--janela`) vence o arquivo. Ver `docs/decisoes.md` e o README.
+  - `resolucao.json` (API 0.27): a regra do original para a tela virtual — `linhas_acima_da_area_cliente` (38: barra de título + menus), `tabelas_posicoes` (lista em ordem de `{ate_altura, tabela}`; a primeira cuja `ate_altura` comporta a altura da tela dá o objeto tipo 9; sem `ate_altura`, qualquer altura) e `resolucoes` (as aceitas em `resolucao_virtual`). Desde a 0.27 o executável tira daqui a tabela de posições e o tamanho da área cliente da abertura e da partida: `jogo.json` → `tabela_posicoes` e `tela_jogo.json` → `largura`, `altura`, `tabela_posicoes` só valem para os testes e exemplos do engine.
   - `baloes.json` (API 0.22): balões de fala "Silly" da janela de edição — `falas` (por fala: `lista`, `espera`, `sorteio_espera`, `chance`), `aranha`, `maximo`, `linhas_acima_minimas`, `meio_da_celula`, `deslocamento`, `fonte`, `cor_tinta`, `cor_fundo`; validado ao carregar (sorteios só com potências de 2). Ver `docs/spec/telas/baloes.md`.
   - `desenho_aranha.json` (API 0.24): a aranha na janela de edição — ids dos sprites do corpo e da agonia, cor transparente, cores das pernas e dos palpos (e dos palpos da aranha do jogador), deslocamentos do corpo por direção e da agonia por quadro, pernas e palpos das direções-base (as outras direções são giros e espelhos). Ver `docs/spec/telas/jogo.md`, "Aranha na janela de edição".
   - `codigos_trapaca.json` (API 0.17): os códigos de trapaça do **original** (`_CheatKeys`, `docs/spec/regras/trapacas.md`): `codigos` (lista de `codigo` de 4 letras A–Z/a–z e `efeito`), `valores`, `sons`, `mensagens`. Um mod pode trocar o texto de um código ou tirá-lo da lista (o efeito é o do original). Validado ao carregar.
@@ -81,7 +89,7 @@ Um script é código Lua 5.4 que roda numa sandbox e só fala com o jogo pelas f
 
 - Cada mod com `"scripts"` ganha **uma máquina Lua só sua**: os arquivos dele rodam em ordem na mesma máquina (compartilham as globais); mods diferentes não se enxergam.
 - A ordem entre mods é a mesma dos dados (dependências primeiro, depois alfabética): para o mesmo gancho, o mod que vem antes é chamado antes.
-- Os scripts recomeçam do zero a cada partida (jogo novo, Load). O estado dos scripts **não vai para o save**.
+- Os scripts recomeçam do zero a cada partida (jogo novo, Load). Desde a 0.26, um mod pode guardar uma tabela própria ao lado do save (`ao_salvar`/`ao_carregar`, seção "Estado no save"); as globais Lua não vão para o save.
 - Mods são escolhidos como para os dados: todos os de `--mods DIR` (padrão `mods/`) estão ativos.
 
 ### Ganchos
@@ -95,8 +103,37 @@ O script define funções **globais** com estes nomes (no corpo do arquivo ou de
 | `depois_do_tick(estado)` | Depois de cada tick. |
 | `ao_menu(indice, texto, estado)` | (API 0.17) O jogador escolheu o item `indice` (a partir de 1, contando os separadores) do menu do mod (`definir_menu`). |
 | `ao_evento(evento, estado)` | Para cada pedido das regras à interface, antes de a interface tratá-lo. `evento.tipo` é `"som"`, `"musica"`, `"mensagem"` (com `id`), `"mensagem_faixa"` (com `lista`, `indice`), `"tema_do_ninho"`, `"fim_de_jogo"`, `"centralizar_na_amarela"` (desde 2026-10-18 com `plano`, `x`, `y`: a posição da amarela no momento do pedido; num mesmo tick pode haver mais de um) ou, desde a 0.16, `"espera"` (com `ms`: uma animação do tick espera esse tempo entre dois quadros; a interface atrasa os efeitos seguintes); desde a 0.18, `"animacao"` (com `codigo` — 0 luta, 1–9 morte, 10 choque, −1 loucura —, `plano`, `quadros` e `espera_ms`: uma animação da amarela; a simulação fica parada `espera_ms × (quadros − 1)` ms enquanto a janela de edição mostra os quadros); desde a 0.22, `"quadro_amarela"` (com `imagem`: `_YellowDialog`, a trofalaxia é 9110) e `"escolher_colonia"` (`_SpecialXfer`: o jogador vai escolher outra colônia preta no quintal); desde a 0.24, `"dialogo_aranha"` (com `texto`: `_SpiderDialog`, a aranha comeu a amarela; o texto já sorteado, SHARED tipo 4); desde a 0.25, `"quadro_amarela"` também com `indice` (−1 na trofalaxia, 0 na morte 9100, 1 ou 2 no renascimento 9101), `"quadro_formiga_leao"` (`_LionDialog`) e `"animacao_vitoria"` (`_DrawSimPayoff`). |
+| `ao_salvar(estado)` | (API 0.26) File → Save/Save As (e `--salvar`), depois de gravar o `.ANT`: devolve a tabela do mod que vai para o arquivo lateral, ou `nil`. Seção "Estado no save". |
+| `ao_carregar(dados, estado)` | (API 0.26) No Load, logo depois de `ao_iniciar`, com a tabela que o mod gravou (só se o arquivo lateral tem dados deste mod). |
+| `antes_<parte>(estado)`, `depois_<parte>(estado)` | (API 0.26) **Dentro** do tick, logo antes e logo depois da parte (tabela abaixo). |
 
-Os ganchos rodam **fora** do tick (antes e depois dele): a ordem interna do tick do original não muda. Sem nenhum mod com script, o laço do jogo é exatamente o mesmo de antes (os vetores de tick do original continuam iguais).
+`antes_do_tick`/`depois_do_tick` rodam **fora** do tick (antes e depois dele). Sem nenhum mod com script, o laço do jogo é exatamente o mesmo de antes (os vetores de tick do original continuam iguais).
+
+#### Ganchos dentro do tick (API 0.26)
+
+Cada parte é uma sub-rotina de `_DoAntSim` (simulacao-visao-geral.md §5); a ordem é **a do original** e não muda:
+
+| Parte | Rotina do original | Observação |
+|---|---|---|
+| `quintal` | `_DoSimYard` | todo tick |
+| `agua` | `_DoWater` | todo tick |
+| `formigas_leao` | `_DoAntLions` | todo tick |
+| `aranha` | `_MoveSpider` | todo tick |
+| `lagarta` | `_DoPillar` | só nos ticks com `_Cycle` ímpar |
+| `estrategia` | `_GetStrategy` (`_SetCasteProd`, `_SetModeProd`) | todo tick |
+| `superficie` | `_DoAntSimA` (lista A) | todo tick |
+| `ninho_preto` | `_DoAntSimB` | todo tick |
+| `ninho_vermelho` | `_DoAntSimR` | todo tick |
+| `amarela` | `_DoAntSimY` | todo tick |
+| `lider_vermelha` | `_MakeRedInitiator` | só quando nenhuma vermelha está no modo 19 |
+| `movimento_amarela` | `_DoAntMoveY` | todo tick |
+| `conselhos` | `_Feedback` | no fim do tick e também dentro do `_FullCount` (a cada 64 ticks, no começo do tick) |
+
+Exemplo: `function antes_ninho_preto(estado) ... end` roda depois de `_DoAntSimA` e antes de `_DoAntSimB`. A alimentação periódica (`_FeedAnts`), a manutenção dos cheiros e dos contadores (`_DoSmells`, `_CountAnts`, `_HistUpdate`) e o fim do tick não têm ganchos.
+
+- **Escritas** feitas num gancho de parte valem na hora: a parte seguinte já as vê. **Ações** (pedidos) feitas num gancho de parte só rodam **depois do tick inteiro**, antes de `depois_do_tick`.
+- **Custo:** os ganchos de parte só são chamados se algum mod ativo define pelo menos um deles; sem isso o tick é chamado como antes, sem nenhuma camada a mais. Com eles, cada gancho definido custa uma chamada Lua por tick (a criação do objeto `estado` e a chamada; da ordem de microssegundos, mais o que o script fizer), com os mesmos limites de instruções e tempo de qualquer gancho. Um script que só lê não muda o jogo (teste `ganchos_de_parte_que_so_leem_nao_mudam_o_jogo`, 300 ticks do `QUICK2.ANT`).
+- Um erro num gancho de parte desliga o mod como qualquer outro erro; o tick continua com as outras partes.
 
 ### O objeto `estado`
 
@@ -125,6 +162,9 @@ Leitura:
 | `estado:patch()` | (0.17) patch atual do quintal (`_CurYardPnt`): x, y. |
 | `estado:quintal(cor, x, y)` | (0.17) população da cor no patch (x, y) do quintal (`_YMapPop*`). |
 | `estado:licao()` | (0.17) lição do tutorial (`_TutLesson`) e se já foi dada. |
+| `estado:cheiro(tipo, x, y)` | (0.26) valor 0..255 do mapa de cheiro na célula que contém o tile (x, y) da superfície (os mapas são 64 × 32, uma célula a cada 2 × 2 tiles; feromonios.md), ou `nil` fora da superfície. Tipos: `"ninho_preto"`, `"trilha_preta"`, `"ninho_vermelho"`, `"trilha_vermelha"`, `"alarme"`. Os ninhos não têm cheiro. |
+| `estado:castas()` | (0.26) janela Caste: `reprodutores`, `operarias`, `soldados` (`_casteLevels`, 0..65535, somam 65535), `automatico` (`_CasteAuto`) e `ideais` (`_IdealCaste` em %: `operaria`, `soldado`, `macho`, `rainha_nova`). |
+| `estado:comportamento()` | (0.26) janela Behavior Control: `forragear`, `cavar`, `cuidar` (`_modeLevels`) e `automatico` (`_ModeAuto`). |
 
 Escrita (sempre validada; uma recusa devolve `false` e não muda nada):
 
@@ -134,8 +174,17 @@ Escrita (sempre validada; uma recusa devolve `false` e não muda nada):
 | `estado:colocar_pedra(x, y)` | Pedrinha (`regras.pedrinha` de `experimental.json`) numa célula livre da superfície (tile abaixo de `barreira_abaixo_de`, sem formiga). |
 | `estado:colocar_formiga(cor, x, y [, casta])` | Operária (T = `formiga_tipo`, + `formiga_vermelha` se vermelha; M = `formiga_modo_superficie`) numa célula livre da superfície, no fim da lista A (cheia: `false`). Desde a 0.17, `casta` = `"operaria"` (padrão) ou `"soldado"` (T = 0x30, grupo 6). |
 | `estado:definir_velocidade(v)` | `_GameSpeed` = v (0..3). |
+| `estado:depositar_cheiro(tipo, x, y)` | (0.26) A ferramenta Cheiro do Experimental (`_ExpIncSmell`): +`cheiro_somar` (70) na célula do tile (x, y) da superfície, limitado a 255, e `_SmoothMany` (a célula e as quatro vizinhas são suavizadas). `false` fora da superfície. |
+| `estado:tirar_cheiro(tipo, x, y)` | (0.26) A mesma ferramenta com Ctrl: −`cheiro_tirar` (40), limitado a 0, e `_SmoothMany`. |
+| `estado:limpar_cheiro(tipo, x, y)` | (0.26) A célula do tile vai a 0, sem suavizar. Extensão do port (o original não tem rotina que zere uma célula; o decaimento e a chuva fazem isso aos poucos). |
+| `estado:definir_castas(reprodutores, operarias, soldados)` | (0.26) Como arrastar o botão do triângulo da janela Caste (`_ProcCasteEvent`): três pesos ≥ 0 (soma > 0) viram níveis proporcionais que somam 65535 (o arredondamento fica nas operárias, o nível "resto" de `_GetTriLatDist`), `_IdealCaste` é recalculado e a janela passa a Manual (`_CasteAuto` = 0). Peso inválido é erro. |
+| `estado:definir_comportamento(forragear, cavar, cuidar)` | (0.26) O mesmo na janela Behavior Control (`_modeLevels`, `_ModeAuto` = 0; o arredondamento fica em cavar). |
+| `estado:castas_automaticas(ligar)`, `estado:comportamento_automatico(ligar)` | (0.26) Os botões Auto/Manual das janelas (`_CasteAuto`, `_ModeAuto`). |
+| `estado:por_formiga(plano, cor, x, y [, casta [, modo]])` | (0.26) Uma formiga em qualquer plano, no fim da lista do plano (cheia: `false`). `casta`: `"operaria"` (padrão, grupo 2), `"soldado"` (6), `"macho"` (4), `"rainha_nova"` (8); T = grupo × 8 (+ `formiga_vermelha` se vermelha), direção 0. `modo`: 0..19 (outro valor é erro); padrão `formiga_modo_superficie` (2) na superfície e, no ninho, `formiga_modo_proprio_ninho` (2) ou `formiga_modo_ninho_alheio` (7), como `_ExpAddAnt`. Superfície: só em célula livre (`_IsClearTile`). Ninho: nunca na linha 0 nem em célula com formiga; se o tile for > `cavar_formiga_acima_de` (0x1B), a célula é cavada antes (`_DigTileB/R`, **que sorteia S**, como `_ExpAddAnt`). |
+| `estado:remover_formiga(plano, x, y)` | (0.26) A formiga da célula sai, como um jato da ferramenta Inseticida (`_ExpKillAnts`) sem bichos nem som: na superfície vira cadáver (`_DeadAntHere`, **que sorteia S**); no ninho some sem cadáver. A amarela não é atingida. `false` sem formiga. |
+| `estado:tirar_comida(plano, x, y)` | (0.26) A ferramenta Comida com Ctrl (`_IncFoodHere`): um tile de comida (limiar..limiar+3) vira chão `SRand1(8)` (**sorteia S**); na superfície desconta `_FoodA` (ou `_FoodR`). Vale na superfície e nos ninhos; para pôr comida nos ninhos, `colocar_comida` já aceita `"ninho_preto"`/`"ninho_vermelho"`. |
 
-As tabelas usadas nas escritas vêm de `data/experimental.json` (com mods). Nenhuma escrita sorteia: os geradores S e R do jogo não são tocados.
+As tabelas usadas nas escritas vêm de `data/experimental.json` e, desde a 0.26, `amarela.json` e `inimigos.json` (com mods). As escritas da 0.12 não sorteiam. As da 0.26 chamam as rotinas das regras (as ferramentas do Experimental, as janelas Caste/Behavior) e só sorteiam o que essas rotinas sorteiam, onde a tabela diz (cavar, cadáver, tirar comida); as outras não tocam S nem R.
 
 Ações (API 0.17). Diferente das escritas acima, uma ação é um **pedido**: o método valida os argumentos (argumento inválido é erro, que desliga o script) e devolve `true`; o jogo executa os pedidos **logo depois que o gancho termina**, na ordem em que foram feitos, com as tabelas das regras (com mods). Por isso uma leitura feita no mesmo gancho, depois da ação, ainda vê o estado de antes. Cada ação chama a rotina do original que faz aquilo e só sorteia o que essa rotina sorteia. Se o jogo recusar (o motivo está na tabela), nada muda e o motivo vai para o registro (`[mod] ... recusado: ...`) e para a faixa. Até 200 pedidos por chamada.
 
@@ -161,6 +210,15 @@ Ações (API 0.17). Diferente das escritas acima, uma ação é um **pedido**: o
 | `estado:terminar_jogo(resultado)` | `"vitoria"`: música e texto de vitória de `_SimColonies`, `_IsGameOver = 1`, `_BlackWon = 1`; `"derrota"`: texto de derrota, `_BlackWon = 0`. O quadro de fim de jogo vem no tick seguinte. | o jogo já acabou |
 | `estado:misterio()` | `_MysteryButton` (um `RRand(15)` e o efeito sorteado). | — |
 
+### Estado no save (API 0.26)
+
+O `.ANT` do original não tem campo para os mods, e o port não o muda (o original continua lendo o save normalmente). O estado de cada mod vai para um **arquivo lateral** na mesma pasta, com o nome do save mais `.mods.json` (`JOGO.ANT` → `JOGO.ANT.mods.json`).
+
+- **Gravar:** depois de gravar o `.ANT` (File → Save, Save As, a gravação antes do Load ou do Quit, `--salvar`), o port chama `ao_salvar(estado)` de cada mod ativo que o define. O valor devolvido (uma tabela, ou `nil` = nada a guardar) vai para JSON: `nil`, booleanos, números finitos, textos UTF-8 e tabelas — uma lista 1..n sem buracos vira lista, uma tabela só com chaves de texto vira objeto (a vazia vira objeto). Funções, userdata, chaves misturadas (números e textos), listas com buracos, `NaN`/infinitos, mais de 32 níveis ou mais de 1 MiB de JSON por mod são erro (desligam o mod, e o save sai sem os dados dele). Escritas em `ao_salvar` valem; ações pedidas nele são descartadas.
+- **Formato:** `{"formato": "simant-recomp/estado-dos-mods", "api": "0.26", "tempo": <_GameTime do save>, "mods": {"<nome do mod>": <tabela>}}`. Sem nenhum dado de mod, o arquivo lateral não é gravado e um antigo com o mesmo nome é apagado (ele seria de outra gravação).
+- **Carregar:** no Load de um `.ANT`, depois de `ao_iniciar`, o port lê o arquivo lateral (se existir) e chama `ao_carregar(dados, estado)` de cada mod ativo que o define e tem dados nele (os números inteiros voltam inteiros). O arquivo é **ignorado**, com uma linha no registro, se for inválido, de outro formato, ou se `tempo` não for o `_GameTime` do `.ANT` (por exemplo: o original gravou por cima do save; os dados seriam de outro momento do jogo). Dados de um mod que não está instalado são ignorados (e somem na próxima gravação).
+- Jogo novo, Tutorial e os saves sem arquivo lateral não chamam `ao_carregar`.
+
 ### Funções globais
 
 | Função | Efeito |
@@ -173,7 +231,7 @@ Ações (API 0.17). Diferente das escritas acima, uma ação é um **pedido**: o
 | `definir_painel(texto)` | (0.17) Painel de texto no canto da tela de jogo (até 16 linhas de 60 caracteres, separadas por `\n`), com o nome do mod; `nil` esconde. |
 | `avancar_ticks(n)` | (0.17) Pede `n` (1..10000) ticks seguidos, sem esperar o relógio e mesmo com o jogo pausado (com todos os ganchos de tick). Param no fim do jogo, num quadro modal ou com `parar_avanco()`. |
 | `parar_avanco()` | (0.17) Cancela os ticks pedidos que ainda faltam. |
-| `API_VERSAO`, `MOD_NOME` | A versão da API (`"0.21"`; era `"0.12"` até a 0.16 e depois acompanha cada versão) e o nome do mod. |
+| `API_VERSAO`, `MOD_NOME` | A versão da API (`"0.27"`; era `"0.12"` até a 0.16 e depois acompanha cada versão) e o nome do mod. |
 
 ### Sandbox e limites
 
@@ -185,7 +243,6 @@ Ações (API 0.17). Diferente das escritas acima, uma ação é um **pedido**: o
 
 Mudanças previstas na API, sem data. Cada uma, quando entrar, ganha linha no histórico com a nota de compatibilidade.
 
-- **Sobrescrita parcial por chave** nos `data/*.json`: hoje um mod troca o arquivo inteiro, então precisa trazer todas as chaves (e herda as chaves novas de cada versão como obrigação; ver 0.7, 0.10, 0.13, 0.14, 0.15). Com a mesclagem por chave, um mod traria só o que muda. É o que o `CLAUDE.md` pede ("mods sobrescrevem dados por chave").
 - **Botões configuráveis da faixa 35** (janela do quintal), como os da faixa 34 (`partida.json`, `botoes_usuario`); ver `docs/spec/regras/som.md`.
 - **Barra de menus do Windows** (File, Window, View, Options, Speed): quando existir, os itens e aceleradores devem vir de um arquivo de dados sobrescrevível, e os scripts talvez possam acrescentar itens (hoje o menu de mod é um menu à parte, `definir_menu`).
 - **Scripts:** leitura das tabelas das regras (`comum.json` e as das partes) pelo objeto `estado`, para scripts que queiram conferir o que um mod de dados mudou.
@@ -221,5 +278,6 @@ Mudanças previstas na API, sem data. Cada uma, quando entrar, ganha linha no hi
 | 0.21 | Barra de menus: novo arquivo sobrescrevível `data/barra_menus.json` (aparência da barra e dos menus, o que cada comando faz, aceleradores Ctrl+Q/T/J/K, janelas Status e About). `dialogos.json` ganhou `caixa_mensagem.titulo_quit` e `topo_na_tela` (opcionais). Ctrl+Q, Ctrl+T, Ctrl+J e Ctrl+K passam a ser teclas do jogo (antes dos menus de mods), e Alt, F10 e Alt+letra são da barra. A janela do port ganhou 19 linhas em cima (a barra); as coordenadas da área cliente não mudaram. `API_VERSAO` passa a `"0.21"`. | Arquivo novo: compatível. Um `dialogos.json` de mod anterior continua válido. Um menu de mod com Ctrl+Q/T/J/K não abre mais por essas teclas (o console avisa). Um script que compare `API_VERSAO` com `"0.20"` precisa aceitar `"0.21"`. |
 | 0.23 | Novo arquivo sobrescrevível `data/mini_mapa.json` (mini mapa da faixa 34: botão, posição e moldura medidas, escala, cursor; telas/mapa.md §7). Na interface, sem mudança de arquivo: Shift+clique no mapa vira o clique da janela de edição na célula, o duplo clique traz a janela de edição e o arrasto centraliza durante o movimento. `API_VERSAO` passa a `"0.23"`. | Compatível com 0.22: só acrescenta; um mod que traga o arquivo precisa de todas as chaves. Um script que compare `API_VERSAO` com `"0.22"` precisa aceitar `"0.23"`. |
 | 0.24 | Novo arquivo sobrescrevível `data/desenho_aranha.json` (desenho da aranha na janela de edição: sprites, deslocamentos do corpo, pernas e palpos por quadro, cores; telas/jogo.md "Aranha na janela de edição"). Chaves novas opcionais: `amarela.json` → `mensagens.aranha_comeu` (os dois textos de `_SpiderDialog`; padrão 10047 e 10048), `mensagens.json` → `quadro.cor_borda` (cor da moldura das caixas de mensagem e das lições; sem ela, `interface.json` → `borda.cor`). Pedido novo das regras: `Evento::DialogoAranha { texto }` (nos scripts, `"dialogo_aranha"`). As regras passam a fazer os sorteios do redesenho da janela de edição **dentro** do tick (regras/rng.md, "Desenho dentro do tick"). `API_VERSAO` passa a `"0.24"`. | Compatível com 0.23: só acrescenta; um mod que traga `desenho_aranha.json` precisa de todas as chaves. Com a janela de edição aberta e a aranha à vista, a sequência de S ao vivo muda (agora como no original). Um script que compare `API_VERSAO` com `"0.23"` precisa aceitar `"0.24"`. |
-| 0.26 | Novo arquivo sobrescrevível `data/resolucao.json` (regra do original para escolher o layout pela resolução). `video.json`: chave nova opcional `resolucao_virtual` (padrão `[640, 480]`). O executável passa a ignorar `jogo.json` → `tabela_posicoes` e `tela_jogo.json` → `largura`/`altura`/`tabela_posicoes` (vêm da tela virtual); a abertura sai em 640×442 com a tabela 9/0 por padrão (antes, 800×562 com a 9/8). `API_VERSAO` passa a `"0.26"`. | Compatível com 0.25 para os dados; um mod que mudava a tabela de posições por `jogo.json` ou `tela_jogo.json` deve trazer um `resolucao.json`. Um script que compare `API_VERSAO` com `"0.25"` precisa aceitar `"0.26"`. |
 | 0.25 | Chaves novas opcionais: `mensagens.json` → `quadros_animados` (`_SpiderDialog`, `_LionDialog`, `_DrawSimPayoff`: bitmaps, quadros, posições, intervalos, sons e músicas), `quadro_amarela.cor_externa`, `cor_borda_inativa` e, por sequência, `ajuste` e `texto` (texto da 9101); `quadro_amarela.externo` e `area` passam a ser só documentação (a geometria sai do tamanho do bitmap); `amarela.json` → `quadros` (ids 9100/9101); `ajuda.json` → `janelas` (menus, Search, History e popups do WinHelp). Pedidos das regras: `Evento::QuadroAmarela` passa a levar `indice`; novos `Evento::QuadroFormigaLeao` e `Evento::AnimacaoVitoria` (nos scripts, `"quadro_formiga_leao"`, `"animacao_vitoria"`); o `Evento::DialogoAranha` da 0.24 passa a mostrar a animação de `_SpiderDialog` antes do texto. `API_VERSAO` passa a `"0.25"`. | Compatível com 0.24: só acrescenta (um `mensagens.json` de mod sem `quadros_animados` não mostra os quadros novos; um `quadro_amarela` antigo continua valendo). Um script que trate só os tipos antigos de evento ignora os novos; um que compare `API_VERSAO` com `"0.24"` precisa aceitar `"0.25"`. |
+| 0.26 | **Mesclagem por chave** dos `data/*.json` de mods (objetos mesclam, listas e valores substituem, `"_substituir": true` troca um objeto inteiro). Scripts: ganchos dentro do tick `antes_<parte>`/`depois_<parte>` (13 partes, na ordem do original); `ao_salvar`/`ao_carregar` com o arquivo lateral `NOME.ANT.mods.json`; leituras `cheiro`, `castas`, `comportamento`; escritas `depositar_cheiro`, `tirar_cheiro`, `limpar_cheiro`, `definir_castas`, `definir_comportamento`, `castas_automaticas`, `comportamento_automatico`, `por_formiga` (qualquer plano, casta e modo), `remover_formiga`, `tirar_comida`. As escritas usam as tabelas de `amarela.json` e `inimigos.json` com mods (antes, as embutidas). `API_VERSAO` passa a `"0.26"`. | Mods que trazem o arquivo inteiro continuam dando o mesmo resultado, **exceto** se omitiam uma chave de propósito: antes ela sumia (uma chave opcional desligava o recurso, uma tecla de um mapa nome → ação deixava de existir), agora vem do port; para o efeito antigo, use `"_substituir": true` no objeto (ou no topo do arquivo). Um mod que omitia uma chave obrigatória, e por isso impedia o jogo de iniciar, agora inicia. Scripts antigos não mudam: sem ganchos de parte o tick é chamado como antes, e sem `ao_salvar` nada é gravado ao lado do save (um `.mods.json` antigo com o nome do save é apagado). Um script que defina por acaso uma global com o nome de um gancho novo (`antes_quintal`, `ao_salvar`...) passa a ser chamado. Um script que compare `API_VERSAO` com `"0.25"` precisa aceitar `"0.26"`. |
+| 0.27 | Novo arquivo sobrescrevível `data/resolucao.json` (regra do original para escolher o layout pela resolução). `video.json`: chave nova opcional `resolucao_virtual` (padrão `[640, 480]`). O executável passa a ignorar `jogo.json` → `tabela_posicoes` e `tela_jogo.json` → `largura`/`altura`/`tabela_posicoes` (vêm da tela virtual); a abertura sai em 640×442 com a tabela 9/0 por padrão (antes, 800×562 com a 9/8). `API_VERSAO` passa a `"0.27"`. | Compatível com 0.26 para os dados; um mod que mudava a tabela de posições por `jogo.json` ou `tela_jogo.json` deve trazer um `resolucao.json`. Um script que compare `API_VERSAO` com `"0.26"` precisa aceitar `"0.27"`. |

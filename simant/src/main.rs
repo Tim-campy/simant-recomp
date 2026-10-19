@@ -485,6 +485,7 @@ fn principal() -> Result<(), String> {
         }
         if let Some(arq) = &o.salvar {
             s.partida.estado.para_save(&s.layout)?.gravar(arq)?;
+            s.partida.gravar_estado_dos_mods(arq)?;
             println!("{} Saved correctly", arq.display());
         }
         if o.ticks.is_some() || o.exportar_tela_jogo.is_some() || o.salvar.is_some() {

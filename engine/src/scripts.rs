@@ -14,8 +14,11 @@
 //! erro (de carga, de execução ou de limite) desliga os scripts daquele mod, registra o erro e pede
 //! um aviso na faixa. O jogo continua.
 //!
-//! Fidelidade: os ganchos rodam fora de `rules::tick::tick` (antes e depois dele, em
-//! `core::partida`); sem scripts, nada aqui é chamado.
+//! Fidelidade: `antes_do_tick`/`depois_do_tick` rodam fora de `rules::tick::tick` (em
+//! `core::partida`). Os ganchos de parte (API 0.26, `antes_<parte>`/`depois_<parte>`) rodam dentro
+//! do tick pelas regras embrulhadas em [`RegrasComScripts`], entre as sub-rotinas e na ordem do
+//! original; o embrulho só é usado quando algum mod define um gancho de parte. Sem scripts, nada
+//! aqui é chamado.
 //!
 //! Ações (API 0.17): os métodos de ação do `estado` e `avancar_ticks` só validam os argumentos e
 //! guardam um [`PedidoMod`]; quem os executa, logo depois que o gancho termina e na ordem em que
@@ -38,9 +41,10 @@ use crate::rules::estado::{cor_do_tipo, Estado, Evento, Grade};
 use crate::rules::experimental::{self, TabelasExperimental};
 use crate::rules::geracao::Cor;
 use crate::rules::inimigos::TabelasInimigos;
+use crate::rules::tick::{Regras, RegrasAmarela, RegrasConselhos, RegrasInimigos, RegrasNinho, RegrasQuintal, RegrasSuperficie};
 
 /// Versão da API de mods que os scripts veem em `API_VERSAO`.
-pub const VERSAO_API: &str = "0.26";
+pub const VERSAO_API: &str = "0.27";
 
 /// Tamanho máximo do texto de `mostrar_mensagem` (caracteres).
 pub const MAX_TEXTO_MENSAGEM: usize = 120;
@@ -50,6 +54,78 @@ const MAX_REGISTRO: usize = 1000;
 
 /// A cada quantas instruções da VM o limite é conferido.
 const INTERVALO_CONFERENCIA: u32 = 1000;
+
+/// Partes do tick em que um script pode ter ganchos `antes_<parte>`/`depois_<parte>` (API 0.26).
+/// Cada parte é uma sub-rotina chamada por `rules::tick::tick` (um método das traits de
+/// `rules::tick`), na ordem do original (`_DoAntSim`, simulacao-visao-geral.md §5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ParteTick {
+    /// `_DoSimYard` (menino, bichos, chuva, colônias do quintal).
+    Quintal,
+    /// `_DoWater`.
+    Agua,
+    /// `_DoAntLions`.
+    FormigasLeao,
+    /// `_MoveSpider`.
+    Aranha,
+    /// `_DoPillar` (só nos ticks com `_Cycle` ímpar).
+    Lagarta,
+    /// `_GetStrategy` (com `_SetCasteProd`, `_SetModeProd`).
+    Estrategia,
+    /// `_DoAntSimA` (lista A).
+    Superficie,
+    /// `_DoAntSimB`.
+    NinhoPreto,
+    /// `_DoAntSimR`.
+    NinhoVermelho,
+    /// `_DoAntSimY`.
+    Amarela,
+    /// `_MakeRedInitiator` (só quando nenhuma vermelha está no modo 19).
+    LiderVermelha,
+    /// `_DoAntMoveY`.
+    MovimentoAmarela,
+    /// `_Feedback` (a do tick e a do `_FullCount`, a cada 64 ticks).
+    Conselhos,
+}
+
+const N_PARTES: usize = 13;
+
+impl ParteTick {
+    pub const TODAS: [ParteTick; N_PARTES] = [
+        ParteTick::Quintal,
+        ParteTick::Agua,
+        ParteTick::FormigasLeao,
+        ParteTick::Aranha,
+        ParteTick::Lagarta,
+        ParteTick::Estrategia,
+        ParteTick::Superficie,
+        ParteTick::NinhoPreto,
+        ParteTick::NinhoVermelho,
+        ParteTick::Amarela,
+        ParteTick::LiderVermelha,
+        ParteTick::MovimentoAmarela,
+        ParteTick::Conselhos,
+    ];
+
+    /// Nomes dos dois ganchos da parte: (`antes_<parte>`, `depois_<parte>`).
+    pub fn nomes(self) -> (&'static str, &'static str) {
+        match self {
+            ParteTick::Quintal => ("antes_quintal", "depois_quintal"),
+            ParteTick::Agua => ("antes_agua", "depois_agua"),
+            ParteTick::FormigasLeao => ("antes_formigas_leao", "depois_formigas_leao"),
+            ParteTick::Aranha => ("antes_aranha", "depois_aranha"),
+            ParteTick::Lagarta => ("antes_lagarta", "depois_lagarta"),
+            ParteTick::Estrategia => ("antes_estrategia", "depois_estrategia"),
+            ParteTick::Superficie => ("antes_superficie", "depois_superficie"),
+            ParteTick::NinhoPreto => ("antes_ninho_preto", "depois_ninho_preto"),
+            ParteTick::NinhoVermelho => ("antes_ninho_vermelho", "depois_ninho_vermelho"),
+            ParteTick::Amarela => ("antes_amarela", "depois_amarela"),
+            ParteTick::LiderVermelha => ("antes_lider_vermelha", "depois_lider_vermelha"),
+            ParteTick::MovimentoAmarela => ("antes_movimento_amarela", "depois_movimento_amarela"),
+            ParteTick::Conselhos => ("antes_conselhos", "depois_conselhos"),
+        }
+    }
+}
 
 /// Funções globais que o script pode definir.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -64,13 +140,37 @@ pub enum Gancho {
     AoEvento,
     /// `ao_menu(indice, texto, estado)` (API 0.17): o jogador escolheu um item do menu do mod.
     AoMenu,
+    /// `ao_salvar(estado)` (API 0.26): devolve a tabela do mod que vai para o arquivo lateral do save.
+    AoSalvar,
+    /// `ao_carregar(dados, estado)` (API 0.26): no Load, com a tabela gravada por `ao_salvar`.
+    AoCarregar,
+    /// `antes_<parte>(estado)` (API 0.26): dentro do tick, logo antes da parte.
+    Antes(ParteTick),
+    /// `depois_<parte>(estado)` (API 0.26): dentro do tick, logo depois da parte.
+    Depois(ParteTick),
 }
 
-const N_GANCHOS: usize = 5;
+const N_BASICOS: usize = 7;
+const N_GANCHOS: usize = N_BASICOS + 2 * N_PARTES;
 
 impl Gancho {
-    pub const TODOS: [Gancho; N_GANCHOS] =
-        [Gancho::AoIniciar, Gancho::AntesDoTick, Gancho::DepoisDoTick, Gancho::AoEvento, Gancho::AoMenu];
+    /// Os ganchos que não são de parte do tick.
+    pub const BASICOS: [Gancho; N_BASICOS] = [
+        Gancho::AoIniciar,
+        Gancho::AntesDoTick,
+        Gancho::DepoisDoTick,
+        Gancho::AoEvento,
+        Gancho::AoMenu,
+        Gancho::AoSalvar,
+        Gancho::AoCarregar,
+    ];
+
+    /// Todos os ganchos, na ordem dos índices.
+    pub fn todos() -> impl Iterator<Item = Gancho> {
+        Gancho::BASICOS
+            .into_iter()
+            .chain(ParteTick::TODAS.into_iter().flat_map(|p| [Gancho::Antes(p), Gancho::Depois(p)]))
+    }
 
     pub fn nome(self) -> &'static str {
         match self {
@@ -79,11 +179,24 @@ impl Gancho {
             Gancho::DepoisDoTick => "depois_do_tick",
             Gancho::AoEvento => "ao_evento",
             Gancho::AoMenu => "ao_menu",
+            Gancho::AoSalvar => "ao_salvar",
+            Gancho::AoCarregar => "ao_carregar",
+            Gancho::Antes(p) => p.nomes().0,
+            Gancho::Depois(p) => p.nomes().1,
         }
     }
 
     fn indice(self) -> usize {
-        self as usize
+        match self {
+            Gancho::Antes(p) => N_BASICOS + 2 * p as usize,
+            Gancho::Depois(p) => N_BASICOS + 2 * p as usize + 1,
+            basico => Gancho::BASICOS.iter().position(|&g| g == basico).unwrap_or(0),
+        }
+    }
+
+    /// Gancho de uma parte do tick?
+    fn de_parte(self) -> bool {
+        matches!(self, Gancho::Antes(_) | Gancho::Depois(_))
     }
 }
 
@@ -231,13 +344,42 @@ impl Orcamento {
     }
 }
 
+/// Tabelas das regras usadas pelas escritas dos scripts (com mods): as do Experimental (comida,
+/// pedra, formiga, cheiro), as da amarela (direções de `_DigTile*`) e as dos inimigos.
+#[derive(Clone, Debug)]
+pub struct TabelasScripts {
+    pub experimental: TabelasExperimental,
+    pub amarela: TabelasAmarela,
+    pub inimigos: TabelasInimigos,
+}
+
+impl TabelasScripts {
+    /// As tabelas pelos recursos (`data/` com mods).
+    pub fn carregar(r: &Recursos) -> Result<TabelasScripts, String> {
+        Ok(TabelasScripts {
+            experimental: TabelasExperimental::carregar(r)?,
+            amarela: TabelasAmarela::carregar(r)?,
+            inimigos: TabelasInimigos::carregar(r)?,
+        })
+    }
+
+    /// As do Experimental dadas e as outras embutidas (testes).
+    pub fn com_experimental(experimental: TabelasExperimental) -> TabelasScripts {
+        TabelasScripts { experimental, amarela: TabelasAmarela::padrao().clone(), inimigos: TabelasInimigos::padrao().clone() }
+    }
+
+    fn contexto(&self) -> experimental::Contexto<'_> {
+        experimental::Contexto { tabelas: &self.experimental, amarela: &self.amarela, inimigos: &self.inimigos }
+    }
+}
+
 /// O que fica dentro de cada máquina Lua (app data): nome, gerador próprio, saídas pendentes e as
 /// tabelas usadas pelas escritas.
 struct Contexto {
     sorteio: u32,
     registro: Vec<String>,
     mensagens: Vec<MensagemScript>,
-    experimental: Rc<TabelasExperimental>,
+    tabelas: Rc<TabelasScripts>,
     pedidos: Vec<PedidoMod>,
     menu: Option<MenuMod>,
     painel: Option<Vec<String>>,
@@ -297,16 +439,26 @@ impl Scripts {
         if com_scripts.is_empty() {
             return Ok(None);
         }
-        let tabelas = TabelasExperimental::carregar(r)?;
+        let tabelas = TabelasScripts::carregar(r)?;
         let fontes = com_scripts.into_iter().map(|m| (m.manifesto.nome.clone(), ler_scripts_do_mod(m))).collect();
-        Ok(Some(Scripts::de_fontes(fontes, tabelas, limites)))
+        Ok(Some(Scripts::de_fontes_com(fontes, tabelas, limites)))
     }
 
     /// Scripts a partir do código já lido (testes e ferramentas). Cada item: nome do mod e os
-    /// arquivos, ou o erro de leitura (o mod entra desligado).
+    /// arquivos, ou o erro de leitura (o mod entra desligado). As tabelas da amarela e dos inimigos
+    /// são as embutidas.
     pub fn de_fontes(
         fontes: Vec<(String, Result<ArquivosScript, String>)>,
         tabelas: TabelasExperimental,
+        limites: Limites,
+    ) -> Scripts {
+        Scripts::de_fontes_com(fontes, TabelasScripts::com_experimental(tabelas), limites)
+    }
+
+    /// Como [`Scripts::de_fontes`], com todas as tabelas dadas.
+    pub fn de_fontes_com(
+        fontes: Vec<(String, Result<ArquivosScript, String>)>,
+        tabelas: TabelasScripts,
         limites: Limites,
     ) -> Scripts {
         let tabelas = Rc::new(tabelas);
@@ -376,6 +528,63 @@ impl Scripts {
 
     pub fn ao_evento(&mut self, ev: &Evento, e: &mut Estado) {
         self.chamar(Gancho::AoEvento, e, Some(ev));
+    }
+
+    /// Algum mod ativo define um gancho de parte do tick (`antes_<parte>`/`depois_<parte>`, API 0.26)?
+    pub fn tem_ganchos_do_tick(&self) -> bool {
+        self.mods.iter().any(|m| m.ativo && Gancho::todos().any(|g| g.de_parte() && m.ganchos[g.indice()]))
+    }
+
+    /// `antes_<parte>(estado)` (`depois` = falso) ou `depois_<parte>(estado)`, nos mods que o definem.
+    pub fn parte(&mut self, p: ParteTick, depois: bool, e: &mut Estado) {
+        let g = if depois { Gancho::Depois(p) } else { Gancho::Antes(p) };
+        if self.tem_gancho(g) {
+            self.chamar(g, e, None);
+        }
+    }
+
+    /// `ao_salvar(estado)` de cada mod ativo que o define (API 0.26): a tabela devolvida, já em JSON,
+    /// com o nome do mod. `nil` = nada a guardar. Um valor que não vai para JSON é erro (desliga o
+    /// mod). As ações pedidas dentro de `ao_salvar` são descartadas (salvar não muda o jogo).
+    pub fn ao_salvar(&mut self, e: &mut Estado) -> Vec<(String, serde_json::Value)> {
+        let mut saida = Vec::new();
+        let Scripts { mods, registro, mensagens, pedidos } = self;
+        for m in mods.iter_mut().filter(|m| m.ativo && m.ganchos[Gancho::AoSalvar.indice()]) {
+            let antes = pedidos.len();
+            let mut dados = None;
+            chamar_mod(m, Gancho::AoSalvar, e, (&mut *registro, &mut *mensagens, &mut *pedidos), |lua, ud| {
+                let f: Function = lua.globals().get(Gancho::AoSalvar.nome())?;
+                let v: Value = f.call(ud)?;
+                if v.is_nil() {
+                    return Ok(());
+                }
+                let j = lua_para_json(&v, 0)?;
+                let tamanho = serde_json::to_string(&j).map_or(usize::MAX, |t| t.len());
+                if tamanho > MAX_ESTADO_SALVO {
+                    return Err(erro(format!("ao_salvar: a tabela tem {tamanho} bytes em JSON (máximo {MAX_ESTADO_SALVO})")));
+                }
+                dados = Some(j);
+                Ok(())
+            });
+            pedidos.truncate(antes);
+            if let (true, Some(d)) = (m.ativo, dados) {
+                saida.push((m.nome.clone(), d));
+            }
+        }
+        saida
+    }
+
+    /// `ao_carregar(dados, estado)` de cada mod ativo que o define e tem dados em `por_mod` (o
+    /// objeto `mods` do arquivo lateral, API 0.26).
+    pub fn ao_carregar(&mut self, por_mod: &serde_json::Map<String, serde_json::Value>, e: &mut Estado) {
+        let Scripts { mods, registro, mensagens, pedidos } = self;
+        for m in mods.iter_mut().filter(|m| m.ativo && m.ganchos[Gancho::AoCarregar.indice()]) {
+            let Some(dados) = por_mod.get(&m.nome) else { continue };
+            chamar_mod(m, Gancho::AoCarregar, e, (&mut *registro, &mut *mensagens, &mut *pedidos), |lua, ud| {
+                let f: Function = lua.globals().get(Gancho::AoCarregar.nome())?;
+                f.call::<()>((json_para_lua(lua, dados)?, ud))
+            });
+        }
     }
 
     /// Linhas de `registrar`/`print` e avisos de desligamento, prefixadas com o nome do mod.
@@ -499,7 +708,7 @@ pub fn ler_scripts_do_mod(m: &Mod) -> Result<ArquivosScript, String> {
 
 type ErroCarga = Box<(Option<ScriptMod>, mlua::Error)>;
 
-fn carregar_mod(nome: &str, arquivos: &ArquivosScript, tabelas: Rc<TabelasExperimental>, limites: Limites) -> Result<ScriptMod, ErroCarga> {
+fn carregar_mod(nome: &str, arquivos: &ArquivosScript, tabelas: Rc<TabelasScripts>, limites: Limites) -> Result<ScriptMod, ErroCarga> {
     let (lua, orcamento) = nova_maquina(nome, tabelas, limites).map_err(|e| Box::new((None, e)))?;
     let mut m = ScriptMod { nome: nome.to_string(), lua, ativo: true, ganchos: [false; N_GANCHOS], orcamento };
     for (arquivo, codigo) in arquivos {
@@ -516,17 +725,21 @@ fn carregar_mod(nome: &str, arquivos: &ArquivosScript, tabelas: Rc<TabelasExperi
 
 fn procurar_ganchos(lua: &Lua) -> [bool; N_GANCHOS] {
     let g = lua.globals();
-    Gancho::TODOS.map(|k| matches!(g.raw_get::<Value>(k.nome()), Ok(Value::Function(_))))
+    let mut achados = [false; N_GANCHOS];
+    for k in Gancho::todos() {
+        achados[k.indice()] = matches!(g.raw_get::<Value>(k.nome()), Ok(Value::Function(_)));
+    }
+    achados
 }
 
 /// Máquina Lua com a sandbox, os limites e a API.
-fn nova_maquina(nome: &str, tabelas: Rc<TabelasExperimental>, limites: Limites) -> mlua::Result<(Lua, Rc<Orcamento>)> {
+fn nova_maquina(nome: &str, tabelas: Rc<TabelasScripts>, limites: Limites) -> mlua::Result<(Lua, Rc<Orcamento>)> {
     let lua = Lua::new_with(StdLib::TABLE | StdLib::STRING | StdLib::MATH | StdLib::UTF8, LuaOptions::default())?;
     lua.set_app_data(Contexto {
         sorteio: semente_do_nome(nome),
         registro: Vec::new(),
         mensagens: Vec::new(),
-        experimental: tabelas,
+        tabelas,
         pedidos: Vec::new(),
         menu: None,
         painel: None,
@@ -807,7 +1020,8 @@ fn registrar_api(reg: &mut mlua::UserDataRegistry<Estado>) {
     reg.add_method_mut("colocar_comida", |lua, e, (plano, x, y): (String, i64, i64)| {
         let p = Plano::de_nome(&plano)?;
         let (x, y) = (coord(x), coord(y));
-        let tabelas = lua.app_data_ref::<Contexto>().map(|c| c.experimental.clone()).ok_or_else(|| mlua::Error::runtime("sem contexto"))?;
+        let todas = tabelas_do_mod(lua)?;
+        let tabelas = &todas.experimental;
         let (Some(v), Some(0)) = (p.mapa(e).em(x, y), p.vida(e).em(x, y)) else {
             return Ok(false);
         };
@@ -818,12 +1032,13 @@ fn registrar_api(reg: &mut mlua::UserDataRegistry<Estado>) {
         if v > limiar + r.comida_somar_ate || (v < limiar && v >= r.comida_chao_abaixo_de) {
             return Ok(false);
         }
-        let ctx = experimental::Contexto { tabelas: &tabelas, amarela: TabelasAmarela::padrao(), inimigos: TabelasInimigos::padrao() };
+        let ctx = todas.contexto();
         Ok(experimental::por_comida(e, ctx, p.numero(), x, y, false))
     });
     reg.add_method_mut("colocar_pedra", |lua, e, (x, y): (i64, i64)| {
         let (x, y) = (coord(x), coord(y));
-        let tabelas = lua.app_data_ref::<Contexto>().map(|c| c.experimental.clone()).ok_or_else(|| mlua::Error::runtime("sem contexto"))?;
+        let todas = tabelas_do_mod(lua)?;
+        let tabelas = &todas.experimental;
         let r = &tabelas.regras;
         match (e.superficie.mapa.em(x, y), e.superficie.vida.em(x, y)) {
             (Some(v), Some(0)) if v < r.barreira_abaixo_de => Ok(e.superficie.mapa.definir(x, y, r.pedrinha)),
@@ -834,7 +1049,8 @@ fn registrar_api(reg: &mut mlua::UserDataRegistry<Estado>) {
         let cor = cor_de_nome(&cor)?;
         let casta = casta_de_nome(casta.as_deref())?;
         let (x, y) = (coord(x), coord(y));
-        let tabelas = lua.app_data_ref::<Contexto>().map(|c| c.experimental.clone()).ok_or_else(|| mlua::Error::runtime("sem contexto"))?;
+        let todas = tabelas_do_mod(lua)?;
+        let tabelas = &todas.experimental;
         let r = &tabelas.regras;
         if e.superficie.vida.em(x, y) != Some(0) || !comum::celula_livre(e, 1, x, y) {
             return Ok(false);
@@ -852,6 +1068,399 @@ fn registrar_api(reg: &mut mlua::UserDataRegistry<Estado>) {
         Ok(())
     });
     registrar_api_017(reg);
+    registrar_api_026(reg);
+}
+
+/// As tabelas das regras guardadas na máquina do mod.
+fn tabelas_do_mod(lua: &Lua) -> mlua::Result<Rc<TabelasScripts>> {
+    lua.app_data_ref::<Contexto>().map(|c| c.tabelas.clone()).ok_or_else(|| mlua::Error::runtime("sem contexto"))
+}
+
+// ---------------------------------------------------------------------------------------------
+// API 0.26: cheiros, castas e comportamento, formigas em qualquer plano, comida dos ninhos
+// ---------------------------------------------------------------------------------------------
+
+/// Tipo de cheiro → subopção da ferramenta Cheiro do Experimental (`experimental::subopcao`).
+fn cheiro_de_nome(nome: &str) -> mlua::Result<u8> {
+    use experimental::subopcao as s;
+    match nome {
+        "ninho_preto" => Ok(s::NINHO_PRETO),
+        "trilha_preta" => Ok(s::TRILHA_PRETA),
+        "ninho_vermelho" => Ok(s::NINHO_VERMELHO),
+        "trilha_vermelha" => Ok(s::TRILHA_VERMELHA),
+        "alarme" => Ok(s::ALARME),
+        _ => Err(erro(format!(
+            "cheiro desconhecido: {nome} (use \"ninho_preto\", \"trilha_preta\", \"ninho_vermelho\", \"trilha_vermelha\" ou \"alarme\")"
+        ))),
+    }
+}
+
+fn grade_de_cheiro(e: &mut Estado, sub: u8) -> &mut Grade {
+    use experimental::subopcao as s;
+    let f = &mut e.feromonios;
+    match sub {
+        s::NINHO_PRETO => &mut f.ninho_b,
+        s::TRILHA_PRETA => &mut f.trilha_b,
+        s::NINHO_VERMELHO => &mut f.ninho_r,
+        s::TRILHA_VERMELHA => &mut f.trilha_r,
+        _ => &mut f.alarme,
+    }
+}
+
+/// Tile (x, y) da superfície (os mapas de cheiro cobrem só a superfície, uma célula a cada 2 × 2).
+fn na_superficie(x: i32, y: i32) -> bool {
+    (0..128).contains(&x) && (0..64).contains(&y)
+}
+
+/// Grupo (`(T & 0x78) >> 3`) de uma casta posta por `por_formiga` (formigas.md §3).
+fn grupo_da_casta(nome: Option<&str>) -> mlua::Result<u8> {
+    match nome {
+        None | Some("operaria") => Ok(2),
+        Some("soldado") => Ok(6),
+        Some("macho") => Ok(4),
+        Some("rainha_nova") => Ok(8),
+        Some(outro) => Err(erro(format!(
+            "casta desconhecida: {outro} (use \"operaria\", \"soldado\", \"macho\" ou \"rainha_nova\")"
+        ))),
+    }
+}
+
+/// Três níveis de um triângulo (Caste ou Behavior) a partir de pesos ≥ 0 com soma > 0: cada um
+/// proporcional ao peso, somando 65535; o arredondamento fica no do meio, como `_GetTriLatDist`
+/// (o nível 1 é o resto).
+fn niveis_do_triangulo(funcao: &str, pesos: [f64; 3]) -> mlua::Result<[u16; 3]> {
+    if pesos.iter().any(|p| !p.is_finite() || *p < 0.0) {
+        return Err(erro(format!("{funcao}: os três valores precisam ser números ≥ 0")));
+    }
+    let soma: f64 = pesos.iter().sum();
+    if soma <= 0.0 {
+        return Err(erro(format!("{funcao}: a soma dos três valores precisa ser > 0")));
+    }
+    let n = |p: f64| ((p * 65535.0 / soma).floor() as u32).min(0xFFFF) as u16;
+    let (n0, n2) = (n(pesos[0]), n(pesos[2]));
+    Ok([n0, 0xFFFFu16.saturating_sub(n0).saturating_sub(n2), n2])
+}
+
+/// Métodos do `estado` da 0.26 (escritas imediatas e validadas, como as da 0.12).
+fn registrar_api_026(reg: &mut mlua::UserDataRegistry<Estado>) {
+    // --- cheiros (só na superfície) ---
+    reg.add_method("cheiro", |_, e, (tipo, x, y): (String, i64, i64)| {
+        use experimental::subopcao as s;
+        let sub = cheiro_de_nome(&tipo)?;
+        let (x, y) = (coord(x), coord(y));
+        if !na_superficie(x, y) {
+            return Ok(None);
+        }
+        let f = &e.feromonios;
+        let g = match sub {
+            s::NINHO_PRETO => &f.ninho_b,
+            s::TRILHA_PRETA => &f.trilha_b,
+            s::NINHO_VERMELHO => &f.ninho_r,
+            s::TRILHA_VERMELHA => &f.trilha_r,
+            _ => &f.alarme,
+        };
+        Ok(g.em(x >> 1, y >> 1))
+    });
+    for (nome, tirar) in [("depositar_cheiro", false), ("tirar_cheiro", true)] {
+        reg.add_method_mut(nome, move |lua, e, (tipo, x, y): (String, i64, i64)| {
+            let sub = cheiro_de_nome(&tipo)?;
+            let (x, y) = (coord(x), coord(y));
+            if !na_superficie(x, y) {
+                return Ok(false);
+            }
+            let t = tabelas_do_mod(lua)?;
+            Ok(experimental::mudar_cheiro(e, &t.experimental.regras, sub, x, y, tirar))
+        });
+    }
+    reg.add_method_mut("limpar_cheiro", |_, e, (tipo, x, y): (String, i64, i64)| {
+        let sub = cheiro_de_nome(&tipo)?;
+        let (x, y) = (coord(x), coord(y));
+        if !na_superficie(x, y) {
+            return Ok(false);
+        }
+        Ok(grade_de_cheiro(e, sub).definir(x >> 1, y >> 1, 0))
+    });
+
+    // --- castas e comportamento (janelas Caste e Behavior Control) ---
+    reg.add_method("castas", |lua, e, ()| {
+        let k = &e.controles;
+        let t = lua.create_table()?;
+        t.set("reprodutores", k.castas[0])?;
+        t.set("operarias", k.castas[1])?;
+        t.set("soldados", k.castas[2])?;
+        t.set("automatico", k.casta_automatica != 0)?;
+        let ideais = lua.create_table()?;
+        for (i, nome) in ["operaria", "soldado", "macho", "rainha_nova"].into_iter().enumerate() {
+            ideais.set(nome, k.castas_ideais[i])?;
+        }
+        t.set("ideais", ideais)?;
+        Ok(t)
+    });
+    reg.add_method("comportamento", |lua, e, ()| {
+        let k = &e.controles;
+        let t = lua.create_table()?;
+        t.set("forragear", k.tarefas[0])?;
+        t.set("cavar", k.tarefas[1])?;
+        t.set("cuidar", k.tarefas[2])?;
+        t.set("automatico", k.modo_automatico != 0)?;
+        Ok(t)
+    });
+    reg.add_method_mut("definir_castas", |_, e, (r, o, s): (f64, f64, f64)| {
+        // Como arrastar o botão do triângulo (`_ProcCasteEvent`): níveis, `_IdealCaste` e Manual.
+        let n = niveis_do_triangulo("definir_castas", [r, o, s])?;
+        e.controles.castas = n;
+        e.controles.castas_ideais = crate::core::triangulo::castas_ideais(n);
+        e.controles.casta_automatica = 0;
+        Ok(())
+    });
+    reg.add_method_mut("definir_comportamento", |_, e, (f, c, n): (f64, f64, f64)| {
+        // `_ProcModeEvent`: níveis e Manual.
+        e.controles.tarefas = niveis_do_triangulo("definir_comportamento", [f, c, n])?;
+        e.controles.modo_automatico = 0;
+        Ok(())
+    });
+    reg.add_method_mut("castas_automaticas", |_, e, ligar: bool| {
+        e.controles.casta_automatica = i16::from(ligar);
+        Ok(())
+    });
+    reg.add_method_mut("comportamento_automatico", |_, e, ligar: bool| {
+        e.controles.modo_automatico = i16::from(ligar);
+        Ok(())
+    });
+
+    // --- formigas em qualquer plano ---
+    reg.add_method_mut(
+        "por_formiga",
+        |lua, e, (plano, cor, x, y, casta, modo): (String, String, i64, i64, Option<String>, Option<i64>)| {
+            let p = Plano::de_nome(&plano)?;
+            let cor = cor_de_nome(&cor)?;
+            let grupo = grupo_da_casta(casta.as_deref())?;
+            let modo = modo.map(|m| faixa("por_formiga", "modo", m, 0, 19).map(|m| m as u8)).transpose()?;
+            let (x, y) = (coord(x), coord(y));
+            let todas = tabelas_do_mod(lua)?;
+            let r = &todas.experimental.regras;
+            let base = grupo << 3;
+            let tipo = if cor == Cor::Vermelha { base.wrapping_add(r.formiga_vermelha) } else { base };
+            let f = |modo| Formiga { x: x as u8, y: y as u8, modo, tipo, s: 0 };
+            match p {
+                Plano::Superficie => {
+                    if e.superficie.vida.em(x, y) != Some(0) || !comum::celula_livre(e, 1, x, y) {
+                        return Ok(false);
+                    }
+                    Ok(e.adicionar_formiga(Lista::A, f(modo.unwrap_or(r.formiga_modo_superficie))))
+                }
+                Plano::NinhoPreto | Plano::NinhoVermelho => {
+                    // `_ExpAddAnt` no ninho, sem o sorteio do T: nunca na linha 0; cava a célula se
+                    // o tile for > `cavar_formiga_acima_de` (`_DigTile*`, que sorteia S).
+                    if y == 0 || p.vida(e).em(x, y) != Some(0) {
+                        return Ok(false);
+                    }
+                    let ninho = if p == Plano::NinhoPreto { Cor::Preta } else { Cor::Vermelha };
+                    if e.ninho(ninho).mapa.em(x, y).is_some_and(|v| v > r.cavar_formiga_acima_de) {
+                        comum::cavar(e, &todas.amarela, ninho, x, y);
+                    }
+                    let padrao = if ninho == cor { r.formiga_modo_proprio_ninho } else { r.formiga_modo_ninho_alheio };
+                    Ok(e.adicionar_formiga(comum::lista_do_ninho(ninho), f(modo.unwrap_or(padrao))))
+                }
+            }
+        },
+    );
+    reg.add_method_mut("remover_formiga", |_, e, (plano, x, y): (String, i64, i64)| {
+        let p = Plano::de_nome(&plano)?;
+        let (x, y) = (coord(x), coord(y));
+        if !experimental::posicao_valida(p.numero(), x, y) {
+            return Ok(false);
+        }
+        Ok(experimental::tirar_formiga(e, p.numero(), x, y))
+    });
+
+    // --- comida (superfície e ninhos) ---
+    reg.add_method_mut("tirar_comida", |lua, e, (plano, x, y): (String, i64, i64)| {
+        let p = Plano::de_nome(&plano)?;
+        let (x, y) = (coord(x), coord(y));
+        if !experimental::posicao_valida(p.numero(), x, y) {
+            return Ok(false);
+        }
+        let todas = tabelas_do_mod(lua)?;
+        Ok(experimental::por_comida(e, todas.contexto(), p.numero(), x, y, true))
+    });
+}
+
+// ---------------------------------------------------------------------------------------------
+// API 0.26: ganchos dentro do tick
+// ---------------------------------------------------------------------------------------------
+
+/// As regras do tick com os ganchos `antes_<parte>`/`depois_<parte>` dos scripts em volta de cada
+/// parte. Cada método chama o gancho de antes, a parte das regras de dentro (sem mudança) e o de
+/// depois; a ordem das partes é a de `rules::tick::tick`, a do original. Só é usada quando algum
+/// script define um gancho de parte ([`Scripts::tem_ganchos_do_tick`]); sem isso a `Partida` chama
+/// o tick com as regras diretamente.
+pub struct RegrasComScripts<'a, R: Regras + ?Sized> {
+    pub regras: &'a mut R,
+    pub scripts: &'a mut Scripts,
+}
+
+impl<R: Regras + ?Sized> RegrasComScripts<'_, R> {
+    fn em_volta(&mut self, p: ParteTick, e: &mut Estado, parte: impl FnOnce(&mut R, &mut Estado)) {
+        self.scripts.parte(p, false, e);
+        parte(self.regras, e);
+        self.scripts.parte(p, true, e);
+    }
+}
+
+impl<R: Regras + ?Sized> RegrasQuintal for RegrasComScripts<'_, R> {
+    fn simular_quintal(&mut self, e: &mut Estado) {
+        self.em_volta(ParteTick::Quintal, e, |r, e| r.simular_quintal(e));
+    }
+    fn simular_agua(&mut self, e: &mut Estado) {
+        self.em_volta(ParteTick::Agua, e, |r, e| r.simular_agua(e));
+    }
+}
+
+impl<R: Regras + ?Sized> RegrasInimigos for RegrasComScripts<'_, R> {
+    fn simular_formigas_leao(&mut self, e: &mut Estado) {
+        self.em_volta(ParteTick::FormigasLeao, e, |r, e| r.simular_formigas_leao(e));
+    }
+    fn mover_aranha(&mut self, e: &mut Estado) {
+        self.em_volta(ParteTick::Aranha, e, |r, e| r.mover_aranha(e));
+    }
+    fn simular_lagarta(&mut self, e: &mut Estado) {
+        self.em_volta(ParteTick::Lagarta, e, |r, e| r.simular_lagarta(e));
+    }
+}
+
+impl<R: Regras + ?Sized> RegrasSuperficie for RegrasComScripts<'_, R> {
+    fn simular_superficie(&mut self, e: &mut Estado) {
+        self.em_volta(ParteTick::Superficie, e, |r, e| r.simular_superficie(e));
+    }
+    fn adicionar_comida(&mut self, e: &mut Estado, quantidade: i32, som: bool) {
+        self.regras.adicionar_comida(e, quantidade, som);
+    }
+    fn escolher_estrategia(&mut self, e: &mut Estado) {
+        self.em_volta(ParteTick::Estrategia, e, |r, e| r.escolher_estrategia(e));
+    }
+    fn criar_lider_vermelha(&mut self, e: &mut Estado) {
+        self.em_volta(ParteTick::LiderVermelha, e, |r, e| r.criar_lider_vermelha(e));
+    }
+    fn fase_de_cheiro(&mut self, e: &mut Estado, fase: crate::rules::feromonios::FaseCheiro) {
+        self.regras.fase_de_cheiro(e, fase);
+    }
+}
+
+impl<R: Regras + ?Sized> RegrasNinho for RegrasComScripts<'_, R> {
+    fn simular_ninho(&mut self, e: &mut Estado, cor: Cor) {
+        let p = if cor == Cor::Preta { ParteTick::NinhoPreto } else { ParteTick::NinhoVermelho };
+        self.em_volta(p, e, |r, e| r.simular_ninho(e, cor));
+    }
+}
+
+impl<R: Regras + ?Sized> RegrasAmarela for RegrasComScripts<'_, R> {
+    fn simular_amarela(&mut self, e: &mut Estado) {
+        self.em_volta(ParteTick::Amarela, e, |r, e| r.simular_amarela(e));
+    }
+    fn mover_amarela(&mut self, e: &mut Estado) {
+        self.em_volta(ParteTick::MovimentoAmarela, e, |r, e| r.mover_amarela(e));
+    }
+}
+
+impl<R: Regras + ?Sized> RegrasConselhos for RegrasComScripts<'_, R> {
+    fn dar_conselhos(&mut self, e: &mut Estado) {
+        self.em_volta(ParteTick::Conselhos, e, |r, e| r.dar_conselhos(e));
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// API 0.26: estado dos scripts no arquivo lateral do save
+// ---------------------------------------------------------------------------------------------
+
+/// Sufixo do arquivo lateral: `NOME.ANT` → `NOME.ANT.mods.json`.
+pub const SUFIXO_ARQUIVO_LATERAL: &str = ".mods.json";
+/// Valor de `formato` no arquivo lateral.
+pub const FORMATO_ARQUIVO_LATERAL: &str = "simant-recomp/estado-dos-mods";
+/// Tamanho máximo do JSON da tabela de um mod (bytes).
+pub const MAX_ESTADO_SALVO: usize = 1024 * 1024;
+/// Profundidade máxima de tabelas aninhadas no estado salvo.
+const MAX_PROFUNDIDADE: usize = 32;
+
+/// O arquivo lateral de um save (`NOME.ANT` → `NOME.ANT.mods.json`, na mesma pasta).
+pub fn arquivo_lateral(save: &Path) -> std::path::PathBuf {
+    let mut s = save.as_os_str().to_owned();
+    s.push(SUFIXO_ARQUIVO_LATERAL);
+    std::path::PathBuf::from(s)
+}
+
+/// Valor Lua → JSON: `nil`, booleanos, números (finitos), textos UTF-8 e tabelas (sequência 1..n
+/// vira lista; só chaves de texto vira objeto; tabela vazia vira objeto). Funções, userdata, chaves
+/// misturadas e listas com buracos são erro.
+pub fn lua_para_json(v: &Value, profundidade: usize) -> mlua::Result<serde_json::Value> {
+    use serde_json::Value as J;
+    if profundidade > MAX_PROFUNDIDADE {
+        return Err(erro(format!("ao_salvar: tabelas aninhadas demais (mais de {MAX_PROFUNDIDADE})")));
+    }
+    Ok(match v {
+        Value::Nil => J::Null,
+        Value::Boolean(b) => J::Bool(*b),
+        Value::Integer(i) => J::from(*i),
+        Value::Number(f) => serde_json::Number::from_f64(*f)
+            .map(J::Number)
+            .ok_or_else(|| erro(format!("ao_salvar: número não finito ({f})")))?,
+        Value::String(s) => J::String(s.to_str().map_err(|_| erro("ao_salvar: texto que não é UTF-8".into()))?.to_string()),
+        Value::Table(t) => {
+            let n = t.raw_len();
+            let mut pares = Vec::new();
+            for par in t.clone().pairs::<Value, Value>() {
+                pares.push(par?);
+            }
+            if n > 0 && pares.len() == n {
+                let mut lista = Vec::with_capacity(n);
+                for i in 1..=n {
+                    lista.push(lua_para_json(&t.raw_get::<Value>(i)?, profundidade + 1)?);
+                }
+                J::Array(lista)
+            } else {
+                let mut obj = serde_json::Map::new();
+                for (k, v) in pares {
+                    let Value::String(k) = k else {
+                        return Err(erro(
+                            "ao_salvar: uma tabela precisa ser uma lista 1..n sem buracos ou ter só chaves de texto".into(),
+                        ));
+                    };
+                    let k = k.to_str().map_err(|_| erro("ao_salvar: chave que não é UTF-8".into()))?.to_string();
+                    obj.insert(k, lua_para_json(&v, profundidade + 1)?);
+                }
+                J::Object(obj)
+            }
+        }
+        outro => return Err(erro(format!("ao_salvar: valor que não vai para o save ({})", outro.type_name()))),
+    })
+}
+
+/// JSON → valor Lua (o inverso de [`lua_para_json`]; números inteiros voltam inteiros).
+pub fn json_para_lua(lua: &Lua, v: &serde_json::Value) -> mlua::Result<Value> {
+    use serde_json::Value as J;
+    Ok(match v {
+        J::Null => Value::Nil,
+        J::Bool(b) => Value::Boolean(*b),
+        J::Number(n) => match n.as_i64() {
+            Some(i) => Value::Integer(i),
+            None => Value::Number(n.as_f64().unwrap_or(0.0)),
+        },
+        J::String(s) => Value::String(lua.create_string(s)?),
+        J::Array(l) => {
+            let t = lua.create_table()?;
+            for (i, x) in l.iter().enumerate() {
+                t.raw_set(i + 1, json_para_lua(lua, x)?)?;
+            }
+            Value::Table(t)
+        }
+        J::Object(o) => {
+            let t = lua.create_table()?;
+            for (k, x) in o {
+                t.raw_set(k.as_str(), json_para_lua(lua, x)?)?;
+            }
+            Value::Table(t)
+        }
+    })
 }
 
 // ---------------------------------------------------------------------------------------------

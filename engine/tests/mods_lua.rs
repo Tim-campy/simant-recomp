@@ -207,7 +207,8 @@ fn mod_de_exemplo_chove_comida_a_cada_500_ticks() {
     e.ambiente.proxima_comida = -1; // sem a alimentação periódica do jogo, para isolar o script
     let mut regras = RegrasOriginais::default();
     s.ao_iniciar(&mut e);
-    assert!(s.retirar_registro()[0].contains("chuva de comida ligada; API 0.26, jogo rapido"));
+    let esperado = format!("chuva de comida ligada; API {}, jogo rapido", engine::scripts::VERSAO_API);
+    assert!(s.retirar_registro()[0].contains(&esperado));
     let mut sem_script = e.clone();
     for _ in 0..499 {
         s.antes_do_tick(&mut e);
@@ -270,7 +271,7 @@ fn caminho_de_script_invalido_desliga_o_mod() {
 // API 0.17: menu, painel, ações e avanço de ticks (pela Partida, que executa os pedidos)
 // ---------------------------------------------------------------------------------------------
 
-mod api017 {
+pub(crate) mod api017 {
     use super::*;
     use engine::core::avisos::ConfigAvisos;
     use engine::core::navegacao::{Evento as EventoTecla, Navegacao};
@@ -492,6 +493,285 @@ mod api017 {
             let mut p = partida_com(&[codigo]);
             escolher(&mut p, 1);
             assert_eq!(p.scripts.as_ref().unwrap().ativo("teste"), Some(false), "{codigo}");
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// API 0.26: ganchos dentro do tick, escritas novas e estado dos scripts no arquivo lateral
+// ---------------------------------------------------------------------------------------------
+
+mod api026 {
+    use super::api017::partida;
+    use super::*;
+    use engine::scripts::{arquivo_lateral, ParteTick, RegrasComScripts};
+
+    /// Nomes de todos os ganchos de parte (`antes_<parte>`, `depois_<parte>`).
+    fn ganchos_de_parte() -> Vec<&'static str> {
+        ParteTick::TODAS
+            .iter()
+            .flat_map(|p| {
+                let (a, d) = p.nomes();
+                [a, d]
+            })
+            .collect()
+    }
+
+    #[test]
+    fn ganchos_de_parte_rodam_dentro_do_tick_na_ordem_do_original() {
+        let codigo: String = ganchos_de_parte().iter().map(|n| format!("function {n}(e) registrar('{n}') end\n")).collect();
+        let mut s = scripts(&codigo);
+        assert!(s.tem_ganchos_do_tick());
+        let mut e = estado_quick();
+        // Ciclo 0 → 1: tick ímpar (lagarta), sem fase de 32 ticks.
+        let mut regras = RegrasOriginais::default();
+        tick(&mut e, &mut RegrasComScripts { regras: &mut regras, scripts: &mut s });
+        let nomes: Vec<String> = s.retirar_registro().into_iter().map(|l| l.trim_start_matches("[teste] ").to_string()).collect();
+        let esperado: Vec<String> = [
+            "quintal",
+            "agua",
+            "formigas_leao",
+            "aranha",
+            "lagarta",
+            "estrategia",
+            "superficie",
+            "ninho_preto",
+            "ninho_vermelho",
+            "amarela",
+            "lider_vermelha",
+            "movimento_amarela",
+            "conselhos",
+        ]
+        .iter()
+        .flat_map(|p| [format!("antes_{p}"), format!("depois_{p}")])
+        .collect();
+        assert_eq!(nomes, esperado);
+        // Tick par: sem lagarta.
+        tick(&mut e, &mut RegrasComScripts { regras: &mut regras, scripts: &mut s });
+        assert!(!s.retirar_registro().iter().any(|l| l.contains("lagarta")));
+    }
+
+    #[test]
+    fn ganchos_de_parte_que_so_leem_nao_mudam_o_jogo() {
+        // QUICK2.ANT, 300 ticks: um script que lê em todas as partes não muda nada (nem S, nem R).
+        let codigo: String = ganchos_de_parte()
+            .iter()
+            .map(|n| format!("function {n}(e) local _ = e:formigas('superficie') local _ = e:cheiro('alarme', 3, 3) end\n"))
+            .collect();
+        let mut com = partida();
+        com.ligar_scripts(scripts(&codigo));
+        let mut sem = partida();
+        for _ in 0..300 {
+            com.rodar_tick();
+            sem.rodar_tick();
+        }
+        assert!(com.estado == sem.estado);
+        assert_eq!(com.scripts.as_ref().unwrap().ativo("teste"), Some(true));
+    }
+
+    #[test]
+    fn escrita_dentro_do_tick_vale_logo_e_acao_depois_do_tick() {
+        let mut p = partida();
+        p.ligar_scripts(scripts(
+            "function antes_ninho_preto(e) \
+               registrar('posta', e:por_formiga('ninho_preto', 'preta', 30, 40, 'soldado')) \
+               e:comecar_chuva() \
+               registrar('chovendo', e:chuva().chovendo) \
+             end",
+        ));
+        p.estado.ninho_b.mapa.definir(30, 40, 0);
+        p.estado.ninho_b.vida.definir(30, 40, 0);
+        let antes = p.estado.ninho_b.lista.ativas().count();
+        p.rodar_tick();
+        let reg = p.retirar_registro_scripts();
+        assert!(reg.contains(&"[teste] posta\ttrue".to_string()), "{reg:?}");
+        assert!(reg.contains(&"[teste] chovendo\tfalse".to_string()), "a ação só roda depois do tick: {reg:?}");
+        assert_eq!(p.estado.ambiente.chovendo, 1, "a chuva começou logo depois do tick");
+        assert!(p.estado.ninho_b.lista.ativas().count() > antes, "o soldado entrou na lista B");
+    }
+
+    #[test]
+    fn cheiros_pela_ferramenta_do_experimental() {
+        let mut e = estado_quick();
+        e.s.definir_semente(0x1357);
+        let (s0, r0) = (e.s, e.r);
+        let mut s = scripts(
+            r#"
+            function ao_iniciar(e)
+              local a = e:cheiro("trilha_preta", 20, 20)
+              local ok = e:depositar_cheiro("trilha_preta", 20, 20)
+              local b = e:cheiro("trilha_preta", 21, 21)
+              e:depositar_cheiro("trilha_preta", 20, 20)
+              local c = e:cheiro("trilha_preta", 20, 20)
+              e:tirar_cheiro("trilha_preta", 20, 20)
+              local d = e:cheiro("trilha_preta", 20, 20)
+              local limpou = e:limpar_cheiro("trilha_preta", 20, 20)
+              registrar(a, ok, b > 0, c > b, d < c, limpou, e:cheiro("trilha_preta", 20, 20),
+                tostring(e:cheiro("alarme", 200, 0)), e:depositar_cheiro("alarme", -1, 0))
+            end
+            "#,
+        );
+        s.ao_iniciar(&mut e);
+        assert_eq!(s.retirar_registro(), vec!["[teste] 0\ttrue\ttrue\ttrue\ttrue\ttrue\t0\tnil\tfalse".to_string()]);
+        assert!(e.feromonios.trilha_b.em(9, 10).is_some_and(|v| v > 0), "_SmoothMany espalhou para a vizinha");
+        assert_eq!((e.s, e.r), (s0, r0), "_ExpIncSmell não sorteia");
+        // Tipo desconhecido é erro.
+        let mut s = scripts("function ao_iniciar(e) e:cheiro('azul', 1, 1) end");
+        s.ao_iniciar(&mut e);
+        assert_eq!(s.ativo("teste"), Some(false));
+    }
+
+    #[test]
+    fn castas_e_comportamento_como_as_janelas() {
+        let mut e = estado_quick();
+        e.controles.casta_automatica = 1;
+        let mut s = scripts(
+            r#"
+            function ao_iniciar(e)
+              e:definir_castas(0, 1, 0)
+              e:definir_comportamento(1, 1, 2)
+              local c, b = e:castas(), e:comportamento()
+              registrar(c.reprodutores, c.operarias, c.soldados, c.automatico, c.ideais.operaria, c.ideais.soldado,
+                b.forragear, b.cavar, b.cuidar, b.automatico)
+              e:castas_automaticas(true)
+              e:comportamento_automatico(true)
+            end
+            "#,
+        );
+        s.ao_iniciar(&mut e);
+        assert_eq!(s.retirar_registro(), vec!["[teste] 0\t65535\t0\tfalse\t100\t0\t16383\t16385\t32767\tfalse".to_string()]);
+        assert_eq!(e.controles.castas, [0, 65535, 0]);
+        assert_eq!(e.controles.castas_ideais, [100, 0, 0, 0]);
+        assert_eq!((e.controles.casta_automatica, e.controles.modo_automatico), (1, 1));
+        for codigo in ["e:definir_castas(0, 0, 0)", "e:definir_castas(-1, 1, 1)", "e:definir_comportamento(1, 0/0, 1)"] {
+            let mut s = scripts(&format!("function ao_iniciar(e) {codigo} end"));
+            s.ao_iniciar(&mut e);
+            assert_eq!(s.ativo("teste"), Some(false), "{codigo}");
+        }
+    }
+
+    #[test]
+    fn formigas_e_comida_em_qualquer_plano() {
+        let mut e = estado_quick();
+        e.s.definir_semente(0x2468);
+        let s0 = e.s;
+        e.ninho_r.mapa.definir(10, 10, 0x10); // comida do ninho (limiar 0x10)
+        let mut s = scripts(
+            r#"
+            function ao_iniciar(e)
+              registrar(
+                e:por_formiga("ninho_preto", "preta", 5, 5, "rainha_nova"),
+                e:por_formiga("ninho_preto", "vermelha", 6, 5, "soldado", 4),
+                e:por_formiga("ninho_preto", "preta", 7, 0),
+                e:por_formiga("ninho_preto", "preta", 5, 5),
+                e:por_formiga("superficie", "vermelha", 3, 3, "macho", 13))
+            end
+            "#,
+        );
+        s.ao_iniciar(&mut e);
+        assert_eq!(s.retirar_registro(), vec!["[teste] true\ttrue\tfalse\tfalse\ttrue".to_string()]);
+        let b: Vec<_> = e.ninho_b.lista.ativas().map(|(_, f)| (f.x, f.y, f.tipo, f.modo)).collect();
+        assert_eq!(b, vec![(5, 5, 0x40, 2), (6, 5, 0xB0, 4)], "modo padrão: 2 no próprio ninho");
+        assert_eq!(e.ninho_b.vida.em(6, 5), Some(0xB0));
+        assert_eq!(e.superficie.vida.em(3, 3), Some(0xA0));
+        assert_eq!(e.s, s0, "sem cavar nem cadáver, nada sorteia");
+
+        let mut s = scripts(
+            r#"
+            function ao_iniciar(e)
+              registrar(e:remover_formiga("ninho_preto", 5, 5), e:remover_formiga("ninho_preto", 5, 5),
+                e:tirar_comida("ninho_vermelho", 10, 10), e:tirar_comida("ninho_vermelho", 11, 10),
+                e:remover_formiga("superficie", 3, 3))
+            end
+            "#,
+        );
+        s.ao_iniciar(&mut e);
+        assert_eq!(s.retirar_registro(), vec!["[teste] true\tfalse\ttrue\tfalse\ttrue".to_string()]);
+        assert_eq!(e.ninho_b.vida.em(5, 5), Some(0));
+        assert!(e.ninho_r.mapa.em(10, 10).is_some_and(|v| v < 8), "comida vira chão (SRand1(8))");
+        assert_eq!(e.superficie.vida.em(3, 3), Some(0));
+        assert!((0x14..0x18).contains(&e.superficie.mapa.em(3, 3).unwrap()), "cadáver vermelho de _DeadAntHere");
+        assert_ne!(e.s, s0, "tirar comida e o cadáver sorteiam, como as rotinas");
+        for codigo in ["e:por_formiga('ninho_preto', 'preta', 1, 1, 'rainha')", "e:por_formiga('superficie', 'preta', 1, 1, 'operaria', 20)"] {
+            let mut s = scripts(&format!("function ao_iniciar(e) {codigo} end"));
+            s.ao_iniciar(&mut e);
+            assert_eq!(s.ativo("teste"), Some(false), "{codigo}");
+        }
+    }
+
+    fn tmp_save(nome: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("simant_mods_lua_save_{nome}_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&d);
+        fs::create_dir_all(&d).unwrap();
+        d.join("TESTE.ANT")
+    }
+
+    const SCRIPT_SALVA: &str = r#"
+        contador = 0
+        function ao_iniciar(e) definir_menu({ titulo = "x", tecla = "F12", itens = { "a" } }) end
+        function ao_menu(i, t, e) contador = contador + 10 end
+        function ao_salvar(e)
+          return { contador = contador, lista = {1, 2.5, "tres"}, sub = { ligado = true }, vazio = {} }
+        end
+        function ao_carregar(dados, e)
+          contador = dados.contador
+          registrar("carregado", dados.contador, #dados.lista, dados.lista[2], dados.lista[3], dados.sub.ligado,
+            math.type(dados.contador))
+        end
+    "#;
+
+    #[test]
+    fn estado_dos_scripts_vai_para_o_arquivo_lateral() {
+        let save = tmp_save("lateral");
+        let mut p = partida();
+        p.ligar_scripts(scripts(SCRIPT_SALVA));
+        p.escolher_no_menu_de_mod("teste", 1);
+        fs::write(&save, b"o .ANT").unwrap();
+        p.gravar_estado_dos_mods(&save).unwrap();
+        assert_eq!(fs::read(&save).unwrap(), b"o .ANT", "o .ANT não muda");
+        let lateral = arquivo_lateral(&save);
+        assert!(lateral.ends_with("TESTE.ANT.mods.json"));
+        let v: serde_json::Value = serde_json::from_str(&fs::read_to_string(&lateral).unwrap()).unwrap();
+        assert_eq!(v["mods"]["teste"]["contador"], 10);
+        assert_eq!(v["mods"]["teste"]["vazio"], serde_json::json!({}));
+        assert_eq!(v["tempo"], p.estado.partida.tempo);
+
+        // Load: outra partida no mesmo tempo de jogo recebe a tabela.
+        let mut q = partida();
+        q.ligar_scripts(scripts(SCRIPT_SALVA));
+        q.retirar_registro_scripts();
+        q.ler_estado_dos_mods(&save);
+        assert_eq!(q.retirar_registro_scripts(), vec!["[teste] carregado\t10\t3\t2.5\ttres\ttrue\tinteger".to_string()]);
+
+        // Outra gravação (o original gravou por cima: o tempo não bate) é ignorada.
+        let mut r = partida();
+        r.rodar_tick();
+        r.ligar_scripts(scripts(SCRIPT_SALVA));
+        r.retirar_registro_scripts();
+        r.ler_estado_dos_mods(&save);
+        let reg = r.retirar_registro_scripts();
+        assert!(reg.len() == 1 && reg[0].contains("outra gravação"), "{reg:?}");
+
+        // Sem dados de mod, o arquivo lateral antigo é apagado.
+        let mut sem = partida();
+        sem.gravar_estado_dos_mods(&save).unwrap();
+        assert!(!lateral.exists());
+    }
+
+    #[test]
+    fn valor_que_nao_vai_para_json_desliga_o_mod() {
+        let save = tmp_save("invalido");
+        for codigo in [
+            "function ao_salvar(e) return { f = print } end",
+            "function ao_salvar(e) return { [1] = 1, [3] = 3 } end",
+            "function ao_salvar(e) return { 1, x = 2 } end",
+            "function ao_salvar(e) return { x = 0/0 } end",
+        ] {
+            let mut p = partida();
+            p.ligar_scripts(scripts(codigo));
+            p.gravar_estado_dos_mods(&save).unwrap();
+            assert_eq!(p.scripts.as_ref().unwrap().ativo("teste"), Some(false), "{codigo}");
+            assert!(!arquivo_lateral(&save).exists(), "{codigo}");
         }
     }
 }

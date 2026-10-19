@@ -724,16 +724,25 @@ fn por_cheiro(e: &mut Estado, c: Contexto, plano: i32, sub: u8, x: i32, y: i32, 
     if plano > 1 {
         return Vec::new();
     }
-    let r = &c.tabelas.regras;
-    let (cx, cy) = (x >> 1, y >> 1);
-    if let Some(g) = mapa_de_cheiro(e, sub) {
-        if let Some(v) = g.em(cx, cy) {
-            let novo = if ctrl { v as i32 - r.cheiro_tirar } else { v as i32 + r.cheiro_somar };
-            g.definir(cx, cy, novo.clamp(0, 255) as u8);
-        }
-        suavizar_varias(g, cx, cy);
-    }
+    mudar_cheiro(e, &c.tabelas.regras, sub, x, y, ctrl);
     vec![som(c.tabelas.sons.cheiro)]
+}
+
+/// O miolo de `_ExpIncSmell` no tile (x, y) da superfície, no mapa de cheiro da subopção `sub`
+/// (`subopcao::NINHO_PRETO`..`ALARME`): soma `cheiro_somar` (Ctrl: tira `cheiro_tirar`), limitado a
+/// 0..255, e `_SmoothMany`. Não sorteia. Também é a escrita `depositar_cheiro`/`tirar_cheiro` dos
+/// scripts (API de mods 0.26). Devolve se a célula existe.
+pub fn mudar_cheiro(e: &mut Estado, r: &RegrasExperimental, sub: u8, x: i32, y: i32, ctrl: bool) -> bool {
+    let (cx, cy) = (x >> 1, y >> 1);
+    let Some(g) = mapa_de_cheiro(e, sub) else { return false };
+    let Some(v) = g.em(cx, cy) else {
+        suavizar_varias(g, cx, cy);
+        return false;
+    };
+    let novo = if ctrl { v as i32 - r.cheiro_tirar } else { v as i32 + r.cheiro_somar };
+    g.definir(cx, cy, novo.clamp(0, 255) as u8);
+    suavizar_varias(g, cx, cy);
+    true
 }
 
 /// `_SmoothMany(x, y)` (`1010:889c`): `_SmoothACell` na célula, em cima, à direita, embaixo, à
@@ -783,18 +792,9 @@ fn inseticida(e: &mut Estado, c: Contexto, plano: i32, sub: u8, x: i32, y: i32) 
         if !posicao_valida(plano, px, py) {
             continue;
         }
+        tirar_formiga(e, plano, px, py);
         match plano {
             0 | 1 => {
-                if e.superficie.vida.em(px, py).is_some_and(|v| v != 0) {
-                    let achada = achar_na_lista_a(e, px, py);
-                    e.tindex = achada.map_or(-1, |i| i as i32);
-                    if let Some(i) = achada {
-                        let vermelha = e.superficie.lista.vagas[i].tipo & 0x80 != 0;
-                        cadaver_aqui(e, px, py, vermelha);
-                        e.superficie.lista.vagas[i].tipo = 0;
-                        e.superficie.vida.definir(px, py, 0);
-                    }
-                }
                 if (e.aranha.x >> 4) as i32 == px && (e.aranha.y >> 4) as i32 == py {
                     inimigos::matar_aranha(e, c.inimigos);
                 }
@@ -807,23 +807,47 @@ fn inseticida(e: &mut Estado, c: Contexto, plano: i32, sub: u8, x: i32, y: i32) 
                     }
                 }
             }
-            2 | 3 => {
-                let cor = cor_do_plano(plano);
-                let lista = comum::lista_do_ninho(cor);
-                let v = e.ninho(cor).vida.em(px, py).unwrap_or(0);
-                if v != 0 {
-                    let achada = achar_formiga(e, lista, px, py, v);
-                    e.tindex = achada.map_or(-1, |i| i as i32);
-                    if let Some(i) = achada {
-                        e.lista_mut(lista).vagas[i].tipo = 0;
-                        e.ninho_mut(cor).vida.definir(px, py, 0);
-                    }
-                }
-            }
             _ => {}
         }
     }
     efeitos
+}
+
+/// A parte de `_ExpKillAnts` que atinge a formiga da célula (x, y) do plano (já validada): na
+/// superfície, a formiga da lista A vira cadáver (`_DeadAntHere`, que sorteia S); no ninho, a formiga
+/// da lista do ninho some, sem cadáver. A amarela não é atingida. Também é a escrita
+/// `remover_formiga` dos scripts (API de mods 0.26). Devolve se havia formiga.
+pub fn tirar_formiga(e: &mut Estado, plano: i32, x: i32, y: i32) -> bool {
+    match plano {
+        0 | 1 => {
+            if !e.superficie.vida.em(x, y).is_some_and(|v| v != 0) {
+                return false;
+            }
+            let achada = achar_na_lista_a(e, x, y);
+            e.tindex = achada.map_or(-1, |i| i as i32);
+            let Some(i) = achada else { return false };
+            let vermelha = e.superficie.lista.vagas[i].tipo & 0x80 != 0;
+            cadaver_aqui(e, x, y, vermelha);
+            e.superficie.lista.vagas[i].tipo = 0;
+            e.superficie.vida.definir(x, y, 0);
+            true
+        }
+        2 | 3 => {
+            let cor = cor_do_plano(plano);
+            let lista = comum::lista_do_ninho(cor);
+            let v = e.ninho(cor).vida.em(x, y).unwrap_or(0);
+            if v == 0 {
+                return false;
+            }
+            let achada = achar_formiga(e, lista, x, y, v);
+            e.tindex = achada.map_or(-1, |i| i as i32);
+            let Some(i) = achada else { return false };
+            e.lista_mut(lista).vagas[i].tipo = 0;
+            e.ninho_mut(cor).vida.definir(x, y, 0);
+            true
+        }
+        _ => false,
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
