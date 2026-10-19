@@ -50,10 +50,10 @@
   "mapa": {"janela": 1, "objeto_area": "mapTileArea"},
   "_quintal": "Janela do quintal (layout 25, _MapToYard); o contorno vem de data/quintal_mapa.json ('externo').",
   "quintal": 25,
-  "_gerenciador": "Gerenciador de janelas (engine/src/core/gerenciador.rs, docs/spec/telas/janelas.md §8). tamanho_minimo: menor contorno externo de janela com moldura grossa (WM_GETMINMAXINFO, _AdjustWndMinMax): largura 317 medida na bancada (v17), altura [hipótese: a mesma conta com o objeto 0x13 da janela de edição]. Menu de sistema: itens do menu do Windows depois de _win_Open (RemoveMenu/InsertMenu: Close com 'Ctrl+F4' e Next com 'Ctrl+F6', textos do DGROUP em 1048:bda7 e 1048:bdb6); geometria medida em w04 pixel a pixel (item de 18 linhas, separador de 7 com a linha na 4.ª, 149 de largura; texto alinhado à esquerda a 16 da borda, atalho alinhado à esquerda na coluna 88, como o texto depois do tab no Windows 3.1; letra do & sublinhada 2 linhas abaixo do glifo).",
+  "_gerenciador": "Gerenciador de janelas (engine/src/core/gerenciador.rs, docs/spec/telas/janelas.md §8). cor_contorno_arrasto: máscara XOR dos pontos do contorno de arrasto (15 = cor complementar, como o PATINVERT com o pincel cinza do Windows; medido em w02). tamanho_minimo: menor contorno externo de janela com moldura grossa (WM_GETMINMAXINFO, _AdjustWndMinMax): largura 317 medida na bancada (v17), altura [hipótese: a mesma conta com o objeto 0x13 da janela de edição]. Menu de sistema: itens do menu do Windows depois de _win_Open (RemoveMenu/InsertMenu: Close com 'Ctrl+F4' e Next com 'Ctrl+F6', textos do DGROUP em 1048:bda7 e 1048:bdb6); geometria medida em w04 pixel a pixel (item de 18 linhas, separador de 7 com a linha na 4.ª, 149 de largura; texto alinhado à esquerda a 16 da borda, atalho alinhado à esquerda na coluna 88, como o texto depois do tab no Windows 3.1; letra do & sublinhada 2 linhas abaixo do glifo).",
   "gerenciador": {
     "tamanho_minimo": [317, 296],
-    "cor_contorno_arrasto": 7,
+    "cor_contorno_arrasto": 15,
     "cor_seta": 0,
     "menu_sistema": {
       "itens": [
