@@ -206,6 +206,8 @@ Diálogos
 
 ## 4. Falta para concluir (priorizado)
 
+**Feito depois desta revisão (2026-10-18, branch dos balões; detalhes nas specs citadas):** balões "Silly" da janela de edição (anotação no tick, sorteios do redesenho na ordem do original, desenho; sorteios e desenho conferidos na bancada, 100% nas regiões dos balões do ovo e da rainha: `telas/baloes.md`); `_DrawEditGraphs` não desenha nos modos do Windows (`_displayType` 9/10), então não há o que fazer (`telas/baloes.md` §3); quadro da trofalaxia (`_YellowDialog` 9110, 100% na bancada: `telas/mensagens.md` §10); PLACE parando a simulação e repetindo com Shift (`telas/quintal.md` §5.3); `_SpecialXfer` ao vivo, logo depois do tick (a troca dentro do tick continua sendo divergência registrada); comida que cai na casa (`_DropFoodA` com `_DROPdir`, `regras/superficie.md` 8.2, sem caso na bancada); avisos do Experimental na faixa; botões configuráveis da faixa 35; animações da amarela com a ordem real das janelas; segunda metade da rainha amarela na reconstrução da vida. API de mods 0.22.
+
 Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; **G** = uma semana ou mais.
 
 ### Alto impacto para quem joga

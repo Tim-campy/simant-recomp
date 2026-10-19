@@ -43,6 +43,9 @@ pub struct Preferencias {
     /// Função de `_DoUserButton` de cada botão configurável da faixa 34 (`mapuserbutton0`–`7`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub botoes_faixa: Option<Vec<u16>>,
+    /// Os da faixa 35 do quintal (`yarduserbutton0`–`7`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub botoes_quintal: Option<Vec<u16>>,
 }
 
 impl Preferencias {
@@ -95,8 +98,17 @@ impl Preferencias {
         }
     }
 
+    /// Como [`Preferencias::aplicar_botoes`], para os botões da faixa 35.
+    pub fn aplicar_botoes_quintal(&self, funcoes: &mut [u16]) {
+        if let Some(b) = &self.botoes_quintal {
+            for (f, &v) in funcoes.iter_mut().zip(b) {
+                *f = v;
+            }
+        }
+    }
+
     /// O que gravar ao sair: as opções e os botões do momento (`WriteProfileString` de tudo).
-    pub fn do_momento(opcoes: &[i16; 6], funcoes: &[u16]) -> Preferencias {
+    pub fn do_momento(opcoes: &[i16; 6], funcoes: &[u16], funcoes_quintal: &[u16]) -> Preferencias {
         let b = |i: usize| Some(opcoes[i] != 0);
         Preferencias {
             auto_track: b(0),
@@ -106,6 +118,7 @@ impl Preferencias {
             mensagens: b(4),
             silly: b(5),
             botoes_faixa: Some(funcoes.to_vec()),
+            botoes_quintal: (!funcoes_quintal.is_empty()).then(|| funcoes_quintal.to_vec()),
         }
     }
 }
@@ -130,7 +143,7 @@ mod testes {
         let dir = std::env::temp_dir().join(format!("simant_pref_{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let arq = dir.join(ARQUIVO);
-        let p = Preferencias::do_momento(&[1, 0, 1, 0, 1, 0], &[15, 0, 1, 3, 7, 6, 5, 11]);
+        let p = Preferencias::do_momento(&[1, 0, 1, 0, 1, 0], &[15, 0, 1, 3, 7, 6, 5, 11], &[15, 0, 1, 3, 7, 6, 5, 8]);
         p.gravar(&arq).unwrap();
         let lida = Preferencias::ler(&arq);
         assert_eq!(lida, p);

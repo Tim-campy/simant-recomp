@@ -350,6 +350,32 @@ pub struct TelaDeJogo {
     pub valores_faixa: super::barras_faixa::ValoresFaixa,
     /// Camada de feromônio sobreposta à superfície (`_ELayerMode` ≠ −1), copiada do estado.
     camada_edicao: Option<Vec<u8>>,
+    /// Balão "Silly" desenhado no último redesenho (`Baloes::desenhado`), copiado do estado.
+    balao: Option<crate::rules::baloes::Balao>,
+    /// Balões da janela de edição: tabelas, peças e falas (listas do banco), carregados uma vez.
+    baloes: Option<BaloesDaEdicao>,
+}
+
+/// O que o desenho dos balões da janela de edição precisa (docs/spec/telas/baloes.md).
+#[derive(Clone, Debug)]
+struct BaloesDaEdicao {
+    tabelas: crate::rules::baloes::TabelasBaloes,
+    pecas: std::collections::HashMap<String, Vec<String>>,
+    falas: std::collections::HashMap<crate::rules::baloes::Fala, Vec<Vec<u8>>>,
+}
+
+impl BaloesDaEdicao {
+    fn carregar(recursos: &Recursos) -> Result<BaloesDaEdicao, String> {
+        use crate::rules::baloes::{Fala, TabelasBaloes};
+        #[derive(serde::Deserialize)]
+        struct SoPecas {
+            balao_menino: super::quintal_mapa::BalaoMenino,
+        }
+        let tabelas = TabelasBaloes::carregar(recursos)?;
+        let pecas = recursos.dados::<SoPecas>(super::quintal_mapa::ARQUIVO_CONFIG)?.balao_menino.pecas;
+        let falas = Fala::TODAS.iter().map(|&f| (f, super::avisos::linhas_do_texto(recursos, tabelas.fala(f).lista))).collect();
+        Ok(BaloesDaEdicao { tabelas, pecas, falas })
+    }
 }
 
 fn indice_do_plano(p: Plano) -> usize {
@@ -380,6 +406,13 @@ impl TelaDeJogo {
         if plano_de(amarela.plano).is_none() {
             pendencias.push(format!("_MePlane = {}", amarela.plano));
         }
+        let baloes = match BaloesDaEdicao::carregar(recursos) {
+            Ok(b) => Some(b),
+            Err(erro) => {
+                pendencias.push(format!("balões da edição: {erro}"));
+                None
+            }
+        };
         let mapa = |p: Plano| -> Result<Vec<u8>, String> {
             let s = bloco_do_mapa(p);
             let bytes = jogo.bloco(s).ok_or(format!("bloco {s} ausente"))?;
@@ -414,6 +447,8 @@ impl TelaDeJogo {
                 }
             },
             camada_edicao: None,
+            balao: None,
+            baloes,
             bitmaps_da_faixa: Vec::new(),
             titulo: String::new(),
             selecao_da_faixa: Vec::new(),
@@ -433,6 +468,7 @@ impl TelaDeJogo {
             r: e.ninho_r.vida.dados.clone(),
         };
         self.valores_faixa = super::barras_faixa::ValoresFaixa::do_estado(e);
+        self.balao = e.baloes.desenhado;
         // _DoCalcTile: com _ELayerMode 0..4, a superfície mostra o feromônio no lugar do chão.
         let f = &e.feromonios;
         self.camada_edicao = match e.camada_edicao {
@@ -593,9 +629,43 @@ impl TelaDeJogo {
         };
         q.recorte = Some(partes.cliente);
         let r = desenhar_vista(&mut q, vista, &cena, (ax as i32, ay as i32));
+        if r.is_ok() {
+            self.desenhar_balao(&mut q, interface, nav, (ax as i32, ay as i32));
+        }
         q.recorte = None;
         r?;
         Ok((q, pendentes))
+    }
+
+    /// `_DrawBalloons`: o balão escolhido no último redesenho, se a célula do ponto ainda está na vista
+    /// (com ao menos `linhas_acima_minimas` linhas acima), com o canto em (x + dx, y − (altura + dy))
+    /// em pixels do mapa. `origem` = canto da vista na tela.
+    fn desenhar_balao(&self, q: &mut Quadro, interface: &Interface, nav: &Navegacao, origem: (i32, i32)) {
+        let (Some(b), Some(d)) = (self.balao, &self.baloes) else { return };
+        let t = &d.tabelas;
+        let v = &nav.vista;
+        let (cx, cy) = (i32::from(b.x) / LADO as i32, i32::from(b.y) / LADO as i32);
+        let plano = match v.plano {
+            Plano::Superficie => 1,
+            Plano::NinhoPreto => 2,
+            Plano::NinhoVermelho => 3,
+        };
+        let na_vista = i32::from(b.plano) == plano
+            && v.x <= cx
+            && cx < v.x + v.largura
+            && v.y <= cy - i32::from(t.linhas_acima_minimas)
+            && cy < v.y + v.altura;
+        let Some(f) = interface.fontes.get(t.fonte).and_then(|f| f.as_ref()) else { return };
+        let Some(lista) = d.falas.get(&b.fala).filter(|l| !l.is_empty()) else { return };
+        if !na_vista {
+            return;
+        }
+        let texto = &lista[usize::try_from(b.indice).unwrap_or(0) % lista.len()];
+        let forma = super::baloes::FormaBalao::medir(texto, f);
+        let x0 = origem.0 + i32::from(b.x) + i32::from(t.deslocamento[0]) - v.x * LADO as i32;
+        let y0 = origem.1 + i32::from(b.y) - (forma.altura + i32::from(t.deslocamento[1])) - v.y * LADO as i32;
+        let pecas = super::baloes::PecasBalao { pecas: &d.pecas, cor_tinta: t.cor_tinta, cor_fundo: t.cor_fundo };
+        super::baloes::desenhar(q, &forma, f, pecas, x0, y0);
     }
 
     /// Índice do objeto visível da faixa sob o ponto (o último do layout que o contém; 0 se nenhum).

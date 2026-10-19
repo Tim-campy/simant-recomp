@@ -1,5 +1,7 @@
 {
   "_comentario": "Patches da casa (_MakeHousePatch, n = px * 16 + py <= 37). Formas extraídas do SIMANTW.EXE e receitas escritas por tools/extrair_casa.py. Célula (x+i, y+j) de uma forma recebe celulas[j*largura+i]. Operações e ordem dos sorteios: docs/spec/regras/geracao-mundo.md §5. Valores em decimal.",
+  "_direcoes_queda": "_DropFoodA (1020:0d86): passo da comida que cai na casa, tabelas DGROUP 10:22be (dx) e 10:22c2 (dy) indexadas por _DROPdir; somadas sem sinal (sub ah, ah na desmontagem), então 255 não é -1: sai do mapa no primeiro passo.",
+  "direcoes_queda": {"dx": [0, 1, 0, 255], "dy": [255, 0, 1, 0]},
   "formas": {
     "tomada_v": {"largura": 5, "altura": 4, "transparente": false, "celulas": [107, 108, 108, 108, 109, 113, 120, 100, 120, 114, 113, 121, 116, 121, 114, 110, 111, 111, 111, 112]},
     "tomada_h": {"largura": 4, "altura": 5, "transparente": false, "celulas": [107, 108, 108, 109, 113, 118, 119, 114, 113, 100, 100, 114, 113, 118, 119, 114, 110, 111, 111, 112]},

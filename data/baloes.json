@@ -1,0 +1,22 @@
+{
+  "_comentario": "Balões de fala da janela de edição com a opção Silly (_OptionStates[5]): o tick anota onde há luta, descanso, rainha ou ovo à vista (_FightBalloons, _RestBalloons, _QueenBalloons, _EggBalloons); o redesenho da janela de edição (FUN_1010_16d4) sorteia, com prazos em tempo real (_TickCount = GetTickCount / 55), se cada fala aparece (_DrawCurBalloons, e o balão da aranha em _DrawSpider), e desenha só o primeiro balão visível (_DrawBalloons + _MakeBalloon, com as peças 8x8 de quintal_mapa.json balao_menino). Ver docs/spec/telas/baloes.md.",
+  "_origem_falas": "Ordem e listas de _DrawCurBalloons (1010:4cac) e _DrawSpider (1010:1d6a); listas carregadas em _initStuff com _LoadStringAnt(0x4c4, 0x4ce, 0x4d8, 0x4e2, 0x4ec, 0x4ba). espera = constante somada ao prazo; sorteio_espera = K de SRandK somado ao prazo; chance = K de SRandK que liga o balão quando dá 0.",
+  "falas": {
+    "luta_preta": {"lista": 1220, "espera": 60, "sorteio_espera": 32, "chance": 2},
+    "luta_vermelha": {"lista": 1230, "espera": 60, "sorteio_espera": 32, "chance": 2},
+    "ovo": {"lista": 1240, "espera": 170, "sorteio_espera": 32, "chance": 4},
+    "rainha": {"lista": 1250, "espera": 180, "sorteio_espera": 32, "chance": 4},
+    "descanso": {"lista": 1260, "espera": 120, "sorteio_espera": 64, "chance": 2},
+    "aranha": {"lista": 1210, "espera": 180, "sorteio_espera": 64, "chance": 2}
+  },
+  "_origem_aranha": "_DrawSpider: com _SMode diferente do último visto (DGROUP 0x72f4) ou > 4, prazo = SRand(sorteio_troca) + agora + espera_troca e o balão desliga; a fala é a entrada _SMode × falas_por_modo + índice da lista 1210 (índice volta a 0 depois de falas_por_modo − 1). Posição: (_SpidX, _SpidY) + 8 × (_Dx8, _Dy8)[_SpidDir], em pixels do mapa; só na superfície (plano 1).",
+  "aranha": {"espera_troca": 30, "sorteio_troca": 32, "falas_por_modo": 5, "modo_maximo": 4, "plano": 1, "passo": 8},
+  "_origem_geometria": "_AddMsgBalloon/_DrawCurBalloons guardam a célula × 16 + 8; _DrawBalloons põe o canto do balão em (x + 4, y − (altura + 4)) e só desenha se a célula do ponto está na vista com ao menos linhas_acima_minimas linhas acima (_BalloonIsVisible: y − 3 ≥ _MapPnt.y). maximo = 6 pedidos por redesenho (_CurBalloonCnt < 6). fonte = _font_SetFont(2).",
+  "maximo": 6,
+  "linhas_acima_minimas": 3,
+  "meio_da_celula": 8,
+  "deslocamento": [4, 4],
+  "fonte": 2,
+  "cor_tinta": 0,
+  "cor_fundo": 15
+}

@@ -559,10 +559,10 @@ pub fn pegar_comida_superficie(e: &mut Estado, x: i32, y: i32) {
 /// `_DropFoodA(x, y)` (`1020:0d86`, superficie.md 8.2): uma unidade de comida na célula; `false` se
 /// não coube.
 ///
-/// [lacuna] Na casa, um tile 0x27–0x3F faria a comida "cair" pela tabela `10:22be/22c2` (indexada por
-/// `_DROPdir`, que não está no estado do port): aqui a comida some e a função devolve sucesso, como o
-/// original devolveria depois da queda. Os tiles 4–7 (também "cair" no original) devolvem falha. A
-/// aranha morta ignora o resultado; a amarela o usa para saber se largou a carga.
+/// Na casa, um tile 4–7 ou 0x27–0x3F faz a comida **cair** (superficie.md 8.2): a partir da célula,
+/// anda o passo `e.passo_queda` (somado sem sinal) até achar chão livre (tile < 4), onde a comida
+/// fica, ou sair do mapa (a comida some); devolve sucesso nos dois casos. A aranha morta ignora o
+/// resultado; a amarela o usa para saber se largou a carga.
 pub fn largar_comida_superficie(e: &mut Estado, x: i32, y: i32) -> bool {
     let Some(v) = e.superficie.mapa.em(x, y) else { return false };
     let novo = if em_casa(e) {
@@ -570,7 +570,10 @@ pub fn largar_comida_superficie(e: &mut Estado, x: i32, y: i32) -> bool {
             0..=3 => (v + 6) * 4,
             8..=0x17 => (((v - 8) >> 2) + 6) * 4,
             0x18..=0x26 => v + 1,
-            0x27..=0x3F => return true,
+            4..=7 | 0x27..=0x3F => {
+                comida_cai(e, x, y);
+                return true;
+            }
             _ => return false,
         }
     } else {
@@ -586,6 +589,24 @@ pub fn largar_comida_superficie(e: &mut Estado, x: i32, y: i32) -> bool {
     e.superficie.mapa.definir(x, y, novo);
     e.ambiente.comida_superficie += 1;
     true
+}
+
+/// A queda de `_DropFoodA`: célula a célula no passo de `_DROPdir`, a primeira com tile < 4 recebe a
+/// comida (`(v + 6) × 4`, `_FoodA += 1`); para no mapa ou fora dele.
+fn comida_cai(e: &mut Estado, mut x: i32, mut y: i32) {
+    let (dx, dy) = (i32::from(e.passo_queda.0), i32::from(e.passo_queda.1));
+    loop {
+        if let Some(v) = e.superficie.mapa.em(x, y).filter(|&v| v < 4) {
+            e.superficie.mapa.definir(x, y, (v + 6) * 4);
+            e.ambiente.comida_superficie += 1;
+            return;
+        }
+        x += dx;
+        y += dy;
+        if !(0..=0x7F).contains(&x) || !(0..=0x3F).contains(&y) {
+            return;
+        }
+    }
 }
 
 /// Modo Defense (formigas.md §5).
@@ -1138,6 +1159,34 @@ pub fn novo_buraco<T: Terreno + ?Sized, D: Direcoes + ?Sized>(t: &mut T, dirs: &
 #[cfg(test)]
 mod testes {
     use super::*;
+
+    #[test]
+    fn comida_cai_na_casa_pelo_dropdir() {
+        let mut e = Estado::vazio();
+        e.ambiente.terreno = 1;
+        for y in 0..64 {
+            e.superficie.mapa.definir(10, y, 0x30);
+        }
+        e.superficie.mapa.definir(10, 14, 2);
+        // _DROPdir 2 (para baixo): a comida cai até a primeira célula livre.
+        e.passo_queda = (0, 1);
+        assert!(largar_comida_superficie(&mut e, 10, 10));
+        assert_eq!(e.superficie.mapa.em(10, 14), Some((2 + 6) * 4));
+        assert_eq!(e.ambiente.comida_superficie, 1);
+        // _DROPdir 0 (dy = 255, somado sem sinal): sai do mapa no primeiro passo; a comida some.
+        e.passo_queda = (0, 255);
+        e.superficie.mapa.definir(10, 9, 1);
+        assert!(largar_comida_superficie(&mut e, 10, 10));
+        assert_eq!(e.superficie.mapa.em(10, 9), Some(1));
+        assert_eq!(e.ambiente.comida_superficie, 1);
+        // Tiles 4–7 também fazem cair.
+        e.passo_queda = (1, 0);
+        e.superficie.mapa.definir(20, 5, 5);
+        e.superficie.mapa.definir(22, 5, 0);
+        e.superficie.mapa.definir(21, 5, 0x30);
+        assert!(largar_comida_superficie(&mut e, 20, 5));
+        assert_eq!(e.superficie.mapa.em(22, 5), Some(24));
+    }
 
     struct D8;
     impl Direcoes for D8 {

@@ -163,6 +163,10 @@ pub struct ConfigPartida {
     /// Espera de `_processEdit` no clique simples, em unidades de `_TickCount` (6).
     pub espera_clique_simples_tickcount: u64,
     pub botoes_usuario: BotoesUsuario,
+    /// Botões configuráveis da faixa 35 (`ribUserDef2A`–`2H`, tabela `1048:0022`). Opcional (API
+    /// 0.22): sem ele, a faixa do quintal não tem botões configuráveis.
+    #[serde(default)]
+    pub botoes_usuario_quintal: Option<BotoesUsuario>,
     pub marcadores: ConfigMarcadores,
 }
 
@@ -259,6 +263,8 @@ pub struct Partida {
     pub marcadores: [Option<(i16, i32, i32)>; 7],
     /// Função de cada botão configurável da faixa (`1048:0012`), trocada pelo menu de ícones.
     pub funcoes_botoes: Vec<u16>,
+    /// Os da faixa 35 (`_yardUserButton`, `1048:0022`).
+    pub funcoes_botoes_quintal: Vec<u16>,
     /// `_showTrails` (botão 4): trilhas na janela do mapa — os rastros das formigas acumulados, não
     /// o feromônio (telas/mapa.md §2.6).
     pub mostrar_trilhas: bool,
@@ -268,6 +274,11 @@ pub struct Partida {
     pub janelas_desenho: JanelasDesenho,
     /// Contadores de `MYTIMERFUNC`/`_UpdateWindows` (fora do save).
     pub contadores_redesenho: ContadoresRedesenho,
+    /// `_SpecialXfer` pedido pelo tick e ainda não escolhido (a simulação fica parada).
+    pub escolher_colonia: bool,
+    /// A interface está num laço modal do original que para a simulação (`_StopSimulation`), como o
+    /// PLACE esperando o clique (`_PlaceQueenInYard`).
+    pub parada_pela_interface: bool,
     /// Efeito do último Mystery (para a interface escrever).
     pub ultimo_misterio: Option<crate::rules::misterio::EfeitoMisterio>,
     /// Scripts Lua dos mods (docs/api-mods.md, "Scripts Lua"). `None`: nenhum mod com script, e o
@@ -329,10 +340,13 @@ impl Partida {
             pausar_ao_fechar: false,
             marcadores: [None; 7],
             funcoes_botoes: Vec::new(),
+            funcoes_botoes_quintal: Vec::new(),
             mostrar_trilhas: false,
             janelas_desenho: JanelasDesenho { ativa: true, edicao_aberta: true, edicao_na_frente: true, ..Default::default() },
             contadores_redesenho: ContadoresRedesenho::default(),
             ultimo_misterio: None,
+            escolher_colonia: false,
+            parada_pela_interface: false,
             scripts: None,
             registro_scripts: Vec::new(),
             tabelas_trapaca: TabelasTrapaca::padrao().clone(),
@@ -344,6 +358,7 @@ impl Partida {
             avanco_rapido: false,
         };
         p.funcoes_botoes = p.cfg.botoes_usuario.funcoes.clone();
+        p.funcoes_botoes_quintal = p.cfg.botoes_usuario_quintal.as_ref().map(|b| b.funcoes.clone()).unwrap_or_default();
         p.vistas_para_estado();
         p
     }
@@ -397,11 +412,16 @@ impl Partida {
             self.resto_ms = 0;
             return Avanco::default();
         }
+        let sobreposta = self.avisos.sobreposta_visivel();
         if self.avisos.passar_tempo(self.agora()).is_some() {
             self.redesenhar = true;
             self.depois_de_fechar();
         }
-        if self.avisos.tem_modal() {
+        self.redesenhar |= sobreposta != self.avisos.sobreposta_visivel();
+        for id in self.avisos.retirar_sons() {
+            self.eventos.push_back(Evento::Som(id));
+        }
+        if self.avisos.tem_modal() || self.escolher_colonia || self.parada_pela_interface {
             self.resto_ms = 0;
             self.laco = LacoTimer::default();
             return Avanco::default();
@@ -518,8 +538,11 @@ impl Partida {
         let v = &self.nav.vista;
         let aranha = desenho::aranha_visivel(&self.estado, self.nav.plano_mapa, v.x, v.y, v.largura, v.altura);
         let som_cortador = self.regras.quintal.sons.cortador;
-        let janelas = JanelasDesenho { ativa: self.ativo, aranha_visivel: aranha, som_cortador, ..self.janelas_desenho };
-        desenho::redesenho_do_timer(&mut self.estado, &janelas, &mut self.contadores_redesenho);
+        let tick_count = (self.ms_total / 55) as u32;
+        let janelas = JanelasDesenho { ativa: self.ativo, aranha_visivel: aranha, som_cortador, tick_count, ..self.janelas_desenho };
+        let r = &self.regras;
+        let tabelas = desenho::TabelasDesenho { baloes: &r.baloes, d8: (&r.inimigos.dx8, &r.inimigos.dy8) };
+        desenho::redesenho_do_timer(&mut self.estado, &janelas, &mut self.contadores_redesenho, &tabelas);
         // _UpdateWindows: em fast/ultra o mapa só é redesenhado a cada 2/4 ticks; sem foco, a cada 8.
         self.contador_mapa = self.contador_mapa.wrapping_add(1);
         self.quadros += 1;
@@ -613,6 +636,7 @@ impl Partida {
         }
         e.vistas.plano = n.plano_mapa;
         e.vistas.ponto = (n.vista.x as i16, n.vista.y as i16);
+        e.baloes.vista = (n.vista.largura as i16, n.vista.altura as i16);
         e.vistas.ponto_quintal = par(n.pontos[0]);
         e.vistas.ponto_superficie = par(n.pontos[1]);
         e.preta.vista_ninho = par(n.pontos[2]);
@@ -660,9 +684,24 @@ impl Partida {
                     use super::avisos::TextoFaixa;
                     let agora = self.agora();
                     let opcao = self.estado.partida.opcoes[4] != 0;
-                    let texto = TextoFaixa::Lista { lista: m.lista, indice: m.indice as usize };
-                    self.avisos.editar(Some(texto), Some(u32::from(m.duracao)), m.importante, opcao, agora);
+                    // Lista 0: limpar (`_EditMessage(0, …)`); duração 0xFFFE: permanente.
+                    let texto = (m.lista != 0).then_some(TextoFaixa::Lista { lista: m.lista, indice: m.indice as usize });
+                    let duracao = (m.duracao != 0xFFFE && m.lista != 0).then_some(u32::from(m.duracao));
+                    self.avisos.editar(texto, duracao, m.importante, opcao, agora);
                     self.redesenhar = true;
+                }
+                Evento::EscolherColonia => {
+                    // _SpecialXfer: a interface abre o quintal e espera o clique numa colônia, depois
+                    // do quadro 10058; a simulação fica parada até lá.
+                    self.escolher_colonia = true;
+                    self.eventos.push_back(ev);
+                }
+                Evento::QuadroAmarela(imagem) => {
+                    // _YellowDialog: só com Options → Events (_OptionStates[3]).
+                    if self.estado.partida.opcoes[3] != 0 {
+                        self.avisos.receber_quadro_amarela(imagem);
+                    }
+                    self.eventos.push_back(ev);
                 }
                 Evento::Mensagem(id) => {
                     let licoes = &self.regras.quintal.conselhos.licoes;
@@ -1071,30 +1110,57 @@ impl Partida {
         ok
     }
 
-    /// Função do botão configurável com esse nome de objeto.
-    pub fn funcao_do_botao(&self, objeto: &str) -> Option<u16> {
-        let b = &self.cfg.botoes_usuario;
-        b.objetos.iter().position(|o| o == objeto).and_then(|i| self.funcoes_botoes.get(i).copied())
+    /// (faixa, índice) do botão configurável com esse nome de objeto: faixa 0 = 34, 1 = 35.
+    fn botao_configuravel(&self, objeto: &str) -> Option<(usize, usize)> {
+        if let Some(i) = self.cfg.botoes_usuario.objetos.iter().position(|o| o == objeto) {
+            return Some((0, i));
+        }
+        let q = self.cfg.botoes_usuario_quintal.as_ref()?;
+        q.objetos.iter().position(|o| o == objeto).map(|i| (1, i))
     }
 
-    /// Menu de ícones: troca a função do botão (`_SetUserButton`).
-    pub fn definir_funcao_do_botao(&mut self, objeto: &str, f: u16) {
-        if let Some(i) = self.cfg.botoes_usuario.objetos.iter().position(|o| o == objeto) {
-            if let Some(v) = self.funcoes_botoes.get_mut(i) {
+    fn funcoes_da_faixa(&mut self, faixa: usize) -> &mut Vec<u16> {
+        if faixa == 0 {
+            &mut self.funcoes_botoes
+        } else {
+            &mut self.funcoes_botoes_quintal
+        }
+    }
+
+    /// Função do botão configurável com esse nome de objeto (faixa 34 ou 35).
+    pub fn funcao_do_botao(&self, objeto: &str) -> Option<u16> {
+        let (faixa, i) = self.botao_configuravel(objeto)?;
+        if faixa == 0 { self.funcoes_botoes.get(i) } else { self.funcoes_botoes_quintal.get(i) }.copied()
+    }
+
+    /// Menu de ícones: troca a função do botão (`_SetUserButton`). Com `so_este` (Shift apertado), só
+    /// este; senão também o botão de mesmo índice da outra faixa (`_DoUserButton`, `1000:04c4`).
+    pub fn definir_funcao_do_botao(&mut self, objeto: &str, f: u16, so_este: bool) {
+        let Some((faixa, i)) = self.botao_configuravel(objeto) else { return };
+        let faixas: &[usize] = if so_este { &[faixa] } else { &[0, 1] };
+        for &k in faixas {
+            if let Some(v) = self.funcoes_da_faixa(k).get_mut(i) {
                 *v = f;
-                self.redesenhar = true;
             }
         }
+        self.redesenhar = true;
     }
 
     /// Estado desenhado dos botões configuráveis (`_SetUserButton`/`_UpdateUserButtons`): nome,
     /// bitmaps (selecionado, normal) da função e, nos botões de alternar, se estão ligados.
     pub fn estado_dos_botoes(&self) -> Vec<(String, u16, u16, Option<bool>)> {
-        let b = &self.cfg.botoes_usuario;
+        let mut v = self.estado_dos_botoes_de(&self.cfg.botoes_usuario, &self.funcoes_botoes);
+        if let Some(q) = &self.cfg.botoes_usuario_quintal {
+            v.extend(self.estado_dos_botoes_de(q, &self.funcoes_botoes_quintal));
+        }
+        v
+    }
+
+    fn estado_dos_botoes_de(&self, b: &BotoesUsuario, funcoes: &[u16]) -> Vec<(String, u16, u16, Option<bool>)> {
         let p = &self.estado.partida;
         b.objetos
             .iter()
-            .zip(&self.funcoes_botoes)
+            .zip(funcoes)
             .map(|(nome, &f)| {
                 let ligado = match f {
                     4 => Some(self.mostrar_trilhas),

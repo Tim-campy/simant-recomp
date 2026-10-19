@@ -80,7 +80,7 @@ Um byte por célula, no mesmo índice do mapa de chão (`x × 64 + y`): 0 = vazi
 
 - Só age se (x, y) estiver dentro do mapa do plano (planos 0 e 1: 128 × 64; 2 e 3: 64 × 64).
 - Grava o valor (0xFF) em `_LifeA` (planos 0 e 1), `_LifeB` (2) ou `_LifeR` (3), por cima do que as listas deixaram.
-- Se `_MeType = 0x60` (rainha), grava também a segunda metade (0xFE) na célula vizinha, deslocada por uma tabela de direções indexada por `_MeDir ^ 4`. **A tabela não foi localizada** (o pseudocódigo mostra só o endereço relativo) [em aberto; provavelmente `_Dx8/_Dy8`, que as regras da amarela já usam para a cauda (`rules/amarela.rs`, `cauda`), hipótese]; a reconstrução do port (`core/vida.rs`) ainda não grava essa metade.
+- Se `_MeType = 0x60` (rainha), grava também a segunda metade (0xFE) em `(x + _Dx8[_MeDir ^ 4], y + _Dy8[_MeDir ^ 4])`: `_SetMyLife` (`1020:6536`) lê `*(char *)(dir ^ 4)` e `((char *)(dir ^ 4))[8]`, que são `_Dx8` (DS:0) e `_Dy8` (DS:8) — a mesma tabela da cauda nas regras (`rules/amarela.rs`, `cauda`) [código: pseudocódigo, com os endereços DS:0 e DS:8 conferidos na tabela de símbolos; sem captura de uma rainha amarela]. A reconstrução do port (`core/vida.rs`) grava essa metade desde 2026-10-18.
 - Nos ninhos, `_SetLife` com valor > 0 em célula de terra (`_IsItDirt`) ou de grama (0x1C a 0x1F) escava o tile (`_DigMyTile`) e toca um som [código]. Isso não muda a camada de vida e não ocorre no `QUICK2.ANT` (a formiga está num túnel); o port não reproduz a escavação ao carregar [hipótese: caso raro].
 
 No `QUICK2.ANT`, `_MeMode = 0` e a formiga amarela está em (34, 9) do ninho preto, a mesma célula da rainha preta (T = 102) e de um ovo. Resultado em `_LifeB`: (34, 9) = 0xFF, (35, 9) = 110 (metade da rainha), (36, 9) = 1 (ovo) [save + código].
@@ -102,7 +102,7 @@ A célula é o tile de chão e, por cima, o tile de vida com o índice 13 transp
 
 ## Desenho da janela de edição
 
-`FUN_1010_16d4` (`1010:16d4`) desenha as `_editWidth × _editHeight` células no buffer `_editBuf`, linha a linha; `_win_DrawEditWindow` (`1010:14f0`) copia o buffer para a tela no canto do `editTileArea` [código]. Cada célula (col, lin) vem de `FUN_1010_6250`: célula do mapa `(_MapPnt.x + col, _MapPnt.y + lin)`; se y passar de 63, soma 64 a x e faz `y &= 63` (com os limites, só aconteceria com `_editHeight > 64`) [código]. Por cima do mapa vêm a aranha e os balões (`_DrawSpider`, `_DrawBalloons`) e os gráficos de saúde (`_DrawEditGraphs`), ainda não especificados.
+`FUN_1010_16d4` (`1010:16d4`) desenha as `_editWidth × _editHeight` células no buffer `_editBuf`, linha a linha; `_win_DrawEditWindow` (`1010:14f0`) copia o buffer para a tela no canto do `editTileArea` [código]. Cada célula (col, lin) vem de `FUN_1010_6250`: célula do mapa `(_MapPnt.x + col, _MapPnt.y + lin)`; se y passar de 63, soma 64 a x e faz `y &= 63` (com os limites, só aconteceria com `_editHeight > 64`) [código]. Por cima do mapa vêm a aranha e os balões (`_DrawSpider`, `_DrawBalloons`; balões em [baloes.md](baloes.md)). Os gráficos de saúde (`_DrawEditGraphs`) não são desenhados nos modos do Windows (`_displayType` 9 e 10; baloes.md §3).
 
 ### Faixa
 

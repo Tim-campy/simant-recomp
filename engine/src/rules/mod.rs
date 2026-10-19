@@ -2,6 +2,7 @@
 //! Especificação em docs/spec/regras/.
 
 pub mod amarela;
+pub mod baloes;
 pub mod casa;
 pub mod comum;
 pub mod conselhos;

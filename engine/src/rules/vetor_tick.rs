@@ -745,14 +745,7 @@ pub fn aplicar_acao(
 /// `_ColonyUpdateFlag = 1`), `_SetMapPlane(0)` (`_OldMapPlane`, `_MapPlane = 0`, `_YMapPnt` = patch
 /// atual) e grava `_YMapPnt` = escolhido.
 pub fn transferencia_especial(e: &mut Estado, x: i16, y: i16) {
-    let (cx, cy) = e.ambiente.patch;
-    e.preta.populacao_quintal.0[(cx * 16 + cy) as usize] = 0;
-    e.vistas.modo_quintal = 2;
-    e.ambiente.atualizar_colonias = 1;
-    // `_SetMapPlane(0)`: plano e modo do mapa 0. Na bancada `_OldMapPlane` terminou como estava (0),
-    // e não com o plano anterior [em aberto: quem o repõe].
-    e.vistas.plano = 0;
-    e.vistas.modo_mapa = 0;
+    super::troca_patch::iniciar_transferencia_especial(e);
     e.vistas.ponto_quintal = (x, y);
 }
 
@@ -863,7 +856,7 @@ pub fn rodar_sequencia(dir: &Path, layout: &LayoutSave, regras: &mut dyn Regras)
         }
         if let (Some(m), Some((proximo, _))) = (desenho, extras.get(k + 1)) {
             e.vistas.modo_quintal = m;
-            passos_desenho.0 += u64::from(super::desenho::redesenho_do_timer(&mut e, &janelas, &mut contadores));
+            passos_desenho.0 += u64::from(super::desenho::redesenho_do_timer(&mut e, &janelas, &mut contadores, &super::desenho::TabelasDesenho::padrao()));
             passos_desenho.1 += u64::from(passos_entre(depois.semente_s, proximo.semente_s).unwrap_or(u32::MAX));
             if primeiro_desenho_diferente.is_none() && e.s.semente() != proximo.semente_s {
                 primeiro_desenho_diferente = Some(k + 1);

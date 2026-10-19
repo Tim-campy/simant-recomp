@@ -138,7 +138,7 @@ Para limitar a faixa plausível numa máquina real, a velocidade da CPU emulada 
 |---|---|---|
 | 1 | `_Cycle` (`9:75fc`) += 1; se passar de 0x1000, volta a 0 | todo tick (o ciclo tem 4097 valores) |
 | 2 | `_GameTime` (`9:76a8`, 32 bits) += 1 | todo tick |
-| 3 | zera contadores de balões de texto (luta/descanso/rainha/ovo) | só se `_OptionStates[5]` (`8:85fc`) == 1 ([hipótese] opção "balões de fala"; a mesma flag liga `_FightBalloons`/`_RestBalloons`) |
+| 3 | zera contadores de balões de texto (luta/descanso/rainha/ovo) e os últimos pontos (−1) | só se `_OptionStates[5]` (`8:85fc`, Options → Silly) == 1; a mesma opção liga `_FightBalloons`/`_RestBalloons`/`_QueenBalloons`/`_EggBalloons` (telas/baloes.md) |
 | 4 | **alimentação** (corpo de `_FeedAnts`): `_HealthB` −1 (se não `_AlwaysHealthy`), `_HealthR` −1, mínimo 0; se o jogo não é Experimental (`_CurGameType` ≠ 3) e `_FoodA` < `_NextFeed`: `_AddFood(150, 1)` e `_NextFeed = SRand1(50) + 1` | `_Cycle & 0x3F == 0` (a cada 64 ticks) |
 | 5 | **manutenção em 4 fases** (corpo de `_DoSmells`), fase = `(_Cycle & 0x60) >> 5`: | `_Cycle & 0x1F == 0` (a cada 32 ticks; cada fase a cada 128) |
 | 5a | fase 0: `_CompactListA`, depois `_FullCount` (= `_CountAnts` + `_Feedback`), `_HistUpdate`, `_SmoothAlarm` | `_Cycle mod 128 == 0` |

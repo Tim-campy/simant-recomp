@@ -361,8 +361,10 @@ pub struct JanelaQuintal {
     /// A faixa 35 está no lugar da 34: o quintal foi a última ativada entre ele e a janela de edição
     /// (`WM_NCACTIVATE`, janelas.md §8). A ordem das janelas é do gerenciador.
     pub na_frente: bool,
-    /// Esperando o clique do PLACE.
+    /// Esperando o clique do PLACE (`_PlaceQueenInYard`; a simulação fica parada).
     pub colocando_rainha: bool,
+    /// Esperando o clique numa colônia preta (`_SpecialXfer`).
+    pub escolhendo_colonia: bool,
 }
 
 /// O que um clique na janela do quintal causou (para o terminal/registro).
@@ -373,26 +375,27 @@ pub enum RespostaQuintal {
     Escolheu(i16, i16),
     Troca(ResultadoTroca),
     Rainha(ResultadoRainha),
+    Colonia(troca_patch::ResultadoColonia),
 }
 
 impl JanelaQuintal {
     /// Aplica uma ação: modos, abrir/fechar, PLACE e Automatic/Manual.
     pub fn aplicar(&mut self, a: AcaoQuintal, e: &mut Estado) {
-        let modo = &mut e.vistas.modo_quintal;
+        let modo = e.vistas.modo_quintal;
         let novo = match a {
             AcaoQuintal::Abrir => None,
             AcaoQuintal::Fechar | AcaoQuintal::ParaMapa => {
                 *self = JanelaQuintal::default();
                 return;
             }
-            AcaoQuintal::AlternarCasa => Some(if *modo < 2 { *modo ^ 1 } else { 0 }),
+            AcaoQuintal::AlternarCasa => Some(if modo < 2 { modo ^ 1 } else { 0 }),
             AcaoQuintal::ModoQuintal => Some(0),
             AcaoQuintal::ModoCasa => Some(1),
             AcaoQuintal::ModoEstrategico => Some(2),
             AcaoQuintal::ModoGrafico => Some(3),
             AcaoQuintal::ColocarRainha => {
                 // _PlaceQueenInYard: sem rainhas guardadas, só a mensagem (som de erro).
-                self.colocando_rainha = e.preta.rainhas_guardadas >= 1;
+                self.colocando_rainha = troca_patch::iniciar_colocacao(e);
                 None
             }
             AcaoQuintal::RainhasAutomatico => {
@@ -407,7 +410,7 @@ impl JanelaQuintal {
             AcaoQuintal::Revoada => return,
         };
         if let Some(m) = novo {
-            *modo = m;
+            e.vistas.modo_quintal = m;
         }
         self.aberta = true;
         self.na_frente = true;
@@ -416,7 +419,42 @@ impl JanelaQuintal {
 
 /// Um clique esquerdo (simples ou duplo) na área cliente da janela do quintal, com a partida:
 /// PLACE pendente coloca a rainha; senão escolhe o patch e, no duplo clique, troca (`_XferPatch`).
-pub fn clicar(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Partida, x: i32, y: i32, duplo: bool) -> Result<RespostaQuintal, String> {
+/// Com o PLACE, Shift apertado no clique repete o laço (outra rainha, ou outra tentativa).
+pub fn clicar(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Partida, x: i32, y: i32, duplo: bool, shift: bool) -> Result<RespostaQuintal, String> {
+    let r = clicar_sem_parada(j, cfg, p, x, y, duplo, shift);
+    p.parada_pela_interface = j.colocando_rainha;
+    r
+}
+
+/// `_SpecialXfer` pedido pelo tick: começa a escolha (o quintal na Strategic View, a mensagem) e
+/// devolve se começou. Quem chama abre o quintal na frente.
+pub fn iniciar_escolha_de_colonia(j: &mut JanelaQuintal, p: &mut Partida) -> bool {
+    if !p.escolher_colonia || j.escolhendo_colonia || p.avisos.tem_modal() {
+        return false;
+    }
+    troca_patch::iniciar_transferencia_especial(&mut p.estado);
+    p.nav.plano_mapa = 0;
+    j.escolhendo_colonia = true;
+    j.colocando_rainha = false;
+    j.aberta = true;
+    j.na_frente = true;
+    p.processar_eventos_do_estado();
+    true
+}
+
+/// Fim de um laço modal do quintal sem clique (o quintal deixou de ser a janela da frente): limpa a
+/// faixa e a simulação volta (`_PlaceQueenInYard`). A escolha do `_SpecialXfer` não tem saída.
+pub fn cancelar_colocacao(j: &mut JanelaQuintal, p: &mut Partida) {
+    if j.colocando_rainha {
+        j.colocando_rainha = false;
+        troca_patch::limpar_faixa(&mut p.estado);
+        p.processar_eventos_do_estado();
+    }
+    p.parada_pela_interface = false;
+}
+
+#[allow(clippy::too_many_arguments)]
+fn clicar_sem_parada(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Partida, x: i32, y: i32, duplo: bool, shift: bool) -> Result<RespostaQuintal, String> {
     j.na_frente = true;
     let Some((px, py)) = cfg.patch_em(x, y) else {
         return Ok(RespostaQuintal::Nada);
@@ -425,9 +463,25 @@ pub fn clicar(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Partida, x
     // o PLACE também chega aqui, dentro ou fora do alcance (bancada: acoes/place e place_fora).
     p.nav.pontos[0] = (i32::from(px), i32::from(py));
     p.estado.vistas.ponto_quintal = (px, py);
+    if j.escolhendo_colonia {
+        let geracao = p.regras.geracao.as_ref().ok_or("tabelas de geração não carregadas (troca de patch)")?;
+        let r = troca_patch::escolher_colonia(&mut p.estado, geracao, &p.cfg_simulacao, px, py)?;
+        if let troca_patch::ResultadoColonia::Trocou(t) = r {
+            j.escolhendo_colonia = false;
+            p.escolher_colonia = false;
+            if let ResultadoTroca::Trocou { .. } = t {
+                let e = &p.estado;
+                let par = |(x, y): (i16, i16)| (i32::from(x), i32::from(y));
+                p.nav.pontos = [par(e.vistas.ponto_quintal), par(e.vistas.ponto_superficie), par(e.preta.vista_ninho), par(e.vermelha.vista_ninho)];
+                p.estado.pedir_centralizar_na_amarela();
+            }
+        }
+        p.processar_eventos_do_estado();
+        return Ok(RespostaQuintal::Colonia(r));
+    }
     if j.colocando_rainha {
-        j.colocando_rainha = false;
         let r = troca_patch::colocar_rainha(&mut p.estado, px, py);
+        j.colocando_rainha = troca_patch::continuar_colocacao(&mut p.estado, r, shift);
         p.processar_eventos_do_estado();
         return Ok(RespostaQuintal::Rainha(r));
     }
@@ -589,70 +643,14 @@ impl DesenhoQuintal {
         let fala = usize::try_from(m.mensagem_offset).ok().and_then(|i| self.falas_menino.get(i));
         let (Some(f), Some(texto)) = (fonte, fala) else { return };
         let b = &self.cfg.balao_menino;
-        // Linhas separadas pelos dois caracteres '\' 'n'.
-        let mut linhas: Vec<&[u8]> = Vec::new();
-        let mut resto: &[u8] = texto;
-        while let Some(p) = resto.windows(2).position(|w| w == b"\\n") {
-            linhas.push(&resto[..p]);
-            resto = &resto[p + 2..];
-        }
-        linhas.push(resto);
-        let largura_texto = linhas.iter().map(|l| f.largura_texto(l) as i32).max().unwrap_or(0);
-        let colunas = ((largura_texto + 23) >> 3).max(3);
-        let fh = f.altura() as i32;
-        let n = linhas.len() as i32;
-        let y_baixo = fh * n + 6;
-        let altura = fh * n + 15 - i32::from(n <= 1);
+        let forma = super::baloes::FormaBalao::medir(texto, f);
         let (dx, _) = self.cfg.sprites.menino.deslocamento(m.quadro);
         let (ox, oy) = self.cfg.origem();
         let x0 = ox + i32::from(m.x + dx) + i32::from(b.dx);
-        let y0 = oy + i32::from(m.y) + i32::from(b.dy) - altura;
+        let y0 = oy + i32::from(m.y) + i32::from(b.dy) - forma.altura;
         let antes = q.recorte.replace(self.cfg.cliente());
-        let peca = |q: &mut Quadro, nome: &str, coluna: i32, py: i32| {
-            let Some(linhas) = b.pecas.get(nome) else { return };
-            for (j, l) in linhas.iter().enumerate() {
-                for (i, c) in l.bytes().enumerate() {
-                    let cor = match c {
-                        b'#' => b.cor_tinta,
-                        b'o' => b.cor_fundo,
-                        _ => continue,
-                    };
-                    q.ponto(x0 + coluna * 8 + i as i32, y0 + py + j as i32, cor);
-                }
-            }
-        };
-        peca(q, "canto_sup_esq", 0, 0);
-        for c in 1..colunas - 1 {
-            peca(q, "borda_cima", c, 0);
-        }
-        peca(q, "canto_sup_dir", colunas - 1, 0);
-        let mut y = 8;
-        while y < y_baixo {
-            peca(q, "borda_esq", 0, y);
-            for c in 1..colunas - 1 {
-                peca(q, "centro", c, y);
-            }
-            peca(q, "borda_dir", colunas - 1, y);
-            y += 8;
-        }
-        peca(q, "canto_inf_esq", 0, y_baixo);
-        for c in 1..colunas - 1 {
-            peca(q, "borda_baixo", c, y_baixo);
-        }
-        peca(q, "canto_inf_dir", colunas - 1, y_baixo);
-        peca(q, "cunha_esq", 1, y_baixo);
-        for (i, l) in linhas.iter().enumerate() {
-            let img = f.imagem(l);
-            let tx = x0 + (colunas * 8 - img.largura as i32) / 2;
-            let ty = y0 + fh * i as i32 + 6;
-            for j in 0..img.altura {
-                for k in 0..img.largura {
-                    if img.bits[j * img.largura + k] {
-                        q.ponto(tx + k as i32, ty + j as i32, b.cor_tinta);
-                    }
-                }
-            }
-        }
+        let pecas = super::baloes::PecasBalao { pecas: &b.pecas, cor_tinta: b.cor_tinta, cor_fundo: b.cor_fundo };
+        super::baloes::desenhar(q, &forma, f, pecas, x0, y0);
         q.recorte = antes;
     }
 
@@ -782,8 +780,10 @@ impl DesenhoQuintal {
         }
     }
 
-    /// Desenha a faixa 35 no lugar da 34, com o botão do modo e Automatic/Manual selecionados.
-    pub fn desenhar_faixa(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, e: &Estado) -> Vec<String> {
+    /// Desenha a faixa 35 no lugar da 34, com o botão do modo e Automatic/Manual selecionados e os
+    /// botões configuráveis (`botoes`: nome, bitmaps selecionado/normal e se está ligado, de
+    /// `Partida::estado_dos_botoes`).
+    pub fn desenhar_faixa(&self, q: &mut Quadro, recursos: &Recursos, interface: &Interface, e: &Estado, botoes: &[(String, u16, u16, Option<bool>)]) -> Vec<String> {
         let c = &self.cfg;
         let f = &interface.moldura.faixa;
         q.preencher(Retangulo { esq: 0, topo: 0, dir: q.largura as i16, base: f.altura }, f.fundo, f.fundo);
@@ -792,6 +792,16 @@ impl DesenhoQuintal {
         let rainha = if e.controles.modo_por_rainha == 1 { 0 } else { 1 };
         let grupos: [(&[String], &str); 2] = [(&c.botao_do_modo, &c.botao_do_modo[modo]), (&c.botoes_rainhas, &c.botoes_rainhas[rainha])];
         for ob in faixa.objetos.iter_mut() {
+            if let Some((_, s, n, ligado)) = botoes.iter().find(|b| b.0 == ob.nome) {
+                if let crate::formats::janela::Conteudo::BotaoBitmap { selecionado, normal } = &mut ob.conteudo {
+                    (*selecionado, *normal) = (*s, *n);
+                }
+                if ligado.unwrap_or(false) {
+                    ob.flags |= FLAG_SELECIONADO;
+                } else {
+                    ob.flags &= !FLAG_SELECIONADO;
+                }
+            }
             for (grupo, escolhido) in grupos {
                 if grupo.contains(&ob.nome) {
                     if ob.nome == escolhido {

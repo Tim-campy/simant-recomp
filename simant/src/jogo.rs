@@ -110,10 +110,11 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
             p.aplicar_opcoes(&mut s.partida.estado.partida.opcoes);
         }
         p.aplicar_botoes(&mut s.partida.funcoes_botoes);
+        p.aplicar_botoes_quintal(&mut s.partida.funcoes_botoes_quintal);
     }
     let r = laco_partida(&mut s, titulo, o, jogo_novo);
     if let Some(caminho) = &o.preferencias {
-        let p = preferencias::Preferencias::do_momento(&s.partida.estado.partida.opcoes, &s.partida.funcoes_botoes);
+        let p = preferencias::Preferencias::do_momento(&s.partida.estado.partida.opcoes, &s.partida.funcoes_botoes, &s.partida.funcoes_botoes_quintal);
         match p.gravar(caminho) {
             Ok(()) => println!("preferências gravadas em {}", caminho.display()),
             Err(e) => eprintln!("preferências: {e}"),
@@ -353,7 +354,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                             modos::Resposta::Tratada
                         }
                         janelas_ui::Roteamento::Quintal => {
-                            modos::clique_no_quintal(s, x, y, clicks >= 2);
+                            modos::clique_no_quintal(s, x, y, clicks >= 2, shift_apertado(&eventos));
                             modos::Resposta::Tratada
                         }
                         janelas_ui::Roteamento::Edicao => {
@@ -490,6 +491,16 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
             && !s.menus.prende_simulacao()
         {
             s.partida.avancar(ms);
+        }
+        // _SpecialXfer: fechado o quadro 10058, o quintal vem para a frente na Strategic View e
+        // espera o clique numa colônia preta.
+        if engine::core::quintal_mapa::iniciar_escolha_de_colonia(&mut s.modos.janela, &mut s.partida) {
+            s.abrir_quintal();
+            redesenhar = true;
+        }
+        // PLACE: o laço acaba se o quintal deixa de ser a janela da frente (_win_IsWinInFront).
+        if s.modos.janela.colocando_rainha && !s.janelas.aberta(Controle::Quintal) {
+            engine::core::quintal_mapa::cancelar_colocacao(&mut s.modos.janela, &mut s.partida);
         }
         redesenhar |= menus_ui::passar_tempo(s);
         let pedidos = s.registrar_eventos();

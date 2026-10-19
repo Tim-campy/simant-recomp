@@ -72,8 +72,8 @@ pub struct ConstantesAmarela {
 /// Quadros das animações que consomem sorteios (§10.2) e o estado de interface assumido.
 #[derive(Clone, Debug, Deserialize)]
 pub struct AnimacaoAmarela {
-    /// [hipótese] `_win_IsWinInFront(0)`: a janela de edição está à frente. O port tem a janela, mas o
-    /// tick não consulta a ordem real das janelas: este valor fixo decide quantos quadros (e sorteios)
+    /// `_win_IsWinInFront(0)`: a janela de edição está à frente. Sem interface vale o do JSON; ao vivo a
+    /// interface põe aqui a ordem real a cada quadro. Decide quantos quadros (e sorteios)
     /// as animações de morte e de loucura gastam (com a edição atrás, o original gasta menos).
     pub janela_edicao_na_frente: bool,
     pub quadros_luta: i32,
@@ -187,6 +187,13 @@ pub struct TabelasAmarela {
     pub mensagens: MensagensAmarela,
     #[serde(default)]
     pub sons: SonsAmarela,
+    /// Bitmap do `_YellowDialog` da trofalaxia (`_EatMyFood(1)`, 0x2396). Opcional (API 0.22).
+    #[serde(default = "imagem_trofalaxia_padrao")]
+    pub imagem_trofalaxia: u16,
+}
+
+fn imagem_trofalaxia_padrao() -> u16 {
+    9110
 }
 
 /// Ids dos efeitos sonoros (objetos tipo 5 do banco SOUND, `_myBeginSound`) pedidos por esta parte
@@ -1222,7 +1229,8 @@ fn comer(e: &mut Estado, t: &TabelasAmarela, tipo: i32) {
         return;
     }
     if tipo == 1 {
-        // `_YellowDialog` da trofalaxia (quadro com imagem): ainda não no port [lacuna].
+        // `_YellowDialog(9110)` da trofalaxia: quadro com imagem (a interface confere Events).
+        e.eventos.push(Evento::QuadroAmarela(t.imagem_trofalaxia));
     }
     let vida = e.amarela.saude as i32;
     let pop = e.preta.populacao as i32;
@@ -1892,6 +1900,7 @@ fn reencarnar(e: &mut Estado, t: &TabelasAmarela) {
                 // escolha; o efeito existe (`vetor_tick::transferencia_especial` + troca de patch), mas só
                 // os vetores o chamam: a interface ainda não liga a escolha [lacuna: interface].
                 e.eventos.push(Evento::Mensagem(t.mensagens.outra_colonia));
+                e.eventos.push(Evento::EscolherColonia);
             } else {
                 e.partida.fim_de_jogo = 1;
                 e.partida.pretas_venceram = 0;
