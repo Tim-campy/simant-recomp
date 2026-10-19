@@ -1,0 +1,181 @@
+# Lançamento: só roda quando uma tag v* é enviada (ex.: v1.0.0). Monta os pacotes de Windows x64 e
+# Linux x64 e cria um release em RASCUNHO (draft) para revisão; nada é publicado sem aprovação manual
+# na página de releases do GitHub. Checklist e decisões pendentes: docs/lancamento.md.
+#
+# O pacote leva só o que é do projeto: executável, data/, exemplos/mods/, LICENSE, LEIAME, CHANGELOG e
+# os avisos de terceiros (e o SDL2.dll oficial no Windows). Nunca leva arquivos do jogo original
+# (SimAnt-T, *.DAT, *.NDX, *.HLP, *.ANT...), re_trabalho, capturas, referencia/qemu, WAVs nem MIDIs:
+# o passo "Conferir o conteúdo" falha o build se algo assim aparecer.
+name: Lançamento
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  SDL2_VERSAO: "2.30.9"
+  # SHA-256 de SDL2-devel-2.30.9-VC.zip (github.com/libsdl-org/SDL/releases), conferido em 2026-10-19
+  SDL2_SHA256: "8c91d91e5bcb997d062ec2b553c53832ebf95654d4aa35e8c02a954d4ce752ae"
+
+jobs:
+  pacote:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - so: windows-x64
+            runner: windows-2022
+            alvo: x86_64-pc-windows-msvc
+            exe: simant.exe
+          - so: linux-x64
+            # Ubuntu 22.04 (glibc 2.35) para o binário rodar também em distribuições um pouco mais antigas
+            runner: ubuntu-22.04
+            alvo: x86_64-unknown-linux-gnu
+            exe: simant
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versão da tag igual à dos Cargo.toml
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          cargo_versao=$(sed -n '/^\[workspace.package\]/,/^\[/{s/^version *= *"\(.*\)"/\1/p}' Cargo.toml)
+          echo "tag=$tag cargo=$cargo_versao"
+          if [ "$tag" != "$cargo_versao" ]; then
+            echo "::error::A tag $GITHUB_REF_NAME não bate com a versão $cargo_versao de Cargo.toml"; exit 1
+          fi
+          test -f LICENSE || { echo "::error::Falta o arquivo LICENSE (ver docs/lancamento.md)"; exit 1; }
+          echo "VERSAO=$tag" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.alvo }}
+
+      - name: SDL2 (Windows, binário oficial em vendor/)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p vendor
+          curl -fsSL -o vendor/SDL2-devel.zip \
+            "https://github.com/libsdl-org/SDL/releases/download/release-${SDL2_VERSAO}/SDL2-devel-${SDL2_VERSAO}-VC.zip"
+          echo "${SDL2_SHA256}  vendor/SDL2-devel.zip" | sha256sum -c -
+          7z x -y -ovendor vendor/SDL2-devel.zip > /dev/null
+          test -f "vendor/SDL2-${SDL2_VERSAO}/lib/x64/SDL2.dll"
+
+      - name: SDL2 (Linux, do sistema)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+
+      - name: Testes
+        run: cargo test --workspace --release
+
+      - name: Build
+        run: cargo build --release --locked -p simant --target ${{ matrix.alvo }}
+
+      - name: Montar o pacote
+        run: |
+          nome="simant-recomp-${VERSAO}-${{ matrix.so }}"
+          dir="pacote/$nome"
+          mkdir -p "$dir/mods" "$dir/exemplos"
+          cp "target/${{ matrix.alvo }}/release/${{ matrix.exe }}" "$dir/"
+          cp -r data "$dir/data"
+          cp -r exemplos/mods "$dir/exemplos/mods"
+          cp LICENSE "$dir/LICENSE.txt"
+          cp LEIAME-usuario.md "$dir/LEIAME.txt"
+          if [ -f README-user.md ]; then cp README-user.md "$dir/README.txt"; fi
+          cp CHANGELOG.md "$dir/CHANGELOG.txt"
+          printf '%s\n' "Coloque aqui os mods que devem ficar ligados (uma pasta por mod, com mod.json)." \
+            "Exemplos em ../exemplos/mods; ver LEIAME.txt." > "$dir/mods/LEIAME.txt"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp "vendor/SDL2-${SDL2_VERSAO}/lib/x64/SDL2.dll" "$dir/"
+            cp "vendor/SDL2-${SDL2_VERSAO}/README-SDL.txt" "$dir/README-SDL.txt"
+            python tools/gerar_avisos_terceiros.py --alvo ${{ matrix.alvo }} --saida "$dir/AVISOS-TERCEIROS.txt" \
+              --sdl2 "vendor/SDL2-${SDL2_VERSAO}/COPYING.txt"
+          else
+            python3 tools/gerar_avisos_terceiros.py --alvo ${{ matrix.alvo }} --saida "$dir/AVISOS-TERCEIROS.txt"
+            printf '%s\n' '#!/bin/sh' '# Roda o SimAnt recomp a partir da pasta do pacote (data/ e mods/ são procurados na pasta atual).' \
+              'cd "$(dirname "$0")" && exec ./simant "$@"' > "$dir/simant.sh"
+            chmod +x "$dir/simant.sh" "$dir/simant"
+          fi
+          echo "NOME_PACOTE=$nome" >> "$GITHUB_ENV"
+
+      - name: Conferir o conteúdo (nada do jogo original nem material de RE)
+        run: |
+          cd pacote
+          proibidos=$(find . \( -iname '*.dat' -o -iname '*.ndx' -o -iname '*.hlp' -o -iname '*.ant' \
+            -o -iname '*.wav' -o -iname '*.mid' -o -iname '*.midi' -o -iname '*.sf2' -o -iname '*.fon' \
+            -o -iname '*.cfg' -o -iname '*.sym' -o -iname '*.img' -o -iname '*.qcow2' -o -iname '*.png' \
+            -o -iname 'SIMANTW.EXE' -o -iname 'WIN.INI' \
+            -o -ipath '*SimAnt-T*' -o -ipath '*re_trabalho*' -o -ipath '*capturas*' -o -ipath '*qemu*' \
+            -o -ipath '*referencia*' -o -ipath '*research_notes*' -o -ipath '*/.re/*' \))
+          if [ -n "$proibidos" ]; then echo "::error::Arquivos proibidos no pacote:"; echo "$proibidos"; exit 1; fi
+          find . -type f | sort
+
+      - name: Smoke test sem janela
+        if: runner.os == 'Linux'
+        run: |
+          cd "pacote/$NOME_PACOTE"
+          # Sem os arquivos do jogo (o CI não os tem) o executável deve terminar com o erro "não encontrei
+          # .../SHARED.ndx" e código 1, sem pânico (101). Com eles, `--novo-jogo --ticks 5` imprime
+          # "5 ticks: GameTime 0 -> 5" (conferido localmente; ver docs/lancamento.md).
+          codigo=0
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./simant --novo-jogo --ticks 5 --sem-som --jogo /nao/existe \
+            2> erro.txt || codigo=$?
+          cat erro.txt; rm erro.txt
+          echo "código de saída: $codigo"
+          test "$codigo" -eq 1
+
+      - name: Compactar
+        run: |
+          cd pacote
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a -tzip "$NOME_PACOTE.zip" "$NOME_PACOTE" > /dev/null
+            sha256sum "$NOME_PACOTE.zip" > "$NOME_PACOTE.zip.sha256"
+          else
+            tar -czf "$NOME_PACOTE.tar.gz" "$NOME_PACOTE"
+            sha256sum "$NOME_PACOTE.tar.gz" > "$NOME_PACOTE.tar.gz.sha256"
+          fi
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NOME_PACOTE }}
+          path: |
+            pacote/*.zip
+            pacote/*.tar.gz
+            pacote/*.sha256
+          if-no-files-found: error
+
+  rascunho:
+    needs: pacote
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: arquivos
+          merge-multiple: true
+      - name: Notas do release (seção da versão no CHANGELOG.md)
+        run: |
+          versao="${GITHUB_REF_NAME#v}"
+          awk -v v="$versao" '
+            /^## \[/ { dentro = index($0, "[" v "]") > 0; next }
+            dentro { print }
+          ' CHANGELOG.md > notas.md
+          printf '\n---\n%s\n' "Este projeto não é afiliado à Maxis nem à Electronic Arts e não distribui arquivos do SimAnt: é preciso ter uma cópia do jogo original (Windows 3.x). Ver LEIAME.txt no pacote." >> notas.md
+          cat notas.md
+      - name: Criar release em rascunho
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" arquivos/* \
+            --draft --verify-tag \
+            --title "SimAnt recomp ${GITHUB_REF_NAME}" \
+            --notes-file notas.md
