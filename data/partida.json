@@ -3,9 +3,9 @@
   "relogio": {
     "_intervalo_mensagem_ms": "SetTimer(_rootWnd, 0, 17 ms, MYTIMERFUNC) em WINMAIN e _RestartSimulation (fato visto no código).",
     "intervalo_mensagem_ms": 17,
-    "_intervalo_sem_foco_ms": "WM_ACTIVATEAPP com wParam = 0 refaz o temporizador com 170 ms (0xAA), MAINWNDPROC 1000:2930.",
-    "intervalo_sem_foco_ms": 170,
-    "_resolucao_timer_ms": "Resolução do SetTimer no Windows 3.1 (relógio do sistema a 18,2 Hz): o intervalo pedido é arredondado para cima até um múltiplo dela; o de 17 ms vira uma WM_TIMER a cada 55 ms. Medido na bancada (2026-10-18, tests/referencias/roteiros/qemu_ritmo*.txt): normal = 6,0 ticks/s e slow = 3,0 ticks/s, exatamente o que o laço de MYTIMERFUNC dá com mensagens a cada 55 ms. O de 170 ms (sem foco) vira 220 ms [hipótese: não medido].",
+    "_intervalo_sem_foco_ms": "WM_ACTIVATEAPP com wParam = 0 refaz o temporizador com 170 ms (0xAA) no código (MAINWNDPROC 1000:2930), mas na bancada (2026-10-19, roteiro qemu_ui_moldura_principal.txt) o GameTime andou 61 ticks em 10 s com a janela ativa, com a Task List do Windows na frente (inativa) e minimizada: o ritmo não muda sem foco. O port usa então o mesmo intervalo de 17 ms (o mecanismo que anula os 170 ms fica em aberto; docs/spec/regras/simulacao-visao-geral.md §1). Era 170 até 2026-10-19.",
+    "intervalo_sem_foco_ms": 17,
+    "_resolucao_timer_ms": "Resolução do SetTimer no Windows 3.1 (relógio do sistema a 18,2 Hz): o intervalo pedido é arredondado para cima até um múltiplo dela; o de 17 ms vira uma WM_TIMER a cada 55 ms. Medido na bancada (2026-10-18, tests/referencias/roteiros/qemu_ritmo*.txt): normal = 6,0 ticks/s e slow = 3,0 ticks/s, exatamente o que o laço de MYTIMERFUNC dá com mensagens a cada 55 ms. Sem foco o ritmo é o mesmo (medido; ver _intervalo_sem_foco_ms).",
     "resolucao_timer_ms": 55,
     "_voltas_por_periodo": "Por _GameSpeed (slow, normal, fast, ultra): voltas do laço ocupado de MYTIMERFUNC entre duas WM_TIMER (cada volta soma 1 a _gameCycles e roda no máximo um tick). Depende da CPU no original. Em fast/ultra toda volta roda um tick e uma chamada rende 2N + 1 ticks a cada 165 ms: N = 5 dá 66,7 ticks/s (bancada: 55–63) e N = 7 dá 90,9 ticks/s (bancada: 91). Em slow/normal só a velocidade decide quando há tick; N só muda _gameCycles (bancada: 111–208 voltas por tick em normal; N = 80 dá 161).",
     "voltas_por_periodo": [80, 80, 5, 7],
