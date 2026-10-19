@@ -23,8 +23,9 @@ fn raiz() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
+/// `data/<nome>` com as referências de texto do original marcadas (o teste não depende delas).
 fn ler(nome: &str) -> String {
-    fs::read_to_string(raiz().join("data").join(nome)).unwrap()
+    engine::recursos::marcar_referencias(&fs::read_to_string(raiz().join("data").join(nome)).unwrap())
 }
 
 fn mod_trapacas() -> Scripts {

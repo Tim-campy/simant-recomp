@@ -283,8 +283,9 @@ pub(crate) mod api017 {
     use engine::rules::quintal::{self, Relogios, TabelasQuintal};
     use engine::scripts::TeclaMod;
 
+    /// `data/<nome>` com as referências de texto do original marcadas (o teste não depende delas).
     fn ler(nome: &str) -> String {
-        fs::read_to_string(raiz().join("data").join(nome)).unwrap()
+        engine::recursos::marcar_referencias(&fs::read_to_string(raiz().join("data").join(nome)).unwrap())
     }
 
     /// Partida do QUICK2.ANT (Jogo Rápido), sem scripts.

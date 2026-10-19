@@ -62,11 +62,11 @@
         ]
       ]
     ],
-    "titulo_load": "SimAnt Load",
-    "pergunta_load": "Do you want to save the current ant hill?",
-    "titulo_quit": "SimAnt Quit",
-    "titulo_mensagem": "Message",
-    "salvo": "%s\nSaved correctly",
+    "titulo_load": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x17eb"},
+    "pergunta_load": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x17f7"},
+    "titulo_quit": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x1650"},
+    "titulo_mensagem": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x185a"},
+    "salvo": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x1840"},
     "sim": "&Yes",
     "nao": "&No",
     "cancelar": "Cancel",
@@ -118,8 +118,8 @@
       5
     ],
     "altura_titulo": 18,
-    "titulo_abrir": "Load Ant Hill",
-    "titulo_salvar": "Save Ant Hill As",
+    "titulo_abrir": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x1745"},
+    "titulo_salvar": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x1763"},
     "campo": [
       73,
       65,
@@ -225,7 +225,7 @@
         ]
       ]
     ],
-    "texto_tipo": "SimAnt Files(*.ANT)",
+    "texto_tipo": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x1715"},
     "texto_unidade": "c:",
     "texto_ok": "OK",
     "texto_cancelar": "Cancel",
@@ -236,7 +236,7 @@
         153
       ]
     ],
-    "campo_inicial": "*.ant",
+    "campo_inicial": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x1729"},
     "caminho": [
       256,
       68

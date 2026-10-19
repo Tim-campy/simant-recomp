@@ -2,7 +2,7 @@
   "_comentario": "Janelas de controle (engine/src/core/janelas.rs): Caste Control (janela 19, _OpenCasteWindow) e Behavior Control (janela 18, _OpenModeWindow). Ver docs/spec/telas/janelas.md.",
   "castas": {
     "janela": 19,
-    "titulo": "Caste Control",
+    "titulo": {"banco": "WINGANT", "tipo": 0, "id": 19, "objeto": 1},
     "objeto_triangulo": "casteTriangle",
     "objeto_graficos": "casteGraphs",
     "objetos_niveis": ["casteBreeders", "casteWorkers", "casteSoldiers"],
@@ -15,7 +15,7 @@
   },
   "tarefas": {
     "janela": 18,
-    "titulo": "Behavior Control",
+    "titulo": {"banco": "WINGANT", "tipo": 0, "id": 18, "objeto": 1},
     "objeto_triangulo": "modeTriangle",
     "objeto_graficos": "modeGraphs",
     "objetos_niveis": ["modeForage", "modeDig", "modeNurse"],
@@ -98,7 +98,7 @@
   "historico": {
     "_comentario": "Janela 21 (_OpenHistoryWindow, _ProcHistoryEvent, _ToggleHistButton, _drawHistGraph em 1000:8a6a–8e78). Séries de _HistGraphs (8:8672) e parceiras de escala de _AltHistGraphs (8:869a), por símbolo do save; nomes da lista 4/1050. As cores dos 4 lugares vêm de _ConvColor(0x43, 0x46, 0x49, 0x45) (8:8e4c): medidas na bancada (2026-10-18, telas/janelas.md §3) = vermelho 9, azul-escuro 4, oliva 3, magenta-escuro 5. ajuste_grafico: as linhas e a caixa do nome ficam 1 pixel acima e à esquerda do retângulo do objeto (medido).",
     "janela": 21,
-    "titulo": "History Window",
+    "titulo": {"banco": "WINGANT", "tipo": 0, "id": 21, "objeto": 1},
     "objeto_grafico": "histGraphArea",
     "botoes": ["histBPop", "histRPop", "histBFood", "histRFood", "histBHealth", "histRHealth", "histFoodAv", "histEaten", "histExpired", "histKilled"],
     "series": ["H_BPop", "H_BFood", "H_BHeal", "H_FoodA", "H_ADead", "H_RPop", "H_RFood", "H_RHeal", "H_PDead", "H_FDead"],

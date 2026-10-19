@@ -16,8 +16,16 @@ fn raiz() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
+/// `data/<nome>` com as referências de texto do original marcadas (`recursos::marcar_referencias`):
+/// os textos da faixa que vêm do SIMANTW.EXE são conferidos pela referência, não pelo texto
+/// (o texto em si: tests/textos_originais.rs, com a instalação).
 fn ler(nome: &str) -> String {
-    std::fs::read_to_string(raiz().join("data").join(nome)).unwrap()
+    engine::recursos::marcar_referencias(&std::fs::read_to_string(raiz().join("data").join(nome)).unwrap())
+}
+
+/// Texto da faixa de `mensagens.json` → `faixa` (já marcado por `ler`).
+fn texto_faixa(f: impl Fn(&engine::core::avisos::ConfigFaixa) -> String) -> engine::core::avisos::TextoFaixa {
+    engine::core::avisos::TextoFaixa::Literal(f(&ConfigAvisos::de_json(&ler("mensagens.json")).unwrap().faixa))
 }
 
 fn partida() -> Partida {
@@ -140,7 +148,7 @@ fn botao_de_velocidade_e_espera_do_clique() {
     assert_eq!(p.botao_usuario(6), RespostaBotao::Feito);
     assert_eq!(p.estado.partida.velocidade, 2);
     let agora = p.agora();
-    assert_eq!(p.avisos.texto_da_faixa(agora), Some(&TextoFaixa::Literal("Game speed now fast.".into())));
+    assert_eq!(p.avisos.texto_da_faixa(agora), Some(&texto_faixa(|f| f.velocidade[2].clone())));
     for _ in 0..2 {
         p.botao_usuario(6);
     }
@@ -194,19 +202,18 @@ fn load_conta_as_formigas_e_pausa_depois_dos_quadros() {
 /// `_DoBookMark`: Ctrl+clique põe o marcador (vista atual), clique volta a ele; vazio avisa.
 #[test]
 fn marcadores_da_faixa() {
-    use engine::core::avisos::TextoFaixa;
     use engine::core::navegacao::Acao;
     let mut p = partida();
     p.marcador(1, false);
     let agora = p.agora();
-    assert_eq!(p.avisos.texto_da_faixa(agora), Some(&TextoFaixa::Literal("Bookmark has not been placed.".into())));
+    assert_eq!(p.avisos.texto_da_faixa(agora), Some(&texto_faixa(|f| f.marcador_ausente.clone())));
     assert!(p.retirar_eventos().contains(&engine::rules::estado::Evento::Som(1)));
     let vista = (p.nav.plano_mapa, p.nav.vista.x, p.nav.vista.y);
     p.marcador(1, true);
     assert_eq!(p.marcadores[1], Some(vista));
     assert_eq!(p.bitmaps_dos_marcadores(), vec![("ribBM2".to_string(), 14558, 14508)]);
     let agora = p.agora();
-    assert_eq!(p.avisos.texto_da_faixa(agora), Some(&TextoFaixa::Literal("Bookmark has been placed.".into())));
+    assert_eq!(p.avisos.texto_da_faixa(agora), Some(&texto_faixa(|f| f.marcador_posto.clone())));
     p.navegar(Acao::Superficie);
     assert_eq!(p.nav.plano_mapa, 1);
     p.marcador(1, false);

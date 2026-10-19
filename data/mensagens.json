@@ -64,10 +64,10 @@
     "duracao_botao": 180,
     "fator_duracao": [3, 2],
     "_velocidade": "Textos do DGROUP (1048:014b, 0160, 0177, 018c) mostrados por _DoUserButton caso 6, por _GameSpeed depois da troca.",
-    "velocidade": ["Game speed now slow.", "Game speed now normal.", "Game speed now fast.", "Game speed now ultra."],
+    "velocidade": [{"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x014b"}, {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x0160"}, {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x0177"}, {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x018c"}],
     "_marcadores": "_DoBookMark (1000:08a6): textos do DGROUP 1048:01a2 e 01bc, com a duração do botão (0xb4), importantes.",
-    "marcador_posto": "Bookmark has been placed.",
-    "marcador_ausente": "Bookmark has not been placed."
+    "marcador_posto": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x01a2"},
+    "marcador_ausente": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x01bc"}
   },
   "fim_de_jogo": {
     "_janela": "_EndGameDialog (1000:6602) abre a janela 4 (gameOverWin, bitmap 16100); _win_DrawEndGameWindow (1000:64d4) escreve tipo, pontos e avaliação com a fonte 4. Clique no objeto 0x401 (gameOverPic) fecha e chama _NewGame(0).",

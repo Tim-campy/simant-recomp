@@ -28,8 +28,8 @@
   "marca_y": 3,
   "_cores": "desabilitado: texto dos itens acinzentados (menu de sistema da janela principal; cinza-claro, m05b e s01). sombra: coluna e linha 1 pixel à direita e embaixo de todo menu aberto, cinza-claro (m01: coluna x = 144 e linha 161 do File; m05b: x = 167 e linha 160 do menu de sistema).",
   "cores": {"fundo": 15, "texto": 0, "realce": 19, "texto_realce": 20, "borda": 0, "desabilitado": 8, "sombra": 8},
-  "_texto_pausa": "_SetMenuOptionText(0x41, …) troca o texto do item 0xFD41 pelo do DGROUP: 0x911 '&Pause\\tShift+0' com o jogo andando, 0x900 'Un&pause\\tShift+0' pausado (o objeto do banco traz '&Pause   \\tShift+0', só usado antes do primeiro _SetMenuEntries). Bancada: m05 e n05.",
-  "texto_pausa": ["&Pause\tShift+0", "Un&pause\tShift+0"],
+  "_texto_pausa": "_SetMenuOptionText(0x41, …) troca o texto do item 0xFD41 pelo do DGROUP: 0x911 (pausar) com o jogo andando, 0x900 (despausar) pausado; texto_pausa traz as referências a esses dois textos, lidos do SIMANTW.EXE do usuário (o objeto do banco traz o item com espaços antes do tab, só usado antes do primeiro _SetMenuEntries). Bancada: m05 e n05.",
+  "texto_pausa": [{"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x0911"}, {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x0900"}],
   "_comandos": "_InitMenu numera os itens 0xFD01 + 16 × menu + item (separadores incluídos); _ProcMenu decide pelo byte baixo. Ver docs/spec/telas/menus.md, tabela dos itens.",
   "comandos": {
     "0xFD01": "sobre",

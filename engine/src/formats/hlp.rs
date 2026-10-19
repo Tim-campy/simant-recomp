@@ -264,16 +264,7 @@ impl ArquivoAjuda {
             dados,
             arquivos,
         };
-        let sistema = a.interno("|SYSTEM")?.to_vec();
-        if u16_em(&sistema, 0)? != 0x036C {
-            return Err("|SYSTEM inválido".into());
-        }
-        let menor = u16_em(&sistema, 2)?;
-        if menor > 16 {
-            return Err(format!("ajuda do WinHelp 3.1 (|SYSTEM menor {menor}) não suportada; só HC30"));
-        }
-        let fim = sistema.iter().skip(12).position(|&b| b == 0).map_or(sistema.len(), |p| p + 12);
-        a.titulo = String::from_utf8_lossy(sistema.get(12..fim).unwrap_or(&[])).into_owned();
+        a.titulo = titulo_do_sistema(a.interno("|SYSTEM")?)?;
         let frases = a.frases()?;
         a.fontes = a.ler_fontes()?;
         a.topicos = a.ler_topicos(&frases)?;
@@ -293,9 +284,17 @@ impl ArquivoAjuda {
 
     /// Conteúdo de um arquivo interno (sem o cabeçalho de 9 bytes).
     pub fn interno(&self, nome: &str) -> Result<&[u8], String> {
-        let &o = self.arquivos.get(nome).ok_or_else(|| format!("arquivo interno {nome} não existe"))?;
-        let usado = i32_em(&self.dados, o + 4)? as usize;
-        self.dados.get(o + 9..o + 9 + usado).ok_or_else(|| format!("{nome} truncado"))
+        interno(&self.dados, &self.arquivos, nome)
+    }
+
+    /// Só o título do |SYSTEM (`[OPTIONS] TITLE` do projeto), sem ler os tópicos. Usado pelas
+    /// referências de texto de `data/ajuda.json` (recursos.rs).
+    pub fn titulo_de(dados: &[u8]) -> Result<String, String> {
+        if u32_em(dados, 0)? != 0x0003_5F3F {
+            return Err("não é um arquivo de ajuda do WinHelp".into());
+        }
+        let arquivos = diretorio(dados, i32_em(dados, 4)? as usize)?;
+        titulo_do_sistema(interno(dados, &arquivos, "|SYSTEM")?)
     }
 
     /// Palavras-chave da busca (`|KWBTREE` + `|KWDATA`), na ordem da árvore (a alfabética do
@@ -527,6 +526,25 @@ impl ArquivoAjuda {
 }
 
 /// Diretório (árvore B+ de nomes → posição do arquivo interno).
+fn interno<'a>(dados: &'a [u8], arquivos: &HashMap<String, usize>, nome: &str) -> Result<&'a [u8], String> {
+    let &o = arquivos.get(nome).ok_or_else(|| format!("arquivo interno {nome} não existe"))?;
+    let usado = i32_em(dados, o + 4)? as usize;
+    dados.get(o + 9..o + 9 + usado).ok_or_else(|| format!("{nome} truncado"))
+}
+
+/// Título do |SYSTEM do HC30: cabeçalho de 12 bytes (0x036C, versão menor até 16, ...) e o texto
+/// ASCIIZ. Os bytes viram caracteres Latin-1, como nas listas de strings do banco.
+fn titulo_do_sistema(sistema: &[u8]) -> Result<String, String> {
+    if u16_em(sistema, 0)? != 0x036C {
+        return Err("|SYSTEM inválido".into());
+    }
+    let menor = u16_em(sistema, 2)?;
+    if menor > 16 {
+        return Err(format!("ajuda do WinHelp 3.1 (|SYSTEM menor {menor}) não suportada; só HC30"));
+    }
+    Ok(sistema.get(12..).unwrap_or(&[]).iter().take_while(|&&b| b != 0).map(|&b| b as char).collect())
+}
+
 fn diretorio(d: &[u8], inicio: usize) -> Result<HashMap<String, usize>, String> {
     let o = inicio + 9;
     if u16_em(d, o)? != 0x293B {

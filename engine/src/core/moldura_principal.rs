@@ -237,7 +237,7 @@ mod testes {
     use super::*;
 
     fn cfg() -> ConfigMolduraPrincipal {
-        serde_json::from_str(include_str!("../../../data/moldura_principal.json")).unwrap()
+        serde_json::from_str(&crate::recursos::marcar_referencias(include_str!("../../../data/moldura_principal.json"))).unwrap()
     }
 
     /// Geometria medida em m00 (640 de largura): caixa 0–17 e linha em 18; minimizar 603–620,

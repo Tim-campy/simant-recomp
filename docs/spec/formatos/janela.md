@@ -87,7 +87,7 @@ Depois do cálculo:
 | 15 | 15 | contorno de 1 pixel com a cor de frente | — |
 | 16 | 9 | texto | u8 fonte; ponteiro far (0x2A, zero no arquivo); a partir de 0x2E, texto ASCIIZ (pode ser formato `printf`, ex.: `%s`) |
 | 17 | 1 | preenche e escreve texto (como o 16) | idem 16 |
-| 18 | 8 | título da janela, desenhado por outra rotina [em aberto] | — |
+| 18 | 8 | título da janela, desenhado pela moldura (não por `_win_DrawObjectI`) | ponteiro far (0x2A, zero no arquivo); a partir de 0x2E, texto ASCIIZ, como o 16 [fato verificado nas janelas 18, 19 e 21: "Behavior Control", "Caste Control", "History Window"; o port lê esses títulos daqui, `data/janelas.json`] |
 | 19, 20 | 1 | contorno em relevo (3D), lado claro e escuro trocados entre 19 e 20 | u8 espessura |
 | 21, 22 | 0 | preenche e faz o contorno em relevo | u8 espessura |
 
