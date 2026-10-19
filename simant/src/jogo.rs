@@ -174,7 +174,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         s.menus.ligar_moldura(s.recursos, s.tela.cfg.largura)?;
     }
     let (lw, lh) = (s.tela.cfg.largura, s.tela.cfg.altura + s.menus.altura() as u32);
-    let Janela { sdl, mut canvas } = abrir_janela(titulo, lw, lh, &o.video)?;
+    let Janela { sdl, mut canvas, mut moldura } = abrir_janela(titulo, lw, lh, &o.video, s.menus.moldura.as_ref(), &s.cores)?;
     let criador = canvas.texture_creator();
     let mut textura = criador.create_texture_static(PixelFormatEnum::RGB24, lw, lh).map_err(|e| e.to_string())?;
     let mut eventos = sdl.event_pump()?;
@@ -204,6 +204,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
     loop {
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
+            // Sem a borda do sistema, a moldura grossa do Windows 3.1 fica em volta (moldura_janela.rs).
+            let ev = moldura.deslocar(ev);
             // `GetAsyncKeyState(VK_LBUTTON) & 1` do fim da volta de `MYTIMERFUNC`: qualquer clique
             // esquerdo (em qualquer lugar) marca o bit até o laço consultá-lo.
             if let Event::MouseButtonDown { mouse_btn: MouseButton::Left, .. } = ev {
@@ -235,6 +237,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     match c {
                         C::Minimizar => canvas.window_mut().minimize(),
                         C::Restaurar if canvas.window().is_maximized() => canvas.window_mut().restore(),
+                        // Sem a borda do sistema e restaurada: o botão é o de maximizar (moldura_janela.rs).
+                        C::Restaurar | C::Maximizar if moldura.restaurada() => canvas.window_mut().maximize(),
                         // SC_CLOSE: MAINWNDPROC chama _MenuQuit (s12).
                         C::Fechar => s.abrir_pergunta_sair(),
                         // Switch To… (a Task List do Windows) e os acinzentados: nada no port.
@@ -646,6 +650,12 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
             faixa = nova_faixa;
             redesenhar = true;
         }
+        // Sem a borda do sistema: maximizada ou restaurada (moldura grossa e botão de maximizar).
+        moldura.atualizar(&mut canvas);
+        if s.menus.restaurada != moldura.restaurada() {
+            s.menus.definir_restaurada(moldura.restaurada());
+            redesenhar = true;
+        }
         if redesenhar {
             let cliente = s.quadro_rgb()?;
             let rgb = menus_ui::compor(s, &cliente, foco.unwrap_or(true));
@@ -658,7 +668,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
             situacao = nova;
         }
         canvas.clear();
-        canvas.copy(&textura, None, None)?;
+        moldura.copiar(&mut canvas, &textura)?;
         if o.sair_apos_ms.is_some_and(|ms| (agora - inicio).as_millis() as u64 >= ms) {
             // Lê o quadro antes do present (depois dele o conteúdo do buffer é indefinido). Sem
             // redimensionar, a janela tem exatamente a resolução lógica × escala.

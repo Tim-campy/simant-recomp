@@ -4,6 +4,12 @@
 //! restaurar à direita e a linha preta embaixo. É opcional no port (`data/video.json` →
 //! `moldura_windows31`): a janela do sistema atual já tem título.
 //!
+//! Extensão do port (escolha do usuário, 2026-10-19): com `substituir_moldura_do_sistema`, a janela
+//! do port fica sem a borda do sistema e esta barra passa a ser a moldura de verdade. Com a janela
+//! do sistema restaurada (não maximizada), a barra mostra o botão de maximizar e a janela ganha a
+//! moldura grossa do Windows 3.1 em volta ([`ConfigMolduraPrincipal::retangulos_da_borda`]);
+//! [`ConfigMolduraPrincipal::parte_da_janela`] diz onde se arrasta e onde se redimensiona.
+//!
 //! O menu de sistema da janela principal é desenhado e tratado pela barra de menus
 //! (`barra_menus::BarraMenus`, como um menu antes do File), porque o Windows o percorre junto com
 //! ela pelo teclado (← no File, → no Speed). Especificação: docs/spec/telas/menus.md §8. Medidas:
@@ -67,6 +73,35 @@ pub struct CoresTitulo {
     pub glifo: u8,
 }
 
+/// Moldura grossa (`WS_THICKFRAME`) da janela principal restaurada: linha preta por fora e por
+/// dentro, a cor da borda no meio e as marcas dos cantos a (espessura + título) de cada canto, como a
+/// das janelas filhas (tela_jogo.json → `edicao.moldura`).
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+pub struct BordaJanela {
+    /// `SM_CXFRAME` (4 a 640 × 480).
+    pub espessura: i16,
+    /// `COLOR_ACTIVEBORDER` (cinza-claro no esquema padrão).
+    pub cor: u8,
+    pub linha: u8,
+}
+
+impl Default for BordaJanela {
+    fn default() -> Self {
+        BordaJanela { espessura: 4, cor: 8, linha: 0 }
+    }
+}
+
+/// Onde o ponto cai na janela do port sem a borda do sistema (o `WM_NCHITTEST` do Windows).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ParteJanela {
+    /// Área do jogo, botões do título e caixa do menu de sistema: o jogo trata.
+    Normal,
+    /// A faixa do título (`HTCAPTION`): arrasta a janela; duplo clique maximiza ou restaura.
+    Arrastar,
+    /// Moldura grossa: redimensiona pelos lados marcados (cantos = dois lados).
+    Redimensionar { esq: bool, dir: bool, topo: bool, base: bool },
+}
+
 /// Conteúdo de data/moldura_principal.json.
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigMolduraPrincipal {
@@ -83,6 +118,9 @@ pub struct ConfigMolduraPrincipal {
     pub glifo_apertado: [i16; 2],
     /// Itens do menu de sistema.
     pub itens: Vec<ItemPrincipal>,
+    /// Moldura grossa da janela restaurada (sem a borda do sistema). Opcional (API 0.37).
+    #[serde(default)]
+    pub borda: BordaJanela,
 }
 
 /// Partes da barra de título.
@@ -104,6 +142,9 @@ pub struct EstadoTitulo {
     pub caixa_realcada: bool,
     /// Botão apertado com o cursor em cima.
     pub apertado: Option<ParteTitulo>,
+    /// A janela não está maximizada (só sem a borda do sistema): o botão da direita é o de
+    /// maximizar (seta para cima), não o de restaurar.
+    pub restaurada: bool,
 }
 
 impl ConfigMolduraPrincipal {
@@ -163,7 +204,16 @@ impl ConfigMolduraPrincipal {
             botao(q, r, c, apertado);
             let (dx, dy) = if apertado { (self.glifo_apertado[0], self.glifo_apertado[1]) } else { (0, 0) };
             let g = Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy };
-            if p == ParteTitulo::Restaurar {
+            if p == ParteTitulo::Restaurar && e.restaurada {
+                // Maximizar: seta para cima de 1, 3, 5 e 7 pixels nas linhas 6–9, centrada na coluna 8
+                // (a das janelas filhas, medida em j00).
+                let (ax, ay) = (i32::from(g.esq) + 8, i32::from(g.topo) + 6);
+                for k in 0..4 {
+                    for d in -k..=k {
+                        q.ponto(ax + d, ay + k, c.glifo);
+                    }
+                }
+            } else if p == ParteTitulo::Restaurar {
                 desenhar_glifo_restaurar(q, g, c.glifo);
             } else {
                 // Seta para baixo de 7, 5, 3 e 1 pixels nas linhas 7–10 do botão, centrada na coluna 8 [m00].
@@ -184,6 +234,71 @@ impl ConfigMolduraPrincipal {
             let antes = q.recorte.replace(faixa);
             texto_a_esquerda(q, f, &self.texto, x, topo, texto, fundo);
             q.recorte = antes;
+        }
+    }
+}
+
+impl ConfigMolduraPrincipal {
+    /// Retângulos (e cor) da moldura grossa de uma janela de `largura` × `altura` (com a moldura):
+    /// as quatro faixas, as linhas de fora e de dentro e as marcas dos cantos, nessa ordem.
+    pub fn retangulos_da_borda(&self, largura: i16, altura: i16) -> Vec<(Retangulo, u8)> {
+        let b = &self.borda;
+        let (t, w, h) = (b.espessura, largura, altura);
+        let r = |esq, topo, dir, base| Retangulo { esq, topo, dir, base };
+        let mut v = vec![
+            (r(0, 0, w, t), b.cor),
+            (r(0, h - t, w, h), b.cor),
+            (r(0, t, t, h - t), b.cor),
+            (r(w - t, t, w, h - t), b.cor),
+        ];
+        // Linhas de fora e de dentro (a de dentro na última coluna da moldura).
+        for k in [0, t - 1] {
+            v.push((r(k, k, w - k, k + 1), b.linha));
+            v.push((r(k, h - k - 1, w - k, h - k), b.linha));
+            v.push((r(k, k, k + 1, h - k), b.linha));
+            v.push((r(w - k - 1, k, w - k, h - k), b.linha));
+        }
+        // Marcas dos cantos, a (espessura + título) de cada canto.
+        let d = t + self.altura;
+        for x in [d, w - 1 - d] {
+            v.push((r(x, 0, x + 1, t), b.linha));
+            v.push((r(x, h - t, x + 1, h), b.linha));
+        }
+        for y in [d, h - 1 - d] {
+            v.push((r(0, y, t, y + 1), b.linha));
+            v.push((r(w - t, y, w, y + 1), b.linha));
+        }
+        v
+    }
+
+    /// O que fica sob (x, y) numa janela de `largura` × `altura` com a moldura de `borda` pixels (0 =
+    /// maximizada) e a barra de título logo dentro dela. Fora da janela (as tarjas da escala inteira)
+    /// conta como moldura. Sem `redimensionavel`, a moldura não redimensiona.
+    pub fn parte_da_janela(&self, largura: i32, altura: i32, borda: i32, redimensionavel: bool, x: i32, y: i32) -> ParteJanela {
+        if borda > 0 {
+            let (esq, dir, topo, base) = (x < borda, x >= largura - borda, y < borda, y >= altura - borda);
+            if esq || dir || topo || base {
+                if !redimensionavel {
+                    return ParteJanela::Normal;
+                }
+                // Os cantos vão até as marcas (espessura + título) de cada lado.
+                let canto = borda + i32::from(self.altura);
+                let perto_esq = x < canto;
+                let perto_dir = x >= largura - canto;
+                let perto_topo = y < canto;
+                let perto_base = y >= altura - canto;
+                return ParteJanela::Redimensionar {
+                    esq: esq || ((topo || base) && perto_esq),
+                    dir: dir || ((topo || base) && perto_dir),
+                    topo: topo || ((esq || dir) && perto_topo),
+                    base: base || ((esq || dir) && perto_base),
+                };
+            }
+        }
+        let largura_titulo = (largura - 2 * borda).clamp(0, i32::from(i16::MAX)) as i16;
+        match self.parte_em(largura_titulo, x - borda, y - borda) {
+            Some(ParteTitulo::Faixa) => ParteJanela::Arrastar,
+            _ => ParteJanela::Normal,
         }
     }
 }
@@ -262,7 +377,7 @@ mod testes {
     fn botao_apertado_sem_relevo() {
         let c = cfg();
         let mut q = Quadro::new(640, 19, 255);
-        c.desenhar(&mut q, None, &EstadoTitulo { ativa: true, caixa_realcada: false, apertado: Some(ParteTitulo::Minimizar) });
+        c.desenhar(&mut q, None, &EstadoTitulo { ativa: true, caixa_realcada: false, apertado: Some(ParteTitulo::Minimizar), restaurada: false });
         let px = |x: usize, y: usize| q.pixels[y * 640 + x];
         assert_eq!((px(603, 0), px(603, 5), px(620, 5), px(620, 17)), (c.cores.escuro, c.cores.escuro, c.cores.botao, c.cores.botao));
         // Seta deslocada (+1, +2): a linha de 7 pixels na linha 9, de 609 a 615.
@@ -270,5 +385,53 @@ mod testes {
         assert_eq!(px(608, 9), c.cores.botao);
         // O de restaurar, solto: relevo.
         assert_eq!((px(622, 0), px(639, 0), px(639, 17)), (c.cores.claro, c.cores.escuro, c.cores.escuro));
+        // Glifo de restaurar (duas setas): a ponta de cima na linha 4; o de maximizar começa na 6.
+        assert_eq!((px(630, 4), px(630, 6), px(627, 9)), (c.cores.glifo, c.cores.glifo, c.cores.botao));
+        let mut q = Quadro::new(640, 19, 255);
+        c.desenhar(&mut q, None, &EstadoTitulo { ativa: true, restaurada: true, ..Default::default() });
+        let px = |x: usize, y: usize| q.pixels[y * 640 + x];
+        assert_eq!((px(630, 4), px(630, 6), px(627, 9), px(633, 9), px(630, 13)), (c.cores.botao, c.cores.glifo, c.cores.glifo, c.cores.glifo, c.cores.botao));
+    }
+
+    /// Sem a borda do sistema: a faixa do título arrasta, a moldura grossa redimensiona (cantos até
+    /// as marcas), os botões e o jogo ficam com o jogo.
+    #[test]
+    fn partes_da_janela_sem_a_borda_do_sistema() {
+        let c = cfg();
+        let (w, h) = (648, 488);
+        let p = |x, y| c.parte_da_janela(w, h, 4, true, x, y);
+        let lados = |esq, dir, topo, base| ParteJanela::Redimensionar { esq, dir, topo, base };
+        assert_eq!(p(300, 10), ParteJanela::Arrastar, "faixa do título");
+        assert_eq!(p(10, 10), ParteJanela::Normal, "caixa do menu de sistema");
+        assert_eq!(p(4 + 611, 10), ParteJanela::Normal, "minimizar");
+        assert_eq!(p(4 + 630, 10), ParteJanela::Normal, "maximizar");
+        assert_eq!(p(300, 4 + 18), ParteJanela::Normal, "a linha preta do título");
+        assert_eq!(p(300, 300), ParteJanela::Normal, "área do jogo");
+        assert_eq!(p(300, 1), lados(false, false, true, false));
+        assert_eq!(p(1, 300), lados(true, false, false, false));
+        assert_eq!(p(646, 487), lados(false, true, false, true));
+        assert_eq!(p(10, 2), lados(true, false, true, false), "canto até a marca");
+        assert_eq!(p(2, 470), lados(true, false, false, true));
+        assert_eq!(p(-5, 300), lados(true, false, false, false), "tarja à esquerda");
+        assert_eq!(c.parte_da_janela(w, h, 4, false, 1, 300), ParteJanela::Normal, "sem redimensionar");
+        // Maximizada: sem moldura; a faixa ainda arrasta (o Windows restaura).
+        assert_eq!(c.parte_da_janela(640, 480, 0, true, 300, 5), ParteJanela::Arrastar);
+        assert_eq!(c.parte_da_janela(640, 480, 0, true, 0, 300), ParteJanela::Normal);
+    }
+
+    #[test]
+    fn moldura_grossa_da_janela_restaurada() {
+        let c = cfg();
+        assert_eq!(c.borda, BordaJanela { espessura: 4, cor: 8, linha: 0 });
+        let mut q = Quadro::new(648, 488, 255);
+        for (r, cor) in c.retangulos_da_borda(648, 488) {
+            q.preencher(r, cor, cor);
+        }
+        let px = |x: usize, y: usize| q.pixels[y * 648 + x];
+        // Linha preta, duas da cor da borda e a linha preta de dentro; o interior fica livre.
+        assert_eq!((px(0, 100), px(1, 100), px(2, 100), px(3, 100), px(4, 100)), (0, 8, 8, 0, 255));
+        assert_eq!((px(100, 487), px(100, 486), px(100, 484)), (0, 8, 0));
+        // Marcas dos cantos a 4 + 18 = 22.
+        assert_eq!((px(22, 1), px(21, 1), px(648 - 23, 2), px(1, 22), px(2, 488 - 23)), (0, 8, 0, 0, 0));
     }
 }

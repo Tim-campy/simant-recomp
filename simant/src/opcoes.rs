@@ -30,6 +30,9 @@ pub(crate) struct Opcoes {
     pub(crate) janela: Option<(u32, u32)>,
     /// Barra de título do Windows 3.1 (`--moldura` liga, `--sem-moldura` desliga); vence `data/video.json`.
     pub(crate) moldura: Option<bool>,
+    /// Com a moldura do Windows 3.1, manter a do sistema (`--moldura-do-sistema`) ou substituí-la
+    /// (`--sem-moldura-do-sistema`); vence `data/video.json` → `substituir_moldura_do_sistema`.
+    pub(crate) substituir_moldura: Option<bool>,
     /// Ritmo de Fast/Ultra (`--velocidades original|proporcional`); vence `data/partida.json`.
     pub(crate) velocidades: Option<String>,
     /// Cadência sem foco (`--sem-foco lenta|original`); vence `data/partida.json`.
@@ -148,6 +151,7 @@ pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
         tela_virtual: None,
         janela: None,
         moldura: None,
+        substituir_moldura: None,
         velocidades: None,
         sem_foco: None,
         video: video::ConfigVideo::default(),
@@ -195,6 +199,8 @@ pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
             "--resolucao" => o.resolucao = Some(video::ler_tamanho("--resolucao", &valor()?)?),
             "--moldura" => o.moldura = Some(true),
             "--sem-moldura" => o.moldura = Some(false),
+            "--moldura-do-sistema" => o.substituir_moldura = Some(false),
+            "--sem-moldura-do-sistema" => o.substituir_moldura = Some(true),
             "--velocidades" => o.velocidades = Some(ler_escolha(&a, valor()?, &VELOCIDADES)?),
             "--sem-foco" => o.sem_foco = Some(ler_escolha(&a, valor()?, &SEM_FOCO)?),
             "--preferencias" => o.preferencias = Some(valor()?.into()),
