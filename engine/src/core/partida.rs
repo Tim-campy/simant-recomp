@@ -1245,6 +1245,34 @@ impl Partida {
         self.ir_para_amarela(plano, x, y);
     }
 
+    /// `_GotoSpider` (`1000:a844`), o botão `ribToSpider` da faixa 34 (id 0x2207 em
+    /// `_ProcMapRibbonEvent`): sem a aranha no mapa (`_SpidOn` = 0, como no Tutorial ou depois de ela
+    /// morrer) só toca o som de erro (`_myBeginSound(1, 0, 0x7e)`); senão a vista vai à célula dela
+    /// (`_SpidX >> 4`, `_SpidY >> 4`) na superfície: com a superfície na tela, `_CenterEdit` e a
+    /// alternância do mapa zerada; noutro plano, `_SetMapPlaneLocation(1, x, y)` (troca de plano
+    /// centralizando uma vez, sem mexer no ponto lembrado). Devolve se foi.
+    pub fn ir_para_aranha(&mut self) -> bool {
+        let a = &self.estado.aranha;
+        if a.ligada == 0 {
+            if let Some(id) = self.tabelas_amarela.sons.erro {
+                self.eventos.push_back(Evento::Som(id));
+            }
+            return false;
+        }
+        let (x, y) = (i32::from(a.x >> 4), i32::from(a.y >> 4));
+        if self.nav.plano_mapa == 1 {
+            self.alterna_mapa = false;
+            let antes = self.nav.vista;
+            self.nav.vista.centralizar(x, y);
+            self.nav.vista.limitar();
+            self.redesenhar |= antes != self.nav.vista;
+        } else {
+            self.redesenhar |= self.nav.ir_para_ponto(1, x, y);
+        }
+        self.vistas_para_estado();
+        true
+    }
+
     /// Se algum `_UpdateWindows` desde a última chamada mostrou o mapa (`_DrawMap`), e zera.
     pub fn tomar_mapa_na_tela(&mut self) -> bool {
         std::mem::take(&mut self.mapa_na_tela)

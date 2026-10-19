@@ -223,6 +223,34 @@ fn marcadores_da_faixa() {
     assert!((p.nav.vista.y - vista.2).abs() <= 1);
 }
 
+/// `_GotoSpider` (botão `ribToSpider` da faixa 34): do ninho preto, a vista vai para a superfície
+/// centrada na célula da aranha (`_SetMapPlaneLocation(1, x, y)`, sem mexer no ponto lembrado); na
+/// superfície, só centraliza; sem aranha (`_SpidOn` = 0), o som de erro e a vista fica.
+#[test]
+fn botao_da_aranha() {
+    let mut p = partida();
+    assert_eq!(p.nav.plano_mapa, 2, "QUICK2.ANT começa no ninho preto");
+    p.estado.aranha.ligada = 1;
+    p.estado.aranha.x = 40 * 16 + 7;
+    p.estado.aranha.y = 30 * 16;
+    let lembrado = p.nav.pontos[1];
+    assert!(p.ir_para_aranha());
+    let v = &p.nav.vista;
+    assert_eq!(p.nav.plano_mapa, 1);
+    // Uma centralização só (`_SetMapPlaneLocation`): um eixo pode ficar um passo atrás (jogo.md).
+    assert!((v.x + v.largura / 2 - 40).abs() <= 1 && (v.y + v.altura / 2 - 30).abs() <= 1, "{v:?}");
+    assert_eq!(p.nav.pontos[1], lembrado);
+    p.estado.aranha.x = 90 * 16;
+    assert!(p.ir_para_aranha());
+    assert!((p.nav.vista.x + p.nav.vista.largura / 2 - 90).abs() <= 1);
+    p.retirar_eventos();
+    p.estado.aranha.ligada = 0;
+    let antes = (p.nav.plano_mapa, p.nav.vista.x, p.nav.vista.y);
+    assert!(!p.ir_para_aranha());
+    assert_eq!((p.nav.plano_mapa, p.nav.vista.x, p.nav.vista.y), antes);
+    assert!(p.retirar_eventos().contains(&engine::rules::estado::Evento::Som(1)));
+}
+
 /// Botões configuráveis: bitmaps e estado de `_SetUserButton`/`_UpdateUserButtons`; o menu de
 /// ícones troca a função; o menu da amarela manda `_YellowCommand` e segurar o botão na amarela
 /// pede o menu.

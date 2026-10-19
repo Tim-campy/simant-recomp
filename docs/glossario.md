@@ -90,5 +90,6 @@ Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese
 | `_SetMenuEntries` (`1000:4c24`) / `_SetMenuItemState` / `_SetMenuOptionText` | marcas do Speed e do Options e o texto Pause/Unpause | pseudocódigo; telas/menus.md §2 |
 | `_MenuQuit` (`1000:d628`) | pergunta "SimAnt Quit" (Yes = Save As e sai, No = sai, Cancel) | pseudocódigo, bancada m19/o03; telas/menus.md §4 |
 | `_AboutDialog` (`1000:cf3a`) | File → About: janela 31, figura e créditos (4/1700) rolando, jogo pausado | pseudocódigo, bancada; telas/menus.md §5 |
-| `_ScoreDialog` (`1000:5caa`) / `_win_DrawScoreWindow` (`1000:5aca`) | Window → Status (Ctrl+T): janela 24 com as notas de `_CalcScore` e a pontuação; o jogo continua andando | pseudocódigo, bancada n02; telas/menus.md §6 |
+| `_GotoSpider` (`1000:a844`) | Botão `ribToSpider` da faixa 34 (0x2207) e `editGoSpider`: a vista vai à aranha na superfície; sem `_SpidOn`, o som de erro | pseudocódigo; telas/jogo.md "Faixa" |
+| `_ScoreDialog` (`1000:5caa`) / `_win_DrawScoreWindow` (`1000:5aca`) | Window → Status (Ctrl+T) e botão `ribStats` da faixa 34 (0x2209): janela 24 com as notas de `_CalcScore` e a pontuação; o jogo continua andando | pseudocódigo, bancada n02; telas/menus.md §6 |
 | `_win_Events` (`1030:d040`) | despacha as mensagens pendentes e diz se houve clique ou Espaço/Insert (fecha os diálogos do jogo) | pseudocódigo |

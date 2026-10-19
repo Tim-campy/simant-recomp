@@ -156,7 +156,7 @@ impl Sessao<'_> {
                 println!("janela {id} na frente");
                 Roteamento::Tratado
             }
-            Clique::Tamanho(_) | Clique::Moveu(_) | Clique::Nada | Clique::Rolar(..) => Roteamento::Tratado,
+            Clique::Tamanho(_) | Clique::Moveu(_) | Clique::Minimizou(_) | Clique::Nada | Clique::Rolar(..) => Roteamento::Tratado,
         }
     }
 

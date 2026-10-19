@@ -1,0 +1,107 @@
+# Controles do diálogo "Load Ant Hill" (COMMDLG): as duas listas suspensas, a rolagem da árvore de pastas e da
+# lista de arquivos pelo teclado, Read Only, seleção de texto no File Name e arrasto pelo título
+# (telas/arquivos.md §3.1). Disquete re_trabalho/ag_dlgaj/pastas.img = muitos.img + 12 pastas + rótulo
+# (tools/disquete_pastas.py). Tela = área cliente + 38 linhas.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_dialogo_controles.txt --overlay <cópia do c_overlay.qcow2>
+snapshot_carregar quick
+esperar 2
+disquete re_trabalho/ag_dlgaj/pastas.img
+esperar 1
+teclas ctrl+l
+esperar 3
+teclas n
+esperar 3
+capturar re_trabalho/ag_dlgaj/dlg/g00_load.png
+# List Files of Type: seta da lista suspensa
+clicar_em 221 272
+esperar 2
+capturar re_trabalho/ag_dlgaj/dlg/g01_tipos_aberta.png
+clicar_em 221 272
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g02_tipos_fechada.png
+# Drives: seta da lista suspensa
+clicar_em 406 273
+esperar 2
+capturar re_trabalho/ag_dlgaj/dlg/g03_drives_aberta.png
+teclas up
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g04_drives_cima.png
+teclas ret
+esperar 4
+capturar re_trabalho/ag_dlgaj/dlg/g05_drive_a.png
+# Árvore de pastas: seta de baixo, trilho, seta de cima
+clicar_em 408 235
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g06_arvore_seta.png
+clicar_em 408 215
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g07_arvore_pagina.png
+clicar_em 408 135
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g08_arvore_seta_cima.png
+# Lista de arquivos pelo teclado: clique no primeiro item e setas / PageDown / End
+clicar_em 120 134
+esperar 1
+teclas down
+teclas down
+teclas down
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g09_lista_tres.png
+teclas pgdn
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g10_lista_pagina.png
+teclas end
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g11_lista_fim.png
+teclas home
+esperar 1
+# Árvore pelo teclado (Tab até ela? usa o clique num item e Down)
+# Read Only
+clicar_em 431 197
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g12_readonly.png
+# File Name: digitar e selecionar
+teclas alt+n
+esperar 1
+digitar abcd efgh ijkl
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g13_digitado.png
+ir_para 80 113
+apertar
+mover 40 0
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g14_arrasto_sel.png
+soltar
+esperar 1
+clicar_em 120 113
+clicar
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g15_duplo.png
+teclas end
+teclas shift+left shift+left shift+left
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g16_shift_esq.png
+teclas ctrl+a
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g17_ctrl_a.png
+teclas home
+teclas shift+end
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g18_shift_end.png
+# Arrastar o diálogo pelo título
+ir_para 300 66
+apertar
+mover 30 20
+mover 30 20
+esperar 1
+capturar re_trabalho/ag_dlgaj/dlg/g19_arrasto_titulo.png
+soltar
+esperar 2
+capturar re_trabalho/ag_dlgaj/dlg/g20_movido.png
+# Load com Read Only marcado (o jogo ignora a marca?)
+teclas alt+n
+digitar alfa
+teclas ret
+esperar 6
+capturar re_trabalho/ag_dlgaj/dlg/g21_carregado_readonly.png
+fim

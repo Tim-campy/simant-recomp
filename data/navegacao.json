@@ -23,6 +23,11 @@
     "ribToBNest": "ninho_preto",
     "ribToRNest": "ninho_vermelho"
   },
+  "_botoes_faixa_outros": "_ProcMapRibbonEvent (1010:c3d4): 0x2207 ribToSpider -> _GotoSpider (1000:a844: sem _SpidOn, o som de erro; senão a vista vai à aranha na superfície); 0x2209 ribStats -> _ScoreDialog (a janela Status de Window -> Status). Valores: aranha, status.",
+  "botoes_faixa_outros": {
+    "ribToSpider": "aranha",
+    "ribStats": "status"
+  },
   "_repeticao": "O original repete o clique nas setas das barras e Ctrl+seta num laço dentro de MAINWNDPROC enquanto o botão (ou Ctrl e a seta) continua apertado, um passo por redesenho da janela de edição, sem espera antes da repetição e com a simulação parada (nenhuma WM_TIMER é tratada no laço). O ritmo depende da CPU: na bancada QEMU (TCG) foram 22, 25 e 35 passos em 1, 1 e 1,5 s, ~23 por segundo (qemu_ritmo_rolagem.txt, 2026-10-19). O port usa um passo a cada intervalo_ms, a partir de atraso_ms depois do primeiro.",
   "repeticao": {"atraso_ms": 43, "intervalo_ms": 43}
 }

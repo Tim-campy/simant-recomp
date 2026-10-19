@@ -242,6 +242,45 @@
       68
     ],
     "recuo_pasta": 4,
-    "texto_pasta": 22
+    "texto_pasta": 22,
+    "_controles": "Controles do diálogo (telas/arquivos.md §3.1; bancada 2026-10-19, qemu_dialogo_controles.txt, capturas re_trabalho/ag_dlgaj/dlg/g00-g21): listas suspensas abertas da linha de baixo da caixa para baixo, 'List Files of Type' com itens de 13 e 7 visíveis (g01), 'Drives' com itens de 16 e 5 visíveis (g03); ícone da unidade (16 x 9) em (+5, +3) do item e texto em +27, na caixa fechada em (+7, +6) e +28. Ícones: '#' preto, 'w' branco, '.' cinza-claro, ':' cinza-escuro (medidos em g03). limite_nome: caracteres do campo. repeticao_ms: espera e intervalo da seta segurada [hipótese]. linhas_roda: a roda do mouse (extensão do port).",
+    "controles": {
+      "tipo_altura_item": 13,
+      "tipo_visiveis": 7,
+      "unidades_altura_item": 16,
+      "unidades_visiveis": 5,
+      "unidade_icone": [5, 3],
+      "unidade_texto": 27,
+      "unidade_icone_fechada": [7, 6],
+      "unidade_texto_fechada": 28,
+      "icones_unidade": {
+        "disquete": [
+          "################",
+          "#wwwwwwwwwwwww:#",
+          "#w...........#:#",
+          "#w...######...:#",
+          "#w############:#",
+          "#w...######...:#",
+          "#w............:#",
+          "#::::::::::::::#",
+          "################"
+        ],
+        "disco": [
+          "################",
+          "#wwwwwwwwwwwww:#",
+          "#w............:#",
+          "#w############:#",
+          "#w............:#",
+          "#w############:#",
+          "#w##..........:#",
+          "#::::::::::::::#",
+          "################"
+        ]
+      },
+      "limite_nome": 127,
+      "repeticao_ms": [400, 50],
+      "linhas_roda": 3
+    }
   }
 }
+

@@ -1,0 +1,61 @@
+# Janela do WinHelp (continuação de qemu_ajuda_janela.txt): tamanho mínimo pelas bordas e o lugar em que
+# a janela reabre depois de movida, redimensionada ou maximizada e fechada.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ajuda_janela2.txt --overlay <cópia do c_overlay.qcow2>
+snapshot_carregar quick
+esperar 3
+teclas f1
+esperar 6
+# Borda direita (x 636) para a esquerda até o mínimo
+ir_para 636 300
+apertar
+mover -150 0
+mover -150 0
+mover -150 0
+esperar 1
+capturar re_trabalho/ag_dlgaj/aj/k00_redim_dir.png
+soltar
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/k01_estreita.png
+# Borda de baixo (y 476) para cima até o mínimo
+ir_para 260 476
+apertar
+mover 0 -150
+mover 0 -150
+mover 0 -150
+esperar 1
+soltar
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/k02_baixa.png
+# Fechar e abrir de novo: o lugar e o tamanho ficam?
+teclas alt+f4
+esperar 3
+teclas f1
+esperar 6
+capturar re_trabalho/ag_dlgaj/aj/k03_reaberta.png
+# Maximizar pelo duplo clique no título, fechar e abrir de novo
+clicar_em 300 14
+clicar
+esperar 3
+capturar re_trabalho/ag_dlgaj/aj/k04_max.png
+teclas alt+f4
+esperar 3
+teclas f1
+esperar 6
+capturar re_trabalho/ag_dlgaj/aj/k05_reaberta_max.png
+# Arrastar o título com a janela maximizada (não deve mover)
+ir_para 300 9
+apertar
+mover 40 40
+esperar 1
+capturar re_trabalho/ag_dlgaj/aj/k06_arrasto_max.png
+soltar
+esperar 2
+capturar re_trabalho/ag_dlgaj/aj/k07_depois.png
+# Menu de sistema da janela maximizada
+clicar_em 9 9
+esperar 2
+capturar re_trabalho/ag_dlgaj/aj/k08_menu_max.png
+teclas esc
+teclas alt+f4
+esperar 2
+fim

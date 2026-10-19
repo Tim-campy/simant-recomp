@@ -123,7 +123,47 @@ pub struct ConfigAjuda {
     /// botões Search e History não fazem nada e os popups trocam o tópico, como antes.
     #[serde(default)]
     pub janelas: Option<super::ajuda_janelas::ConfigJanelasAjuda>,
+    /// A janela do WinHelp como janela de nível superior do Windows 3.1 (menu de sistema, mover,
+    /// redimensionar, minimizar, maximizar), pelo gerenciador de janelas (`core/gerenciador.rs`).
+    /// Opcional (API 0.40): sem ela, a interface usa o menu e o tamanho mínimo das janelas filhas.
+    #[serde(default)]
+    pub janela: Option<ConfigJanelaAjuda>,
 }
+
+/// O que muda, na configuração do gerenciador das janelas filhas (`janelas.json` →
+/// `gerenciador`), para a janela do WinHelp [bancada h01, k01/k02].
+#[derive(Clone, Debug, Deserialize)]
+pub struct ConfigJanelaAjuda {
+    /// Menor contorno externo (`SM_CXMINTRACK` × `SM_CYMINTRACK` do Windows 3.1 a 640×480: 103 × 26,
+    /// o título com a moldura).
+    pub tamanho_minimo: [i16; 2],
+    /// Itens do menu de sistema de uma janela de nível superior: Restore, Move, Size, Minimize,
+    /// Maximize, —, Close Alt+F4, —, Switch To... Ctrl+Esc.
+    pub itens: Vec<super::gerenciador::ItemMenuSistema>,
+    pub largura_menu: i16,
+    pub coluna_atalho: i16,
+    /// Cor da sombra de 1 pixel do menu (cinza-claro).
+    #[serde(default)]
+    pub sombra_menu: Option<u8>,
+    /// Fase do pontilhado do contorno de arrasto (o Windows o alinha à tela; ver
+    /// `Gerenciador::fase_pontilhado`).
+    #[serde(default)]
+    pub fase_pontilhado: i32,
+}
+
+impl ConfigJanelaAjuda {
+    /// A configuração do gerenciador das janelas filhas com o que é da janela do WinHelp.
+    pub fn aplicar(&self, cfg: &mut super::gerenciador::ConfigGerenciador) {
+        cfg.tamanho_minimo = self.tamanho_minimo;
+        let m = &mut cfg.menu_sistema;
+        m.itens = self.itens.clone();
+        m.largura = self.largura_menu;
+        m.coluna_atalho = self.coluna_atalho;
+        m.alinhar_na_caixa = true;
+        m.sombra = self.sombra_menu;
+    }
+}
+
 
 /// O que a interface faz depois de uma entrada no visor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -180,6 +220,11 @@ pub struct VisorAjuda {
     /// Posição guardada da janela History (`WIN.INI`, `[Windows Help] H_WindowPosition` =
     /// `[x, y, largura, altura, maximizada]` em pixels da tela).
     pub(crate) historico_guardado: Option<[i16; 4]>,
+    /// A janela está maximizada (o botão da direita do título é o de restaurar). Quem move,
+    /// redimensiona e maximiza é o gerenciador de janelas da interface (`core/gerenciador.rs`).
+    pub maximizada: bool,
+    /// O WinHelp é a aplicação ativa (título azul); com o foco no jogo, o título fica inativo.
+    pub ativa_no_sistema: bool,
 }
 
 pub(crate) fn ret(e: i16, t: i16, d: i16, b: i16) -> Retangulo {
@@ -282,6 +327,8 @@ impl VisorAjuda {
             tela: None,
             historico_guardado: None,
             visitados: vec![indice],
+            maximizada: false,
+            ativa_no_sistema: true,
         })
     }
 
@@ -400,28 +447,83 @@ impl VisorAjuda {
         ret(i.esq, i.topo, i.dir, i.topo + self.cfg.altura_titulo)
     }
 
+    /// Barra de menus inteira (todas as linhas, sem a linha preta de baixo).
     pub(crate) fn faixa_menu(&self) -> Retangulo {
         let t = self.faixa_titulo();
-        ret(t.esq, t.base + 1, t.dir, t.base + 1 + self.cfg.altura_menu)
+        let n = self.celulas_menu().iter().map(|c| c.1).max().unwrap_or(0) as i16 + 1;
+        ret(t.esq, t.base + 1, t.dir, t.base + 1 + n * self.cfg.altura_menu + (n - 1))
     }
 
-    /// Faixa dos botões, da linha preta de cima (topo) até a de baixo (base − 1).
+    /// Largura da célula de cada item da barra de menus e o x do texto dentro dela: as faixas
+    /// realçadas medidas (`janelas.menus[k].destaque`, File 40, Edit 41, Bookmark 81, Help 46); sem
+    /// elas, a distância entre os textos.
+    fn larguras_menu(&self) -> Vec<(i16, i16)> {
+        let k = self.cfg.espessura_moldura;
+        let n = self.cfg.menu.len();
+        (0..n)
+            .map(|i| {
+                let destaque = self.cj().and_then(|c| c.menus.get(i)).map(|m| m.destaque);
+                match destaque {
+                    Some([a, b]) => (b - a + 1, self.cfg.menu[i].x - (a - k)),
+                    None => {
+                        let x = self.cfg.menu[i].x;
+                        let prox = self.cfg.menu.get(i + 1).map_or(x + 8 * self.cfg.menu[i].texto.len() as i16 + 8, |m| m.x);
+                        (prox - x, 8)
+                    }
+                }
+            })
+            .collect()
+    }
+
+    /// Células da barra de menus (o retângulo realçado de cada item e a linha), da esquerda para a
+    /// direita; um item que não cabe na linha vai para a seguinte, como a barra de menus do Windows
+    /// numa janela estreita (bancada k01: "File Edit" / "Bookmark" / "Help", linhas de 18 + 1).
+    pub(crate) fn celulas_menu(&self) -> Vec<(Retangulo, usize, i16)> {
+        let t = self.faixa_titulo();
+        let largura = t.dir - t.esq;
+        let (mut x, mut linha) = (0i16, 0usize);
+        let mut v = Vec::new();
+        for (w, texto) in self.larguras_menu() {
+            if x > 0 && x + w > largura {
+                linha += 1;
+                x = 0;
+            }
+            let topo = t.base + 1 + linha as i16 * (self.cfg.altura_menu + 1);
+            v.push((ret(t.esq + x, topo, t.esq + x + w, topo + self.cfg.altura_menu), linha, texto));
+            x += w;
+        }
+        v
+    }
+
+    /// Botões por linha da barra de botões: os que cabem na largura (pelo menos 1; bancada k01, um
+    /// por linha numa janela de 103 pixels).
+    fn botoes_por_linha(&self) -> usize {
+        let i = self.interno();
+        (((i.dir - i.esq) / self.cfg.largura_botao.max(1)) as usize).max(1)
+    }
+
+    /// Faixa dos botões, da linha preta de cima (topo) até a de baixo (base − 1); com várias linhas
+    /// de botões, cada uma tem a altura de um botão (21).
     fn faixa_botoes(&self) -> Retangulo {
         let m = self.faixa_menu();
-        ret(m.esq, m.base + 1, m.dir, m.base + 1 + self.cfg.altura_botoes + 1)
+        let n = self.cfg.botoes.len().div_ceil(self.botoes_por_linha()).max(1) as i16;
+        ret(m.esq, m.base + 1, m.dir, m.base + 1 + n * (self.cfg.altura_botoes + 1))
     }
 
     fn botao(&self, k: usize) -> Retangulo {
         let f = self.faixa_botoes();
-        let x0 = f.esq + k as i16 * self.cfg.largura_botao;
-        ret(x0, f.topo, x0 + self.cfg.largura_botao, f.base)
+        let n = self.botoes_por_linha();
+        let (linha, coluna) = ((k / n) as i16, (k % n) as i16);
+        let x0 = f.esq + coluna * self.cfg.largura_botao;
+        let y0 = f.topo + linha * (self.cfg.altura_botoes + 1);
+        ret(x0, y0, x0 + self.cfg.largura_botao, y0 + self.cfg.altura_botoes + 1)
     }
 
-    /// Área do texto do tópico (com a barra, se houver).
+    /// Área do texto do tópico (com a barra, se houver); vazia se a janela é baixa demais.
     pub(crate) fn area_texto(&self) -> Retangulo {
         let b = self.faixa_botoes();
         let i = self.interno();
-        ret(i.esq, b.base, i.dir, i.base)
+        ret(i.esq, b.base.min(i.base), i.dir, i.base)
     }
 
     pub(crate) fn caixa_menu_sistema(&self) -> Retangulo {
@@ -725,7 +827,7 @@ impl VisorAjuda {
         let t = self.faixa_titulo();
         let inativas = self.cfg.janelas.as_ref().map(|j| (j.cores.titulo_inativo, j.cores.texto_titulo_inativo));
         let (cor_titulo, cor_texto_titulo) = match inativas {
-            Some(par) if !self.janela_ativa() => par,
+            Some(par) if !self.janela_ativa() || !self.ativa_no_sistema => par,
             _ => (c.titulo, c.texto_titulo),
         };
         q.preencher(t, cor_titulo, cor_titulo);
@@ -740,6 +842,11 @@ impl VisorAjuda {
         let min = ret(t.dir - 2 * h - 1, t.topo, t.dir - h - 1, t.base);
         for (b, cima) in [(min, false), (max, true)] {
             self.desenhar_botao_titulo(q, b);
+            if cima && self.maximizada {
+                // Maximizada: o botão de restaurar (as duas setas; w13).
+                super::gerenciador::desenhar_glifo_restaurar(q, b, c.linha);
+                continue;
+            }
             let cx = i32::from(b.esq) + 8;
             let y0 = i32::from(b.topo) + if cima { 6 } else { 7 };
             for kk in 0..4 {
@@ -752,22 +859,27 @@ impl VisorAjuda {
         if let Some(f) = sistema {
             let w = f.largura_texto(self.cfg.titulo.as_bytes()) as i32;
             let (x0, x1) = (i32::from(caixa.dir) + 1, i32::from(min.esq) - 1);
-            let x = (x0 + x1 - w) / 2;
+            // O Windows centraliza o título; se ele não cabe, alinha à esquerda (bancada k01).
+            let x = ((x0 + x1 - w) / 2).max(x0 + 1);
             q.recorte = Some(ret(x0 as i16, t.topo, x1 as i16, t.base));
             escrever(q, f, x, i32::from(t.topo) + (i32::from(h) - f.altura() as i32) / 2, self.cfg.titulo.as_bytes(), cor_texto_titulo);
             q.recorte = None;
         }
         q.linha(i32::from(i.esq), i32::from(t.base), i32::from(i.dir) - 1, i32::from(t.base), c.linha);
-        // Barra de menus (só desenho).
+        // Barra de menus (uma linha por fileira de itens).
         let m = self.faixa_menu();
         q.preencher(m, c.menu, c.menu);
         if let Some(f) = sistema {
-            for it in &self.cfg.menu {
-                escrever_mnemonico(q, f, i32::from(m.esq + it.x), i32::from(m.topo), &it.texto, c.texto_menu, false);
+            q.recorte = Some(ret(i.esq, m.topo, i.dir, m.base));
+            for (it, (cel, _, tx)) in self.cfg.menu.iter().zip(self.celulas_menu()) {
+                escrever_mnemonico(q, f, i32::from(cel.esq + tx), i32::from(cel.topo), &it.texto, c.texto_menu, false);
             }
+            q.recorte = None;
         }
         q.linha(i32::from(i.esq), i32::from(m.base), i32::from(i.dir) - 1, i32::from(m.base), c.linha);
-        // Barra de botões: fundo escuro, botões com relevo, linha preta embaixo.
+        // Barra de botões: fundo escuro, botões com relevo, linha preta embaixo. Tudo recortado ao
+        // interior (a janela pode ser mais baixa que as barras).
+        q.recorte = Some(i);
         let fb = self.faixa_botoes();
         q.preencher(fb, c.fundo_botoes, c.fundo_botoes);
         q.linha(i32::from(i.esq), i32::from(fb.base) - 1, i32::from(i.dir) - 1, i32::from(fb.base) - 1, c.linha);
@@ -797,6 +909,8 @@ impl VisorAjuda {
                 escrever_mnemonico(q, f, x, y0 + i32::from(self.cfg.topo_texto_botao), &b.texto, c.linha, !self.habilitado(b.acao));
             }
         }
+        q.recorte = None;
+
         // Texto do tópico.
         let a = self.area_texto();
         q.preencher(a, c.fundo, c.fundo);

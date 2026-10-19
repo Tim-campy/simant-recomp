@@ -145,6 +145,8 @@ pub enum Parte {
     MenuSistema,
     Titulo,
     Maximizar,
+    /// Botão de minimizar (só janelas com `WS_MINIMIZEBOX`: no port, a do WinHelp).
+    Minimizar,
     /// Moldura grossa (redimensionar pelos lados marcados).
     Borda(Lados),
     /// Moldura fina ou linha do título: não faz nada.
@@ -165,6 +167,8 @@ pub struct Geometria {
     pub titulo: Option<Retangulo>,
     pub caixa_menu: Option<Retangulo>,
     pub botao_maximizar: Option<Retangulo>,
+    /// Botão de minimizar: à esquerda do de maximizar, com uma linha preta entre os dois.
+    pub botao_minimizar: Option<Retangulo>,
     /// Área cliente sem as barras (as linhas que separam as barras ficam em `cliente.dir` e
     /// `cliente.base`).
     pub cliente: Retangulo,
@@ -184,6 +188,10 @@ pub struct JanelaFilha {
     pub restaurar: Option<Retangulo>,
     /// Barras de rolagem [horizontal, vertical], atualizadas pela interface.
     pub rolagem: [Rolagem; 2],
+    /// Minimizada (`SC_MINIMIZE`): vira ícone. Nenhuma janela filha do jogo minimiza; a janela do
+    /// WinHelp, de nível superior, vira um ícone da área de trabalho, escondido atrás da janela
+    /// maximizada do SimAnt (bancada h11): some da tela e não recebe cliques.
+    pub minimizada: bool,
 }
 
 impl JanelaFilha {
@@ -216,6 +224,11 @@ pub fn geometria(externo: Retangulo, estilo: &Estilo, m: &Metricas) -> Geometria
     let topo_area = titulo.map_or(i.topo, |t| t.base + 1);
     let caixa_menu = titulo.filter(|_| estilo.menu_sistema).map(|t| Retangulo { dir: t.esq + h, ..t });
     let botao_maximizar = titulo.filter(|_| estilo.maximizar).map(|t| Retangulo { esq: t.dir - h, ..t });
+    // Minimizar: colado à esquerda do de maximizar, com a linha preta entre os dois (ou na ponta).
+    let botao_minimizar = titulo.filter(|_| estilo.minimizar).map(|t| {
+        let dir = botao_maximizar.map_or(t.dir, |b| b.esq - 1);
+        Retangulo { esq: dir - h, dir, ..t }
+    });
     let (cliente, barra_h, barra_v) = if estilo.rolagem {
         let b = m.barra_rolagem;
         let c = Retangulo { esq: i.esq, topo: topo_area, dir: i.dir - b, base: i.base - b };
@@ -225,7 +238,7 @@ pub fn geometria(externo: Retangulo, estilo: &Estilo, m: &Metricas) -> Geometria
     } else {
         (Retangulo { topo: topo_area, ..i }, None, None)
     };
-    Geometria { externo, interior: i, titulo, caixa_menu, botao_maximizar, cliente, barra_h, barra_v }
+    Geometria { externo, interior: i, titulo, caixa_menu, botao_maximizar, botao_minimizar, cliente, barra_h, barra_v }
 }
 
 /// Trilho de uma barra: posições das linhas pretas depois da seta de menos e antes da de mais.
@@ -310,6 +323,9 @@ pub fn parte_em(j: &JanelaFilha, x: i32, y: i32) -> Option<Parte> {
             if g.botao_maximizar.is_some_and(|b| contem(b, x, y)) {
                 return Some(Parte::Maximizar);
             }
+            if g.botao_minimizar.is_some_and(|b| contem(b, x, y)) {
+                return Some(Parte::Minimizar);
+            }
             return Some(Parte::Titulo);
         }
         if y == i32::from(t.base) {
@@ -343,6 +359,9 @@ pub enum ComandoSistema {
     Maximizar,
     Fechar,
     Proxima,
+    /// "Switch To..." (Ctrl+Esc) das janelas de nível superior: a Task List do Windows, que o port
+    /// não tem (o item só fecha o menu).
+    Alternar,
     Separador,
 }
 
@@ -380,6 +399,14 @@ pub struct ConfigMenuSistema {
     pub cor_realce: u8,
     pub cor_texto_realce: u8,
     pub cor_borda: u8,
+    /// O menu abre com o canto esquerdo na caixa do menu de sistema (janela de nível superior de
+    /// moldura grossa: o WinHelp, bancada h01), não no contorno da janela (janelas filhas, w04).
+    #[serde(default)]
+    pub alinhar_na_caixa: bool,
+    /// Cor da coluna e da linha de 1 pixel por fora do menu, à direita e embaixo, a partir do
+    /// segundo pixel (medidas no menu de sistema do WinHelp, h01); sem ela, não são desenhadas.
+    #[serde(default)]
+    pub sombra: Option<u8>,
 }
 
 /// Conteúdo de "gerenciador" em data/janelas.json.
@@ -406,6 +433,8 @@ pub enum Arrasto {
     Polegar { id: u16, barra: Barra, pega: i32, inicio: i32, pos: i32 },
     /// Botão de maximizar/restaurar apertado: age ao soltar dentro dele.
     BotaoMaximizar { id: u16 },
+    /// Botão de minimizar apertado: age ao soltar dentro dele.
+    BotaoMinimizar { id: u16 },
 }
 
 /// Menu de sistema aberto.
@@ -436,6 +465,8 @@ pub enum Clique {
     Tamanho(u16),
     /// Moveu.
     Moveu(u16),
+    /// Minimizou (a janela some; volta com [`Gerenciador::restaurar`]).
+    Minimizou(u16),
     /// Mensagem de rolagem para a janela.
     Rolar(u16, Barra, ComandoRolagem),
 }
@@ -453,11 +484,16 @@ pub struct Gerenciador {
     fechadas: Vec<JanelaFilha>,
     pub arrasto: Option<Arrasto>,
     pub menu: Option<MenuAberto>,
+    /// Fase do pontilhado do contorno de arrasto: o Windows o desenha em XOR com o pincel cinza
+    /// alinhado à tela; as janelas filhas o desenham na área cliente da mãe (fase 0, medida em w02)
+    /// e a janela do WinHelp na tela inteira (a interface passa a fase que põe os pontos invertidos
+    /// onde x + y da tela é par; bancada h03).
+    pub fase_pontilhado: i32,
 }
 
 impl Gerenciador {
     pub fn new(cfg: ConfigGerenciador, area: Retangulo) -> Gerenciador {
-        Gerenciador { cfg, area, pilha: Vec::new(), fechadas: Vec::new(), arrasto: None, menu: None }
+        Gerenciador { cfg, area, pilha: Vec::new(), fechadas: Vec::new(), arrasto: None, menu: None, fase_pontilhado: 0 }
     }
 
     fn indice(&self, id: u16) -> Option<usize> {
@@ -494,7 +530,7 @@ impl Gerenciador {
         }
         let j = match self.fechadas.iter().position(|j| j.id == id) {
             Some(i) => self.fechadas.remove(i),
-            None => JanelaFilha { id, externo, estilo, metricas, restaurar: None, rolagem: [Rolagem::default(); 2] },
+            None => JanelaFilha { id, externo, estilo, metricas, restaurar: None, rolagem: [Rolagem::default(); 2], minimizada: false },
         };
         self.pilha.push(j);
     }
@@ -546,9 +582,9 @@ impl Gerenciador {
         self.topo()
     }
 
-    /// Janela da frente que contém o ponto.
+    /// Janela da frente que contém o ponto (as minimizadas não estão na tela).
     pub fn janela_em(&self, x: i32, y: i32) -> Option<u16> {
-        self.pilha.iter().rev().find(|j| contem(j.externo, x, y)).map(|j| j.id)
+        self.pilha.iter().rev().find(|j| !j.minimizada && contem(j.externo, x, y)).map(|j| j.id)
     }
 
     /// O ponto cai na área cliente da janela `id` e nenhuma outra por cima o cobre.
@@ -575,11 +611,33 @@ impl Gerenciador {
         true
     }
 
-    /// `SC_RESTORE`.
+    /// `SC_RESTORE`: de minimizada, volta como estava (maximizada ou não); de maximizada, ao
+    /// retângulo de antes.
     pub fn restaurar(&mut self, id: u16) -> bool {
         let Some(j) = self.janela_mut(id) else { return false };
+        if j.minimizada {
+            j.minimizada = false;
+            return true;
+        }
         let Some(r) = j.restaurar.take() else { return false };
         j.externo = r;
+        true
+    }
+
+    /// `SC_MINIMIZE` (só janelas com `WS_MINIMIZEBOX`): a janela vira ícone; fecha o menu e o
+    /// arrasto dela.
+    pub fn minimizar(&mut self, id: u16) -> bool {
+        let Some(j) = self.janela_mut(id) else { return false };
+        if j.minimizada || !j.estilo.minimizar {
+            return false;
+        }
+        j.minimizada = true;
+        if self.menu.is_some_and(|m| m.id == id) {
+            self.menu = None;
+        }
+        if self.arrasto.is_some_and(|a| arrasto_id(&a) == id) {
+            self.arrasto = None;
+        }
         true
     }
 
@@ -653,6 +711,10 @@ impl Gerenciador {
             }
             Parte::Maximizar => {
                 self.arrasto = Some(Arrasto::BotaoMaximizar { id });
+                Clique::Nada
+            }
+            Parte::Minimizar => {
+                self.arrasto = Some(Arrasto::BotaoMinimizar { id });
                 Clique::Nada
             }
             Parte::Titulo => {
@@ -760,7 +822,7 @@ impl Gerenciador {
                 let msg = (novo != pos).then_some(Clique::Rolar(id, barra, ComandoRolagem::Acompanhar(novo)));
                 (true, msg)
             }
-            Arrasto::BotaoMaximizar { .. } => (false, None),
+            Arrasto::BotaoMaximizar { .. } | Arrasto::BotaoMinimizar { .. } => (false, None),
         }
     }
 
@@ -802,6 +864,17 @@ impl Gerenciador {
                     Clique::Nada
                 }
             }
+            Arrasto::BotaoMinimizar { id } => {
+                let dentro = self
+                    .janela(id)
+                    .and_then(|j| j.geometria().botao_minimizar)
+                    .is_some_and(|b| contem(b, x, y));
+                if dentro && self.minimizar(id) {
+                    Clique::Minimizou(id)
+                } else {
+                    Clique::Nada
+                }
+            }
         }
     }
 
@@ -811,7 +884,8 @@ impl Gerenciador {
         let Some(j) = self.janela(id) else { return false };
         let g = j.geometria();
         let Some(c) = g.caixa_menu else { return false };
-        self.menu = Some(MenuAberto { id, x: i32::from(g.externo.esq), y: i32::from(c.base), realcado: Some(0) });
+        let x = if self.cfg.menu_sistema.alinhar_na_caixa { c.esq } else { g.externo.esq };
+        self.menu = Some(MenuAberto { id, x: i32::from(x), y: i32::from(c.base), realcado: Some(0) });
         true
     }
 
@@ -854,13 +928,14 @@ impl Gerenciador {
     pub fn habilitado(&self, id: u16, c: ComandoSistema) -> bool {
         let Some(j) = self.janela(id) else { return false };
         let max = j.maximizada();
+        let min = j.minimizada;
         match c {
-            ComandoSistema::Restaurar => max,
+            ComandoSistema::Restaurar => max || min,
             ComandoSistema::Mover => !max,
-            ComandoSistema::Tamanho => j.estilo.moldura_grossa && !max,
-            ComandoSistema::Minimizar => j.estilo.minimizar,
+            ComandoSistema::Tamanho => j.estilo.moldura_grossa && !max && !min,
+            ComandoSistema::Minimizar => j.estilo.minimizar && !min,
             ComandoSistema::Maximizar => j.estilo.maximizar && !max,
-            ComandoSistema::Fechar | ComandoSistema::Proxima => true,
+            ComandoSistema::Fechar | ComandoSistema::Proxima | ComandoSistema::Alternar => true,
             ComandoSistema::Separador => false,
         }
     }
@@ -936,7 +1011,14 @@ impl Gerenciador {
                 Some(t) => Clique::Ativou(t),
                 None => Clique::Nada,
             },
-            ComandoSistema::Minimizar | ComandoSistema::Separador => Clique::Nada,
+            ComandoSistema::Minimizar => {
+                if self.minimizar(id) {
+                    Clique::Minimizou(id)
+                } else {
+                    Clique::Nada
+                }
+            }
+            ComandoSistema::Alternar | ComandoSistema::Separador => Clique::Nada,
         }
     }
 
@@ -1009,9 +1091,17 @@ impl Gerenciador {
     /// e então quem o desenha é a barra.
     pub fn desenhar_por_cima(&self, q: &mut Quadro, fonte: Option<&Fonte>, acompanhando: bool) {
         let cor = self.cfg.cor_contorno_arrasto;
+        let fase = self.fase_pontilhado;
         match self.arrasto {
-            Some(Arrasto::Mover { contorno, .. }) | Some(Arrasto::Redimensionar { contorno, .. }) => {
-                contorno_pontilhado(q, Retangulo { dir: contorno.dir - 1, base: contorno.base - 1, ..contorno }, cor);
+            Some(Arrasto::Mover { id, contorno, .. }) | Some(Arrasto::Redimensionar { id, contorno, .. }) => {
+                // O Windows desenha o retângulo de arrasto com a espessura da moldura menos 1 nas
+                // janelas de moldura grossa (3 pixels: bancada h03, o WinHelp) e com 1 pixel nas de
+                // moldura fina (w02) [hipótese para a janela de edição, que não foi medida].
+                let k = self.janela(id).map_or(1, |j| if j.estilo.moldura_grossa { (j.metricas.espessura - 1).max(1) } else { 1 });
+                for d in 0..k {
+                    let r = Retangulo { esq: contorno.esq + d, topo: contorno.topo + d, dir: contorno.dir - 1 - d, base: contorno.base - 1 - d };
+                    contorno_pontilhado_fase(q, r, cor, fase);
+                }
             }
             Some(Arrasto::Polegar { id, barra, inicio, .. }) if !acompanhando => {
                 if let Some(j) = self.janela(id) {
@@ -1025,7 +1115,7 @@ impl Gerenciador {
                         } else {
                             Retangulo { esq: c.esq - 1, topo: p, dir: c.dir, base: p + lado + 1 }
                         };
-                        contorno_pontilhado(q, r, cor);
+                        contorno_pontilhado_fase(q, r, cor, fase);
                     }
                 }
             }
@@ -1045,6 +1135,10 @@ impl Gerenciador {
         let r = self.retangulo_do_menu(m);
         q.preencher(r, c.cor_fundo, c.cor_fundo);
         q.contorno(Retangulo { dir: r.dir - 1, base: r.base - 1, ..r }, c.cor_borda);
+        if let Some(s) = c.sombra {
+            q.linha(i32::from(r.dir), i32::from(r.topo) + 1, i32::from(r.dir), i32::from(r.base), s);
+            q.linha(i32::from(r.esq) + 1, i32::from(r.base), i32::from(r.dir), i32::from(r.base), s);
+        }
         let (itens, _) = self.layout_menu();
         for (i, (it, &(t, h))) in c.itens.iter().zip(itens.iter()).enumerate() {
             let topo = r.topo + t as i16;
@@ -1140,7 +1234,11 @@ pub(crate) fn texto_acinzentado(q: &mut Quadro, f: &Fonte, texto: &str, x: i16, 
 
 fn arrasto_id(a: &Arrasto) -> u16 {
     match *a {
-        Arrasto::Mover { id, .. } | Arrasto::Redimensionar { id, .. } | Arrasto::Polegar { id, .. } | Arrasto::BotaoMaximizar { id } => id,
+        Arrasto::Mover { id, .. }
+        | Arrasto::Redimensionar { id, .. }
+        | Arrasto::Polegar { id, .. }
+        | Arrasto::BotaoMaximizar { id }
+        | Arrasto::BotaoMinimizar { id } => id,
     }
 }
 
@@ -1156,9 +1254,15 @@ pub(crate) fn mnemonico(texto: &str) -> Option<char> {
 /// → amarelo); os outros ficam como estão [medido em w02: 85 de 170 pontos da borda invertidos, todos
 /// com x + y ímpar na tela, e a tela começa numa linha par da área cliente].
 pub fn contorno_pontilhado(q: &mut Quadro, r: Retangulo, mascara: u8) {
+    contorno_pontilhado_fase(q, r, mascara, 0);
+}
+
+/// Como [`contorno_pontilhado`], com os pontos invertidos onde `x + y + fase` é ímpar.
+pub fn contorno_pontilhado_fase(q: &mut Quadro, r: Retangulo, mascara: u8, fase: i32) {
     let (e, t, d, b) = (i32::from(r.esq), i32::from(r.topo), i32::from(r.dir), i32::from(r.base));
     let mut inverter = |x: i32, y: i32| {
-        if (x + y).rem_euclid(2) == 1 && x >= 0 && y >= 0 && (x as usize) < q.largura && (y as usize) < q.altura {
+        if (x + y + fase).rem_euclid(2) == 1
+ && x >= 0 && y >= 0 && (x as usize) < q.largura && (y as usize) < q.altura {
             let c = q.pixels[y as usize * q.largura + x as usize];
             if c < 16 {
                 q.ponto(x, y, (c ^ mascara) & 15);
@@ -1287,7 +1391,10 @@ mod testes {
                 cor_realce: 4,
                 cor_texto_realce: 15,
                 cor_borda: 0,
+                alinhar_na_caixa: false,
+                sombra: None,
             },
+
         }
     }
 
