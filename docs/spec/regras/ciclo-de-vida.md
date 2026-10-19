@@ -289,7 +289,7 @@ Observações das execuções:
 
 ## Lacunas
 
-- Testados na bancada: C-01, C-02 e C-11 (acima); C-10 esbarra na mensagem modal do load. No port, C-11 é conferido em `engine/tests/regras_ninho.rs`, e os vetores de tick 79–83 (com a postura do tick 80) batem com o ovo, a rainha e a cauda do port (ver [ninho.md](ninho.md#133-observado-no-original)). Os demais casos ainda não; C-04 a C-07 são estatísticos e pedem várias execuções (ou a semente forçada por `escrever_variavel SementeS` logo depois do load).
+- Testados na bancada: C-01, C-02 e C-11 (acima); C-10 esbarra na mensagem modal do load. No port, C-11 é conferido em `engine/tests/regras_ninho.rs`, e os vetores de tick 79–83 (com a postura do tick 80) batem com o ovo, a rainha e a cauda do port (ver [ninho.md](ninho.md#133-observado-no-original)). C-04 a C-07 viraram vetores de tick (2026-10-18, `tools/cenarios_regras.py`, snapshot `rico`, 307/307 com S, R e vida; [testes-tick.md](testes-tick.md#quinta-rodada-2026-10-18-regras-não-verificadas-da-revisão)): `ovos_c04_c05/1791` (com `_ModeAuto` = 0 e `_modeLevels[2]` = 0 os 13 ovos pretos T = 7 morrem na eclosão, `_TotalEggsDiedB` 0 → 13; com `_HealthR` = 20 os 21 ovos vermelhos 0x87 nascem 17 operárias e 4 soldados, nenhum macho ou rainha), `ovos_c06/1711` (postura com `_HealthB` 100: ovo novo, `_TotalEggsLaidB` +1, `_HealthB` −1) e `ovos_c07/1711` (`_HealthB` 0: nenhum ovo) — **confirmados**. Faltam C-08 em diante.
 - O significado exato da lista 4/1100 por estágio (o índice usado na janela Examine) não foi conferido na interface.
 - `_YellowBirth` e a postura da amarela-rainha: só resumidos (ficam com `formiga-amarela.md`).
 - A fundação de colônias novas no Jogo Completo (`_SimColonies`, `_QueenStorage*`, revoada) não está aqui.

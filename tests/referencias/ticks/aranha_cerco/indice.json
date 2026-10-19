@@ -1,0 +1,73 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-18",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "rico",
+ "descricao": "Cerco da aranha (inimigos.md §2.4): aranha parada em (64, 32) e 9 pretas paradas (M = 17) no 3 x 3, _Scycle2 = 3 e _SpidRevenge = 2. No 1793: _SMode 0 -> 5, _DeathCnt = 500, mensagem 10046 (caixa modal fechada pela bancada), _SpidRevenge 3 e _MeSMode = 7 (a próxima caça por faro)",
+ "passos": [
+  "esperou até GameTime 1793",
+  "SpidOn <- 1",
+  "SpidX <- 1032",
+  "SpidY <- 520",
+  "SMode <- 0",
+  "Starg <- -2",
+  "EatCnt <- 0",
+  "9 pretas (M = 17) no 3 x 3 da aranha em (64, 32)",
+  "Scycle2 <- 3",
+  "SpidRevenge <- 2",
+  "tick 1793 parado: tela em re_trabalho/cen/dialogo_1793_0.png; fechando a caixa"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ]
+ },
+ "ticks": [
+  "tick_001793"
+ ],
+ "selecao": [
+  "1793"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}

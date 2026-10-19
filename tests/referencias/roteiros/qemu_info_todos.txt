@@ -1,0 +1,265 @@
+# Gerado por tools/gerar_roteiro_info.py: visita e captura os cartões do Info alcançáveis por clique.
+# Pré-requisitos como em qemu_info_cartas.txt (re_trabalho/info_todos/ov.qcow2 com o snapshot quick; a.img com PORT50).
+# Uso: python tools/qemu_bancada.py roteiro ESTE --overlay re_trabalho/info_todos/ov.qcow2
+snapshot_carregar quick
+esperar 2
+disquete re_trabalho/info_todos/a.img
+esperar 1
+teclas ctrl+l
+esperar 3
+teclas n
+esperar 3
+digitar A
+teclas shift+semicolon
+digitar PORT50
+esperar 1
+teclas ret
+esperar 5
+clicar_em 105 97
+esperar 3
+capturar re_trabalho/info_todos/c128.png
+clicar_em 337 310
+esperar 2
+capturar re_trabalho/info_todos/c130.png
+clicar_em 399 357
+esperar 2
+capturar re_trabalho/info_todos/c131.png
+clicar_em 330 449
+esperar 2
+clicar_em 443 357
+esperar 2
+capturar re_trabalho/info_todos/c132.png
+clicar_em 330 449
+esperar 2
+clicar_em 503 357
+esperar 2
+capturar re_trabalho/info_todos/c133.png
+clicar_em 552 449
+esperar 2
+clicar_em 337 296
+esperar 2
+capturar re_trabalho/info_todos/c134.png
+clicar_em 313 286
+esperar 2
+capturar re_trabalho/info_todos/c135.png
+clicar_em 330 449
+esperar 2
+clicar_em 388 325
+esperar 2
+capturar re_trabalho/info_todos/c136.png
+clicar_em 330 449
+esperar 2
+clicar_em 311 365
+esperar 2
+capturar re_trabalho/info_todos/c137.png
+clicar_em 330 449
+esperar 2
+clicar_em 385 411
+esperar 2
+capturar re_trabalho/info_todos/c138.png
+clicar_em 552 449
+esperar 2
+clicar_em 336 338
+esperar 2
+capturar re_trabalho/info_todos/c139.png
+clicar_em 346 288
+esperar 2
+capturar re_trabalho/info_todos/c140.png
+clicar_em 330 449
+esperar 2
+clicar_em 346 303
+esperar 2
+capturar re_trabalho/info_todos/c141.png
+clicar_em 330 449
+esperar 2
+clicar_em 346 318
+esperar 2
+capturar re_trabalho/info_todos/c142.png
+clicar_em 330 449
+esperar 2
+clicar_em 345 333
+esperar 2
+capturar re_trabalho/info_todos/c143.png
+clicar_em 330 449
+esperar 2
+clicar_em 347 348
+esperar 2
+capturar re_trabalho/info_todos/c144.png
+clicar_em 330 449
+esperar 2
+clicar_em 345 363
+esperar 2
+capturar re_trabalho/info_todos/c145.png
+clicar_em 552 449
+esperar 2
+clicar_em 337 352
+esperar 2
+capturar re_trabalho/info_todos/c146.png
+clicar_em 342 355
+esperar 2
+capturar re_trabalho/info_todos/c147.png
+clicar_em 330 449
+esperar 2
+clicar_em 342 295
+esperar 2
+capturar re_trabalho/info_todos/c148.png
+clicar_em 330 449
+esperar 2
+clicar_em 341 325
+esperar 2
+capturar re_trabalho/info_todos/c149.png
+clicar_em 330 449
+esperar 2
+clicar_em 339 385
+esperar 2
+capturar re_trabalho/info_todos/c150.png
+clicar_em 330 449
+esperar 2
+clicar_em 340 400
+esperar 2
+capturar re_trabalho/info_todos/c151.png
+clicar_em 552 449
+esperar 2
+clicar_em 337 366
+esperar 2
+capturar re_trabalho/info_todos/c152.png
+clicar_em 345 374
+esperar 2
+capturar re_trabalho/info_todos/c153.png
+clicar_em 330 449
+esperar 2
+clicar_em 345 344
+esperar 2
+capturar re_trabalho/info_todos/c154.png
+clicar_em 330 449
+esperar 2
+clicar_em 344 389
+esperar 2
+capturar re_trabalho/info_todos/c155.png
+clicar_em 330 449
+esperar 2
+clicar_em 345 359
+esperar 2
+capturar re_trabalho/info_todos/c156.png
+clicar_em 552 449
+esperar 2
+clicar_em 336 324
+esperar 2
+capturar re_trabalho/info_todos/c157.png
+clicar_em 330 449
+esperar 2
+clicar_em 337 310
+esperar 2
+clicar_em 399 357
+esperar 2
+clicar_em 307 292
+esperar 2
+capturar re_trabalho/info_todos/c158.png
+clicar_em 330 449
+esperar 2
+clicar_em 311 406
+esperar 2
+capturar re_trabalho/info_todos/c159.png
+clicar_em 330 449
+esperar 2
+clicar_em 388 405
+esperar 2
+capturar re_trabalho/info_todos/c160.png
+clicar_em 552 449
+esperar 2
+clicar_em 336 324
+esperar 2
+clicar_em 368 276
+esperar 2
+capturar re_trabalho/info_todos/c161.png
+clicar_em 330 449
+esperar 2
+clicar_em 367 291
+esperar 2
+capturar re_trabalho/info_todos/c162.png
+clicar_em 552 449
+esperar 2
+clicar_em 337 352
+esperar 2
+clicar_em 341 340
+esperar 2
+capturar re_trabalho/info_todos/c163.png
+clicar_em 330 449
+esperar 2
+clicar_em 340 370
+esperar 2
+capturar re_trabalho/info_todos/c164.png
+clicar_em 552 449
+esperar 2
+clicar_em 337 366
+esperar 2
+clicar_em 345 329
+esperar 2
+capturar re_trabalho/info_todos/c165.png
+clicar_em 330 449
+esperar 2
+clicar_em 344 404
+esperar 2
+capturar re_trabalho/info_todos/c166.png
+clicar_em 552 449
+esperar 2
+clicar_em 337 380
+esperar 2
+capturar re_trabalho/info_todos/c167.png
+clicar_em 437 417
+esperar 2
+capturar re_trabalho/info_todos/c168.png
+clicar_em 438 418
+esperar 2
+capturar re_trabalho/info_todos/c169.png
+clicar_em 552 449
+esperar 2
+clicar_em 337 352
+esperar 2
+clicar_em 340 310
+esperar 2
+capturar re_trabalho/info_todos/c170.png
+clicar_em 545 316
+esperar 2
+capturar re_trabalho/info_todos/c173.png
+clicar_em 330 449
+esperar 2
+capturar re_trabalho/info_todos/c171.png
+clicar_em 350 299
+esperar 2
+capturar re_trabalho/info_todos/c172.png
+clicar_em 330 449
+esperar 2
+clicar_em 349 384
+esperar 2
+capturar re_trabalho/info_todos/c174.png
+clicar_em 330 449
+esperar 2
+clicar_em 347 338
+esperar 2
+capturar re_trabalho/info_todos/c175.png
+clicar_em 330 449
+esperar 2
+clicar_em 349 353
+esperar 2
+capturar re_trabalho/info_todos/c176.png
+clicar_em 330 449
+esperar 2
+clicar_em 349 399
+esperar 2
+capturar re_trabalho/info_todos/c177.png
+clicar_em 330 449
+esperar 2
+clicar_em 349 368
+esperar 2
+capturar re_trabalho/info_todos/c178.png
+clicar_em 552 449
+esperar 2
+clicar_em 337 296
+esperar 2
+clicar_em 311 365
+esperar 2
+clicar_em 576 323
+esperar 2
+capturar re_trabalho/info_todos/c179.png
+fim

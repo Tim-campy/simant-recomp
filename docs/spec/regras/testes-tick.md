@@ -308,9 +308,65 @@ Bancada (novidades de `tools/cenarios_tick.py` e `qemu_bancada.py`): um tick que
 
 **Placar da rodada:** 8 vetores novos, 7 batem e são exigidos, 1 pendente; a sequência longa com desenho bate inteira. Ações novas em `acoes/`: `exp_ninho`, `exp_cheiro` (telas/experimental.md §9), 307/307. Fim de jogo pela interface: `engine/tests/fim_de_jogo_interface.rs` (descrito acima, agora implementado): o tick do vetor numa `core::partida::Partida` com o relógio do original dá `_IsGameOver`, um só `DialogoFimDeJogo`, as três caixas na ordem do original (10042, 10056 de `_PictStrnDialog` em `_YellowDeath`, e o GAME OVER) e a **pontuação 27572** mostrada pelo original; o Jogo Completo novo tem a forma do que o original começou; a volta para "Select a Game" está em `simant/` (teste `#[ignore]` com o motivo).
 
+### Quinta rodada (2026-10-18): regras não verificadas da revisão
+
+Itens da lista "Não verificado" de [../../estado-do-projeto.md](../../estado-do-projeto.md) §3, gravados por `tools/cenarios_regras.py` (cenários novos sobre a mesma `Sessao` de `cenarios_tick.py`; `gravar`, `eventos`, `selecionar`, mais `registrar` e `selecionar_lote`). A preparação escreve a memória do original na entrada de um tick (aranha, formigas da lista com a marca no mapa de vida, a amarela, células dos mapas); quando a regra passa pela interface, a preparação usa a interface do original: tecla X e clique na aranha para virar a aranha (`_DoLifeExchange`), tecla 1 e clique para o modo alvo, duplo clique para correr, troca de patch pela Yard View para chegar à casa. Snapshot `rico` (Quick Game com ~1710 ticks), salvo o choque (`full`).
+
+| Subpasta | Ticks | O que exercita |
+|---|---|---|
+| `aranha_cerco` | 1793 | 9 pretas no 3 × 3: estado 5, `_DeathCnt` 500, mensagem 10046, `_SpidRevenge` 2 → 3 e `_MeSMode` = 7 |
+| `aranha_foge` | 1793 | 6 pretas no 3 × 3: estado 4 e corrida |
+| `aranha_vinganca` | 1793 | cerco com `_SpidRevenge` 4 → 5: `_MeSMode` = 8 (laser) |
+| `aranha_faro` | 1793, 1805, 1816 | `_SFoundAnt` por faro, perseguição, comer com `_EatCnt` = 11, `_DeadAntHere` |
+| `aranha_laser` | 1794, 1796 | `_SpiderScan`: uma preta do leque morta em cada tick |
+| `leao_cerco` | 1793 | formiga-leão comendo com 7 vizinhas ocupadas: 10050, centro 0x3F, lista deslocada |
+| `aranha_jogador` | 1801, 1836, 1855, 1856 | aranha do jogador: anda, corre, persegue no modo alvo (`_MeSMode` 6) e come (`_EatCnt` 50) |
+| `aranha_jogador_cercada` | 1800 | a aranha do jogador perseguindo e cercada: `_YellowDeath(3)` |
+| `aranha_jogador_fora` | 1800 | a aranha do jogador sai do mapa correndo: `_YellowDeath(4)` |
+| `amarela_morte_leao` | 1711 | `_YellowDeath(2)` com `_AnimYellowFight` e duas centralizações no tick |
+| `amarela_morte_pisada` | 1712 | `_YellowDeath(5)` (o lugar do pé veio de uma execução de ensaio) |
+| `amarela_morte_cortador` | 1712 | `_YellowDeath(6)` |
+| `amarela_morte_afogada` | 1711 | `_YellowDeath(7)` com `_AnimYellowInsane` |
+| `amarela_morte_fome` | 1711 | `_YellowDeath(8)` com `_AnimYellowInsane` |
+| `amarela_morte_choque` | 27 | `_YellowDeath(10)`: a ordem termina em cima da tomada 0x76 da casa (patch (1, 5) do Jogo Completo) |
+| `amarela_morte_aranha` | 1793 | `_YellowDeath(1)` — **pendente** (abaixo) |
+| `ninho_n01`, `ninho_n01_saude31` | 1714, 1720; 1711 | N-01: morte natural com `_HealthB` 0; nenhuma com 31 |
+| `ninho_n07` | 1712, 1713 | N-07: mordidas na comida guardada |
+| `ninho_n10` | 1711, 1713 | N-10: a água sobe uma linha |
+| `ninho_n12` | 1711, 1716 | N-12: a luta não remove a checadora; a nuvem termina |
+| `ninho_n14` | 1713 | N-14: passagem 0x14 do ninho vermelho para o preto |
+| `ninho_n15` | 1711 | N-15: trofalaxia pela invasora vermelha |
+| `ovos_c04_c05` | 1791 | C-04: morte na eclosão com `_ModeAuto` 0; C-05: casta vermelha com `_HealthR` 20 |
+| `ovos_c06`, `ovos_c07` | 1711; 1711 | C-06: postura com saúde 100; C-07: nenhuma com saúde 0 |
+
+**Placar: 38 vetores novos em 25 cenários, 37 batem inteiros (307/307, S, R e vida) e são exigidos; 1 pendente com a causa isolada.** Antes da seleção, as gravações brutas inteiras foram comparadas (≈ 230 ticks, inclusive 83 da aranha do jogador e 24 do faro): só os ticks abaixo diferiram, e todos por causa conhecida. Volume: 4,7 MB.
+
+Achados:
+
+1. **Duas centralizações no mesmo tick (port corrigido).** Em `amarela_morte_leao/1711` o original deixou `_MapPnt` em (21, 0) e o comparador em (22, 0). Na morte o original chama `_GotoMyAnt` com a amarela ainda no centro da formiga-leão (superfície) e, no renascimento, de novo com ela no ovo (ninho preto); cada `_CenterEdit` parte de onde o anterior deixou a vista: (24, 0) → (18, 16) → (21, 0), com o eixo menor um passo aquém. O port centralizava uma vez só, na posição final. Correção: `Evento::CentralizarNaAmarela` passou a levar `{plano, x, y}` do momento do pedido (`Estado::pedir_centralizar_na_amarela`); a interface (`core::partida::ir_para_amarela`) e o comparador (`vetor_tick::aplicar_vista_da_bancada`) aplicam cada pedido na ordem. Nos scripts de mods, o evento `centralizar_na_amarela` ganhou `plano`, `x`, `y` (api-mods.md).
+2. **Pendente `amarela_morte_aranha/1793` (294/307): desenho dentro do tick.** Isolado com `cenarios_regras.py gravar contar_aranha` (`contar_no_tick`: breakpoints na entrada de `_SRand1`, `_DrawPalps`, `_DrawSpider`, `_DoEditUpdateDraw`, `_GotoMyAnt`, `_SpiderDialog`, `_LionDialog`, `_AnimYellowFight`, `_mySongIsDone`, com o S e, para `_SRand1`, quem chamou; grava `contagem.json`): 4 passos de S a mais no original — `S1(4)` de `_DrawPalps` nos desenhos da janela de edição de `_GotoMyAnt`, de antes do laço de `_AnimYellowFight` e do 1º quadro (a aranha à vista, `_SMode` 3), e `S1(2)` de `_SpiderDialog` ([rng.md](rng.md)). O port não faz os desenhos de dentro do tick. A contagem de controle na morte pela formiga-leão (`contar_leao`) não tem `_DrawPalps` (aranha fora da vista) e bate. Com a música ligada e sem placa de som na bancada, `_mySongIsDone` encerra a animação no 1º quadro (as duas contagens).
+3. **`_gameCycles` com caixa que não para o temporizador.** Em `ninho_n15/1711` o `_DoTroph` abre "You feel much better now!" (`_YellowDialog`), e `_gameCycles` anda 647 dentro do tick enquanto a bancada fecha a caixa (as caixas de `_PictStrnDialog` param o temporizador e não mudam `_gameCycles`). Chave nova no `indice.json` do cenário, `"gamecycles_fora_do_tick"`: o teste deixa de exigir só esse extra.
+4. **Artefatos da bancada evitados:** (a) o clique em (320, 310) que fecha uma caixa pode chegar à janela de edição depois de a caixa sumir e virar uma ordem para a amarela (visto na 1ª gravação de `fome`: destino (40, 9) e um passo); `cenarios_regras.py` fecha as caixas com Enter; (b) o relógio do Mac lido depois de uma caixa modal não é gravado (a lista termina na caixa), e o `_CatDelay` gravado com ele não é reproduzível (vistos em `cortador` e `pisada`); nesses cenários o gato fica fora de jogo (`_CatDelay` enorme na preparação).
+5. **A aranha do jogador com `_SMode` 0 ou 1 não é cercada**: o controle do jogador substitui o resto de `_MoveSpider` (inimigos.md 2.2); a 1ª tentativa de `aranha_jogador_cercada` (aranha parada) não morreu em 4 ticks. Cercada perseguindo, morre.
+
+### Quinta rodada, tutorial (2026-10-18): tutorial completo com as ações do jogador
+
+`tests/referencias/ticks/tutorial_completo/` (16 ticks, 2,1 MB; `cenarios_tick.py gravar tutorial_completo DIR --snapshot tut`, detalhes em [conselhos.md](conselhos.md) §3.1): o roteiro faz a ação que cada lição pede (cliques calculados, teclas, arrasto no Behavior, clique segurado no gráfico) e grava inteiros só os ticks em que `_TutorCnt` chega a múltiplo de 8; grava o snapshot `tutcur` a cada lição para retomar. Ações que dependem de coordenadas de outras janelas vêm do ambiente (`TUT_EXTRA`, JSON por lição). Duas gravações brutas (fora do git): 124 ticks das lições 1–26 (com o relógio lido depois da caixa) e 185 das lições 1–57.
+
+**Resultado:** dos 309 ticks, todos 307/307 com extras 5/5 e vida 0, menos três casos com a causa isolada:
+- `tick_000575` da 1ª gravação: `_CatDelay` diferente. No tick de `_FullCount` (`_Cycle` múltiplo de 64) a caixa da lição abre **antes** de `_DoSimYard`, e o gato leu o relógio depois de a caixa fechar; a gravação só tinha as leituras de antes da caixa (nenhuma), e o port usou `_gameCycles`. Regravado com `MacTickCount_depois_da_caixa`: 307/307 (está no repositório).
+- `tick_001174`–`001229`: a bancada anotou a janela do mapa (0x100) na frente depois do botão Patch, mas o original não concluiu a lição 0x2A até o Ctrl+M (a janela não estava na frente). Erro de anotação, não do port; fora da seleção.
+- `tick_001340`: a caixa com imagem da lição 50 fez o Windows descartar o segmento de código 6 (`_DoAntSim`) e o tick não voltou ao retorno conhecido; o "depois" foi lido cem ticks adiante. Inválido, fora da seleção.
+
+**Divergência achada e corrigida (regra, pequena):** `_TimeTemp` das lições 7, 9 e 0x1A. `_GiveLesson` mostra a caixa e só depois lê `_MacTickCount` (tick 291: relógio 10704 no tick, 12213 depois da caixa, `_TimeTemp` = 12813). O port usava o relógio do tick (`_TimeTemp` = 11304). Correção em `rules/conselhos.rs` (`MemoriaTutor::espera_depois_da_caixa` e `caixa_fechada`), chamada por `Partida::fechar_modal` e, nos vetores, por `vetor_tick::depois_do_tick` (o teste de ticks confere `_TimeTemp`). Teste de unidade `prazo_da_licao_7_conta_do_fechamento_da_caixa`.
+
+**Extras novos** (só em `antes`, todos opcionais): `JanelaNaFrente` (janela que a bancada pôs na frente, no formato de `_win_IsWinInFront`; vai para `RegrasOriginais::interface_tutor`), `VistaEdicao` (`[39, 21]`: a janela de edição do Tutorial é maior que a padrão de 25 × 19; usada por `aplicar_vista_da_bancada`) e, no nível de cima, `MacTickCount_depois_da_caixa`.
+
+**Bancada (`cenarios_tick.py`):** `fechar_caixa_ate_o_retorno` também para na entrada do tick seguinte (estado de depois = o da entrada seguinte) e não exige o segmento 6 presente; clica mais embaixo nas tentativas seguintes (caixas com imagem); com `relogio` anota as leituras do relógio depois de a caixa fechar (só no tick de `_FullCount` ou quando pedido: `anotar_relogio_caixa`). Observado: a caixa da lição sem imagem não chama `_MacTickCount`.
+
 ## Limitações
 
-- **Configurações cobertas.** Os primeiros vetores eram só do snapshot `quick` (Quick Game, velocidade normal, sem balões, chuva nem amarela em movimento). Hoje (2026-10-18) há 107 vetores em 21 grupos, de vários snapshots (`quick`, `rico`, `full`, `tut`, Experimental), com chuva, revoada, predadores, menino e cortador, inseticida, amarela andando e lutando, as quatro velocidades e o tutorial (lições 1–3), além das sequências longas `ticks_longos/rico_200` e `full_600` (esta com a Yard View na frente). Continuam sem vetor: balões ligados, a janela de edição atrás nas animações da amarela, e os ramos listados em [../../estado-do-projeto.md](../../estado-do-projeto.md) §3; nesses casos o desenho pode consumir S ou mudar o caminho do tick.
+- **Configurações cobertas.** Os primeiros vetores eram só do snapshot `quick` (Quick Game, velocidade normal, sem balões, chuva nem amarela em movimento). Hoje (2026-10-18) há 107 vetores em 21 grupos, de vários snapshots (`quick`, `rico`, `full`, `tut`, Experimental), com chuva, revoada, predadores, menino e cortador, inseticida, amarela andando e lutando, as quatro velocidades e o tutorial (lições 1–3 em `tutorial/` e o tutorial inteiro em `tutorial_completo/`), além das sequências longas `ticks_longos/rico_200` e `full_600` (esta com a Yard View na frente). Continuam sem vetor: balões ligados, a janela de edição atrás nas animações da amarela, e os ramos listados em [../../estado-do-projeto.md](../../estado-do-projeto.md) §3; nesses casos o desenho pode consumir S ou mudar o caminho do tick.
 - **Velocidades "fast"/"ultra"**: há vetores (`velocidade_rapida`, `velocidade_ultra`; `_gameCycles` anda 1 por tick), mas o ritmo em ticks por segundo depende da CPU no original e só foi medido na bancada QEMU (ver `_BirdDelay` e simulacao-visao-geral.md §3.1).
 - **Leituras:** o mapeamento cobre os segmentos de dados 8, 9 e 10 fora do save. Não cobre a memória do Windows (API chamada de dentro do tick) nem os mapas de vida (já capturados). Uma variável lida só em situações que não aconteceram nos 140 ticks não aparece.
 - **`_Tindex` e `_TemDensity`**: classificados por inferência, não por teste.

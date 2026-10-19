@@ -409,9 +409,12 @@ impl JanelasControle {
         Some((Retangulo { dir: r.dir + k, base: r.base + k, ..r }, o.cor))
     }
 
+    /// Triângulo do clique: o mesmo do botão (1 pixel a menos à direita e embaixo que o objeto, sem o
+    /// pixel a mais de `_win_GetObjRect`); conferido na bancada pelos níveis lidos depois de um arrasto
+    /// (telas/janelas.md §2.1).
     fn triangulo(j: &Janela, g: &GeometriaControle, cfg: &ConfigControle) -> Option<Triangulo> {
-        let (r, _) = Self::objeto(j, g, &cfg.objeto_triangulo, true)?;
-        Some(Triangulo { esq: r.esq.into(), topo: r.topo.into(), dir: r.dir.into(), base: r.base.into() })
+        let (r, _) = Self::objeto(j, g, &cfg.objeto_triangulo, false)?;
+        Some(Triangulo { esq: r.esq.into(), topo: r.topo.into(), dir: (r.dir - 1).into(), base: (r.base - 1).into() })
     }
 
     /// Clique do botão esquerdo em (x, y): o gerenciador decide quem recebe (só a janela da frente

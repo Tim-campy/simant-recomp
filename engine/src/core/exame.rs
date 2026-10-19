@@ -34,6 +34,10 @@ pub struct ConfigExame {
     /// largura da moldura azul e deslocamento do conteúdo (bitmap) dentro dela.
     #[serde(default)]
     pub ajuste_canto: [i32; 2],
+    /// Somado ao canto só na primeira abertura da janela na sessão (medido: 3 pixels à direita, em
+    /// duas sessões da bancada; causa não localizada, telas/janelas.md §4.3).
+    #[serde(default)]
+    pub ajuste_primeira_abertura: [i32; 2],
     #[serde(default)]
     pub largura_borda: Option<i16>,
     #[serde(default)]
@@ -55,6 +59,8 @@ pub struct JanelaExame {
     pub cfg: ConfigExame,
     janela: Janela,
     listas: [Vec<Vec<u8>>; 4],
+    /// Já foi aberta nesta sessão (ver `ajuste_primeira_abertura`).
+    pub ja_aberta: bool,
 }
 
 impl JanelaExame {
@@ -63,7 +69,7 @@ impl JanelaExame {
         let janela = carregar_janela(recursos, cfg.janela)?;
         let l = |id| super::avisos::linhas_do_texto(recursos, id);
         let listas = [l(cfg.estagios), l(cfg.grupos), l(cfg.modos), l(cfg.cargas)];
-        Ok(JanelaExame { cfg, janela, listas })
+        Ok(JanelaExame { cfg, janela, listas, ja_aberta: false })
     }
 
     /// Tamanho (largura, altura) do objeto 0.
@@ -88,6 +94,17 @@ impl JanelaExame {
             x = (x - w).max(0);
         }
         (x + self.cfg.ajuste_canto[0], y + self.cfg.ajuste_canto[1])
+    }
+
+    /// `canto` de uma abertura: na primeira da sessão soma `ajuste_primeira_abertura`.
+    pub fn canto_ao_abrir(&mut self, celula: (i32, i32), area: (i32, i32), tela: (i32, i32)) -> (i32, i32) {
+        let (mut x, mut y) = self.canto(celula, area, tela);
+        if !self.ja_aberta {
+            x += self.cfg.ajuste_primeira_abertura[0];
+            y += self.cfg.ajuste_primeira_abertura[1];
+            self.ja_aberta = true;
+        }
+        (x, y)
     }
 
     /// Textos das três linhas: estágio (ovo) ou casta; modo; carga.

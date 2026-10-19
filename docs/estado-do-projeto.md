@@ -8,7 +8,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 
 - `cargo test --workspace` com `SIMANT_DIR` apontando para `SimAnt-T/MAXIS/ANTWIN`: **518 testes passaram, 0 falharam, 0 ignorados** em 35 binários de teste (unitários de `engine` e `simant` e os testes de integração de `engine/tests/`).
 - Vetores do original no repositório (`tests/referencias/`):
-  - **107 vetores de tick** em 21 grupos (`ticks/`), todos exigidos 307/307 blocos (com extras e vida) por `engine/tests/ticks_originais.rs`; nenhum em `"pendentes"` (o último, `inseticida_morte/21`, foi resolvido pela interface);
+  - **107 vetores de tick** em 21 grupos (`ticks/`), todos exigidos 307/307 blocos (com extras e vida) por `engine/tests/ticks_originais.rs`; nenhum em `"pendentes"` (o último, `inseticida_morte/21`, foi resolvido pela interface). **Atualização 2026-10-18 (quinta rodada):** +38 vetores em 25 cenários (cerco, laser, faro, aranha do jogador, mortes da amarela, N-01/07/10/12/14/15, C-04..C-07), 37 exigidos 307/307 e 1 pendente com a causa isolada (`amarela_morte_aranha`, desenho dentro do tick);
   - **2 sequências longas** (`ticks_longos/rico_200`, 200 ticks; `ticks_longos/full_600`, 600 ticks do Jogo Completo com a Yard View na frente), iguais ao original;
   - **15 ações da interface** (`acoes/`: troca de patch, PLACE, `_SpecialXfer`, Experimental, desenho da chuva e do enxame, Mystery), todas 307/307;
   - **1 Load do tutorial** (`load_tutorial/`);
@@ -28,13 +28,13 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 | # | Área | Implementado | Verificado no original | Comentário curto |
 |---|---|---|---|---|
 | 1 | Formatos de arquivo | 90% | 85% | banco NDX/DAT + LZSS, bitmaps, fontes, janelas, `SIMANT.CFG`, `.ANT` (byte a byte), sons, tiles, `.HLP`; restam bitmaps ~7100, `kind`/byte 3, bits 4/8 de flags |
-| 2 | Regras da simulação (tick) | 95% | 75% | 107 vetores + 2 sequências + 20 casos batem; vários ramos raros só pelo código (cerco, laser, aranha do jogador, estatísticos) |
+| 2 | Regras da simulação (tick) | 95% | 75% | 107 vetores + 2 sequências + 20 casos batem; desde 2026-10-18 também cerco, laser, faro, aranha do jogador, mortes da amarela e os casos estatísticos (+38 vetores, 1 pendente) |
 | 3 | Geração de mundo | 95% | 75% | Quick Game byte a byte; casa em 4 patches; Tutorial via Load; ramos de Full/Experimental e vários patches da casa sem caso |
 | 4 | Jogo ao vivo (laço, relógio, ritmo) | 90% | 65% | slow/normal medidos (3,0/6,0 ticks/s); fast/ultra e relógio do Mac só na bancada QEMU e com decisões do port |
 | 5 | Telas e janelas | 85% | 70% | quase todas as janelas existem e foram comparadas (93–100%); faltam balões, gráficos de saúde da edição, partes da ajuda |
 | 6 | Diálogos e menus | 60% | 50% | **sem barra de menus do Windows** (File/Window/View/Options/Speed); "Load Game" do "Select a Game" não existe |
 | 7 | Som e música | 75% | 35% | efeitos e músicas das regras e do Experimental tocam; sons de menus e diálogos não; timbre diferente; nada comparado de ouvido |
-| 8 | Modos (Quick, Completo, Experimental, Tutorial) | 90% | 75% | os quatro existem e têm vetores; tutorial é o menos conferido |
+| 8 | Modos (Quick, Completo, Experimental, Tutorial) | 90% | 80% | os quatro existem e têm vetores; tutorial conferido da lição 1 ao fim (`tutorial_completo/`, 2026-10-18) |
 | 9 | Salvar/carregar | 95% | 90% | `.ANT` aceito pelo original; Load com `_RandYard` conferido; `Tutorial.Ant` gerado |
 | 10 | Mods (dados + Lua) | 90% | n/a | API 0.20, 37 JSON sobrescrevíveis (todos, inclusive `jogo.json`), tabelas comuns uma vez só em `comum.json`, Lua em sandbox, seção "Planejado"; testes em `mods.rs`, `mods_lua.rs` e `mod_trapacas.rs` |
 | 11 | Ferramentas e testes | 90% | n/a | 30 ferramentas em `tools/`, bancada QEMU com gdbstub, 518 testes |
@@ -67,7 +67,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 ### 2.4 Jogo ao vivo (laço, relógio, ritmo)
 
 - **Completo e verificado:** temporizador de 55 ms com 3 mensagens por chamada; 6,06 ticks/s em normal e 3,03 em slow contra 6,0/3,0 na bancada; pausa (inclusive a amarela andando durante a pausa); simulação parada com quadro modal e nas animações da luta; `_gameCycles` por volta do laço.
-- **Implementado com decisão do port, não verificado em máquina real:** fast/ultra com 5 e 7 voltas fixas (66,7 e 90,9 ticks/s; bancada QEMU TCG deu 55–66 e 91; no original depende da CPU); relógio do Mac começando no maior prazo do save; `mac_por_tick` (9 na bancada); cadência sem foco 170 → 220 ms [hipótese] (`simulacao-visao-geral.md`).
+- **Implementado com decisão do port, não verificado em máquina real:** fast/ultra com 5 e 7 voltas fixas (66,7 e 90,9 ticks/s; bancada QEMU TCG deu 33–66 e 32–91; com `-icount` o original faz ~3 ticks/s em fast por milhão de instruções/s — 26 a 7,8 M, 105 a 31 M, 186 a 62,5 M —, então os valores do port equivalem a uma CPU de ~20–30 M instruções/s, um 486 da época; `simulacao-visao-geral.md` §3.3); relógio do Mac começando no maior prazo do save; `mac_por_tick` (9 na bancada); cadência sem foco 170 → 220 ms [hipótese] (`simulacao-visao-geral.md`).
 - **Parcial:** o laço não sai com o botão esquerdo apertado (`GetAsyncKeyState(VK_LBUTTON)`, `divergencias.md`); a repetição da rolagem usa a do sistema; descarte de efeito no mesmo milissegundo não reproduzido.
 
 ### 2.5 Telas e janelas (por janela)
@@ -84,7 +84,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 | Mapa (`mapWin`) | 90% | 75% | 93,78–99,89% por modo; `_ELayerMode` da edição e `_win_Swap` ligados; faltam Shift+clique dar ordem e o redesenho alternado atrás (o port gera a cada tick); cores de `_ConvColor` [hipótese] |
 | Quintal (Yard View, faixa 35) | 90% | 85% | 99,27–99,59% nos três modos, faixa 93,09%; botões configuráveis da faixa 35 não existem |
 | Info (cartões) | 90% | 70% | 11 de 53 cartões contra capturas (96,36–99,75%); os outros 42 só por conferência automática |
-| Examine (`_MagnifyMenu`) | 85% | 30% | sem captura do original com a janela aberta; alinhamento e cor dos textos [hipótese] |
+| Examine (`_MagnifyMenu`) | 95% | 90% | conferido na bancada (2026-10-18): 97,6–99,4% na região da janela, inclusive o deslocamento de 3 pixels da primeira abertura da sessão |
 | Ajuda (visor do WinHelp) | 75% | 70% | 99,94–99,97%; Search, History, menus e popups pequenos não existem; desenhada na área cliente, 2 linhas acima |
 | Diálogos de arquivo | 85% | 85% | 99,28–99,97% nas partes comparáveis; é uma imitação (unidade fixa "c:", "Read Only" sem efeito) |
 | Menu de ferramentas do Experimental | 100% | 100% | 100% na bancada |
@@ -103,7 +103,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 ### 2.7 Som e música
 
 - **Completo:** 57 efeitos decodificados (8 bits, 4096 Hz); músicas `.MID` com a tabela MCI; opções Music/Sound Effects; silêncio sem foco em todas as telas; linha do tempo dos sons da luta (165 ms).
-- **Verificado:** só o formato e o catálogo (quem pede cada som, pelo código). **Nada foi comparado de ouvido com o original** (a bancada QEMU não tem placa de som; `divergencias.md`).
+- **Verificado:** só o formato e o catálogo (quem pede cada som, pelo código). **Nada foi comparado de ouvido com o original.** Tentado em 2026-10-18 na bancada QEMU com SB16 + OPL2 e saída em WAV (`tools/som_original.py`): grava, mas não serve de referência — o driver FM é de OPL3 (notas presas no OPL2 do QEMU), o backend descarta os silêncios e os efeitos gravados não batem com os decodificados (`regras/som.md`, "Áudio do original na bancada QEMU").
 - **Parcial / decisão do port:** timbre por `rustysynth` + SoundFont ou sintetizador simples, não o OPL/MIDI Mapper; volume relativo efeito/música não medido; efeito novo sempre corta o anterior.
 - **Falta:** sons de menus e diálogos (`_LionDialog`, `_YellowDialog`, `_SpiderDialog`, `_DrawSimPayoff`, itens da barra de menus; `regras/som.md`, "Interface: o que está ligado e o que falta"). Os das ferramentas do Experimental, dos marcadores, das trapaças, do Mystery, do fim de jogo e da troca de patch tocam.
 
@@ -114,7 +114,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 | Quick Game | 95% | 90% | quase todos os vetores saem do snapshot `quick`/`rico` |
 | Jogo Completo | 90% | 80% | `jogo_completo/`, `full_600`, troca de patch, PLACE, `_SpecialXfer`, 38 patches da casa; PLACE não para a simulação nem aceita Shift |
 | Experimental | 90% | 85% | ações `exp_*` 307/307; textos do quadro de exame e avisos das listas 4/1010, 4/1100–1103 não desenhados (`telas/experimental.md` §10) |
-| Tutorial | 80% | 50% | vetores `tutorial/` (lições 1–3) e Load de `Tutorial.Ant`; as demais lições e as condições de janela só pelo código |
+| Tutorial | 85% | 85% | vetores `tutorial/` (lições 1–3) e `tutorial_completo/` (as 56 lições jogadas no original com as ações pedidas, 309 ticks 307/307 depois de corrigir o prazo das lições 7/9/0x1A; condições de janela conferidas com a janela anotada pela bancada) e Load de `Tutorial.Ant`; a caixa da lição difere na moldura (conselhos.md §3.1) |
 
 ### 2.9 Salvar/carregar
 
@@ -168,41 +168,38 @@ Formatos
 - Classes do campo T e bits 0–2 nas crias (`formatos/save-ant.md`, [hipótese]).
 
 Regras
-- Casos estatísticos C-04 a C-07 dos ovos e a lista 4/1100 por estágio (`regras/ciclo-de-vida.md`, "Lacunas").
+- A lista 4/1100 por estágio (`regras/ciclo-de-vida.md`, "Lacunas"). (C-04 a C-07 verificados em 2026-10-18, vetores `ovos_*`.)
 - Amarela vermelha pondo ovo preto e recriação da cauda em lutas (`regras/ciclo-de-vida.md`, [hipótese]).
 - Morte natural (T1), luta e proporção de vitórias (T5, T6), revoada natural (T8), estratégia vermelha (T9), recrutamento pelo jogador (T11) (`regras/superficie.md`).
-- Cerco da formiga-leão e da aranha, pedrinha cuspida, laser, faro, aranha controlada pelo jogador, sorteios de `_DrawSpider` (`regras/inimigos.md`).
-- Morte da amarela pelos inimigos (`_YellowDeath` 1–4) (`regras/inimigos.md`); pisada e cortador (causas 5 e 6) (`regras/quintal.md`; a causa 9, inseticida, está coberta por `inseticida_morte/21`).
-- Casos estatísticos do ninho N-01, N-07, N-10, N-12 e os de ninho desenvolvido N-14, N-15 (com a amarela por perto) (`regras/ninho.md`).
+- Pedrinha cuspida pela formiga-leão (`regras/inimigos.md`). (Cerco da aranha e da formiga-leão, fuga, vingança, faro, laser e aranha do jogador verificados em 2026-10-18, testes-tick.md "Quinta rodada".)
+- Desenho dentro do tick (`_DrawPalps` e `_SpiderDialog` sorteiam S no meio do tick; medido, não implementado): deixa pendente `amarela_morte_aranha/1793`, a morte da amarela pela aranha (`regras/rng.md`, `regras/inimigos.md`).
+- Afogamento de adultas no ninho (1/100 por tick, `regras/ninho.md` 8.3) e N-02, N-04, N-05, N-08, N-11. (N-01, N-07, N-10, N-12, N-14, N-15 verificados em 2026-10-18, vetores `ninho_*`.)
 - Defeitos do original marcados [hipótese] no ninho (`regras/ninho.md`) e coluna 106 de `_CarpetFloorR` (`divergencias.md`).
 - Suavização dupla na volta de `_Cycle` e giro duplo de `_GetNestDir` (`regras/feromonios.md`).
 - Textos do balão do menino (lista 4/1200) (`regras/quintal.md`).
-- Seção 13 de `regras/formiga-amarela.md` além de Y-01..Y-04; animações de choque, morte com a edição atrás e loucura (`_AnimYellowInsane`).
-- Tutorial além das lições 1–3 (`regras/conselhos.md`, `testes-tick.md`).
+- Seção 13 de `regras/formiga-amarela.md` além de Y-01..Y-04 e Y13; quadros (imagens) do choque e da loucura e as mortes com a janela de edição atrás. (Mortes 2–10 da amarela, inclusive choque e loucura pelo estado e pelos geradores, verificadas em 2026-10-18, vetores `amarela_morte_*`.)
 - Retorno exato de `_CalcScore` e o sentido da nota 3 (`regras/simulacao-visao-geral.md`).
 
 Geração de mundo
 - `_CanBeHouseHole`; patches da casa 5–7, 9, 15, 36/37 e cozinha sem pia; `_DigOutBNest/RNest`; ramos de Tutorial/Full/Experimental de `_InitYelloAnt`/`_RandWorld`; `_AddFood` com parâmetro ≥ 0; `_DROPdir` (`regras/geracao-mundo.md` l. 106, 300, 339).
 
 Jogo ao vivo
-- Taxa de fast/ultra em máquina real; cadência sem foco 170 → 220 ms (`regras/simulacao-visao-geral.md`).
+- Taxa de fast/ultra em máquina real: só limitada por emulação (`-icount`, ~3 ticks/s em fast por milhão de instruções/s; `regras/simulacao-visao-geral.md` §3.3); cadência sem foco 170 → 220 ms.
 - `mac_por_tick` fora da bancada (`regras/quintal.md`).
 - `_editWidth` = 25 também em outras resoluções (`testes-tick.md`, [hipótese]).
 
 Telas
-- Navegação (Ctrl+setas, troca de plano), superfície e ninho vermelho na edição, rainha amarela 0xFE, outras resoluções (`telas/jogo.md`, "Não verificado").
-- Arrasto no triângulo, gráficos do History com dados, menus da rainha e da aranha (`telas/janelas.md` §7).
+- Rainha amarela 0xFE e outras resoluções (`telas/jogo.md`, "Não verificado"). Navegação, superfície e ninho vermelho na edição: verificados em 2026-10-18 (`telas/jogo.md`, "Verificação").
+- Desenho da aranha na janela de edição (`_DrawSpider`: o port não desenha a aranha; visto na captura do menu da aranha, `telas/janelas.md` §7).
 - Altura mínima da edição e clique comido na janela de trás (`telas/janelas.md` §8, [hipótese]).
-- Examine: sem captura do original (`telas/janelas.md` §4.3, `divergencias.md`).
 - Cores do mapa (`_ConvColor`) (`telas/mapa.md`, [hipótese]).
-- 42 dos 53 cartões do Info e clique em palavra em negrito (`telas/info.md` §6).
+- Cartões 127 e 129 do Info (não alcançáveis por clique a partir do Top Card) e clique em palavra em negrito (`telas/info.md` §6).
 - Clique direito no Experimental e nas janelas de controle, F1 com janela de controle, Shift+F1, Delete, `yardHelpBut`, cursor das ferramentas (`telas/ajuda-contexto.md` §6).
-- Duração da abertura e Espaço fechando a abertura (`tests/referencias/README.md`).
 - Posição do menu de ferramentas no Quick Game (`divergencias.md`).
 - O que o original mostra depois de `_XferPatch` (`divergencias.md`).
 
 Som
-- Tudo o que é audível: timbre, volume relativo, sons da luta no tempo, preempção no mesmo milissegundo (`regras/som.md`, `divergencias.md`).
+- Tudo o que é audível: timbre, volume relativo, sons da luta no tempo, preempção no mesmo milissegundo (`regras/som.md`, `divergencias.md`). A gravação pela bancada QEMU (SB16/OPL2 em WAV) foi tentada e não serve de referência (`regras/som.md`, "Áudio do original na bancada QEMU"); falta DOSBox-X com SB16/OPL3 e captura de WAV.
 
 Diálogos
 - Modalidade dos diálogos de arquivo em relação ao `WM_TIMER` (`telas/arquivos.md`, [hipótese]).
@@ -255,12 +252,10 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 
 | Item | Esforço |
 |---|---|
-| Vetores para cerco, laser, aranha do jogador, morte da amarela por inimigos, pisada e cortador | M |
-| Casos estatísticos (C-04..C-07, N-01/07/10/12) com semente forçada | M |
-| Capturas: navegação, superfície e ninho vermelho, Examine, menus da rainha e da aranha, 42 cartões do Info, abertura (duração e Espaço) | M |
-| Tutorial completo (todas as lições) em vetores | M |
-| Comparação de áudio com o original (bancada com placa de som ou DOSBox-X com SB16) | M |
-| Ritmo fast/ultra numa máquina real ou com `icount` | P |
+| Desenho dentro do tick (`_DrawPalps`/`_SpiderDialog`) para fechar `amarela_morte_aranha` | P–M |
+| Capturas: cartões 127 e 129 do Info, rainha amarela 0xFE, outras resoluções (navegação, Examine, menus, History, triângulo, 51 cartões e abertura feitos em 2026-10-18) | P |
+| Comparação de áudio com o original: DOSBox-X com SB16/OPL3 e captura de WAV (a bancada QEMU com SB16 foi tentada e não serve, `regras/som.md`) | M |
+| Ritmo fast/ultra numa máquina real (com `-icount` feito: `simulacao-visao-geral.md` §3.3) | P |
 
 ## 5. Riscos e dívidas técnicas
 
@@ -270,7 +265,7 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 4. **Ritmo de fast/ultra dependente da CPU no original.** O port fixa 5 e 7 voltas por período (decisão registrada). `_BirdDelay` depende de `_gameCycles` e é a única entrada não determinística do tick.
 5. **Desenho que consome o gerador S no original e não no port** (chuva e enxame do quintal, `rules/desenho.rs`; sorteios de `_DrawSpider` não medidos). Com essas janelas abertas, a sequência de sorteios pode se afastar do original. Os vetores com a Yard View na frente (`full_600`) passam porque o port faz os sorteios à parte, entre os ticks.
 6. **Load ressemeia S**, então capturas do original e do port do mesmo estado têm direções diferentes nas animações (`formiga-amarela.md`).
-7. **Bancada QEMU TCG** é lenta e sem placa de som: o ritmo, o relógio e o som medidos ali podem não valer numa máquina real. O determinismo depende do snapshot (QEMU sem `icount`).
+7. **Bancada QEMU TCG** é lenta e sem placa de som utilizável (a SB16 emulada grava, mas não reproduz o original, `regras/som.md`): o ritmo, o relógio e o som medidos ali podem não valer numa máquina real. O determinismo depende do snapshot (QEMU sem `icount`).
 8. **Evidência fora do git.** Capturas, `re_trabalho/` e pseudocódigo não são versionados (direitos autorais); as porcentagens de tela não podem ser refeitas por terceiros sem o jogo e a bancada.
 9. ~~**Documentação desatualizada**~~ **Corrigida em 2026-10-18:** `README.md` (reescrito como guia atual), `spec/README.md`, `regras/som.md`, `regras/conselhos.md`, `regras/formiga-amarela.md`, `regras/quintal.md`, `telas/mensagens.md`, `telas/jogo.md` (a tabela de 2026-10-16 ficou como histórico), `testes-tick.md`, `executavel.md`, `divergencias.md` (duplicadas removidas, cada linha conferida, seção "Resolvidas") e `api-mods.md` (histórico em ordem, seção "Planejado").
 10. **Comentários com `[hipótese]`, "ainda não" ou "[lacuna]" no código** (`engine/src`, `simant/src`): a busca de 2026-10-18 achou 56 linhas (a contagem de 70 da revisão incluía outras grafias); 8 estavam desatualizados e foram corrigidos (entre eles `core/partida.rs`, "Menus de segurar o botão ainda não existem", e `rules/tick.rs`, "subsistema ainda não implementado"); os 48 restantes são hipóteses ainda sem evidência ou lacunas reais (balões, `_YellowDialog`, `_CommandKey`, `_DropFoodA` na casa, Load Game do "Select a Game"). Nenhum `todo!` ou `unimplemented!`.

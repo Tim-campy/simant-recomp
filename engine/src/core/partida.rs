@@ -665,7 +665,7 @@ impl Partida {
                 s.ao_evento(&ev, &mut self.estado);
             }
             match ev {
-                Evento::CentralizarNaAmarela => self.ir_para_amarela(),
+                Evento::CentralizarNaAmarela { plano, x, y } => self.ir_para_amarela(plano, x, y),
                 Evento::DialogoFimDeJogo => {
                     if !self.fim_anunciado {
                         self.fim_anunciado = true;
@@ -832,16 +832,14 @@ impl Partida {
 
     /// Parte de vista de `_GotoMyAnt`: no Experimental só toca o som de erro; senão leva a vista
     /// até a amarela.
-    fn ir_para_amarela(&mut self) {
+    fn ir_para_amarela(&mut self, plano: i16, x: i16, y: i16) {
         if self.estado.partida.tipo_jogo == 3 {
             if let Some(id) = self.tabelas_amarela.sons.erro {
                 self.eventos.push_back(Evento::Som(id));
             }
             return;
         }
-        let a = &self.estado.amarela;
-        let (plano, x, y) = (a.plano, a.x as i32, a.y as i32);
-        self.redesenhar |= self.nav.ir_para_amarela(plano, x, y);
+        self.redesenhar |= self.nav.ir_para_amarela(plano, i32::from(x), i32::from(y));
         self.vistas_para_estado();
     }
 
@@ -915,6 +913,9 @@ impl Partida {
     pub fn fechar_modal(&mut self) -> Option<Modal> {
         self.redesenhar = true;
         let m = self.avisos.fechar_modal();
+        // _GiveLesson lê o relógio para o prazo da lição só depois de a caixa fechar (conselhos.md §3)
+        let relogio = self.mac_inicial.wrapping_add(((self.ms_total / 55) * 3) as u32);
+        self.regras.memoria_tutor.caixa_fechada(i64::from(relogio));
         self.depois_de_fechar();
         m
     }
@@ -1022,7 +1023,11 @@ impl Partida {
             12 => alternar(&mut p.opcoes[3]),
             13 => alternar(&mut p.opcoes[4]),
             14 => return RespostaBotao::Salvar,
-            15 => self.ir_para_amarela(),
+            15 => {
+                let a = &self.estado.amarela;
+                let (plano, x, y) = (a.plano, a.x, a.y);
+                self.ir_para_amarela(plano, x, y);
+            }
             8 => {
                 // _MysteryButton: fora do tick, sorteio de R e efeito (rules/misterio.rs).
                 self.vistas_para_estado();
@@ -1508,7 +1513,7 @@ mod testes {
     impl RegrasAmarela for PedeCentralizar {
         fn mover_amarela(&mut self, e: &mut Estado) {
             e.amarela.x += 1;
-            e.eventos.push(Evento::CentralizarNaAmarela);
+            e.pedir_centralizar_na_amarela();
             e.eventos.push(Evento::Musica(7));
         }
     }
@@ -1540,7 +1545,7 @@ mod testes {
         p.estado.amarela.plano = 1;
         p.estado.amarela.x = 100;
         p.estado.amarela.y = 10;
-        p.estado.eventos.push(Evento::CentralizarNaAmarela);
+        p.estado.pedir_centralizar_na_amarela();
         p.tratar_eventos();
         assert_eq!(p.nav.plano_mapa, 1);
         assert_eq!(p.nav.vista.plano, Plano::Superficie);

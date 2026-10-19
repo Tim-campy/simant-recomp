@@ -112,6 +112,21 @@ pub enum Conselho {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MemoriaTutor {
     pub tempo_limite: i64,
+    /// Espera de uma lição com prazo (7, 9, 0x1A) dada neste tick: o original mostra a caixa
+    /// (`_PictStrnDialog`, modal) **antes** de ler `_MacTickCount` para o prazo, logo o prazo conta
+    /// do fechamento da caixa (verificado na bancada, tutorial_completo/236). O tick põe o prazo com o
+    /// relógio do tick; a interface o refaz ao fechar a caixa ([`MemoriaTutor::caixa_fechada`]).
+    pub espera_depois_da_caixa: Option<i64>,
+}
+
+impl MemoriaTutor {
+    /// A caixa da lição foi fechada com o relógio do Mac em `relogio`: o prazo pendente passa a
+    /// contar daí (`_TimeTemp = _MacTickCount() + espera`, depois do `_PictStrnDialog`).
+    pub fn caixa_fechada(&mut self, relogio: i64) {
+        if let Some(espera) = self.espera_depois_da_caixa.take() {
+            self.tempo_limite = relogio + espera;
+        }
+    }
 }
 
 /// O que o tutorial precisa saber da interface.
@@ -228,10 +243,12 @@ pub fn dar_licao(e: &mut Estado, t: &TabelasConselhos, ta: &TabelasAmarela, mem:
         AoDar::MarcarPosicaoEEsperar { espera } => {
             e.tutorial.temporario = soma_posicao as i16;
             mem.tempo_limite = relogio + espera;
+            mem.espera_depois_da_caixa = Some(espera);
         }
         AoDar::MarcarVistaEEsperar { espera } => {
             e.tutorial.temporario = (e.vistas.ponto.1 as i32 + e.vistas.ponto.0 as i32) as i16;
             mem.tempo_limite = relogio + espera;
+            mem.espera_depois_da_caixa = Some(espera);
         }
         AoDar::MarcarPosicao => e.tutorial.temporario = soma_posicao as i16,
         AoDar::MarcarTarefas => {
@@ -405,6 +422,20 @@ mod testes {
         dar_licao(&mut e, t(), ta(), &mut MemoriaTutor::default(), 0, 0x2B);
         assert_eq!(e.tutorial.licao, 0x2C);
         assert_eq!(e.retirar_eventos(), vec![crate::rules::estado::Evento::Mensagem(11086)]);
+    }
+
+    #[test]
+    fn prazo_da_licao_7_conta_do_fechamento_da_caixa() {
+        // bancada (tutorial_completo, 2ª gravação, tick 291): relógio no tick 10704; lido de novo depois da
+        // caixa, 12213 → _TimeTemp 12813
+        let mut e = Estado::vazio();
+        let mut m = MemoriaTutor::default();
+        dar_licao(&mut e, t(), ta(), &mut m, 10704, 7);
+        assert_eq!(m.tempo_limite, 11304);
+        m.caixa_fechada(12213);
+        assert_eq!(m.tempo_limite, 12813);
+        m.caixa_fechada(13000);
+        assert_eq!(m.tempo_limite, 12813, "só a caixa da lição com prazo refaz o prazo");
     }
 
     #[test]

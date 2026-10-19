@@ -50,7 +50,9 @@ def main():
     plano, mx, my = reg["vista"]
     for k, (x, y, t, m) in enumerate(reg.get("examine", [])):
         p = d / f"p_examine_{k}.png"
-        rodar(a.simant, a.jogo, ["--save", str(d / "capt.ANT"), "--examinar", f"{x},{y}"], p)
+        # só a primeira janela da sessão tem o ajuste de 3 pixels (janelas.md §4.3)
+        ja = ["--exame-ja-aberto"] if k > 0 else []
+        rodar(a.simant, a.jogo, ["--save", str(d / "capt.ANT"), "--examinar", f"{x},{y}", *ja], p)
         # janela de 92 x 87 uma célula à direita e uma acima da clicada (janelas.md §4.3), com folga
         x0 = 24 + (x - mx + 1) * 16 - 4
         y0 = 158 - 38 + (y - my - 1) * 16 - 4

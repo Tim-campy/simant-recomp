@@ -1,0 +1,74 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-18",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "rico",
+ "descricao": "Aranha andando para o norte com _MeSMode = 8 (laser, _SpiderScan, inimigos.md §2.6) e 29 pretas paradas num leque ao norte: no 1794 e no 1796 o laser mata uma preta do leque (S1(12) por ângulo, S4() != 0, _DeadAntHere)",
+ "passos": [
+  "esperou até GameTime 1793",
+  "SpidOn <- 1",
+  "SpidX <- 1032",
+  "SpidY <- 648",
+  "SMode <- 1",
+  "Starg <- -2",
+  "EatCnt <- 0",
+  "SpidDir <- 0",
+  "MeSMode <- 8",
+  "29 pretas no leque ao norte da aranha em (64, 40)"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ]
+ },
+ "ticks": [
+  "tick_001794",
+  "tick_001796"
+ ],
+ "selecao": [
+  "1794",
+  "1796"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}

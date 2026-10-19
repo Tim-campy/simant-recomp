@@ -184,6 +184,8 @@ se _MeMode < 2 e _MePlane == 1 e S4() ≠ 0: _YellowDeath(6)
 
 Cada passada mata 3/4 das formigas da superfície do patch inteiro, a cada 4 ticks (o menino no patch atual só anda nos ticks com `_YardCycle & 3 == 0`).
 
+**Mortes da amarela pelo pé e pelo cortador, verificadas no original** (vetores de tick de 2026-10-18, `tools/cenarios_regras.py`, snapshot `rico`, 307/307 com S, R e vida): `amarela_morte_pisada/1712` (o pé cai em (68, 12), onde a amarela foi posta depois de um ensaio que mostrou o lugar do pé; `_YellowDeath(5)` e, no mesmo tick, `_KillSpider` porque `_SuserX/Y` estava no retângulo) e `amarela_morte_cortador/1712` (a passada mata a amarela com `S4()` ≠ 0, `_YellowDeath(6)`, e a aranha entra em agonia). Nos dois o gato foi tirado de jogo (`_CatDelay` enorme): o relógio do Mac lido depois de uma caixa modal não é gravado pela bancada, e o `_CatDelay` gravado com ele não seria reproduzível.
+
 ## 4. Menino dentro de casa: `_SimKidInside` (`1030:20b6`)
 
 **Fato visto no código.** O menino dentro de casa segue um roteiro de nós. Nós 0–15, 20 e 21 são trechos de caminhada (tabelas de quadro, x e y por passo); nós 30–38 são paradas (quadro, x, y fixos, chance de sair e próximo nó). Tabelas em `data/quintal.json` (`casa`).

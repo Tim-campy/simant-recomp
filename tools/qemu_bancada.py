@@ -1,7 +1,7 @@
 """Bancada de testes do SimAnt original em QEMU, controlada só por QMP (sem janela, sem usar mouse/teclado do host).
 
 Preparação (uma vez):  python tools/qemu_bancada.py preparar
-Roteiro:               python tools/qemu_bancada.py roteiro ARQUIVO [--overlay ARQ.qcow2] [--mem MB]
+Roteiro:               python tools/qemu_bancada.py roteiro ARQUIVO [--overlay ARQ.qcow2] [--mem MB] [--qemu-args "ARGS"]
 Extrair do disco:      python tools/qemu_bancada.py extrair CAMINHO_DOS DESTINO [--overlay ARQ.qcow2]
 
 Comandos de roteiro (um por linha, # = comentário):
@@ -57,6 +57,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import shlex
 import time
 import zlib
 from pathlib import Path
@@ -931,7 +932,13 @@ class Bancada:
     """Uma VM do QEMU com o SimAnt, controlada por QMP (e gdbstub). Usada pelos roteiros e por
     tools/gerar_vetores_tick.py."""
 
-    def __init__(self, overlay=None, mem=16):
+    def __init__(self, overlay=None, mem=16, extra=None):
+        """`extra`: argumentos a mais para o QEMU (lista ou texto; padrão: a variável de ambiente
+        SIMANT_QEMU_ARGS), por exemplo "-icount shift=5,sleep=on" ou a placa de som (bancada-qemu.md)."""
+        if extra is None:
+            extra = os.environ.get("SIMANT_QEMU_ARGS", "")
+        if isinstance(extra, str):
+            extra = shlex.split(extra, posix=True)
         if overlay is not None:
             overlay = caminho_raiz(overlay)
             garantir_overlay(overlay)
@@ -946,7 +953,7 @@ class Bancada:
             "-boot", "a", "-vga", "std", "-display", "none",
             "-qmp", f"tcp:127.0.0.1:{porta_qmp},server,wait=off",
             "-gdb", f"tcp:127.0.0.1:{porta_gdb}",
-        ]
+        ] + list(extra)
         self.proc = subprocess.Popen(args, cwd=RAIZ)
         self.q = Qmp(porta_qmp)
         self.mj = Memoria(self.q, porta_gdb, mem)
@@ -1108,12 +1115,12 @@ class Bancada:
         return True
 
 
-def roteiro(arquivo, overlay=None, mem=16):
+def roteiro(arquivo, overlay=None, mem=16, extra=None):
     linhas = Path(arquivo).read_text(encoding="utf-8").splitlines()
     usa_snap = any(ln.split()[:1] in (["snapshot_salvar"], ["snapshot_carregar"]) for ln in linhas)
     if usa_snap and overlay is None:
         overlay = OVERLAY_PADRAO
-    b = Bancada(overlay, mem)
+    b = Bancada(overlay, mem, extra)
     try:
         for linha in linhas:
             if not b.executar(linha):
@@ -1151,12 +1158,13 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     ov = opcao(args, "--overlay")
     mb = int(opcao(args, "--mem", "16"))
+    qa = opcao(args, "--qemu-args")
     if not args:
         sys.exit(__doc__)
     if args[0] == "preparar":
         preparar()
     elif args[0] == "roteiro":
-        roteiro(args[1], ov, mb)
+        roteiro(args[1], ov, mb, qa)
     elif args[0] == "extrair":
         extrair(args[1], args[2], ov)
     else:

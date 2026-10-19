@@ -1,0 +1,48 @@
+{
+ "antes": {
+  "SementeS": 24873,
+  "SementeR": 956013657,
+  "gameCycles": 96820,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 24141,
+  "GameTime": 1245,
+  "Cycle": 1245,
+  "posicao": "entrada",
+  "MacTickCount": 40359,
+  "JanelaNaFrente": 256,
+  "VistaEdicao": [
+   39,
+   21
+  ]
+ },
+ "dialogos": 1,
+ "depois": {
+  "SementeS": 38611,
+  "SementeR": 4291194296,
+  "gameCycles": 96820,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 24141,
+  "GameTime": 1246,
+  "Cycle": 1246,
+  "posicao": "saida"
+ },
+ "MacTickCount_lidos": [
+  40359
+ ],
+ "tutor_antes": {
+  "TutLesson": 43,
+  "TutGiven": 0,
+  "TutorCnt": 239,
+  "TutHowLong": 9,
+  "LessonTemp": -13108
+ },
+ "tutor_depois": {
+  "TutLesson": 44,
+  "TutGiven": 1,
+  "TutorCnt": 240,
+  "TutHowLong": 0,
+  "LessonTemp": -13108
+ }
+}

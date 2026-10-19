@@ -31,6 +31,10 @@ pub struct ConfigHistorico {
     pub cores: [u8; 4],
     pub cor_fundo: u8,
     pub fonte: usize,
+    /// Deslocamento (x, y) das linhas e da caixa do nome em relação ao retângulo do objeto (medido na
+    /// bancada, telas/janelas.md §3: (−1, −1)).
+    #[serde(default)]
+    pub ajuste_grafico: [i16; 2],
 }
 
 /// Estado da janela (fora do save, como no original: `8:8e54`, `8e10`, `8e5c`, `8e38`).
@@ -139,6 +143,9 @@ impl JanelaHistorico {
         let nomes = super::avisos::linhas_do_texto(recursos, self.cfg.lista_nomes);
         let fonte = interface.fontes.get(self.cfg.fonte).and_then(|f| f.as_ref());
         let antes = q.recorte.replace(area);
+        let [ax, ay] = self.cfg.ajuste_grafico;
+        // As linhas usam o retângulo do objeto sem o pixel a mais da direita, deslocado (medido).
+        let linhas = Retangulo { esq: area.esq + ax, topo: area.topo + ay, dir: area.dir - 1 + ax, base: area.base + ay };
         for (i, b) in self.ativos.iter().enumerate() {
             let Some(b) = *b else { continue };
             let gi = (b & 1) * 5 + b / 2;
@@ -150,7 +157,7 @@ impl JanelaHistorico {
             };
             let cor = self.cfg.cores[self.lugar[b]];
             let nome = nomes.get(gi).cloned().unwrap_or_default();
-            desenhar_grafico(q, area, s, p, &e.historico, i as i32, cor, self.cfg.cor_fundo, fonte, &nome);
+            desenhar_grafico(q, linhas, s, p, &e.historico, i as i32, cor, self.cfg.cor_fundo, fonte, &nome);
         }
         q.recorte = antes;
     }
