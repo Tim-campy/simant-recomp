@@ -45,6 +45,8 @@ class Sessao:
         self.inicio = self.dep.extras()
         self.passos = []
         self.relogio_depois_da_caixa = False
+        self.fechou_na_entrada = False
+        self.anotar_relogio_caixa = False
 
     def log(self, msg):
         self.b.log(msg)
@@ -135,7 +137,7 @@ class Sessao:
         dep.ir_entrada()
         out = {"estado_antes.bin": mj.estado(), "vida_antes.bin": dep.vida()}
         ex = {"antes": dep.extras()}
-        relogio = []
+        relogio, depois_caixa = [], []
         try:
             dep.ir_saida(timeout=espera, relogio=relogio)
         except RuntimeError:
@@ -143,16 +145,28 @@ class Sessao:
             for k in range(5):
                 self.log(f"tick {gt} parado: tela em re_trabalho/cen/dialogo_{gt}_{k}.png; fechando a caixa")
                 self.b.executar(f"capturar re_trabalho/cen/dialogo_{gt}_{k}.png")
-                if self.fechar_caixa_ate_o_retorno(k, relogio=relogio if self.relogio_depois_da_caixa else None):
+                # na 1ª tentativa, no tick do _FullCount (_Cycle múltiplo de 64: o gato lê o relógio
+                # depois da caixa) ou quando pedido (lições 7, 9 e 0x1A do tutorial: _GiveLesson lê o
+                # relógio para _TimeTemp depois de a caixa fechar)
+                anotar = self.relogio_depois_da_caixa and k == 0 and ((gt + 1) % 64 == 0 or self.anotar_relogio_caixa)
+                if self.fechar_caixa_ate_o_retorno(k, relogio=depois_caixa if anotar else None):
                     break
             else:
                 raise RuntimeError(f"tick {gt}: a caixa não fechou")
             ex["dialogos"] = k + 1
+            if self.fechou_na_entrada:
+                ex["depois_na_entrada_seguinte"] = True
         out["estado_depois.bin"] = mj.estado()
         out["vida_depois.bin"] = dep.vida()
         ex["depois"] = dep.extras()
         ex["antes"]["MacTickCount"] = relogio[0] if relogio and relogio[0] is not None else None
         ex["MacTickCount_lidos"] = relogio
+        if depois_caixa:
+            # leituras feitas pelo tick depois de a caixa fechar (antes.MacTickCount fica com a 1ª leitura
+            # do tick; sem leitura antes da caixa, é a 1ª daqui)
+            ex["MacTickCount_depois_da_caixa"] = depois_caixa
+            if ex["antes"]["MacTickCount"] is None:
+                ex["antes"]["MacTickCount"] = depois_caixa[0]
         out["extras.json"] = ex
         return out
 
@@ -160,7 +174,7 @@ class Sessao:
         """Com a VM parada dentro do tick: arma o breakpoint do retorno de _DoAntSim, deixa a VM correr,
         fecha a caixa (clique ou, nas tentativas ímpares, Enter) e espera parar no retorno.
 
-        Com `relogio` (lista) vazia, anota também as leituras de _MacTickCount feitas pelo resto do tick
+        Com `relogio` (lista), anota também as leituras de _MacTickCount feitas pelo resto do tick
         depois da caixa (o _FullCount do tick múltiplo de 64 chama _Feedback, que abre a caixa da lição,
         antes de _DoSimYard ler o relógio para o gato). A caixa em si não chama _MacTickCount (nos ticks
         do tutorial com caixa e leitura, a leitura vem toda antes dela); se chamar antes do clique, a
@@ -168,13 +182,22 @@ class Sessao:
         import socket
         dep = self.dep
         g = self.mj.sessao_gdb()
-        if relogio is not None and relogio:
-            relogio = None
         if relogio is not None:
             mac_ini, mac_ret = (self.mj.linear_codigo(*qb.MACTICKCOUNT), self.mj.linear_codigo(*qb.MACTICKCOUNT_RETF))
             armado = mac_ini
             g.breakpoint(armado)
         g.breakpoint(dep.retorno)
+        # também a entrada do tick seguinte: depois de algumas caixas (lição 50 do tutorial) o tick não
+        # volta ao retorno conhecido; o estado na entrada seguinte é o de depois do tick (entre dois ticks
+        # nada do save muda, testes-tick.md)
+        try:
+            entrada = dep.entrada()
+        except RuntimeError:
+            # o Windows descartou o segmento de código 6 (_DoAntSim) durante a caixa (memória da VM de
+            # 16 MB; visto na caixa com imagem da lição 50 do tutorial): sem breakpoint de entrada
+            entrada = None
+        if entrada is not None:
+            g.breakpoint(entrada)
         try:
             g.drenar()
             g.s.sendall(b"$c#63")
@@ -182,7 +205,9 @@ class Sessao:
             try:
                 if k % 2 == 0:
                     qb.mouse_canto(self.q)
-                    qb.mover_rel(self.q, 320, 310)
+                    # caixas mais altas (com imagem, ex.: lição 50 do tutorial) têm o "Click here to
+                    # continue" mais embaixo e só fecham com o clique nele: 310, depois 337, depois 360
+                    qb.mover_rel(self.q, 320, (310, 337, 360)[k // 2 % 3])
                     time.sleep(0.2)
                     self.botoes(False)
                 else:
@@ -226,10 +251,15 @@ class Sessao:
                 g.s.settimeout(30)
         finally:
             g.breakpoint(dep.retorno, False)
+            if entrada is not None:
+                g.breakpoint(entrada, False)
             if relogio is not None:
                 g.breakpoint(armado, False)
         pc, _ = dep.pc()
-        return pc == dep.retorno
+        self.fechou_na_entrada = entrada is not None and pc == entrada
+        if self.fechou_na_entrada:
+            self.log("o tick não voltou ao retorno conhecido: estado de depois lido na entrada do seguinte")
+        return pc in (dep.retorno, entrada)
 
     def gravar(self, saida, n, parar=None):
         """Grava n ticks consecutivos em saida/tick_NNNNNN; `parar(save_depois)` encerra antes."""
@@ -1620,7 +1650,23 @@ def cenario_tutorial_completo(c: Sessao, saida, n):
         prox = v["TutorCnt"] + 1 if v["TutorCnt"] < 0x400 else 0
         prox2 = prox + 1 if prox < 0x400 else 0
         if (prox & 7) == 0 or ((gt + 1) % 64 == 0 and (prox2 & 7) == 0):
-            arqs = c.capturar_tick(espera=12)
+            c.anotar_relogio_caixa = v["TutGiven"] == 0 and L in (7, 9, 26)
+            try:
+                arqs = c.capturar_tick(espera=12)
+            except RuntimeError as erro:
+                # a caixa fechou mas o tick não voltou a um ponto conhecido (segmento de código
+                # descartado e recarregado pelo Windows): segue sem o vetor deste tick
+                c.log(f"tick {gt} sem vetor: {erro}")
+                t.sem_vetor = getattr(t, "sem_vetor", []) + [gt]
+                c.dep.retomar()
+                for y in (337, 310):
+                    qb.mouse_canto(c.q)
+                    qb.mover_rel(c.q, 320, y)
+                    time.sleep(0.2)
+                    c.botoes(False)
+                    time.sleep(1)
+                c.entrada()
+                continue
             arqs["extras.json"]["antes"]["JanelaNaFrente"] = t.frente
             arqs["extras.json"]["antes"]["VistaEdicao"] = [TUT_COLS, TUT_LINS]
             arqs["extras.json"]["tutor_antes"] = v

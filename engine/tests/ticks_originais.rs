@@ -20,7 +20,7 @@
 use std::path::{Path, PathBuf};
 
 use engine::formats::save::LayoutSave;
-use engine::rules::vetor_tick::{comparar_tick, regras_do_vetor, RelatorioTick, VetorTick};
+use engine::rules::vetor_tick::{comparar_tick, depois_do_tick, regras_do_vetor, RelatorioTick, VetorTick};
 
 fn raiz() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -57,6 +57,7 @@ fn casos() -> Vec<Caso> {
             let v = VetorTick::ler(&dir.join(t), &layout).unwrap();
             let mut regras = regras_do_vetor(&v);
             let r = comparar_tick(&v, &layout, &mut regras).unwrap();
+            depois_do_tick(&v, &mut regras);
             // `_TimeTemp` (memória do tutorial, fora do save) depois do tick, quando gravado.
             let tutor = v
                 .extras_depois

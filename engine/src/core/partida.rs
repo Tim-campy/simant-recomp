@@ -876,6 +876,9 @@ impl Partida {
     pub fn fechar_modal(&mut self) -> Option<Modal> {
         self.redesenhar = true;
         let m = self.avisos.fechar_modal();
+        // _GiveLesson lê o relógio para o prazo da lição só depois de a caixa fechar (conselhos.md §3)
+        let relogio = self.mac_inicial.wrapping_add(((self.ms_total / 55) * 3) as u32);
+        self.regras.memoria_tutor.caixa_fechada(i64::from(relogio));
         self.depois_de_fechar();
         m
     }

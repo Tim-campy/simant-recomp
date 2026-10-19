@@ -65,6 +65,9 @@ pub struct Extras {
     /// Colunas e linhas da janela de edição quando o vetor não é da janela padrão da bancada
     /// (25 × 19): no Tutorial ela abre maior (39 × 21). Usado ao centralizar a vista dentro do tick.
     pub vista_edicao: Option<(i32, i32)>,
+    /// Primeira leitura de `_MacTickCount` feita pelo tick depois de fechada uma caixa modal
+    /// (`MacTickCount_depois_da_caixa` do extras.json; só em `antes`).
+    pub relogio_depois_da_caixa: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -103,6 +106,7 @@ impl From<ExtrasJson> for Extras {
             time_temp: j.time_temp.map(|v| v as i32),
             janela_na_frente: j.janela_na_frente.map(|v| v as u16),
             vista_edicao: j.vista_edicao,
+            relogio_depois_da_caixa: None,
         }
     }
 }
@@ -111,6 +115,8 @@ impl From<ExtrasJson> for Extras {
 struct ExtrasArquivo {
     antes: ExtrasJson,
     depois: ExtrasJson,
+    #[serde(rename = "MacTickCount_depois_da_caixa", default)]
+    depois_da_caixa: Vec<Option<i64>>,
 }
 
 /// Um vetor de tick do original, já lido.
@@ -158,7 +164,10 @@ impl VetorTick {
             depois,
             vida_antes,
             vida_depois,
-            extras_antes: ex.antes.into(),
+            extras_antes: Extras {
+                relogio_depois_da_caixa: ex.depois_da_caixa.first().copied().flatten().map(|v| v as u32),
+                ..Extras::from(ex.antes)
+            },
             extras_depois: ex.depois.into(),
         })
     }
@@ -487,6 +496,15 @@ pub fn regras_do_vetor(v: &VetorTick) -> super::tick::RegrasOriginais {
         r.interface_tutor.janelas = vec![j];
     }
     r
+}
+
+/// O que a interface faz depois do tick e que o vetor registra: fechar a caixa da lição com o relógio
+/// lido depois dela (`MemoriaTutor::caixa_fechada`). Chamar depois de [`comparar_tick`], antes de
+/// conferir `_TimeTemp`.
+pub fn depois_do_tick(v: &VetorTick, regras: &mut super::tick::RegrasOriginais) {
+    if let Some(r) = v.extras_antes.relogio_depois_da_caixa {
+        regras.memoria_tutor.caixa_fechada(i64::from(r));
+    }
 }
 
 pub fn comparar_tick(v: &VetorTick, layout: &LayoutSave, regras: &mut dyn Regras) -> Result<RelatorioTick, String> {
