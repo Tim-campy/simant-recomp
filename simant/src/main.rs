@@ -233,7 +233,11 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
         if desenhada.as_deref() != Some(tela.nome.as_str()) {
             let rgb = match &load {
                 Some(l) => {
-                    let (mut q, _) = compor(tela, recursos, interface)?;
+                    // O original fecha o "Select a Game" antes de abrir o "Load Ant Hill" (bancada,
+                    // 2026-10-19, re_trabalho/raros/load/a2_dialogo.png): o diálogo fica sobre o fundo.
+                    let mut fundo = tela.clone();
+                    fundo.janelas.retain(|j| j.id != selecao.cfg.janela);
+                    let (mut q, _) = compor(&fundo, recursos, interface)?;
                     l.desenhar(&mut q, interface);
                     para_rgb(&q.pixels, cores)
                 }

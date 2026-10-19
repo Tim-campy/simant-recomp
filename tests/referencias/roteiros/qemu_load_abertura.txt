@@ -1,0 +1,22 @@
+# Load Game da abertura: "Select a Game" (snapshot sel2 do overlay ov_modos) → Load Game → "Load Ant
+# Hill" → QUICK2.ANT do C:\MAXIS\ANTWIN → o jogo carregado. Capturas e estado em re_trabalho/raros/load/.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_load_abertura.txt --overlay re_trabalho/raros/ov_modos1.qcow2
+snapshot_carregar sel2
+esperar 3
+capturar re_trabalho/raros/load/a1_selecao.png
+clicar_em 345 375
+esperar 4
+capturar re_trabalho/raros/load/a2_dialogo.png
+digitar QUICK2
+esperar 1
+capturar re_trabalho/raros/load/a3_nome.png
+teclas ret
+esperar 8
+capturar re_trabalho/raros/load/a4_carregado.png
+pausar
+estado re_trabalho/raros/load/a4_estado.ANT
+ler_variavel GamePaused re_trabalho/raros/load/a4_pausa.bin
+continuar
+esperar 3
+capturar re_trabalho/raros/load/a5_depois.png
+fim

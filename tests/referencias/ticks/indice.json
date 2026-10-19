@@ -65,7 +65,10 @@
   "ninho_n11",
   "lista_a_cheia",
   "lista_a_cheia_sem_vagas",
-  "revoada_natural"
+  "revoada_natural",
+  "queda_casa_carpete_esq",
+  "queda_casa_carpete_dir",
+  "amarela_rainha"
  ],
  "snapshot": "quick",
  "semente_s_forcada": null,

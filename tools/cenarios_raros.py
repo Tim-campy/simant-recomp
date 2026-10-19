@@ -489,6 +489,180 @@ def cenario_exp_leao_m1(c: Sessao, saida, n):
     return []
 
 
+# ------------------------------------------------------------------------------------------------
+# Rainha amarela: a segunda metade 0xFE no mapa de vida (telas/jogo.md, formiga-amarela.md §3)
+# ------------------------------------------------------------------------------------------------
+
+def cenario_amarela_rainha(c: Sessao, saida, n):
+    """A amarela vira rainha (_MeType = 0x60) num túnel do ninho preto, virada para a direita, com a
+    0xFF na cabeça e a 0xFE atrás; vista do ninho preto (Ctrl+9) e um clique num túnel a algumas
+    células (ordem de andar): a cada passo _MoveMyLife regrava as duas metades. Grava os ticks e a
+    tela (a 0xFE desenhada com o tile 0x108 + _MeBase + _MeType + _MeDir)."""
+    c.teclas("ctrl+9")
+    time.sleep(1.5)
+    c.entrada()
+    s = c.save()
+    vida_b = vida_ler(c, "B")
+    livre = lambda x, y: 0 < x < 63 and 0 < y < 63 and s.celula("MapB", x, y) < 0x10 and vida_b[x * 64 + y] == 0
+    x, y, d = next((x, y, d) for y in range(3, 40) for x in range(2, 60) for d in (2, 6, 4, 0, 1, 3, 5, 7)
+                   if livre(x, y) and livre(x + D8[d ^ 4][0], y + D8[d ^ 4][1]))
+    cx, cy = x + D8[d ^ 4][0], y + D8[d ^ 4][1]
+    cr.por_amarela(c, 2, x, y, tipo=0x60, vida=100)
+    c.escrever("MeDir", d)
+    vida_escrever(c, "B", cx, cy, 0xFE)
+    c.log(f"amarela rainha em ({x}, {y}) direção {d}, 0xFE em ({cx}, {cy})")
+    alvos = [(tx, ty) for ty in range(1, 63) for tx in range(1, 63) if livre(tx, ty)
+             and 4 <= max(abs(tx - x), abs(ty - y)) <= 7]
+    tx, ty = alvos[len(alvos) // 2]
+    c.clicar_celula(tx, ty, pausado=True)
+    nomes = c.gravar(saida, n)
+    ct.tela(c, saida, "rainha_amarela")
+    return nomes
+
+
+# ------------------------------------------------------------------------------------------------
+# Botão esquerdo encerrando o laço do MYTIMERFUNC (simulacao-visao-geral.md §2)
+# ------------------------------------------------------------------------------------------------
+
+def cenario_ritmo_clique(c: Sessao, saida, n):
+    """Em ultra (Shift+4), para na entrada do MYTIMERFUNC (1000:2440) a cada chamada e anota quantos
+    ticks a chamada anterior rodou (GameTime) e o relógio do BIOS (0040:006C). `n` chamadas sem clique,
+    depois `n` chamadas com um clique esquerdo na barra de título da janela principal (320, 8) logo depois
+    de soltar a VM. Grava saida/ritmo.json."""
+    c.teclas("shift+4")
+    time.sleep(3)
+    c.dep.retomar()
+    qb.mouse_canto(c.q)
+    qb.mover_rel(c.q, 320, 8)
+    time.sleep(0.3)
+    g = c.mj.sessao_gdb()
+    mt = c.mj.linear_codigo(1, 0x2440)
+
+    def chamada(clicar):
+        # um passo de instrução antes de religar o breakpoint (continuar dele o atingiria de novo)
+        g.drenar()
+        g.s.sendall(b"$s#73")
+        while not g._e_parada(g._proximo()):
+            pass
+        g.breakpoint(mt)
+        g.drenar()
+        g.s.sendall(b"$c#63")
+        clicou = False
+        if clicar:
+            time.sleep(0.01)
+            try:
+                c.botoes(False)
+                clicou = True
+            except RuntimeError as e:
+                if "not running" not in str(e):
+                    raise
+        while not g._e_parada(g._proximo()):
+            pass
+        g.breakpoint(mt, False)
+        bios = int.from_bytes(c.mj.ler_linear(0x46C, 4), "little")
+        return {"GameTime": c.ler("GameTime"), "bios": bios, "clique": clicou}
+
+    reg = [chamada(False) for _ in range(n)]
+    reg += [chamada(k % 2 == 0) for k in range(2 * n)]
+    for a, b in zip(reg, reg[1:]):
+        b["ticks"] = b["GameTime"] - a["GameTime"]
+        b["bios_delta"] = b["bios"] - a["bios"]
+    Path(saida).mkdir(parents=True, exist_ok=True)
+    (Path(saida) / "ritmo.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    sem = [r["ticks"] for r in reg[1:n]]
+    depois_clique = [r["ticks"] for a, r in zip(reg[n:], reg[n + 1:]) if a["clique"]]
+    outras = [r["ticks"] for a, r in zip(reg[n:], reg[n + 1:]) if not a["clique"]]
+    c.log(f"ticks por chamada sem clique: {sem}")
+    c.log(f"na chamada em que houve clique: {depois_clique}; nas outras: {outras}")
+    return []
+
+
+# ------------------------------------------------------------------------------------------------
+# Comida que cai na casa (superficie.md 8.2, _DROPdir)
+# ------------------------------------------------------------------------------------------------
+
+def cenario_queda_casa(c: Sessao, saida, n):
+    """Jogo Completo (snapshot full), patch da casa (1, 5) como em cenarios_regras.choque; a amarela
+    carregando comida (_MeType 0x18) ao lado de uma célula de piso que não aceita comida (tile 4–7 ou
+    0x27–0x3F) com ordem de andar até ela: ao chegar, _TryMyDropOrLift → _DropMyFood → _DropFoodA, e a
+    comida cai na direção de _DROPdir (ou some). CASA_TILE (ambiente) escolhe o tile procurado."""
+    import os
+    ct.cenario_xfer(c, str(Path(saida).resolve() / "xfer"), 2)
+    c.dep.retomar()
+    c.teclas("ctrl+e")
+    time.sleep(1)
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.teclas("shift+0")
+    time.sleep(2)
+    c.entrada()
+    s = c.save()
+    vida_a = vida_ler(c, "A")
+    queda = lambda v: 4 <= v <= 7 or 0x27 <= v <= 0x3F  # noqa: E731
+    contagem = Counter(s.celula("MapA", x, y) for x in range(128) for y in range(64))
+    c.log(f"_CurYardPnt = {c.ler('CurYardPnt'):#x}; tiles {sorted(contagem.items())[:40]}")
+    quer = int(os.environ.get("CASA_TILE", "-1"), 0)
+    alvos = [(x, y) for x in range(2, 126) for y in range(2, 62)
+             if (s.celula("MapA", x, y) == quer if quer >= 0 else queda(s.celula("MapA", x, y)))]
+    for tx, ty in alvos:
+        viz = [(tx + dx, ty + dy) for dx, dy in D8 if vida_a[(tx + dx) * 64 + ty + dy] == 0
+               and s.celula("MapA", tx + dx, ty + dy) <= 3]
+        if viz:
+            break
+    else:
+        raise RuntimeError("sem célula de queda com vizinha de piso")
+    x, y = viz[0]
+    c.log(f"alvo ({tx}, {ty}) tile {s.celula('MapA', tx, ty):#x}; amarela em ({x}, {y})")
+    cr.por_amarela(c, 1, x, y, tipo=0x18, vida=90)
+    for nome, v in (("MeGoalX", tx), ("MeGoalY", ty), ("MeMoveMe", 1), ("MeCmd", 1), ("MeCrazyCnt", -2)):
+        c.escrever(nome, v)
+    return c.gravar(saida, n, parar=lambda d: d.ler("MeType") & 8 == 0)
+
+
+def xfer_para(c: Sessao, saida, alvo):
+    """Como cenarios_tick.cenario_xfer, para o patch `alvo` (n = px·16 + py; casa: px < 2)."""
+    c.teclas("shift+0")
+    time.sleep(1)
+    c.mj.sessao_gdb()
+    c.escrever_elemento("YMapPopB", alvo[0] * 16 + alvo[1], 3)
+    c.escrever("ColonyTotalBlack", 2)
+    c.dep.retomar()
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    antes = ct.fotografar(c, saida, "antes")
+    ct.clicar_tela(c, *ct.pixel_patch(*alvo), duplo=True)
+    time.sleep(4)
+    ct.dispensar(c)
+    time.sleep(2)
+    depois = ct.fotografar(c, saida, "depois")
+    ct.gravar_acao(saida, antes, depois, {"xfer": list(alvo)})
+
+
+def cenario_queda_casa_aranha(c: Sessao, saida, n):
+    """Como queda_casa, mas quem larga a comida é a aranha em agonia (inimigos.md 2.5: _SMode 5, ao fim
+    de _DeathCnt vira comida pela _DropFoodA na própria célula), posta sobre um fiapo do carpete (0x3E/
+    0x3F, que não aceita comida): a comida cai na direção de _DROPdir."""
+    import os
+    alvo = tuple(int(v) for v in os.environ.get("CASA_PATCH", "1,5").split(","))
+    xfer_para(c, str(Path(saida).resolve() / "xfer"), alvo)
+    c.dep.retomar()
+    c.teclas("ctrl+e")
+    time.sleep(1)
+    c.teclas("ctrl+8")
+    time.sleep(1)
+    c.teclas("shift+0")  # o xfer deixa o jogo pausado: Unpause
+    time.sleep(2)
+    c.entrada()
+    s = c.save()
+    alvos = [(x, y) for x in range(4, 124) for y in range(4, 60) if s.celula("MapA", x, y) in (0x3E, 0x3F)
+             and s.celula("MapA", x - 1, y) <= 3 and s.celula("MapA", x + 1, y) <= 3]
+    x, y = alvos[len(alvos) // 2]
+    c.log(f"_CurYardPnt = {c.ler('CurYardPnt'):#x}; aranha em agonia em ({x}, {y}) tile {s.celula('MapA', x, y):#x}")
+    cr.aranha_em(c, x, y, modo=5)
+    c.escrever("DeathCnt", 3)
+    return c.gravar(saida, n, parar=lambda d: d.ler("SpidOn") == 0)
+
+
 def mortes(bruto):
     """Por tick: vagas que sumiram (T ≠ 0 → 0) em cada lista, com o T e o M de antes, e os contadores
     _BAntsExpired/_RAntsExpired, _BlkQueens/_RedQueens."""
