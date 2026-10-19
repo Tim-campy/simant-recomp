@@ -1,0 +1,101 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-19",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "rico",
+ "descricao": "N-11 e afogamento (ninho.md 8.1, 8.3): linhas 6..63 inundadas sem chuva, adultas em M = 17 e comida 0x11 em duas células. 1711 macho vermelho afogado; 1719 a água desce uma linha; 1722 operária preta afogada; 1754 a linha da comida seca e a comida some (0x4E -> S(8), _FoodB igual)",
+ "passos": [
+  "ListIndexB <- 30",
+  "lista B[29] = (35, 8) T 0x12 M 13 S 0",
+  "ListIndexB <- 31",
+  "lista B[30] = (37, 9) T 0x32 M 13 S 0",
+  "ListIndexB <- 32",
+  "lista B[31] = (37, 10) T 0x14 M 13 S 0",
+  "MapB(37, 9) <- 0x11",
+  "MapB(37, 10) <- 0x11",
+  "ListIndexR <- 49",
+  "lista R[48] = (29, 9) T 0x92 M 13 S 0",
+  "ListIndexR <- 50",
+  "lista R[49] = (35, 10) T 0xb2 M 13 S 0",
+  "ListIndexR <- 51",
+  "lista R[50] = (33, 10) T 0x94 M 13 S 0",
+  "ListIndexR <- 52",
+  "lista R[51] = (31, 9) T 0xb6 M 13 S 0",
+  "MapB: linhas 6..63 inundadas",
+  "MapR: linhas 6..63 inundadas",
+  "B[29] em (35, 8) M <- 17",
+  "B[30] em (37, 9) M <- 17",
+  "B[31] em (37, 10) M <- 17",
+  "R[7] em (36, 11) M <- 17",
+  "R[9] em (31, 6) M <- 17",
+  "R[22] em (30, 10) M <- 17",
+  "R[48] em (29, 9) M <- 17",
+  "R[49] em (35, 10) M <- 17",
+  "R[50] em (33, 10) M <- 17",
+  "R[51] em (31, 9) M <- 17",
+  "WaterTable <- 6",
+  "RainOn <- 0",
+  "ClearRainFlag <- 0",
+  "HealthB <- 100",
+  "HealthR <- 100"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ]
+ },
+ "ticks": [
+  "tick_001711",
+  "tick_001719",
+  "tick_001722",
+  "tick_001754"
+ ],
+ "selecao": [
+  "1711",
+  "1719",
+  "1722",
+  "1754"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}
