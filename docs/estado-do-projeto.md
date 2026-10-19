@@ -86,11 +86,11 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 | Quintal (Yard View, faixa 35) | 90% | 85% | 99,27–99,59% nos três modos, faixa 93,09%; botões configuráveis da faixa 35 não existem |
 | Info (cartões) | 90% | 70% | 11 de 53 cartões contra capturas (96,36–99,75%); os outros 42 só por conferência automática |
 | Examine (`_MagnifyMenu`) | 95% | 90% | conferido na bancada (2026-10-18): 97,6–99,4% na região da janela, inclusive o deslocamento de 3 pixels da primeira abertura da sessão |
-| Ajuda (visor do WinHelp) | 75% | 70% | 99,94–99,97%; Search, History, menus e popups pequenos não existem; desenhada na área cliente, 2 linhas acima |
+| Ajuda (visor do WinHelp) | 95% | 90% | 99,94–99,97%; desde 2026-10-18 menus (99,4–99,6%), Search (99,5–99,8%), History (99,89%) e popups (99,29%); os itens de menu que abririam diálogos do WinHelp só fecham o menu; regra da largura/posição do popup de uma amostra; desenhada na área cliente, 2 linhas acima |
 | Diálogos de arquivo | 85% | 85% | 99,28–99,97% nas partes comparáveis; é uma imitação (unidade fixa "c:", "Read Only" sem efeito) |
 | Menu de ferramentas do Experimental | 100% | 100% | 100% na bancada |
 | Quadros de mensagem e faixa | 100% | 95% | 100% nas capturas; texto 1 pixel à esquerda por ajuste medido |
-| Fim de jogo e pontuação | 95% | 90% | 97,95%; pontuação 19785 do C-10 e 27572 do `inseticida_morte` iguais; `_DrawSimPayoff` (animação) não existe |
+| Fim de jogo e pontuação | 100% | 90% | 97,95%; pontuação 19785 do C-10 e 27572 do `inseticida_morte` iguais; `_DrawSimPayoff` (vitória e trapaça `fred`) desde 2026-10-18, 99,78% contra a bancada (músicas não ouvidas) |
 
 ### 2.6 Diálogos e menus
 
@@ -98,7 +98,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 - **Falta (alto impacto):**
   - **A barra de menus do Windows** (File, Window, View, Options, Speed): o port não tem (`data/partida.json`: "o port não tem barra de menus"); tudo depende de aceleradores e dos botões configuráveis da faixa. Sem ela, quem joga não descobre Options (Music, Sound Effects, Events, Messages, Silly), Quit, About, a janela de placar (Ctrl+T, `0xFD17`) nem Ctrl+J/K.
   - "Load Game" no "Select a Game", na abertura e durante a partida (`simant/src/modos.rs`: imprime "Load Game ainda não implementado no port"; o Ctrl+L da partida existe). A linha de `divergencias.md` que dizia o contrário foi corrigida em 2026-10-18.
-  - `_YellowDialog` da trofalaxia (`rules/amarela.rs` l. 1212, "[lacuna]"); `_AboutDialog`, `_ScoreDialog` sem equivalente.
+  - ~~`_YellowDialog`~~ (trofalaxia, 9100 e 9101), `_SpiderDialog`, `_LionDialog` e `_DrawSimPayoff` feitos em 2026-10-18 (`telas/mensagens.md` §10–11; 100% nas janelas, 99,78% na vitória).
 - **Implementado, não verificado:** diálogos de arquivo modais (a simulação não anda) [hipótese, `telas/arquivos.md`]; primeiro clique numa janela de trás comido também no título [hipótese].
 
 ### 2.7 Som e música
@@ -106,7 +106,7 @@ Revisão feita sobre o `main` em `1ff4b82`, sem mudar código. Fontes: todas as 
 - **Completo:** 57 efeitos decodificados (8 bits, 4096 Hz); músicas `.MID` com a tabela MCI; opções Music/Sound Effects; silêncio sem foco em todas as telas; linha do tempo dos sons da luta (165 ms).
 - **Verificado:** só o formato e o catálogo (quem pede cada som, pelo código). **Nada foi comparado de ouvido com o original.** Tentado em 2026-10-18 na bancada QEMU com SB16 + OPL2 e saída em WAV (`tools/som_original.py`): grava, mas não serve de referência — o driver FM é de OPL3 (notas presas no OPL2 do QEMU), o backend descarta os silêncios e os efeitos gravados não batem com os decodificados (`regras/som.md`, "Áudio do original na bancada QEMU").
 - **Parcial / decisão do port:** timbre por `rustysynth` + SoundFont ou sintetizador simples, não o OPL/MIDI Mapper; volume relativo efeito/música não medido; efeito novo sempre corta o anterior.
-- **Falta:** sons de menus e diálogos (`_LionDialog`, `_YellowDialog`, `_SpiderDialog`, `_DrawSimPayoff`, itens da barra de menus; `regras/som.md`, "Interface: o que está ligado e o que falta"). Os das ferramentas do Experimental, dos marcadores, das trapaças, do Mystery, do fim de jogo e da troca de patch tocam.
+- **Falta:** sons dos itens da barra de menus (os dos diálogos `_LionDialog`, `_YellowDialog`, `_SpiderDialog` e `_DrawSimPayoff` estão ligados desde 2026-10-18, não ouvidos no original; `regras/som.md`, "Interface: o que está ligado e o que falta"). Os das ferramentas do Experimental, dos marcadores, das trapaças, do Mystery, do fim de jogo e da troca de patch tocam.
 
 ### 2.8 Modos
 
@@ -148,7 +148,7 @@ Método: cada nome de função dos segmentos 1–7 de `re_trabalho/symbols.tsv` 
 | `_win_*` (sistema de janelas próprio) | 123 | 21 | 12 | 90 | substituído pelo gerenciador do port; não precisa de equivalente 1:1 |
 | `_db_`/`_DB*`/`_ch_` (banco, cache) | 28 | 1 | 3 | 24 | substituído pelo leitor do banco |
 | `_mem_*`/`_Ralloc*`, `_hanim_*`, `G*` | 77 | 5 | 8 | 64 | infraestrutura (memória, animação, primitivas gráficas) |
-| `_Draw*` | 34 | 22 | 7 | 5 | sem equivalente: `_DrawBalloons`, `_DrawEditGraphs`, `_DrawSimPayoff`, `_DrawLegs`, `_DrawForSale`, `_DrawMapSpider`, `_DrawMapFoot`, `_DrawMiniMapCursor` |
+| `_Draw*` | 34 | 22 | 7 | 5 | sem equivalente: `_DrawBalloons`, `_DrawEditGraphs`, `_DrawLegs`, `_DrawForSale`, `_DrawMapSpider`, `_DrawMapFoot`, `_DrawMiniMapCursor` |
 | Rede (NetBIOS, DDE, `_ProcessPost`) | 5 | 0 | 3 | 2 | fora do escopo (trapaças `data`, `serv`, `clie` só escrevem no console) |
 | Som/MIDI | 21 | 6 | 6 | 9 | resto são caminhos Sound Blaster/alto-falante/Disney, não reproduzidos |
 | Impressão | 0 | — | — | — | o `.SYM` não tem funções de impressão |
@@ -213,6 +213,8 @@ Diálogos
 
 **Feito depois desta revisão (2026-10-18, branch da aranha e do desenho dentro do tick):** desenho dentro do tick (os sorteios do redesenho da janela de edição em `_GotoMyAnt` e nos `_DoEditUpdateDraw` das mortes, nascimento, animações, trofalaxia e `_DoAntMoveY`, e o `S1(2)` de `_SpiderDialog`; `regras/rng.md`): `amarela_morte_aranha/1793` sai dos pendentes e **todos os 145 vetores de tick batem 307/307**; aranha desenhada na janela de edição (corpo, pernas, palpos, agonia, aranha do jogador; 18 capturas 99,91–100% e o menu da aranha 100%: `telas/jogo.md`); formiga-leão, lagarta, bicho-de-conta e pedrinhas conferidos (tiles, 100% nas suas células); moldura azul-escura da caixa de mensagem/lição (100%: `telas/mensagens.md` §3.3). API de mods 0.24 (`data/desenho_aranha.json`, `Evento::DialogoAranha`, `quadro.cor_borda`, `mensagens.aranha_comeu`).
 
+**Feito depois desta revisão (2026-10-18, branch dos diálogos e da ajuda; detalhes em `telas/mensagens.md` §10–11 e `telas/ajuda.md` §4):** quadros animados da janela 26 — `_SpiderDialog` (ligado ao `Evento::DialogoAranha`, com a janela da aranha que fica aberta e fica branca embaixo do texto), `_LionDialog` (espera o som 38, quadros a cada 30 do Mac) e `_DrawSimPayoff` (vitória do Jogo Completo e trapaça `fred`, com o Ctrl+Y antes e as músicas 20003/20004), com sons; `_YellowDialog` 9100 (depois da luta) e 9101 (renascimento, com o texto); a luta espera os quadros pedidos antes dela; o `_myDelay` fora de um `_DialogWaitInit` volta logo (bancada). Bancada: 100% nas janelas 9110, 9100, 9101, aranha e formiga-leão, 99,98% da aranha embaixo do texto, 99,78% na vitória. Ajuda: menus File/Edit/Bookmark/Help (Exit fecha), Search com as 128 palavras-chave do `|KWBTREE`, History e popups dos saltos 0xE0, 99,3–99,9% contra as capturas do WinHelp 3.1. API de mods 0.25.
+
 Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; **G** = uma semana ou mais.
 
 ### Alto impacto para quem joga
@@ -223,20 +225,17 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 | "Load Game" no "Select a Game" (abertura e partida) | P | `simant/src/modos.rs`; `telas/abertura.md` |
 | Balões de fala da edição ("Silly", luta, descanso, ovos, rainha, aranha) | M | `_DrawBalloons`, `_EggBalloons`, `_QueenBalloons`, `_RestBalloons`, `_FightBalloons`; `rules/desenho.rs` |
 | Gráficos de saúde na janela de edição (`_DrawEditGraphs`) | P–M | `telas/jogo.md` l. 105 |
-| Sons de menus e diálogos (os do Experimental já tocam) | P | `regras/som.md`, "Interface: o que está ligado e o que falta" |
+| Sons dos itens da barra de menus (os do Experimental e dos diálogos da janela 26 já tocam) | P | `regras/som.md`, "Interface: o que está ligado e o que falta" |
 | Janela de placar (Ctrl+T, `0xFD17`) e `_ScoreDialog`, se forem do jogo e não de depuração [em aberto] | M | aceleradores em `telas/experimental.md` |
 
 ### Médio impacto
 
 | Item | Esforço | Referência |
 |---|---|---|
-| Diálogo da trofalaxia (`_YellowDialog`) | P | `rules/amarela.rs` l. 1212 |
-| Ajuda: Search, History, menus e popups pequenos | M | `telas/ajuda.md`, `divergencias.md` |
 | Mapa: redesenho alternado com a janela atrás (Shift+clique, duplo clique e arrasto feitos em 2026-10-18) | P | `telas/mapa.md`, `divergencias.md` |
 | Textos do quadro de exame e avisos do Experimental (listas 4/1010, 4/1100–1103) | P | `telas/experimental.md` §10 |
 | PLACE parando a simulação e Shift para outra rainha | P | `divergencias.md` (`_PlaceQueenInYard`) |
 | `_SpecialXfer` na partida ao vivo (hoje só nos vetores) e dentro do tick (ordem do original) | M | `divergencias.md`, `rules/amarela.rs` |
-| Animação `_DrawSimPayoff` (trapaça `fred` e fim de jogo) | M | `regras/trapacas.md` |
 | Botões configuráveis da faixa 35 | P | `regras/som.md` l. 32 |
 | Queda de comida na casa (`_DROPdir` no `Estado`, `_DropFoodA`) | P | `regras/geracao-mundo.md` l. 294 |
 | Timbre mais próximo do original (FM/OPL ou SoundFont escolhida) | M | `formatos/som.md`, `decisoes.md` |
