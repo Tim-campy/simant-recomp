@@ -2,6 +2,13 @@
 
 Formato: data, decisão, motivo, alternativas descartadas.
 
+## 2026-10-19: Textos do original lidos da instalação do usuário, não guardados em `data/`
+
+- **Decisão (do usuário):** os textos do SimAnt que estavam copiados nos `data/*.json` (frases da faixa, caixas e diálogos de arquivo, títulos de janelas, nome e título do tutorial, item de pausa, título da janela principal e da ajuda) e as peças de bitmap do balão do menino passam a ser lidos da instalação do usuário em tempo de execução. Os JSON guardam só a **referência** à fonte (lista de strings tipo 4 do banco, objeto de layout de janela, segmento do `SIMANTW.EXE`, título do `.HLP`), resolvida por `Recursos::dados` (`engine/src/recursos.rs`). Inventário e análise em `docs/lancamento.md` §6.
+- **Motivo:** o port é distribuído sob "MIT OR Apache-2.0" e não deve levar texto da Maxis; a maior parte dos textos já vinha do banco do usuário (`SHARED`), e estes eram as exceções. Ler da fonte também deixa explícito de onde vem cada texto.
+- **Descartado:** (a) manter os textos em `data/` (redistribui frases da Maxis); (c) só declarar na licença que esses trechos não são cobertos (o texto continuaria no pacote). Tabelas numéricas extraídas do executável ficam (fatos e parâmetros de regra, em formato próprio; §6.3 de `lancamento.md`).
+- **Impacto nos mods:** API 0.35. Um mod que trazia o texto continua valendo (uma string substitui a referência pela mesclagem por chave); ferramentas externas que leem os `data/*.json` encontram objetos no lugar dessas strings.
+
 ## 2026-10-19: Barra de título do Windows 3.1 opcional (`moldura_windows31`), desligada por padrão
 
 - **Decisão:** o port desenha a barra de título e o menu de sistema da janela principal do Windows 3.1 (medidos na bancada, 100% contra as capturas; `telas/menus.md` §8) só com `data/video.json` → `moldura_windows31` = `true` (ou `--moldura`). O padrão é `false`. Com ela: Minimize minimiza a janela do sistema, Close (e o duplo clique na caixa) faz a pergunta do Quit como o `SC_CLOSE` do original, Restore restaura a janela do sistema só se ela estiver maximizada, Switch To… não faz nada; o título fica inativo sem o foco, com um diálogo do Windows aberto ou com o visor da ajuda em foco.

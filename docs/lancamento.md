@@ -2,7 +2,7 @@
 
 Documento de trabalho para o lançamento da **1.0.0**, preparado em 2026-10-19 para revisão. **Nada foi
 publicado:** não há tag, não houve push, os `Cargo.toml` continuam em `0.1.0` e a API de mods continua
-0.34. O que precisa de decisão do usuário está marcado com **[DECIDIR]**.
+0.35 (era 0.34; a 0.35 tirou os textos do original de `data/`, seção 6). O que precisa de decisão do usuário está marcado com **[DECIDIR]**.
 
 Arquivos preparados neste branch:
 
@@ -38,7 +38,7 @@ Pontos que valem para qualquer escolha:
 
 - A licença cobre **só o código e os dados do port**, nunca os arquivos da Maxis. Vale repetir isso no
   `LICENSE` (parágrafo à parte) e no README.
-- **[DECIDIR] Conteúdo de `data/` vindo do original.** Os `data/*.json` trazem tabelas numéricas
+- **Conteúdo de `data/` vindo do original — decidido (2026-10-19): opção (b), ver seção 6.** Os `data/*.json` traziam tabelas numéricas
   extraídas do `SIMANTW.EXE` (`tools/extrair_*.py`) e algumas dezenas de frases curtas de interface do
   jogo em inglês (por exemplo em `mensagens.json`, `dialogos.json`, `amarela.json`,
   `superficie.json`, `ajuda.json`). Números de regras costumam ser tratados como fatos; frases do jogo
@@ -143,7 +143,7 @@ procurados sem diferença de caixa, mas não há teste num sistema de arquivos q
 ### Antes da tag
 
 - [ ] **[DECIDIR]** Licença (seção 1); criar `LICENSE`; `license`/`repository` nos `Cargo.toml`.
-- [ ] **[DECIDIR]** Frases do original em `data/` (seção 1).
+- [x] Frases do original em `data/`: decidido (2026-10-19) e feito — lidas da instalação do usuário (seção 6).
 - [ ] **Versão 1.0.0 nos `Cargo.toml`** — proposta, **não aplicada**. Uma linha, porque os dois crates
       herdam do workspace (`version.workspace = true`):
       ```diff
@@ -156,15 +156,15 @@ procurados sem diferença de caixa, mas não há teste num sistema de arquivos q
       confere que a tag `vX.Y.Z` é igual a essa versão e falha se não for.
 - [ ] **Congelar a API de mods em 1.0** — proposta, **não aplicada**. Em `docs/api-mods.md`:
       - topo: "Versão da API: **1.0** (estável)";
-      - linha nova no histórico: `| 1.0 | Congelamento: a API 0.34 passa a ser a 1.0, sem mudança de
-        formato nem de função. | Compatível com 0.34. A partir da 1.0, mudanças seguem o versionamento
+      - linha nova no histórico: `| 1.0 | Congelamento: a API 0.35 passa a ser a 1.0, sem mudança de
+        formato nem de função. | Compatível com 0.35. A partir da 1.0, mudanças seguem o versionamento
         semântico: 1.x só acrescenta (chaves opcionais, arquivos, funções, ganchos); remover ou mudar o
         sentido de algo exige 2.0, com aviso numa 1.x anterior. |`;
       - em "Planejado", trocar "Remover o aceite das cópias antigas das tabelas comuns (0.20) numa versão
         futura" por "... na 2.0" (é a única remoção pendente e quebraria a regra da 1.x);
-      - `API_VERSAO` dos scripts passa a `"1.0"`: **avisar** que scripts que comparam com `"0.34"` como
+      - `API_VERSAO` dos scripts passa a `"1.0"`: **avisar** que scripts que comparam com `"0.35"` como
         texto precisam aceitar `"1.0"` (o valor está em `engine/src/scripts.rs`,
-        único lugar com `"0.34"`; os mods de exemplo só imprimem a versão);
+        único lugar com `"0.35"`; os mods de exemplo só imprimem a versão);
       - registrar em `docs/decisoes.md` (data, decisão, motivo, alternativas: manter 0.x; numerar a API
         junto com o port).
 - [ ] Revisar e datar o `CHANGELOG.md` (trocar "não lançado" pela data; números de testes e vetores
@@ -222,3 +222,153 @@ Se algo falhar depois da tag: apagar o rascunho e a tag (`git push --delete orig
   `dummy` do SDL) → `.zip`/`.tar.gz` com `.sha256` → artefatos → job `rascunho` cria o release com
   `gh release create --draft --verify-tag`.
 - **Permissões:** `contents: read` por padrão; só o job `rascunho` tem `contents: write`.
+
+## 6. Textos e tabelas do original em `data/` — **decidido (2026-10-19): ler os textos da instalação do usuário**
+
+O usuário escolheu a opção (b) da seção 1: as frases do SimAnt que estavam copiadas nos `data/*.json` passam
+a ser lidas **da instalação do usuário em tempo de execução** e saem do repositório. No lugar de cada texto,
+o JSON guarda a **referência** à fonte, que `Recursos::dados` (`engine/src/recursos.rs`, `Referencia`)
+resolve depois da mesclagem dos mods. Formato das referências e regras para mods: `docs/api-mods.md`,
+"Textos do original" (API de mods **0.35**; um mod que traz o texto literal continua valendo). Registro da
+decisão: `docs/decisoes.md` (2026-10-19).
+
+### 6.1 Inventário dos textos do original no repositório (varredura de 2026-10-19)
+
+Varridos: todos os `data/*.json` (valores e comentários `_…`), o código Rust (`engine/`, `simant/`), os testes,
+`exemplos/mods/`, `tools/` e `docs/`. A fonte de cada texto foi localizada nos arquivos da instalação de
+referência (`SimAnt-T/MAXIS/ANTWIN`): listas de strings tipo 4 dos bancos, segmentos do `SIMANTW.EXE`
+(numeração do `.SYM`; endereço = offset no segmento), objetos de layout de janela e o `|SYSTEM` do `.HLP`.
+
+**Trocados por referência** (29 referências; texto conferido byte a byte, ver 6.4):
+
+| Arquivo → chave | Fonte |
+|---|---|
+| `mensagens.json` → `faixa.velocidade[0..3]` (quatro "Game speed now …") | `SIMANTW.EXE` 10:014b, 10:0160, 10:0177, 10:018c (`_DoUserButton`) |
+| `mensagens.json` → `faixa.marcador_posto`, `marcador_ausente` | 10:01a2, 10:01bc (`_DoBookMark`) |
+| `dialogos.json` → `caixa_mensagem.titulo_load`, `pergunta_load` | 10:17eb, 10:17f7 (`_LoadGame`) |
+| `dialogos.json` → `caixa_mensagem.titulo_quit` | 10:1650 (`_MenuQuit`; a pergunta repete em 10:165c) |
+| `dialogos.json` → `caixa_mensagem.titulo_mensagem` ("Message") | 10:185a (cauda de "SimAnt Message" em 10:1853, `_PopMsg`) |
+| `dialogos.json` → `caixa_mensagem.salvo` (formato com `%s` e quebra de linha) | 10:1840 (`_PopMsg`) |
+| `dialogos.json` → `arquivo.titulo_abrir`, `titulo_salvar`, `texto_tipo`, `campo_inicial` | 10:1745, 10:1763, 10:1715, 10:1729 (`_FileSelect`) |
+| `janelas.json` → `tarefas.titulo`, `castas.titulo`, `historico.titulo` | objeto 1 (tipo 18, título) dos layouts `WINGANT` 0/18, 0/19, 0/21 (iguais no `MWINNT`) |
+| `quintal_mapa.json` → `titulos[0..3]` (Yard/House/Strategic/Graphic View) | `SHARED` 4/1000, índices 9–12 (`_SetMapTitle`) |
+| `quintal_mapa.json` → `balao_menino.pecas` (10 peças 8 × 8 em "arte ASCII") | 10:1c6e, 11 peças de 16 bytes (`_MakeBalloon`; a 10ª, a cunha para a direita, o port não usa) |
+| `tutorial_arquivo.json` → `nome` (`Tutorial.Ant`) | `SHARED` 4/1800[0] |
+| `tutorial_arquivo.json` → `titulo` ("Tutorial Game") | 10:17dd (`_LoadGame`; o mesmo texto está em `SHARED` 4/1001[0]) |
+| `barra_menus.json` → `texto_pausa[0..1]` (item Pause/Unpause com o atalho) | 10:0911, 10:0900 (`_SetMenuOptionText`) |
+| `moldura_principal.json` → `texto` ("SimAnt") | 10:0626 (`CreateWindow` de `_InitInstance`) |
+| `ajuda.json` → `titulo` | título do `SIMANT.HLP` (`|SYSTEM`: "SimAnt") com o formato `"{} Help - SIMANT.HLP"` (a barra medida é esse texto; que o WinHelp a monte assim é [hipótese]) |
+
+**Tirados de comentários** (`_…` dos JSON e dos extratores): as frases citadas em `amarela.json` → `mensagens._faixa`
+(`SHARED` 4/1010[4, 11, 12, 13]), `superficie.json` → `_origem.mensagem_ataque_vermelho` (4/1020[5]) e
+`barra_menus.json` → `_texto_pausa`, e as mesmas em `tools/extrair_amarela.py` e `tools/extrair_superficie.py`.
+
+**Código Rust:** o único texto do original usado em execução era o título padrão `"SimAnt Quit"` de
+`dialogos.rs` (quando um mod tirava a chave): saiu (sem a chave, vale o título do Load). Ficam: comentários de
+documentação que citam uma frase curta para dizer qual mensagem a regra mostra (`rules/troca_patch.rs`,
+`rules/amarela.rs`, `rules/superficie.rs`, `core/partida.rs`, `core/dialogos.rs`), o título `"SimAnt"` da janela
+do SDL e o rótulo `"Tutorial Game"` da saída de console em `simant/src/main.rs` (nomes, não frases), e as
+seções `"SimAnt"`/`"Windows Help"` do `WIN.INI` lidas por `simant/src/preferencias.rs` (chaves de formato).
+
+**Testes:** os que comparavam frases do original passaram a comparar a referência (`partida_quick2.rs`,
+`core/avisos.rs`), um SHA-256 do texto inteiro (`modos_reais.rs`, três textos de cartões do Info, antes
+conferidos por trechos) ou uma descrição em português (mensagens de `assert` de `regras_quintal.rs` e
+`partida_quick2.rs`). Ficam, por serem nomes curtos que identificam o que o teste confere, os títulos de
+tópicos do `.HLP` em `ajuda_reais.rs` e `simant/src/ajuda_ui.rs` ("Patch Ribbon Bar", "Welcome to SimAnt"…),
+os títulos de cartões e itens em `modos_reais.rs` ("Top Card", "Queen"…) e o rótulo "Click here to continue"
+medido em `arquivos_reais.rs` (texto do objeto `gameOverClickHere` da janela 4).
+
+**Documentação:** `docs/spec/` cita cerca de 60 frases curtas do jogo (uma frase por mensagem, ~3 KB no
+total; as maiores em `regras/inimigos.md`, `regras/trapacas.md`, `regras/simulacao-visao-geral.md`,
+`telas/quintal.md`) para documentar **qual** mensagem aparece em cada regra, como pede o princípio 3 do
+`CLAUDE.md`. São citações curtas e pontuais: ficam. Nenhuma doc reproduz tópicos do `.HLP` ou textos de
+cartões inteiros. Em `telas/abertura.md`, a citação da tela de registro trazia o nome e o número de cliente
+**desta cópia**: foram tirados. Ferramentas da bancada (`tools/caso_ant.py`, `cenarios_tick.py`,
+`cenarios_raros.py`) e roteiros (`tests/referencias/roteiros/*.txt`) citam títulos de caixas para reconhecê-las
+na VM: ficam (não vão no pacote).
+
+**Ficam como texto no port, por não serem do SimAnt:**
+
+| O quê | Onde | De quem / por que fica |
+|---|---|---|
+| Itens do menu de sistema (Restore, Move, Size, Minimize, Maximize, Close, Next, Switch To…) | `janelas.json` → `gerenciador.menu_sistema`, `moldura_principal.json` → `itens` | Windows 3.1 (`USER.EXE`). Rótulos padronizados de 1–2 palavras |
+| Botões Yes/No/Cancel/OK da caixa de mensagem | `dialogos.json` → `caixa_mensagem.sim`, `nao`, `cancelar`, `ok` | Windows 3.1 (`USER.EXE`) |
+| Rótulos do diálogo comum de arquivo (File Name, Directories, List Files of Type, Drives, Read Only, OK, Cancel, `c:`) | `dialogos.json` → `arquivo` | Windows 3.1 (`COMMDLG.DLL`) |
+| Menus, botões e diálogos do WinHelp (File, Edit, Bookmark, Help, Contents, Search, Back, History, Search e History) | `ajuda.json` → `menu`, `botoes`, `janelas` | Windows 3.1 (`WINHELP.EXE`). As duas instruções do diálogo Search são as frases mais longas (8 e 7 palavras) |
+| Marca de seleção dos menus (bitmap 8 × 10 em "arte ASCII") | `barra_menus.json` → `marca` | Windows 3.1; medida na tela |
+| Nomes dos 128 instrumentos e 47 percussões General MIDI | `opl_banco.json` | Padrão GM (MMA); o banco FM é do port |
+
+Esses textos não estão nos arquivos do SimAnt; ler do `WINDOWS` do usuário exigiria uma instalação do
+Windows 3.1 ao lado do jogo, que a maior parte dos usuários não tem. São rótulos curtos e funcionais da
+interface padrão do sistema. **[DECIDIR, opcional]** Se quiser tirá-los também: ler de
+`../../WINDOWS/SYSTEM/{USER.EXE,COMMDLG.DLL}` e `../../WINDOWS/WINHELP.EXE` quando existirem (recursos
+`STRING`/`MENU`/`DIALOG` do NE), com um texto do port como reserva.
+
+**Ficam por serem identificadores, não texto:** nomes de objetos das janelas (`ribHelp`, `antEffEH`…, os
+nomes do `SHARED` tipo 1, usados para achar os objetos), nomes de símbolos do `SIMANTW.SYM` em
+`save_layout.json` (o formato do save), nomes de recursos de cursor (`HELPCURSOR`…), nomes de arquivos
+(`SIMANTW.EXE`, `SIMANT.HLP`, `font1`, `FONTRES.FON#Gaia8x14`, as 28 músicas de `som.json`), formatos
+`printf` (`%d%%`, `%ld`) e os 26 códigos de trapaça de 4 letras de `codigos_trapaca.json` (tabela `_Cheats`
+em 8:83bc, guardada invertida; são as teclas que o jogo aceita, publicadas em guias desde 1991, e o mod de
+trapaças precisa poder trocá-las).
+
+### 6.2 O que o usuário vê
+
+Nada muda na tela: os textos resolvidos são os mesmos, e os testes de tela (hashes) continuam iguais.
+Sem a instalação, o port já não abria (precisa dos bancos); agora também precisa do `SIMANTW.EXE` (já era
+lido para os cursores e aceleradores) e do `SIMANT.HLP` (já lido pela ajuda) para esses textos. Uma
+referência que não resolve impede o arquivo de carregar, com a chave e a fonte na mensagem.
+
+### 6.3 Tabelas numéricas extraídas do executável — análise
+
+Os `data/*.json` trazem tabelas extraídas do `SIMANTW.EXE` por `tools/extrair_*.py` (endereço de cada uma no
+topo do script e no `_origem`/`_enderecos` do JSON). Contagem de valores numéricos (fora comentários):
+`quintal.json` 904, `mapa.json` 692, `save_layout.json` 615, `casa.json` 549, `desenho_aranha.json` 338,
+`comum.json` 282, `quintal_mapa.json` 269, `geracao.json` 204, `tutorial_arquivo.json` 126, `inimigos.json`
+90, `amarela.json` 82, `ninho.json` 74, `simulacao.json` 72, `superficie.json` 46 (o maior, `opl_banco.json`,
+é medido pelo port e não vem do SimAnt). Análise:
+
+- **O que são.** Direções e giros (`dx8`, `dy8`, `turn_tab`), tabelas de modo e casta por estratégia
+  (`modos_operaria`, `castas_vermelhas`…), chances de luta (`matriz_luta`), bordas de tiles por direção,
+  tiles das formas de pedra (6 de 5 × 5 e 6 de 3 × 3), cores de terreno por tipo (`ctab`, `htab`…), blocos
+  pontilhados 4 × 4 da rampa do feromônio, deslocamentos de sprites por quadro, vértices de polígonos,
+  valores iniciais, posições do tutorial, constantes de regra e o mapa de endereços do save. São **fatos e
+  parâmetros** do funcionamento do jogo: valores que a regra usa, sem conteúdo expressivo próprio.
+- **Em formato próprio.** Nenhuma é cópia binária: cada valor está em decimal, com nome e estrutura do port
+  (listas, matrizes, objetos com chaves em português), muitas reorganizadas (as receitas de `casa.json` são
+  operações escritas a partir do código, não bytes copiados), e é o que permite aos mods mudar as regras
+  (princípio 4 do `CLAUDE.md`). Servem à **interoperabilidade** (ler os saves e reproduzir as regras para
+  rodar os dados do usuário).
+- **Tamanho.** Pequeno diante do executável (≈ 4.300 números no total, em ~100 KB de JSON com os
+  comentários, contra os 504 KB do `SIMANTW.EXE`); nenhuma tabela é texto.
+- **Casos de fronteira**, avaliados com cuidado: (1) as **peças do balão** eram um bitmap em "arte ASCII"
+  copiado do DGROUP: tratadas como texto e trocadas por referência (6.1). (2) `desenho_aranha.json`
+  (338 números: coordenadas de joelho e pé das 8 pernas em 8 passos, para 2 direções-base, e os palpos) é a
+  tabela mais próxima de um desenho; são coordenadas de segmentos de reta que o código liga com `LineTo`, um
+  esqueleto de 2 cores, não uma imagem. Ficou como está; se o usuário preferir, pode virar referência ao
+  executável como as peças do balão (o formato `{"exe": …}` comporta uma variante numérica). (3)
+  `casa.json` → `formas` (moeda, clipe, tomadas, botão) são índices de tiles 3 × 3 a 5 × 5, que apontam para
+  os tiles do banco do usuário; sem o banco não desenham nada. (4) `mapa.json` → `blocos` são 16 pontilhados
+  4 × 4, funcionais. (5) `save_layout.json` reproduz nomes de símbolos e endereços do `.SYM` para ler e
+  gravar o save: é a descrição do formato de arquivo, necessária à interoperabilidade.
+- **Conclusão:** as tabelas numéricas ficam no repositório e no pacote. Nenhuma foi removida. Se algum dia
+  for preciso, o resolvedor já sabe ler segmentos do executável, e qualquer tabela pode virar referência sem
+  mudar o formato visto pelo código.
+
+### 6.4 Verificado
+
+- `engine/tests/textos_originais.rs`: com a instalação, as 29 referências dão exatamente os textos que os JSON
+  traziam (SHA-256 de cada um no teste; o repositório não guarda o texto). Rodado também com
+  `SIMANT_TEXTOS_ANTIGOS` apontando para uma cópia dos 44 `data/*.json` de antes da troca, feita fora do
+  repositório: cada arquivo resolvido é **igual ao antigo** (fora os comentários). Sem a instalação, o teste
+  avisa e passa; o que confere que toda referência tem o texto esperado registrado roda sempre.
+- Testes de unidade do resolvedor (`recursos.rs`): NE mínimo, lista e layout vindos de `objetos/` de um mod,
+  formato, peças, mod com texto literal e com outra referência, erros com o caminho da chave.
+- `cargo test --workspace` com e sem `SIMANT_DIR`, e `cargo clippy --workspace --all-targets -- -D warnings`:
+  sem falhas nem avisos; os testes de tela (hashes) não mudaram.
+- `simant --novo-jogo --ticks 5`, `--save QUICK2.ANT --ticks 5` e `--save QUICK2.ANT --moldura --sair-apos-ms
+  2500` com a instalação: rodam como antes.
+
+**Não verificado:** a tela da caixa "Message" e a ajuda abertas a olho (cobertas pelos testes de tela e pela
+comparação dos JSON); uma instalação com nomes de arquivo em minúsculas (o executável e o `.HLP` são achados
+sem diferença de caixa, como os outros arquivos soltos, e os bancos aceitam `.ndx`/`.dat`).

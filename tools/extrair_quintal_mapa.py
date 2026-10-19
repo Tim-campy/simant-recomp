@@ -15,6 +15,11 @@ Tabelas lidas do DGROUP (segmento 10, seletor 1048) do executável, sem relocaç
 | sprites.cachorro.deslocamentos  | 1048:1918…1937  | 0–11 (1918/1924), 100–103 (18cc+q/18d0+q)                  |
 | sprites.gato.deslocamentos      | 1048:1938…1953  | 10–19 (192e+q/1932+q), 20–29 (192c+q/1936+q)               |
 
+Textos do original (títulos dos modos) saem como **referências** à lista de strings do banco, não como texto
+(docs/api-mods.md, "Textos do original"). O `balao_menino` foi acrescentado depois, à mão, ao data/quintal_mapa.json;
+as peças dele também são uma referência: `{"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x1c6e",
+"pecas_8x8": [...]}` (DGROUP 1048:1c6e, 11 peças de 16 bytes; a 10ª, a cunha para a direita, o port não usa).
+
 As demais chaves são valores medidos nas capturas da bancada QEMU (re_trabalho/modos/*.png) ou imediatos vistos
 no pseudocódigo (endereço indicado no "_origem" de cada uma).
 """
@@ -63,7 +68,8 @@ def extrair(exe):
         "cor_titulo": 4,
         "cor_botao": 8,
         "cor_fundo": 7,
-        "titulos": ["Yard View", "House View", "Strategic View", "Graphic View"],
+        # Textos do original: só a referência (API de mods 0.35); o port lê o texto do banco do usuário.
+        "titulos": [{"banco": "SHARED", "tipo": 4, "id": 1000, "indice": i} for i in (9, 10, 11, 12)],
         "_origem_titulos": "lista de textos 4/1000 do SHARED, itens 9..12 (_SetMapTitle 1000:953c); o port ainda não desenha o título",
         "origem_patches": [0, 0],
         "_origem_origem_patches": "_mapTileRect = canto da área cliente; medido: cursor do patch (11,8) em (517,304) na tela",

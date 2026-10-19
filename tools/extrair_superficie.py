@@ -64,7 +64,7 @@ REGRAS = {
     "musica_ataque_vermelho": (0x2B0A, "_GstrR: música tocada no ataque vermelho (_myBeginSong)"),
     "mensagem_ataque_vermelho": (
         {"lista": 1020, "indice": 5, "duracao": 120, "importante": False},
-        "_GstrR (1030:03c2) e _StartAttack (1030:050e): _EditMessage(_AdviceStrs[5] = SHARED 4/1020[5] \"The red ants are attacking!\", 0x78, 0)",
+        "_GstrR (1030:03c2) e _StartAttack (1030:050e): _EditMessage(_AdviceStrs[5] = SHARED 4/1020[5] (aviso do ataque vermelho), 0x78, 0)",
     ),
 }
 

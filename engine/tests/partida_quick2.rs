@@ -316,7 +316,7 @@ fn place_para_a_simulacao_e_shift_repete() {
     clicar(&mut j, &cfg, &mut p, x, y, false, false).unwrap();
     assert!(!j.colocando_rainha && !p.parada_pela_interface);
     assert_eq!(p.estado.preta.rainhas_guardadas, 0);
-    assert_eq!(p.avisos.texto_vigente(p.agora()).cloned(), lista(9), "You have started a new colony");
+    assert_eq!(p.avisos.texto_vigente(p.agora()).cloned(), lista(9), "colônia nova");
     p.avancar(2000);
     assert!(p.estado.partida.tempo > tempo);
 }

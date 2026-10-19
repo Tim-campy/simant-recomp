@@ -351,21 +351,21 @@ fn botao_mate_arma_a_revoada_so_no_jogo_completo_com_reprodutores() {
     let mut e = Estado::vazio();
     e.partida.tipo_jogo = 1;
     assert!(!botao_revoada(&mut e, &t));
-    assert_eq!(indice(&e), Some(15), "Fertilize queens in Full Game only");
+    assert_eq!(indice(&e), Some(15), "revoada só no Jogo Completo");
     assert!(e.eventos.contains(&Evento::Som(1)));
     let mut e = Estado::vazio();
     e.partida.tipo_jogo = 2;
     e.preta.castas[4] = 1;
     e.amarela.tipo = 0x40; // a amarela rainha alada é a única: não conta
     assert!(!botao_revoada(&mut e, &t));
-    assert_eq!(indice(&e), Some(5), "Produce males and new queens first");
+    assert_eq!(indice(&e), Some(5), "faltam machos e rainhas novas");
     assert_eq!(e.preta.revoada, 0);
     let mut e = Estado::vazio();
     e.partida.tipo_jogo = 2;
     e.preta.castas[3] = 2;
     assert!(botao_revoada(&mut e, &t));
     assert_eq!(e.preta.revoada, 200);
-    assert_eq!(indice(&e), Some(6), "You have started the mating cycle");
+    assert_eq!(indice(&e), Some(6), "revoada começou");
     assert!(!e.eventos.contains(&Evento::Som(1)));
 }
 

@@ -14,6 +14,11 @@ use engine::recursos::Recursos;
 use engine::rules::estado::Estado;
 use engine::rules::experimental::Ferramenta;
 
+fn sha256(t: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(t.as_bytes()).iter().map(|b| format!("{b:02x}")).collect()
+}
+
 fn raiz() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
@@ -251,8 +256,13 @@ fn info_todos_os_cartoes_tem_figura_e_texto_inteiro() {
         }
     }
     let texto = |id| String::from_utf8_lossy(&TextoCartao::ler(&r, &cfg, id).unwrap().bytes).into_owned();
-    assert!(texto(310).starts_with("Ants can be considered the premier social insects."));
-    assert!(texto(310).ends_with("two teeth)."));
-    assert!(texto(420).contains("larger than the workers, and have big heads"));
-    assert!(texto(212).contains("for fighting, digging") && texto(212).contains("putting it in a pouch"));
+    // Textos inteiros de três cartões, conferidos pelo SHA-256 (o repositório não guarda o texto do
+    // original; antes de 2026-10-19 o teste comparava trechos de cada um).
+    for (id, tamanho, sha) in [
+        (310u16, 622, "9673058859fa28554e6e4950d99929110a31c317bde59ee11275733f67db6a9e"),
+        (420, 642, "76417dcc670187c8c6b0ea218b9ffd6a10b19f8dd0012306837ddee0b44d236c"),
+        (212, 553, "c1a280d550d3d0733f6bfe53f5f26b322366ed62a1abd2d06fb2852e7e9f1995"),
+    ] {
+        assert_eq!((texto(id).len(), sha256(&texto(id)).as_str()), (tamanho, sha), "texto {id}");
+    }
 }
