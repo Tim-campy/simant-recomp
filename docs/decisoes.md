@@ -2,6 +2,13 @@
 
 Formato: data, decisão, motivo, alternativas descartadas.
 
+## 2026-10-19: API de mods 0.26: mesclagem por chave, ganchos dentro do tick, estado dos scripts ao lado do save
+
+- **Decisão:** (1) os `data/*.json` dos mods são mesclados por chave sobre os do port: objetos mesclam, listas e valores substituem, `"_substituir": true` num objeto troca o objeto inteiro; (2) ganchos `antes_<parte>`/`depois_<parte>` em volta das 13 sub-rotinas do tick, por um embrulho das regras (`scripts::RegrasComScripts`) usado só quando algum mod define um deles; (3) o estado dos scripts vai para `NOME.ANT.mods.json`, ao lado do `.ANT`, com o `_GameTime` do save para reconhecer um arquivo lateral de outra gravação.
+- **Motivo:** o `CLAUDE.md` pede "mods sobrescrevem dados por chave"; trocar o arquivo inteiro obrigava cada mod a acompanhar as chaves novas de cada versão. Listas não mesclam item a item porque quase todas são tabelas posicionais do executável (meia tabela de outra versão seria um erro silencioso). O embrulho deixa `rules::tick::tick` intacto e sem custo sem mods (os vetores de tick não podem mudar). O arquivo lateral mantém o `.ANT` legível pelo original, que é o oráculo.
+- **Descartado:** JSON Merge Patch (RFC 7386), em que `null` apaga a chave: vários arquivos usam `null` como valor (`video.json`, `som.json`); mesclar listas por índice; chamar os ganchos de parte de dentro de `tick` com um `Option<&mut Scripts>` (mudaria a assinatura usada pelos testes e pelas ferramentas); gravar o estado dos mods dentro do `.ANT` (o original não tem campo, e um bloco a mais quebraria a leitura dele); executar as ações pedidas nos ganchos de parte na hora (elas precisam da `Partida` inteira, que está emprestada ao tick: rodam logo depois dele).
+- **Impacto nos mods:** compatível para quem traz o arquivo inteiro, salvo chaves omitidas de propósito (ver o histórico da 0.26 em `api-mods.md`).
+
 ## 2026-10-18: Tabelas comuns das regras em `data/comum.json`; `jogo.json` sobrescrevível
 
 - **Decisão:** as 14 tabelas que o original tem uma vez só e várias partes das regras usam (`_Dx8`/`_Dy8`, `_Dx9`/`_Dy9`, `_TurnTab`, `_UnCarryCaste`, `_ModeTabWB`/`_ModeTabSB`/`_CasteModeTabB`, `_SowTab`, classe e matriz de luta, borda do buraco e da formiga-leão) saem dos `data/<parte>.json` e ficam em `data/comum.json`, com o endereço de cada uma (`_enderecos`) e as partes que a usam (`_usado_por`). Cada parte completa o seu JSON com elas ao carregar (`rules/comum.rs`, `completar_com_comuns`); os structs das partes não mudaram. `tools/extrair_comum.py` gera o arquivo; os outros extratores deixaram de gravar as cópias, e `tools/conferir_extracoes.py` confere que todos reproduzem os `data/*.json`. API de mods 0.20.
