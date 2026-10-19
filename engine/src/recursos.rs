@@ -41,7 +41,7 @@ pub struct Recursos {
 
 #[derive(Default)]
 struct CacheTextos {
-    arquivos: HashMap<String, Vec<u8>>,
+    arquivos: HashMap<String, std::sync::Arc<Vec<u8>>>,
     bancos: HashMap<String, Banco>,
 }
 
@@ -222,12 +222,12 @@ impl Recursos {
     }
 
     /// [`Recursos::arquivo`] guardado em memória (o executável é lido uma vez por sessão).
-    fn arquivo_em_cache(&self, nome: &str) -> Result<Vec<u8>, String> {
+    fn arquivo_em_cache(&self, nome: &str) -> Result<std::sync::Arc<Vec<u8>>, String> {
         let mut cache = self.cache_textos.lock().map_err(|_| "cache de textos envenenado")?;
         if let Some(d) = cache.arquivos.get(nome) {
             return Ok(d.clone());
         }
-        let d = self.arquivo(nome)?;
+        let d = std::sync::Arc::new(self.arquivo(nome)?);
         cache.arquivos.insert(nome.to_string(), d.clone());
         Ok(d)
     }
