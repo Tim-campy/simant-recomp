@@ -243,8 +243,8 @@ O `.ANT` do original não tem campo para os mods, e o port não o muda (o origin
 
 Mudanças previstas na API, sem data. Cada uma, quando entrar, ganha linha no histórico com a nota de compatibilidade.
 
-- **Botões configuráveis da faixa 35** (janela do quintal), como os da faixa 34 (`partida.json`, `botoes_usuario`); ver `docs/spec/regras/som.md`.
-- **Barra de menus do Windows** (File, Window, View, Options, Speed): quando existir, os itens e aceleradores devem vir de um arquivo de dados sobrescrevível, e os scripts talvez possam acrescentar itens (hoje o menu de mod é um menu à parte, `definir_menu`).
+- ~~Botões configuráveis da faixa 35~~: entraram na 0.22 (`partida.json`, `botoes_usuario_quintal`). ~~Itens e aceleradores da barra de menus vindos de dados~~: entraram na 0.21 (`barra_menus.json`). (Revisão de 2026-10-19; nada mudou na API.)
+- **Barra de menus:** scripts acrescentarem itens à barra do Windows (hoje o menu de mod é um menu à parte, `definir_menu`).
 - **Scripts:** leitura das tabelas das regras (`comum.json` e as das partes) pelo objeto `estado`, para scripts que queiram conferir o que um mod de dados mudou.
 - **Remover o aceite das cópias antigas das tabelas comuns** (0.20) numa versão futura, com aviso de pelo menos uma versão antes.
 

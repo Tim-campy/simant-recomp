@@ -60,4 +60,4 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
 
 ## O que falta especificar
 
-Os tiles e mapas, as regras da simulação e o som, que estavam nesta lista, já estão especificados (índice acima). O que ainda falta especificar ou implementar está em [../estado-do-projeto.md](../estado-do-projeto.md) §4; os principais são a barra de menus do Windows (File, Window, View, Options, Speed e os seus diálogos), os balões de fala da janela de edição (`_DrawBalloons`) e os gráficos de saúde (`_DrawEditGraphs`).
+Os tiles e mapas, as regras da simulação e o som, que estavam nesta lista, já estão especificados (índice acima). O que ainda falta especificar ou implementar está em [../estado-do-projeto.md](../estado-do-projeto.md) §4 (revisto em 2026-10-19). A barra de menus, os balões e os quadros da janela 26, que estavam aqui, foram feitos em 2026-10-18 ([telas/menus.md](telas/menus.md), [telas/baloes.md](telas/baloes.md), [telas/mensagens.md](telas/mensagens.md)); os gráficos de saúde (`_DrawEditGraphs`) não desenham nos modos do Windows ([telas/baloes.md](telas/baloes.md) §3).
