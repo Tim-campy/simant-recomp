@@ -25,6 +25,10 @@
     "botoes_historico": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0],
     "_barreira": "_Barrier gravado por _OverlayTileSet (1010:00f4) ao trocar o conjunto de tiles: 0x50 no quintal, 0x90 na casa",
     "barreira_quintal": 80,
-    "barreira_casa": 144
+    "barreira_casa": 144,
+    "_estaticos": "Valores estáticos do SIMANTW.EXE que o jogo novo não reescreve (geracao-mundo.md §8, conferidos no original): _MakeMe (8:8a56) e _ModeMe (8:8a58) = 2, _ColonyUpdateFlag (8:8a68) = 1, _MeFoodInType (8:8a6e) = -1, _TutLesson (8:85ee) = 1",
+    "estaticos": {"proxima_casta": 2, "proximo_modo": 2, "atualizar_colonias": 1, "comeu_tipo": -1, "licao": 1},
+    "_modo_edicao_por_plano": "_CurEditMode gravado por _SetMapPlane(_MePlane) no _NewGame: tabela 8:8608 por plano (0 quintal, 1 superfície, 2 ninho preto, 3 vermelho)",
+    "modo_edicao_por_plano": [0, 0, 1, 2]
   }
 }

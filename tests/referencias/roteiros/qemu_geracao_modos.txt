@@ -1,0 +1,44 @@
+# Geração dos outros tipos de jogo: do "Select a Game" (snapshot sel2 do overlay ov_modos), clique em Full Game,
+# Experimental e Tutorial Game; espera _CurGameType e para no CALL do primeiro _DoAntSim (tick_chamada: o segmento 6 só é
+# carregado depois do clique) e grava o estado. Ver docs/spec/regras/geracao-mundo.md ("Tipos de jogo no original").
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_geracao_modos.txt --overlay <cópia do ov_modos.qcow2>
+snapshot_carregar sel2
+esperar 3
+mouse_canto
+mover 265 300
+esperar 1
+clicar
+esperar_variavel CurGameType 2 30
+tick_chamada
+estado re_trabalho/geracao/full.ANT
+extras re_trabalho/geracao/full_extras.json
+capturar re_trabalho/geracao/full_inicio.png
+continuar
+esperar 1
+snapshot_carregar sel2
+esperar 3
+mouse_canto
+mover 185 375
+esperar 1
+clicar
+esperar_variavel CurGameType 3 30
+tick_chamada
+estado re_trabalho/geracao/exp.ANT
+extras re_trabalho/geracao/exp_extras.json
+capturar re_trabalho/geracao/exp_inicio.png
+continuar
+esperar 1
+snapshot_carregar sel2
+esperar 3
+mouse_canto
+mover 180 225
+esperar 1
+clicar
+esperar 2
+tick_chamada
+estado re_trabalho/geracao/tut.ANT
+extras re_trabalho/geracao/tut_extras.json
+capturar re_trabalho/geracao/tut_inicio.png
+continuar
+esperar 1
+fim

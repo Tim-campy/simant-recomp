@@ -734,6 +734,8 @@ def valor_para_bytes(valor: str, n):
 
 # _DoAntSim @ 1028:0000 = segmento de código 6 do NE, offset 0 (SIMANTW.SYM; docs/spec/regras/simulacao-visao-geral.md)
 DOANTSIM = (6, 0x0000)
+# CALL far _DoAntSim (9A 00 00 + relocação) em 1000:2683, logo antes do retorno 1000:2688 (bytes do EXE)
+CHAMADA_DOANTSIM = (1, 0x2683)
 # _MacTickCount @ 1000:9694 = segmento de código 1: CALL _TickCount (GetTickCount() / 55); DX:AX × 3; RETF em
 # 1000:96a5. É o relógio do gato, do latido e do balão do menino (docs/spec/regras/quintal.md, "Relógios").
 MACTICKCOUNT = (1, 0x9694)
@@ -779,7 +781,11 @@ class Depurador:
 
     def onde(self):
         pc, _ = self.pc()
-        if pc == self.entrada():
+        try:
+            entrada = self.entrada()
+        except RuntimeError:  # segmento 6 ainda não carregado (novo jogo, antes do 1º tick)
+            entrada = None
+        if pc == entrada:
             return "entrada"
         if self.retorno is not None and pc == self.retorno:
             return "saida"
@@ -1144,6 +1150,11 @@ class Bancada:
         elif c == "tick_entrada":
             dep.ir_entrada()
             log(f"entrada de _DoAntSim: {dep.extras()}")
+        elif c == "tick_chamada":
+            # Para no CALL far de _DoAntSim dentro do MYTIMERFUNC (segmento 1, sempre carregado): estado
+            # antes do primeiro tick mesmo quando o segmento 6 ainda não está na memória (novo jogo).
+            regs = dep._rodar_ate(mj.linear_codigo(*CHAMADA_DOANTSIM), float(a[0]) if a else 60)
+            log(f"CALL _DoAntSim em 1000:{CHAMADA_DOANTSIM[1]:04x} (EIP {regs['EIP']:#x})")
         elif c == "tick_saida":
             dep.ir_saida()
             log(f"retorno de _DoAntSim: {dep.extras()}")

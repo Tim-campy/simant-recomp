@@ -60,6 +60,7 @@ Opções de `roteiro`: `--overlay ARQ.qcow2` (abre o disco C: por esse overlay; 
 | `extras ARQ.json` | variáveis fora do save capturadas com os vetores de tick (sementes S e R, `_gameCycles`, `_Tindex`, `_GlobalKey`), `GameTime`, `Cycle` e a posição (`entrada`/`saida`/`livre`). O relógio do Mac (`_MacTickCount`, função) só é capturado por `passo_tick`/`gerar_vetores_tick.py`, com breakpoints dentro do tick |
 | `segmentos PREFIXO` | segmentos de dados 8, 9 e 10 inteiros (até o limite do descritor) em `PREFIXO_seg8.bin` etc. |
 | `tick_entrada` | modo tick: roda até a entrada de `_DoAntSim` (estado **antes** de um tick); não anda se já está lá |
+| `tick_chamada [TIMEOUT]` | roda até o `CALL far _DoAntSim` em `1000:2683` (segmento 1, sempre na memória): estado antes do tick mesmo quando o segmento 6 ainda não foi carregado, como logo depois de um jogo novo (spec/regras/geracao-mundo.md §8) |
 | `tick_saida` | da entrada até o retorno de `_DoAntSim`: exatamente um tick (estado **depois**) |
 | `ate_gametime N` | para na entrada de `_DoAntSim` com `GameTime` (ainda não somado) ≥ N, tick a tick |
 | `passo_tick DIR` | um tick: `DIR/estado_antes.bin`, `estado_depois.bin`, `vida_antes.bin`, `vida_depois.bin`, `extras.json` |
