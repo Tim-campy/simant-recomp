@@ -264,7 +264,7 @@ fn principal() -> Result<(), String> {
     for m in recursos.mods() {
         println!("mod carregado: {} {}", m.manifesto.nome, m.manifesto.versao);
     }
-    let cores = recursos.dados::<Paleta>("paleta.json")?.rgb()?;
+    let cores = engine::paleta::carregar_rgb(&recursos)?;
     if let Some(dir) = &o.som.exportar {
         return som::exportar(&recursos, &o.som, dir);
     }

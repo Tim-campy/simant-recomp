@@ -29,7 +29,7 @@ fn main() {
     let cfg: serde_json::Value = serde_json::from_slice(&std::fs::read(dados.join("jogo.json")).unwrap()).unwrap();
     let bancos: Vec<String> = serde_json::from_value(cfg["bancos"].clone()).unwrap();
     let r = Recursos::abrir(jogo, &bancos, &dados, None).unwrap();
-    let rgb = r.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+    let rgb = engine::paleta::carregar_rgb(&r).unwrap();
     for id in a[3..].iter().flat_map(|s| ids(s)) {
         let Ok(bm) = r.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d)) else {
             continue;

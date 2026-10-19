@@ -1,0 +1,81 @@
+# Bancada SVGA 800x600: telas que dependem da resolução, a partir do snapshot "quick" de qemu_svga800_telas_boot.txt.
+# Info, quintal, About, caixas de mensagem (Quit, Load, "Saved correctly"), diálogos de arquivo, WinHelp,
+# quadro da amarela (trapaça "fred", janela 26) e fim de jogo (C10.ANT do disquete de qemu_mensagens.txt).
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_svga800_telas.txt --disco re_trabalho/qemu/svga_ag_800x600.img --overlay re_trabalho/qemu/svga_ag_800x600.qcow2
+snapshot_carregar quick
+esperar 2
+teclas ctrl+i
+esperar 3
+capturar re_trabalho/svga/ag800_info.png
+snapshot_carregar quick
+esperar 2
+teclas ctrl+y
+esperar 4
+capturar re_trabalho/svga/ag800_quintal.png
+snapshot_carregar quick
+esperar 2
+teclas alt+f
+esperar 1
+teclas a
+esperar 4
+capturar re_trabalho/svga/ag800_about.png
+snapshot_carregar quick
+esperar 2
+teclas ctrl+q
+esperar 3
+capturar re_trabalho/svga/ag800_quit.png
+snapshot_carregar quick
+esperar 2
+teclas ctrl+l
+esperar 3
+capturar re_trabalho/svga/ag800_load_pergunta.png
+teclas n
+esperar 3
+capturar re_trabalho/svga/ag800_load_dialogo.png
+snapshot_carregar quick
+esperar 2
+teclas ctrl+a
+esperar 3
+capturar re_trabalho/svga/ag800_salvar_dialogo.png
+digitar AG1
+teclas ret
+esperar 4
+capturar re_trabalho/svga/ag800_salvo.png
+snapshot_carregar quick
+esperar 2
+teclas f1
+esperar 10
+capturar re_trabalho/svga/ag800_ajuda.png
+snapshot_carregar quick
+esperar 2
+teclas shift+2
+esperar 2
+digitar fred
+esperar 1
+capturar re_trabalho/svga/ag800_fred_1.png
+esperar 1
+capturar re_trabalho/svga/ag800_fred_2.png
+esperar 2
+capturar re_trabalho/svga/ag800_fred_3.png
+snapshot_carregar quick
+esperar 2
+disquete re_trabalho/mensagens/a.img
+esperar 1
+teclas ctrl+l
+esperar 3
+teclas n
+esperar 3
+digitar A
+teclas shift+semicolon
+digitar C10
+esperar 1
+teclas ret
+esperar 5
+capturar re_trabalho/svga/ag800_fim_1.png
+clicar_em 403 359
+esperar 3
+capturar re_trabalho/svga/ag800_fim_2.png
+clicar_em 403 359
+esperar 3
+capturar re_trabalho/svga/ag800_fim_3.png
+fim
