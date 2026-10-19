@@ -1,7 +1,7 @@
--- Menu de trapaças para testar o jogo (API de mods 0.17, docs/api-mods.md; LEIAME.md ao lado).
+-- Menu de trapaças para testar o jogo (API de mods 0.17; 0.26 para castas, cheiros, formigas nos ninhos e o save, docs/api-mods.md; LEIAME.md ao lado).
 -- F12 abre o menu. Cada item chama uma ação da API, que usa a rotina do jogo original para aquilo
 -- (o começo da chuva, _XferPatch, _YellowDeath, o Mystery...). Toda trapaça usada aparece na faixa
--- ("Trapaça: ...") e fica marcada no painel; o jogo salvo não guarda isso (o .ANT não tem campo).
+-- ("Trapaça: ...") e fica marcada no painel; desde a API 0.26 a contagem vai para o arquivo lateral do save.
 
 local TECLA = "F12"
 
@@ -18,7 +18,7 @@ local function separador()
   itens[#itens + 1] = "-"
 end
 
--- Estado do próprio mod (não vai para o save).
+-- Estado do próprio mod (usadas e painel vão para o arquivo lateral do save: ao_salvar, API 0.26).
 local painel_ligado = false
 local procurando_evento = false
 local usadas = 0
@@ -125,11 +125,8 @@ end)
 separador()
 -- Amarela ---------------------------------------------------------------------------------
 item("Luta: soldado vermelho junto da amarela", function(e)
-  local a = e:amarela()
-  if a.plano ~= "superficie" then
-    return "a amarela não está na superfície"
-  end
-  local n = em_volta(e, function(_, x, y) return e:colocar_formiga("vermelha", x, y, "soldado") end)
+  -- API 0.26: por_formiga vale na superfície e nos ninhos.
+  local n = em_volta(e, function(plano, x, y) return e:por_formiga(plano, "vermelha", x, y, "soldado") end)
   return n > 0 and (n .. " soldados") or "sem lugar livre"
 end)
 item("Comida em volta da amarela", function(e)
@@ -138,6 +135,29 @@ item("Comida em volta da amarela", function(e)
 end)
 item("Curar a amarela", function(e) e:saude_amarela(100) end)
 item("Matar a amarela", function(e) e:matar_amarela() end)
+separador()
+-- Colônia (API 0.26: escritas diretas, como as janelas Caste/Behavior e as ferramentas) -------
+item("Castas: só soldados (janela Caste)", function(e) e:definir_castas(0, 0, 1) end)
+item("Comportamento: só forragear", function(e) e:definir_comportamento(1, 0, 0) end)
+item("Alarme em volta da amarela", function(e)
+  local a = e:amarela()
+  if a.plano ~= "superficie" then
+    return "o cheiro só existe na superfície"
+  end
+  local n = em_volta(e, function(_, x, y) return e:depositar_cheiro("alarme", x, y) end)
+  return n .. " células"
+end)
+item("5 soldados pretos no ninho preto", function(e)
+  local postos = 0
+  for x = 1, 62 do
+    for y = 1, 62 do
+      if postos < 5 and e:celula("ninho_preto", x, y) < 8 and e:por_formiga("ninho_preto", "preta", x, y, "soldado") then
+        postos = postos + 1
+      end
+    end
+  end
+  return postos .. " postos"
+end)
 separador()
 -- Tempo -----------------------------------------------------------------------------------
 item("Avançar 100 ticks", function() avancar_ticks(100) end)
@@ -186,6 +206,21 @@ function ao_evento(ev, estado)
     procurando_evento = false
     parar_avanco()
     mostrar_mensagem(string.format("Trapaça: parou no tick %d (%s %s)", estado:tempo(), ev.tipo, tostring(ev.id or ev.indice or "")))
+  end
+end
+
+-- API 0.26: a contagem de trapaças e o painel vão para NOME.ANT.mods.json, ao lado do save
+-- (o .ANT continua o do original).
+function ao_salvar(estado)
+  return { usadas = usadas, painel = painel_ligado }
+end
+
+function ao_carregar(dados, estado)
+  usadas = dados.usadas or 0
+  painel_ligado = dados.painel or false
+  atualizar_painel(estado)
+  if usadas > 0 then
+    avisar("este jogo já teve " .. usadas .. " trapaça(s)")
   end
 end
 

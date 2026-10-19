@@ -89,23 +89,117 @@ impl Recursos {
         }
     }
 
-    /// Arquivo de dados JSON do port (`data/<nome>`), sobrescrito por inteiro pelo último mod que o tiver.
+    /// Arquivo de dados JSON do port (`data/<nome>`) com os mods por cima, **mesclados por chave**
+    /// (API de mods 0.26, [`mesclar`]): cada mod que traz `data/<nome>`, na ordem dos mods, é mesclado
+    /// sobre o resultado anterior. Um mod que traz o arquivo inteiro dá o mesmo resultado de antes,
+    /// salvo as chaves que ele omitia (agora vêm do port); `"_substituir": true` num objeto troca o
+    /// objeto inteiro, como até a 0.25.
     pub fn dados<T: DeserializeOwned>(&self, nome: &str) -> Result<T, String> {
-        let mut caminho = self.dir_dados.join(nome);
-        for m in self.mods.iter().rev() {
+        let (valor, origem) = self.dados_mesclados(nome)?;
+        serde_json::from_value(valor).map_err(|e| format!("{origem}: {e}"))
+    }
+
+    /// O JSON de `data/<nome>` já mesclado e a descrição de onde veio (para as mensagens de erro).
+    fn dados_mesclados(&self, nome: &str) -> Result<(serde_json::Value, String), String> {
+        let ler = |caminho: &Path| -> Result<serde_json::Value, String> {
+            let texto = std::fs::read_to_string(caminho).map_err(|e| format!("{}: {e}", caminho.display()))?;
+            serde_json::from_str(&texto).map_err(|e| format!("{}: {e}", caminho.display()))
+        };
+        let base = self.dir_dados.join(nome);
+        let mut valor = if base.is_file() { Some(ler(&base)?) } else { None };
+        let mut origem = base.display().to_string();
+        let mut dos_mods = Vec::new();
+        for m in &self.mods {
             let c = m.dir.join("data").join(nome);
-            if c.is_file() {
-                caminho = c;
-                break;
+            if !c.is_file() {
+                continue;
             }
+            let v = ler(&c)?;
+            valor = Some(match valor {
+                Some(mut atual) => {
+                    mesclar(&mut atual, v);
+                    atual
+                }
+                None => {
+                    let mut v = v;
+                    tirar_marcas(&mut v);
+                    v
+                }
+            });
+            dos_mods.push(m.manifesto.nome.clone());
         }
-        let texto = std::fs::read_to_string(&caminho).map_err(|e| format!("{}: {e}", caminho.display()))?;
-        serde_json::from_str(&texto).map_err(|e| format!("{}: {e}", caminho.display()))
+        if !dos_mods.is_empty() {
+            origem = format!("{origem} (mesclado com os mods {})", dos_mods.join(", "));
+        }
+        let valor = valor.ok_or_else(|| format!("{}: arquivo de dados não encontrado", base.display()))?;
+        Ok((valor, origem))
+    }
+
+    /// `nome` e os mods que trazem `data/<nome>` (para mensagens de erro de quem lê o JSON mesclado
+    /// por [`Recursos::dados`] e o converte depois).
+    pub fn descrever_dados(&self, nome: &str) -> String {
+        let dos_mods: Vec<&str> =
+            self.mods.iter().filter(|m| m.dir.join("data").join(nome).is_file()).map(|m| m.manifesto.nome.as_str()).collect();
+        if dos_mods.is_empty() {
+            nome.to_string()
+        } else {
+            format!("{nome} (mesclado com os mods {})", dos_mods.join(", "))
+        }
     }
 
     /// Há um `data/<nome>` (no port ou num mod)? Para arquivos de dados opcionais.
     pub fn existe_dado(&self, nome: &str) -> bool {
         self.dir_dados.join(nome).is_file() || self.mods.iter().any(|m| m.dir.join("data").join(nome).is_file())
+    }
+}
+
+/// Chave que, num objeto de um `data/*.json` de mod, pede a troca do objeto inteiro em vez da
+/// mesclagem (API de mods 0.26).
+pub const MARCA_SUBSTITUIR: &str = "_substituir";
+
+/// Mesclagem por chave de um `data/*.json` de mod (`por_cima`) sobre o atual (API de mods 0.26):
+///
+/// - objeto sobre objeto: cada chave do mod é mesclada na chave de mesmo nome (recursivamente); as
+///   chaves que o mod não traz ficam como estão;
+/// - objeto do mod com `"_substituir": true`: troca o objeto inteiro (sem a marca);
+/// - qualquer outro caso (listas, números, textos, `null`, tipos diferentes): o valor do mod
+///   substitui o atual. Listas **não** são mescladas item a item.
+pub fn mesclar(atual: &mut serde_json::Value, por_cima: serde_json::Value) {
+    use serde_json::Value;
+    match (atual, por_cima) {
+        (Value::Object(a), Value::Object(mut b)) if !substituir(&b) => {
+            b.remove(MARCA_SUBSTITUIR);
+            for (k, v) in b {
+                match a.get_mut(&k) {
+                    Some(dest) => mesclar(dest, v),
+                    None => {
+                        let mut v = v;
+                        tirar_marcas(&mut v);
+                        a.insert(k, v);
+                    }
+                }
+            }
+        }
+        (atual, mut v) => {
+            tirar_marcas(&mut v);
+            *atual = v;
+        }
+    }
+}
+
+fn substituir(o: &serde_json::Map<String, serde_json::Value>) -> bool {
+    o.get(MARCA_SUBSTITUIR).and_then(serde_json::Value::as_bool).unwrap_or(false)
+}
+
+/// Tira as marcas `_substituir` de um valor que entra inteiro (não chegam às estruturas do port).
+fn tirar_marcas(v: &mut serde_json::Value) {
+    match v {
+        serde_json::Value::Object(o) => {
+            o.remove(MARCA_SUBSTITUIR);
+            o.values_mut().for_each(tirar_marcas);
+        }
+        serde_json::Value::Array(l) => l.iter_mut().for_each(tirar_marcas),
+        _ => {}
     }
 }
 
