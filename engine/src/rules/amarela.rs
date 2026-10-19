@@ -148,6 +148,14 @@ pub struct MensagensAmarela {
     pub faixa_doacao: MensagemFaixa,
     pub faixa_canibalismo: MensagemFaixa,
     pub faixa_ninho_vermelho: MensagemFaixa,
+    /// `_SpiderDialog` (`1000:673a`): texto do quadro depois da animação, `S1(2)` = 0 → o primeiro
+    /// (0x273F), senão o segundo (0x2740).
+    #[serde(default = "aranha_comeu_padrao")]
+    pub aranha_comeu: [u16; 2],
+}
+
+fn aranha_comeu_padrao() -> [u16; 2] {
+    [10047, 10048]
 }
 
 /// Tabelas de `data/comum.json` que a amarela usa (chave aqui, chave em `comum.json`).
@@ -612,6 +620,16 @@ pub(crate) fn encerrar_ordem(e: &mut Estado, plano: i32, x: i32, y: i32) {
 fn centralizar(e: &mut Estado) {
     e.tutorial.temporario = 1;
     e.pedir_centralizar_na_amarela();
+    // Dentro do tick, `_CenterEdit` que move a vista redesenha a janela de edição (rng.md).
+    let a = &e.amarela;
+    let (plano, x, y) = (a.plano, a.x, a.y);
+    super::desenho::centralizar_no_tick(e, plano, x, y);
+}
+
+/// `_DoEditUpdateDraw` (`1010:0e56`) / `_DoEditAndMapUpdateDraw` (`1020:66d6`) dentro do tick: só os
+/// sorteios do redesenho da janela de edição (`rules::desenho::desenhar_no_tick`, rng.md).
+fn redesenhar(e: &mut Estado) {
+    super::desenho::desenhar_no_tick(e);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1171,6 +1189,7 @@ fn tentar_largar_ou_pegar(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32
             let a = e.amarela.clone();
             mover_marca(e, t, a.plano as i32, mx, my, a.tipo as i32, k - 1);
         }
+        redesenhar(e);
         if e.amarela.comeu_tipo >= 0 {
             let tipo = e.amarela.comeu_tipo;
             comer(e, t, tipo as i32);
@@ -1408,6 +1427,7 @@ pub fn mover_amarela(e: &mut Estado, t: &TabelasAmarela) {
                 let plano = e.amarela.plano as i32;
                 gravar_formiga(e, plano, a.alvo_indice as i32, Formiga { tipo, ..al.f });
                 por_vida(e, t, plano, al.x, al.y, tipo);
+                redesenhar(e);
             }
         }
         comer(e, t, 1);
@@ -1444,6 +1464,7 @@ fn passo_da_ordem(e: &mut Estado, t: &TabelasAmarela) -> (i32, Option<Alvo>) {
             if k > 0 {
                 e.amarela.dir = (k - 1) as i16;
             }
+            redesenhar(e);
             return (-1, alvo);
         }
     }
@@ -1510,6 +1531,7 @@ fn passo_da_ordem(e: &mut Estado, t: &TabelasAmarela) -> (i32, Option<Alvo>) {
         if !e_buraco(e, mx, my) || (gp < 2 && (gp != plano || gx != mx || gy != my)) {
             return (0, alvo);
         }
+        redesenhar(e);
         entrar_no_ninho(e, t);
     } else {
         if my != 0 {
@@ -1528,6 +1550,7 @@ fn passo_da_ordem(e: &mut Estado, t: &TabelasAmarela) -> (i32, Option<Alvo>) {
             }
             return (-1, alvo);
         }
+        redesenhar(e);
         sair_do_ninho(e, t);
     }
     let novo_plano = e.amarela.plano as i32;
@@ -1597,6 +1620,7 @@ fn pedir_animacao(e: &mut Estado, codigo: i32, plano: i32, espera_ms: u16, quadr
 #[allow(clippy::too_many_arguments)]
 fn animar_luta(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, dir: i32, tipo: i32, codigo: i32) {
     remarcar(e, t, MARCA_AMARELA);
+    redesenhar(e);
     let tipo_salvo = e.amarela.tipo as i32;
     let mut quadros = if codigo == 0 { t.animacao.quadros_luta } else { quadros_morte(e, t) };
     let mut tile_original = 0u8;
@@ -1636,6 +1660,7 @@ fn animar_luta(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, d
         }
         let d = e.s.mascara(8);
         mover_marca(e, t, plano, x, y, tipo, d);
+        redesenhar(e);
         fotos.extend(quadro_da_tela(e, plano));
     }
     let pedidos = std::mem::replace(&mut e.eventos, fila_antes);
@@ -1663,6 +1688,7 @@ fn melhor_direcao_simples(e: &Estado, t: &TabelasAmarela, plano: i32, x: i32, y:
 /// trava) e volta à posição.
 fn animar_loucura(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32, dir: i32, tipo: i32) {
     remarcar(e, t, MARCA_AMARELA);
+    redesenhar(e);
     let tipo_salvo = e.amarela.tipo as i32;
     let quadros = if t.animacao.janela_edicao_na_frente {
         t.animacao.quadros_loucura_frente
@@ -1690,6 +1716,7 @@ fn animar_loucura(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32
             cy += dy;
         }
         mover_marca(e, t, plano, cx, cy, tipo, d);
+        redesenhar(e);
         fotos.extend(quadro_da_tela(e, plano));
     }
     let pedidos = std::mem::replace(&mut e.eventos, fila_antes);
@@ -1755,6 +1782,7 @@ pub fn trofalaxia(e: &mut Estado, t: &TabelasAmarela, x: i32, y: i32, d: i32) {
     let k = get_dir(ax, ay, x, y);
     let a = e.amarela.clone();
     mover_marca(e, t, a.plano as i32, ax, ay, a.tipo as i32, k - 1);
+    redesenhar(e);
     comer(e, t, 1);
 }
 
@@ -1789,6 +1817,7 @@ pub fn matar_amarela(e: &mut Estado, t: &TabelasAmarela, causa: CausaMorte) {
         }
     }
     centralizar(e);
+    redesenhar(e);
     let a = e.amarela.clone();
     if (7..10).contains(&codigo) {
         animar_loucura(e, t, a.plano as i32, a.x as i32, a.y as i32, a.dir as i32, a.tipo as i32);
@@ -1813,7 +1842,13 @@ pub fn matar_amarela(e: &mut Estado, t: &TabelasAmarela, causa: CausaMorte) {
             morta_em_luta = false;
         }
         CausaMorte::Aranha | CausaMorte::FormigaLeao => {
-            // Quadro da aranha/formiga-leão: interface.
+            // `_SpiderDialog` (`1000:673a`, só com Events): a animação da aranha é da interface; o
+            // texto final sai de um `S1(2)` sorteado dentro do tick (rng.md). `_LionDialog` não sorteia.
+            if causa == CausaMorte::Aranha && eventos {
+                let k = e.s.rand1(2) as usize;
+                let texto = m.aranha_comeu[usize::from(k != 0)];
+                e.eventos.push(Evento::DialogoAranha { texto });
+            }
             e.preta.comidas_por_predadores = e.preta.comidas_por_predadores.wrapping_add(1);
             musica(e);
             let a = e.amarela.clone();
@@ -1932,6 +1967,7 @@ fn reencarnar(e: &mut Estado, t: &TabelasAmarela) {
         encerrar_ordem(e, plano, rx, ry);
         definir_vida(e, t, 100);
         centralizar(e);
+        redesenhar(e);
         e.eventos.push(Evento::Mensagem(t.mensagens.transferida));
     }
 }
@@ -1952,8 +1988,9 @@ fn nascer_de_ovo(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32,
     e.amarela.ovo = 1;
     let dir = e.amarela.dir as i32;
     sem_efeitos(e, |e| marcar_amarela(e, t, plano, x, y, 0, dir, MARCA_AMARELA));
-    e.pedir_som(t.sons.nascimento_ovo);
     centralizar(e);
+    redesenhar(e);
+    e.pedir_som(t.sons.nascimento_ovo);
     depois_do_nascimento(e, t);
     // `_YellowDeath` já trocou 0x60 por 0x10, então na prática a direção é sempre 6.
     e.amarela.dir = if tipo_inicial == TIPO_RAINHA { 2 } else { 6 };
@@ -1961,9 +1998,11 @@ fn nascer_de_ovo(e: &mut Estado, t: &TabelasAmarela, plano: i32, x: i32, y: i32,
         e.amarela.ovo = estagio;
         let dir = e.amarela.dir as i32;
         marcar_amarela(e, t, plano, x, y, 0, dir, MARCA_AMARELA);
+        redesenhar(e);
     }
     let dir = e.amarela.dir as i32;
     marcar_amarela(e, t, plano, x, y, tipo, dir, MARCA_AMARELA);
+    redesenhar(e);
     e.pedir_som(t.sons.nascimento);
     e.eventos.push(Evento::Musica(t.musicas.renascer));
 }
@@ -1996,14 +2035,17 @@ fn fundar_colonia(e: &mut Estado, t: &TabelasAmarela, ox: i32, oy: i32) {
     sem_efeitos(e, |e| {
         desmarcar(e, t);
         remarcar_como(e, t, TIPO_RAINHA);
+        redesenhar(e);
         e.eventos.push(Evento::Musica(t.musicas.fundar_inicio));
         por_vida(e, t, plano_ovo, ox, oy, 1);
+        redesenhar(e);
     });
     e.pedir_som(t.sons.nascimento_ovo);
     depois_do_nascimento(e, t);
     for estagio in 2..=7u8 {
         let p = e.amarela.plano as i32;
         por_vida(e, t, p, ox, oy, estagio);
+        redesenhar(e);
     }
     desmarcar(e, t);
     let a = e.amarela.clone();
@@ -2015,6 +2057,7 @@ fn fundar_colonia(e: &mut Estado, t: &TabelasAmarela, ox: i32, oy: i32) {
     c.castas[1] += 1;
     c.castas[4] -= 1;
     c.populacao += 1;
+    redesenhar(e);
     e.pedir_som(t.sons.nascimento);
     e.eventos.push(Evento::Musica(t.musicas.fundar_fim));
 }

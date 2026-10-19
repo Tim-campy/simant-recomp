@@ -79,9 +79,7 @@
  "selecao": [
   "1793"
  ],
- "pendentes": {
-  "tick_001793": "desenho dentro do tick (isolado com cenarios_regras.py contar_aranha, breakpoints em _SRand1 e nas funções de desenho): o original sorteia 4 passos de S que o port não sorteia: S1(4) de _DrawPalps três vezes (o _DoEditUpdateDraw de _GotoMyAnt na morte, o de antes do laço de _AnimYellowFight e o do 1º quadro: a aranha está à vista e _SMode >= 2) e S1(2) de _SpiderDialog (opção Events). O port não desenha dentro do tick (rng.md, 'Fora'); o resto do tick vem em cascata"
- },
+ "pendentes": {},
  "vida_nao_reconstruivel": {
   "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
  }

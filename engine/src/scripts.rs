@@ -1042,6 +1042,10 @@ fn tabela_evento(lua: &Lua, ev: &Evento) -> mlua::Result<Table> {
             t.set("id", *id)?;
         }
         Evento::EscolherColonia => t.set("tipo", "escolher_colonia")?,
+        Evento::DialogoAranha { texto } => {
+            t.set("tipo", "dialogo_aranha")?;
+            t.set("texto", *texto)?;
+        }
         Evento::QuadroAmarela(id) => {
             t.set("tipo", "quadro_amarela")?;
             t.set("imagem", *id)?;

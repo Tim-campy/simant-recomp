@@ -526,6 +526,7 @@ impl Partida {
             s.antes_do_tick(&mut self.estado);
             self.aplicar_pedidos_dos_mods();
         }
+        self.preparar_edicao_no_tick();
         tick(&mut self.estado, &mut self.regras as &mut dyn Regras);
         if let Some(s) = self.scripts.as_mut().filter(|s| s.tem_gancho(Gancho::DepoisDoTick)) {
             s.depois_do_tick(&mut self.estado);
@@ -552,6 +553,26 @@ impl Partida {
             desenha &= self.quadros.is_multiple_of(u64::from(self.cfg.relogio.redesenho_sem_foco_a_cada.max(1)));
         }
         self.redesenhar |= desenha;
+    }
+
+    /// A janela de edição para os desenhos de dentro do tick (`desenho::EdicaoNoTick`): aberta ou não
+    /// (`janelas_desenho.edicao_aberta`), o tamanho da vista e o `_TickCount` dos balões. `_UpdateEdit`
+    /// só confere `_win_IsWinOpen(0)`; com o programa minimizado o port também desenha [hipótese].
+    fn preparar_edicao_no_tick(&mut self) {
+        if !self.janelas_desenho.edicao_aberta {
+            self.estado.edicao_no_tick = None;
+            return;
+        }
+        let (w, h) = (self.nav.vista.largura, self.nav.vista.altura);
+        let tick_count = (self.ms_total / 55) as u32;
+        let r = &self.regras;
+        let j = self.estado.edicao_no_tick.get_or_insert_with(|| {
+            let baloes = std::sync::Arc::new(r.baloes.clone());
+            Box::new(desenho::EdicaoNoTick::new(w, h, baloes, (r.inimigos.dx8, r.inimigos.dy8)))
+        });
+        j.largura = w;
+        j.altura = h;
+        j.tick_count = tick_count;
     }
 
     /// Botão MATE do quintal (`_ProcYardEvent` 0x2306): arma a revoada preta ou recusa, com a
@@ -701,6 +722,14 @@ impl Partida {
                     if self.estado.partida.opcoes[3] != 0 {
                         self.avisos.receber_quadro_amarela(imagem);
                     }
+                    self.eventos.push_back(ev);
+                }
+                Evento::DialogoAranha { texto } => {
+                    // _SpiderDialog: as regras já conferiram Events e sortearam o texto. Por enquanto
+                    // só o quadro final com o texto; a animação da aranha antes dele é da interface
+                    // dos diálogos [lacuna].
+                    let licoes = &self.regras.quintal.conselhos.licoes;
+                    self.avisos.receber_mensagem(texto, true, licoes);
                     self.eventos.push_back(ev);
                 }
                 Evento::Mensagem(id) => {

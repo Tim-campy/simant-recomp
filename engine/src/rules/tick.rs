@@ -167,6 +167,8 @@ impl RegrasOriginais {
 
 /// Um passo da simulação (`_DoAntSim`), na ordem exata do original (simulacao-visao-geral.md §5).
 pub fn tick(e: &mut Estado, regras: &mut dyn Regras) {
+    // Os desenhos da janela de edição dentro do tick partem da vista atual (rng.md).
+    super::desenho::comecar_tick(e);
     // 1–2. Ciclo (0..0x1000) e tempo de jogo (32 bits).
     e.partida.ciclo = e.partida.ciclo.wrapping_add(1);
     if e.partida.ciclo > 0x1000 {
@@ -250,6 +252,7 @@ pub fn tick(e: &mut Estado, regras: &mut dyn Regras) {
         e.eventos.push(Evento::DialogoFimDeJogo);
     }
     e.precisa_salvar = true;
+    super::desenho::terminar_tick(e);
 }
 
 /// Corpo de `_FeedAnts` (`1028:0474`): saúde −1 e, fora do Experimental, comida nova na superfície
