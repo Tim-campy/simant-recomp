@@ -1,0 +1,56 @@
+# Bancada SVGA 640x480 em 256 cores (vbesvga.drv): Examine, mini mapa e menus abertos capturados no MESMO boot
+# (depois de um snapshot_carregar a paleta de 256 cores do vbesvga não volta; bancada-qemu.md, "Bancada SVGA").
+# Ver docs/spec/telas/resolucao.md §7.
+# python tools/qemu_bancada.py preparar_svga 640 480        (disco re_trabalho/qemu/svga_c_640x480.img)
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_svga640_256cores.txt --disco re_trabalho/qemu/svga_c_640x480.img --overlay <overlay novo>
+esperar 70
+teclas spc
+esperar 4
+teclas spc
+esperar 6
+clicar_em 345 228
+esperar 20
+teclas shift+0
+esperar 3
+capturar re_trabalho/ag_fecha/svga/c00_quick.png
+pausar
+estado re_trabalho/ag_fecha/svga/c00_estado.ANT
+continuar
+# Menus da barra: Alt+F (File aberto, 1º item realçado), seta para baixo, Speed pelo teclado.
+teclas alt+f
+esperar 2
+capturar re_trabalho/ag_fecha/svga/c01_menu_file.png
+teclas down
+esperar 1
+capturar re_trabalho/ag_fecha/svga/c02_menu_file_item2.png
+teclas right right right right
+esperar 2
+capturar re_trabalho/ag_fecha/svga/c03_menu_speed.png
+teclas esc esc
+esperar 2
+# Examine: segurar o botão numa célula da janela de edição (1ª abertura; depois a 2ª, noutra célula).
+ir_para 120 250
+apertar
+esperar 3
+capturar re_trabalho/ag_fecha/svga/c04_examine_1.png
+soltar
+esperar 2
+ir_para 248 330
+apertar
+esperar 3
+capturar re_trabalho/ag_fecha/svga/c05_examine_2.png
+soltar
+esperar 2
+# Mini mapa: apertar o ribToYellow (219, 71), levar o mouse para baixo e soltar fora (fica aberto).
+ir_para 219 71
+apertar
+esperar 2
+capturar re_trabalho/ag_fecha/svga/c06_mini_segurando.png
+ir_para 219 440
+soltar
+esperar 2
+capturar re_trabalho/ag_fecha/svga/c07_mini_aberto.png
+pausar
+estado re_trabalho/ag_fecha/svga/c07_estado.ANT
+continuar
+fim

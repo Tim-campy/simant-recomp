@@ -205,10 +205,10 @@ impl TabelaDeGiro for TabelasInimigos {
 /// Seno de `_fracSIN` / `_fracCOS` (ângulo 0–255 por volta, em 1/32767). Usa a tabela do banco quando
 /// as tabelas da geração foram carregadas; senão, `trunc(sin(i·π/128)·32767)`, que coincide com os 64
 /// valores do objeto 9/1000 (verificado pelo teste `seno_calculado_igual_ao_do_banco`, com `SIMANT_DIR`).
-struct Seno<'a>(Option<&'a TabelasGeracao>);
+pub(crate) struct Seno<'a>(pub(crate) Option<&'a TabelasGeracao>);
 
 impl Seno<'_> {
-    fn sen(&self, angulo: i32) -> i32 {
+    pub(crate) fn sen(&self, angulo: i32) -> i32 {
         if let Some(g) = self.0 {
             return g.seno(angulo);
         }
@@ -228,7 +228,7 @@ impl Seno<'_> {
         }
     }
 
-    fn cos(&self, angulo: i32) -> i32 {
+    pub(crate) fn cos(&self, angulo: i32) -> i32 {
         self.sen((angulo + 0x40) & 0xFF)
     }
 }

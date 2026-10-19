@@ -79,7 +79,9 @@
   "queda_casa_ladrilhos",
   "queda_casa_azulejo",
   "leao_pedrinha",
-  "volta_cycle"
+  "volta_cycle",
+  "alimentacao",
+  "alimentacao_casa"
  ],
  "snapshot": "quick",
  "semente_s_forcada": null,
