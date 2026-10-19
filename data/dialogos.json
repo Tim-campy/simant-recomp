@@ -64,6 +64,7 @@
     ],
     "titulo_load": "SimAnt Load",
     "pergunta_load": "Do you want to save the current ant hill?",
+    "titulo_quit": "SimAnt Quit",
     "titulo_mensagem": "Message",
     "salvo": "%s\nSaved correctly",
     "sim": "&Yes",
