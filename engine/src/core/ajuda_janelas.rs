@@ -181,7 +181,7 @@ fn mnemonico(t: &str) -> Option<char> {
 }
 
 impl VisorAjuda {
-    fn cj(&self) -> Option<&ConfigJanelasAjuda> {
+    pub(crate) fn cj(&self) -> Option<&ConfigJanelasAjuda> {
         self.cfg.janelas.as_ref()
     }
 
@@ -217,11 +217,10 @@ impl VisorAjuda {
 
     // --- menus -------------------------------------------------------------------------------
 
+    /// Faixa realçada do item `k` da barra de menus (a célula dele, na linha em que ele está).
     fn retangulo_destaque(&self, k: usize) -> Option<Retangulo> {
-        let m = self.cj()?.menus.get(k)?;
-        let e = self.externo();
-        let f = self.faixa_menu();
-        Some(ret(e.esq + m.destaque[0], f.topo, e.esq + m.destaque[1] + 1, f.base))
+        self.cj()?.menus.get(k)?;
+        self.celulas_menu().get(k).map(|c| c.0)
     }
 
     /// Caixa do menu `k` (com o contorno) e o retângulo de cada item.
@@ -229,7 +228,8 @@ impl VisorAjuda {
         let c = self.cj()?;
         let m = c.menus.get(k)?;
         let d = self.retangulo_destaque(k)?;
-        let topo = self.faixa_menu().base; // a linha preta da barra é o contorno de cima
+        // A linha de baixo da célula (na última linha da barra, a linha preta) é o contorno de cima.
+        let topo = d.base;
         let mut y = topo + 1;
         let mut itens = Vec::new();
         for it in &m.itens {
@@ -400,8 +400,16 @@ impl VisorAjuda {
         self.sobreposta = Some(Sobreposta::Popup { topico, caixa: ret(x, y, x + c.largura, y + altura) });
     }
 
+    /// A janela History, se aberta, perde o foco (clique na moldura da janela principal).
+    pub fn tirar_foco_do_historico(&mut self) {
+        if let Some(h) = self.janela_historico.as_mut() {
+            h.foco = false;
+        }
+    }
+
     /// O ponto está numa janela pequena (popup, Search, History) — que pode sair da janela de ajuda.
-    pub(crate) fn contem_janelas(&self, x: i32, y: i32) -> bool {
+    pub fn contem_janelas(&self, x: i32, y: i32) -> bool {
+
         let Some(c) = self.cj() else { return false };
         let dentro = match &self.sobreposta {
             Some(Sobreposta::Popup { caixa, .. }) => contem(*caixa, x, y),
@@ -707,8 +715,9 @@ impl VisorAjuda {
         let (Some(d), Some(m), Some(mb)) = (self.retangulo_destaque(menu), c.menus.get(menu), self.cfg.menu.get(menu)) else { return };
         // Item da barra destacado.
         q.preencher(d, cr.selecao, cr.selecao);
-        let fm = self.faixa_menu();
-        escrever_mnemonico(q, f, i32::from(fm.esq + mb.x), i32::from(fm.topo), &mb.texto, cr.texto_selecao, false);
+        let tx = self.celulas_menu().get(menu).map_or(mb.x, |c| c.2);
+        escrever_mnemonico(q, f, i32::from(d.esq + tx), i32::from(d.topo), &mb.texto, cr.texto_selecao, false);
+
         let Some((caixa, itens)) = self.caixa_menu(menu) else { return };
         let (x0, y0, x1, y1) = (i32::from(caixa.esq), i32::from(caixa.topo), i32::from(caixa.dir) - 1, i32::from(caixa.base) - 1);
         q.preencher(caixa, cr.fundo, cr.fundo);

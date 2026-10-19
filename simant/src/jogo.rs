@@ -359,6 +359,11 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 }
                 Event::MouseMotion { x, y, mousestate, .. } => {
                     cursor = (x, y);
+                    if ajuda_ui::mover_mouse(s, x, y) {
+                        // Arrasto da janela do WinHelp ou realce do menu de sistema dela.
+                        redesenhar = true;
+                        continue;
+                    }
                     if let Some((m, _)) = &mut s.menu {
                         redesenhar |= m.mover(x, y);
                         continue;
@@ -540,8 +545,10 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     }
                     redesenhar = true;
                 }
+                Event::MouseButtonUp { mouse_btn: MouseButton::Left, x, y, .. } if ajuda_ui::soltar(s, x, y) => redesenhar = true,
                 Event::MouseButtonUp { mouse_btn: MouseButton::Left, x, y, .. } => {
                     redesenhar |= modos::soltar_no_menu(s, x, y);
+
                     if s.menu.is_some() {
                         s.soltar_menu(x, y, shift_apertado(&eventos));
                         redesenhar = true;
