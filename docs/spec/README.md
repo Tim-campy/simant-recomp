@@ -17,6 +17,7 @@ Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original 
 - [arquivos-do-jogo.md](arquivos-do-jogo.md): inventário dos arquivos da instalação.
 - Telas:
   - [telas/abertura.md](telas/abertura.md): abertura (`_ShowIntro`), implementada no marco 1.
+  - [telas/resolucao.md](telas/resolucao.md): layout por resolução (640×480, 800×600, 1024×768): janela principal maximizada, tabela de posições pela altura da tela e a tela virtual do port.
   - [telas/jogo.md](telas/jogo.md): tela de jogo (faixa + janela de edição com chão e vida), planos, rolagem e reconstrução de `_LifeA/B/R`.
   - [telas/mensagens.md](telas/mensagens.md): avisos ao jogador (mensagem da faixa, quadros de mensagem, fim de jogo e pontuação), botões configuráveis da faixa e salvar.
   - [telas/menus-mods.md](telas/menus-mods.md): menu e painel dos scripts de mods (API 0.17; extensão do port, não existe no original).

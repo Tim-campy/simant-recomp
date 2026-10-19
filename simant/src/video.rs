@@ -1,6 +1,7 @@
-//! Opções de vídeo do port: escala e tamanho da janela. Vêm de `data/video.json` (lido pelos
-//! `Recursos`, então um mod pode trocá-lo) e da linha de comando (`--escala`, `--janela`), que vence.
-//! Decisão em docs/decisoes.md (2026-10-18, "Escala 1 e opções de vídeo").
+//! Opções de vídeo do port: tela virtual, escala e tamanho da janela. Vêm de `data/video.json`
+//! (lido pelos `Recursos`, então um mod pode trocá-lo) e da linha de comando (`--resolucao`,
+//! `--escala`, `--janela`), que vence. Decisões em docs/decisoes.md (2026-10-18, "Escala 1 e opções
+//! de vídeo"; "Tela virtual"); o layout de cada resolução, em docs/spec/telas/resolucao.md.
 
 use serde::Deserialize;
 
@@ -9,6 +10,11 @@ pub const ARQUIVO: &str = "video.json";
 /// `data/video.json`. Todas as chaves são opcionais.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct ConfigVideo {
+    /// Resolução da tela do Windows 3.1 imitada, `[largura, altura]`: muda o tamanho da área
+    /// cliente e a tabela de posições das janelas, como no original (data/resolucao.json). Padrão
+    /// 640×480; 800×600 e 1024×768 opcionais.
+    #[serde(default = "resolucao_padrao")]
+    pub resolucao_virtual: [u32; 2],
     /// Escala inteira inicial (pixels da tela por pixel do jogo). 1 = 640×480 como no original;
     /// 0 = a maior que cabe na área útil do monitor.
     #[serde(default = "escala_padrao")]
@@ -26,6 +32,10 @@ pub struct ConfigVideo {
     pub escala_inteira: bool,
 }
 
+fn resolucao_padrao() -> [u32; 2] {
+    [640, 480]
+}
+
 fn escala_padrao() -> u32 {
     1
 }
@@ -36,13 +46,16 @@ fn verdadeiro() -> bool {
 
 impl Default for ConfigVideo {
     fn default() -> Self {
-        ConfigVideo { escala: 1, janela: None, redimensionavel: true, escala_inteira: true }
+        ConfigVideo { resolucao_virtual: resolucao_padrao(), escala: 1, janela: None, redimensionavel: true, escala_inteira: true }
     }
 }
 
 impl ConfigVideo {
-    /// Aplica as opções da linha de comando (`--escala`, `--janela`), que vencem o arquivo.
-    pub fn com_linha_de_comando(mut self, escala: Option<u32>, janela: Option<(u32, u32)>) -> ConfigVideo {
+    /// Aplica as opções da linha de comando (`--resolucao`, `--escala`, `--janela`), que vencem o arquivo.
+    pub fn com_linha_de_comando(mut self, resolucao: Option<(u32, u32)>, escala: Option<u32>, janela: Option<(u32, u32)>) -> ConfigVideo {
+        if let Some((l, a)) = resolucao {
+            self.resolucao_virtual = [l, a];
+        }
         if let Some(e) = escala {
             self.escala = e;
             // Uma escala pedida na linha de comando define também o tamanho da janela.
@@ -67,13 +80,13 @@ impl ConfigVideo {
     }
 }
 
-/// `--janela LxA` (ex.: `1280x960`).
-pub fn ler_tamanho(texto: &str) -> Result<(u32, u32), String> {
-    let (l, a) = texto.split_once(['x', 'X']).ok_or("--janela LARGURAxALTURA (ex.: 1280x960)")?;
-    let l: u32 = l.trim().parse().map_err(|_| "--janela: largura inválida")?;
-    let a: u32 = a.trim().parse().map_err(|_| "--janela: altura inválida")?;
+/// `--janela LxA` ou `--resolucao LxA` (ex.: `1280x960`); `opcao` é o nome para as mensagens.
+pub fn ler_tamanho(opcao: &str, texto: &str) -> Result<(u32, u32), String> {
+    let (l, a) = texto.split_once(['x', 'X']).ok_or(format!("{opcao} LARGURAxALTURA (ex.: 800x600)"))?;
+    let l: u32 = l.trim().parse().map_err(|_| format!("{opcao}: largura inválida"))?;
+    let a: u32 = a.trim().parse().map_err(|_| format!("{opcao}: altura inválida"))?;
     if l == 0 || a == 0 {
-        return Err("--janela: largura e altura positivas".into());
+        return Err(format!("{opcao}: largura e altura positivas"));
     }
     Ok((l, a))
 }
@@ -108,12 +121,15 @@ mod testes {
     fn linha_de_comando_vence_o_arquivo() {
         let arq: ConfigVideo = serde_json::from_str(r#"{"escala": 3, "janela": [900, 700]}"#).unwrap();
         assert!(arq.redimensionavel && arq.escala_inteira, "chaves ausentes ficam no padrão");
-        let c = arq.clone().com_linha_de_comando(Some(2), None);
+        assert_eq!(arq.resolucao_virtual, [640, 480], "tela virtual padrão");
+        let c = arq.clone().com_linha_de_comando(None, Some(2), None);
         assert_eq!(c.tamanho_inicial(640, 480, None), (2, (1280, 960)));
-        let c = arq.com_linha_de_comando(None, Some((800, 600)));
+        let c = arq.clone().com_linha_de_comando(None, None, Some((800, 600)));
         assert_eq!(c.tamanho_inicial(640, 480, None), (3, (800, 600)));
-        assert_eq!(ler_tamanho("1280x960"), Ok((1280, 960)));
-        assert!(ler_tamanho("1280").is_err());
-        assert!(ler_tamanho("0x5").is_err());
+        let c = arq.com_linha_de_comando(Some((1024, 768)), None, None);
+        assert_eq!(c.resolucao_virtual, [1024, 768]);
+        assert_eq!(ler_tamanho("--janela", "1280x960"), Ok((1280, 960)));
+        assert!(ler_tamanho("--janela", "1280").is_err());
+        assert!(ler_tamanho("--resolucao", "0x5").is_err());
     }
 }

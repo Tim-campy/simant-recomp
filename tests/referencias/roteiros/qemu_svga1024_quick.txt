@@ -1,0 +1,17 @@
+# Disco SVGA 1024x768 (vbesvga.drv): título, "Select a Game" e Quick Game (pausado com Shift+0).
+# python tools/qemu_bancada.py preparar_svga 1024 768
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_svga1024_quick.txt --disco re_trabalho/qemu/svga_c_1024x768.img --overlay re_trabalho/qemu/svga_q1024.qcow2
+esperar 65
+capturar re_trabalho/svga/svga1024_titulo.png
+teclas spc
+esperar 4
+teclas spc
+esperar 6
+capturar re_trabalho/svga/svga1024_selecao.png
+# Em 1024x768 o "Select a Game" fica no mesmo lugar que em 800x600: Quick Game em ~(345, 228)
+clicar_em 345 228
+esperar 20
+teclas shift+0
+esperar 3
+capturar re_trabalho/svga/svga1024_quick.png
+fim

@@ -1,0 +1,11 @@
+# Disco SVGA (vbesvga.drv): título e "Select a Game".
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_svga_selecao.txt --disco re_trabalho/qemu/svga_c_800x600.img --overlay re_trabalho/qemu/svga_sel.qcow2
+esperar 65
+capturar re_trabalho/svga/svga800_titulo.png
+teclas spc
+esperar 4
+capturar re_trabalho/svga/diag_registro.png
+teclas spc
+esperar 6
+capturar re_trabalho/svga/svga800_selecao.png
+fim

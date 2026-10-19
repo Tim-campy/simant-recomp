@@ -39,11 +39,22 @@ Todas as teclas vêm de `data/partida.json`, `data/navegacao.json`, `data/janela
 | `--jogo DIR`, `--dados DIR`, `--mods DIR` | pastas do jogo (padrão `SIMANT_DIR` ou `SimAnt-T/MAXIS/ANTWIN`), dos dados (`data`) e dos mods (`mods`) |
 | `--novo-jogo`, `--tipo T`, `--semente N` | jogo novo do tipo `tutorial`, `rapido` (padrão), `completo` ou `experimental`, com semente fixa (reproduzível) |
 | `--save ARQ.ANT`, `--salvar ARQ.ANT` | abre um save; `--salvar` grava o estado no fim de uma execução sem janela e, na janela, é o nome do "salvar como" (Ctrl+A; sem ele, `SALVO01.ANT`, `SALVO02.ANT`...) |
-| `--escala N`, `--janela LxA` | vídeo (vencem `data/video.json`; padrão 640×480, escala 1; `0` = a maior que cabe) |
+| `--resolucao LxA` | tela virtual do Windows 3.1: `640x480` (padrão), `800x600` ou `1024x768`; muda o layout como o original (janelas na tabela de posições da resolução, mais área livre em volta), sem escalar nada ([`telas/resolucao.md`](docs/spec/telas/resolucao.md)) |
+| `--escala N`, `--janela LxA` | ampliação da tela virtual (inteira, nítida) e tamanho inicial da janela; `0` = a maior que cabe |
 | `--sem-som`, `--soundfont ARQ.sf2` | sem áudio; SoundFont General MIDI para as músicas (ou `SIMANT_SOUNDFONT`; sem ela, sintetizador simples) |
 | `--preferencias ARQ`, `--sem-preferencias` | arquivo das opções guardadas entre partidas (no lugar do `[SimAnt]` do `WIN.INI`; padrão em `%APPDATA%\SimAnt recomp\SimAnt\`) |
 | `--ticks N`, `--avancar-ms MS`, `--acoes A,B`, `--quintal M`, `--janela-mapa M`, `--mini-mapa N` | testes sem interação: roda ticks, passa tempo real, aplica ações de navegação, abre o quintal, o mapa num modo ou o mini mapa (N aberturas) |
 | `--exportar-tela-jogo ARQ.png`, `--exportar-telas DIR`, `--exportar-som DIR`, `--capturar-janela ARQ.png`, `--sair-apos-ms N` | grava a tela de jogo, as telas da abertura, os efeitos e músicas em WAV, ou o que a janela mostrava |
+
+### Opções de vídeo (`data/video.json`)
+
+```json
+{"resolucao_virtual": [640, 480], "escala": 1, "janela": null, "redimensionavel": true, "escala_inteira": true}
+```
+
+- `resolucao_virtual`: a resolução do Windows 3.1 que o port imita. O SimAnt original não amplia nada: numa tela maior, sobra mais área em volta e algumas janelas (título, Caste/Behavior, Info, fim de jogo, quintal) mudam de lugar, pela tabela de posições que o próprio jogo escolhe pela altura da tela (até 480 linhas uma, acima outra). `[640, 480]` é o padrão (a bancada); `[800, 600]` é a do DOSBox-X de referência; `[1024, 768]` usa as mesmas posições do 800×600 com mais área livre. A regra fica em `data/resolucao.json`.
+- `escala`, `janela`, `redimensionavel`, `escala_inteira`: como a tela virtual aparece no monitor — ampliada por múltiplos inteiros (pixels nítidos, tarjas em volta) ou, com `escala_inteira: false`, ocupando o máximo com a proporção.
+- A linha de comando (`--resolucao`, `--escala`, `--janela`) vence o arquivo; um mod pode trazer o seu `video.json`.
 
 A lista completa, com as opções de depuração, está no comentário do topo de `simant/src/main.rs` e em `simant/src/opcoes.rs`.
 
