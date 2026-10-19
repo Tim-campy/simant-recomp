@@ -14,7 +14,15 @@
     "_redesenho_mapa_a_cada": "_UpdateWindows (1000:2224): o mapa é redesenhado todo tick em slow/normal, 1 a cada 2 em fast (contador DGROUP 0x9B00 ímpar pula) e 1 a cada 4 em ultra (0x9B00 & 3).",
     "redesenho_mapa_a_cada": [1, 1, 2, 4],
     "_redesenho_sem_foco_a_cada": "MYTIMERFUNC: sem foco, _UpdateWindows só quando (quadros & 7) == 0.",
-    "redesenho_sem_foco_a_cada": 8
+    "redesenho_sem_foco_a_cada": 8,
+    "_ritmo_velocidades": "Extensão do port (escolha do usuário, 2026-10-19; docs/decisoes.md, divergencias.md 'Extensões do port'). modo 'original': Fast e Ultra seguem o laço ocupado de MYTIMERFUNC com voltas_por_periodo (o 486 da bancada: ~66,7 e ~90,9 ticks/s). modo 'proporcional' (padrão): a velocidade com multiplicador anda a multiplicador × ticks_por_segundo_normal (a Normal do original: 1 tick a cada 3 mensagens de 55 ms = 6,06/s), como num processador mais lento: as voltas do laço por mensagem vêm de um crédito (fração guardada), e em Fast/Ultra cada volta roda um tick; null = a regra do original nessa velocidade (Slow e Normal). Só a cadência muda: o tick, _GameSpeed e o redesenho por velocidade (redesenho_mapa_a_cada) são os mesmos. Linha de comando: --velocidades original|proporcional.",
+    "ritmo_velocidades": {
+      "modo": "proporcional",
+      "ticks_por_segundo_normal": 6.0606,
+      "multiplicadores": [null, null, 2.5, 5.0]
+    },
+    "_sem_foco_velocidade": "Extensão do port (escolha do usuário, 2026-10-19): sem o foco do sistema (outra janela ativa ou minimizada), a cadência cai para esta velocidade (0 = Slow) — ou fica na escolhida, se for mais lenta — e volta à escolhida com o foco. Não muda _GameSpeed: nem o .ANT salvo, nem a marca do menu Speed, nem o redesenho. null = o original (o ritmo não muda sem foco, medido na bancada; ver _intervalo_sem_foco_ms). Linha de comando: --sem-foco lenta|original.",
+    "sem_foco_velocidade": 0
   },
   "_teclas": "Aceleradores do menu Speed e Options (ACCELERATORTABLE do SIMANTW.EXE, formiga-amarela.md §11.7): Shift+0 Pause (0x41, alterna _GamePaused), Shift+1..4 Slow/Normal/Fast/Ultra (0x43–0x46, _GameSpeed = 0..3), também com Shift + NumPad 0–4; Ctrl+G AutoTrack (0x31, alterna _OptionStates[0]); Ctrl+S File → Save (5) e Ctrl+A Save As (6); Ctrl+L File → Load (0xFD04). Os itens da barra de menus (docs/spec/telas/menus.md) usam estas mesmas ações; Ctrl+Q, Ctrl+T, Ctrl+J e Ctrl+K ficam em barra_menus.json. Ações: pausa, velocidade_lenta, velocidade_normal, velocidade_rapida, velocidade_ultra, auto_track, salvar, salvar_como, carregar.",
   "teclas": [

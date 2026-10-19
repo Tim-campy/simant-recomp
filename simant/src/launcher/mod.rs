@@ -57,6 +57,10 @@ pub enum Acao {
     PastaMods(u8),
     Mod(usize),
     Preferencias,
+    /// Fast/Ultra no ritmo do 486 da bancada (`--velocidades original`) ou o proporcional (padrão).
+    VelocidadesOriginais,
+    /// Lenta sem foco (padrão) ou o ritmo do original (`--sem-foco original`).
+    LentaSemFoco,
     MostrarLauncher,
     Jogar,
     Salvar,
@@ -320,6 +324,10 @@ impl Estado {
                 }
             }
             Acao::Preferencias => self.cfg.preferencias = !self.cfg.preferencias,
+            Acao::VelocidadesOriginais => {
+                self.cfg.velocidades = if self.cfg.velocidades.as_deref() == Some("original") { None } else { Some("original".into()) }
+            }
+            Acao::LentaSemFoco => self.cfg.sem_foco = if self.cfg.sem_foco.as_deref() == Some("original") { None } else { Some("original".into()) },
             Acao::MostrarLauncher => self.cfg.mostrar_launcher = !self.cfg.mostrar_launcher,
             Acao::Jogar => return self.jogar(),
             Acao::Salvar => {
@@ -667,11 +675,14 @@ impl Estado {
         texto(&mut w, 300, 355, "WIN.INI:", if c.preferencias { PRETO } else { CINZA });
         campo(&mut w, IdCampo::WinIni);
         let auto = match (&c.win_ini, &self.win_ini_auto) {
-            (Some(_), _) => "WIN.INI escolhido: lido só na primeira partida, nunca gravado.".to_string(),
-            (None, Some(p)) => format!("Automático: {}", encurtar(&p.display().to_string(), 50)),
-            (None, None) => "Automático: nenhum WIN.INI perto da pasta do jogo.".to_string(),
+            (Some(_), _) => "Lido só na 1a partida; nunca gravado.".to_string(),
+            (None, Some(p)) => format!("Auto: {}", encurtar(&p.display().to_string(), 33)),
+            (None, None) => "Auto: nenhum WIN.INI perto do jogo.".to_string(),
         };
-        texto(&mut w, 300 - 21 * CAR, 371, &encurtar(&auto, 62), CINZA);
+        // Ritmo (extensões do port, data/partida.json): marcado = o do original.
+        let fim = caixa(&mut w, x0, 371, "Fast/Ultra do 486", Acao::VelocidadesOriginais, c.velocidades.as_deref() == Some("original"));
+        caixa(&mut w, fim + 10, 371, "Lenta sem foco", Acao::LentaSemFoco, c.sem_foco.as_deref() != Some("original"));
+        texto(&mut w, 316, 371, &encurtar(&auto, 39), CINZA);
 
         // Linha de comando.
         secao(&mut w, 388, "Linha de comando equivalente (editável; Enter aplica)");

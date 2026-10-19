@@ -9,6 +9,8 @@
 //!          [--ticks N] [--avancar-ms MS] [--botoes F,F,...] [--historico B,B,...] [--fechar-avisos N] [--exportar-tela-jogo ARQ.png]
 //!          [--salvar ARQ.ANT]
 //!   opções da janela: [--resolucao LxA] [--escala N] [--janela LxA] [--moldura | --sem-moldura]
+//!     [--moldura-do-sistema | --moldura-sem-sistema]
+//!   ritmo (data/partida.json): [--velocidades proporcional|original] [--sem-foco lenta|original]
 //!     [--perfil-driver vga|svga256|s3_dosbox] [--sair-apos-ms N [--capturar-janela ARQ.png]]
 //!   (padrões em data/video.json: tela virtual 640×480 em escala 1, como a bancada; simant/src/video.rs;
 //!   --resolucao 800x600 ou 1024x768 muda o layout como o original, docs/spec/telas/resolucao.md)
@@ -326,6 +328,10 @@ fn principal(o: Opcoes) -> Result<(), String> {
         // --perfil-driver: por cima de data/resolucao.json (e dos mods), conferido já aqui.
         recursos.sobrepor_dados(engine::core::resolucao::ARQUIVO, serde_json::json!({ "perfil_driver": p }));
         recursos.dados::<engine::core::resolucao::ConfigResolucao>(engine::core::resolucao::ARQUIVO)?.perfil(None)?;
+    }
+    if let Some(v) = sobreposicao_partida(o.velocidades.as_deref(), o.sem_foco.as_deref()) {
+        // --velocidades e --sem-foco: por cima de data/partida.json (e dos mods).
+        recursos.sobrepor_dados(engine::core::partida::ARQUIVO_CONFIG, v);
     }
     for m in recursos.mods() {
         println!("mod carregado: {} {}", m.manifesto.nome, m.manifesto.versao);
