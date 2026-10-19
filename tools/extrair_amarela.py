@@ -99,7 +99,7 @@ MENSAGENS = {
 # Mensagens da faixa (`_EditMessage`), entram em "mensagens" sem origem própria (a origem é "_faixa").
 FAIXA = {
     "_faixa": (
-        "_EditMessage com a lista SHARED 4/1010 (_WindPromptStrs): _EatMyFood (1020:8cda) tipo 1 → [11] \"You feel much better now!\", tipo 2 → [12] \"Thank you for your contribution\" (duração 0x78), tipo 3 → [13] \"Cannibalism has restored your health\" (0xb4); _DoAntMoveY (1028:75f4), passagem para o ninho vermelho → [4] \"You have entered the red nest\" (0x168). Nenhuma é importante."
+        "_EditMessage com a lista SHARED 4/1010 (_WindPromptStrs): _EatMyFood (1020:8cda) tipo 1 (comida recebida) → [11], tipo 2 (doação) → [12] (duração 0x78), tipo 3 (canibalismo) → [13] (0xb4); _DoAntMoveY (1028:75f4), passagem para o ninho vermelho → [4] (0x168). Os textos vêm do banco do usuário. Nenhuma é importante."
     ),
     "faixa_comida_recebida": {"lista": 1010, "indice": 11, "duracao": 120, "importante": False},
     "faixa_doacao": {"lista": 1010, "indice": 12, "duracao": 120, "importante": False},

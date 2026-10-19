@@ -151,9 +151,67 @@ pub fn aceleradores(exe: &[u8]) -> Result<HashMap<String, Vec<Acelerador>>, Stri
     Ok(saida)
 }
 
+/// Bytes de um segmento do executável como estão no arquivo (`n` a partir de 1, a numeração lógica
+/// do `SIMANTW.SYM` e dos endereços `n:offset` da documentação: 10 = DGROUP, seletor 1048). Só a
+/// parte inicializada; a tabela de relocação que vem depois não entra. Formato: tabela de segmentos
+/// do cabeçalho NE (`ne + 0x22`, 8 bytes por segmento: setor, tamanho no arquivo (0 = 64 KB),
+/// flags, alocação mínima; posição = setor << `ne + 0x32`). docs/spec/formatos/ne-recursos.md.
+pub fn segmento(exe: &[u8], n: u16) -> Result<&[u8], String> {
+    if exe.get(0..2) != Some(b"MZ") {
+        return Err("não é um executável MZ".into());
+    }
+    let ne = u32_le(exe, 0x3C)? as usize;
+    if exe.get(ne..ne + 2) != Some(b"NE") {
+        return Err("não é um executável NE".into());
+    }
+    let quantos = u16_le(exe, ne + 0x1C)?;
+    if n == 0 || n > quantos {
+        return Err(format!("segmento {n} não existe (o executável tem {quantos})"));
+    }
+    let tabela = ne + u16_le(exe, ne + 0x22)? as usize;
+    let deslocamento = u16_le(exe, ne + 0x32)?;
+    let e = tabela + (n as usize - 1) * 8;
+    let setor = u16_le(exe, e)? as usize;
+    if setor == 0 {
+        return Err(format!("segmento {n} não tem dados no arquivo"));
+    }
+    let tamanho = match u16_le(exe, e + 2)? {
+        0 => 0x10000,
+        t => t as usize,
+    };
+    let inicio = setor << deslocamento;
+    exe.get(inicio..inicio + tamanho).ok_or_else(|| format!("segmento {n} passa do fim do arquivo"))
+}
+
+#[cfg(test)]
+/// Executável NE mínimo com um segmento de dados (n = 1) de `dados`, alinhamento 16.
+pub(crate) fn exe_de_teste(dados: &[u8]) -> Vec<u8> {
+    let mut v = vec![0u8; 0x90];
+    v[0..2].copy_from_slice(b"MZ");
+    v[0x3C] = 0x40;
+    v[0x40..0x42].copy_from_slice(b"NE");
+    v[0x40 + 0x1C] = 1; // um segmento
+    v[0x40 + 0x22] = 0x40; // tabela de segmentos em ne + 0x40 = 0x80
+    v[0x40 + 0x32] = 4; // setores de 16 bytes
+    v[0x80..0x82].copy_from_slice(&(0x90u16 >> 4).to_le_bytes());
+    v[0x82..0x84].copy_from_slice(&(dados.len() as u16).to_le_bytes());
+    v[0x84] = 1; // DATA
+    v.extend_from_slice(dados);
+    v
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;
+
+    #[test]
+    fn segmento_pela_tabela() {
+        let exe = exe_de_teste(b"\0abc\0de");
+        assert_eq!(segmento(&exe, 1).unwrap(), b"\0abc\0de");
+        assert!(segmento(&exe, 2).is_err());
+        assert!(segmento(&exe, 0).is_err());
+        assert!(segmento(b"MZ", 1).is_err());
+    }
 
     /// O executável não tem recurso MENU (a barra vem do objeto 6/0 do banco, formats/menu.rs); a tabela
     /// ACCELERATORTABLE tem os atalhos que os itens mostram (docs/spec/telas/menus.md).

@@ -11,7 +11,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 
 Primeira versão para quem joga. Reimplementação do **SimAnt: The Electronic Ant Colony** (Maxis, 1991,
 versão Windows 3.x) em Rust + SDL2, que lê os arquivos do jogo original do próprio usuário. Nenhum
-arquivo do jogo é distribuído.
+arquivo do jogo é distribuído; os textos do jogo também são lidos da instalação do usuário.
 
 ### O jogo
 
@@ -62,7 +62,7 @@ arquivo do jogo é distribuído.
 
 ### Mods
 
-- **API de mods 1.0** (era 0.34 durante o desenvolvimento; ver `docs/api-mods.md`): substituição de
+- **API de mods 1.0** (era 0.35 durante o desenvolvimento; ver `docs/api-mods.md`): substituição de
   objetos do banco original, dos arquivos soltos do jogo e de 42 arquivos `data/*.json` do port,
   mesclados por chave; scripts **Lua 5.4** em sandbox, com ganchos fora e dentro do tick, leitura e
   escritas validadas do estado (comida, cheiros, castas, formigas nos ninhos), menu e painel próprios e
@@ -100,4 +100,5 @@ Resumo do histórico do repositório (338 commits, 16 a 19 de outubro de 2026); 
   640/800/1024 e perfil de driver; `WIN.INI` como origem das preferências; sintetizador FM como padrão
   e banco ajustado às 28 músicas do original; barra de título do Windows 3.1 opcional; sétima e oitava
   rodadas de vetores (ramos raros, estratégia vermelha, recrutamento, revoada) e geração conferida;
-  API 0.34.
+  API 0.34. Textos do SimAnt fora do repositório: os `data/*.json` guardam só a referência (banco,
+  executável, layout de janela, `.HLP`) e o port lê o texto da instalação do usuário; API 0.35.

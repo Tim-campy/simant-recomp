@@ -45,7 +45,7 @@ fn partida(v: &VetorTick, layout: &LayoutSave) -> Partida {
         TabelasAmarela::padrao().clone(),
         ConfigSimulacao::de_json(&ler("data/simulacao.json")).unwrap(),
         ConfigPartida::de_json(&ler("data/partida.json")).unwrap(),
-        ConfigAvisos::de_json(&ler("data/mensagens.json")).unwrap(),
+        ConfigAvisos::de_json(&engine::recursos::marcar_referencias(&ler("data/mensagens.json"))).unwrap(),
     )
 }
 

@@ -1517,7 +1517,7 @@ mod testes {
     }
 
     fn cfg_avisos() -> ConfigAvisos {
-        ConfigAvisos::de_json(include_str!("../../../data/mensagens.json")).unwrap()
+        ConfigAvisos::de_json(&crate::recursos::marcar_referencias(include_str!("../../../data/mensagens.json"))).unwrap()
     }
 
     fn cfg_sim() -> ConfigSimulacao {

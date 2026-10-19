@@ -22,6 +22,12 @@ Formato: data, decisão, motivo, alternativas descartadas.
 - **Decisão:** `data/`, `mods/` e o `SimAnt-T/MAXIS/ANTWIN` padrão ficam na **pasta base** do port: a do executável se ela tiver `data/`, senão a pasta atual, senão até três pastas acima do executável (o `target/<perfil>/` do repositório) (`simant/src/pastas.rs`). Caminhos relativos dados em `--jogo`, `--dados` e `--mods` valem a partir da pasta atual e, se não existirem lá, da base (`--mods exemplos/mods` funciona de qualquer pasta).
 - **Motivo:** o pacote precisa funcionar de qualquer lugar e pelo duplo clique (atalhos, "Abrir com", terminal em outra pasta). Antes, tudo era relativo à pasta atual e o Linux precisava do `simant.sh`.
 - **Descartado:** só a pasta do executável (quebraria o `cargo run` na raiz do repositório); variável de ambiente para a pasta base (mais um passo para quem joga).
+## 2026-10-19: Textos do original lidos da instalação do usuário, não guardados em `data/`
+
+- **Decisão (do usuário):** os textos do SimAnt que estavam copiados nos `data/*.json` (frases da faixa, caixas e diálogos de arquivo, títulos de janelas, nome e título do tutorial, item de pausa, título da janela principal e da ajuda) e as peças de bitmap do balão do menino passam a ser lidos da instalação do usuário em tempo de execução. Os JSON guardam só a **referência** à fonte (lista de strings tipo 4 do banco, objeto de layout de janela, segmento do `SIMANTW.EXE`, título do `.HLP`), resolvida por `Recursos::dados` (`engine/src/recursos.rs`). Inventário e análise em `docs/lancamento.md` §6.
+- **Motivo:** o port é distribuído sob "MIT OR Apache-2.0" e não deve levar texto da Maxis; a maior parte dos textos já vinha do banco do usuário (`SHARED`), e estes eram as exceções. Ler da fonte também deixa explícito de onde vem cada texto.
+- **Descartado:** (a) manter os textos em `data/` (redistribui frases da Maxis); (c) só declarar na licença que esses trechos não são cobertos (o texto continuaria no pacote). Tabelas numéricas extraídas do executável ficam (fatos e parâmetros de regra, em formato próprio; §6.3 de `lancamento.md`).
+- **Impacto nos mods:** API 0.35. Um mod que trazia o texto continua valendo (uma string substitui a referência pela mesclagem por chave); ferramentas externas que leem os `data/*.json` encontram objetos no lugar dessas strings.
 
 ## 2026-10-19: Barra de título do Windows 3.1 opcional (`moldura_windows31`), desligada por padrão
 

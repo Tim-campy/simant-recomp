@@ -1,7 +1,7 @@
 {
   "_comentario": "Load de um arquivo com o nome do tutorial (string 1800 do SHARED): _LoadGame não lê o arquivo e chama _GenerateTutorial (1030:6262; geracao-mundo.md §6, telas/arquivos.md). patches: [x, y, pretas/32, vermelhas/32] das tabelas DGROUP 25f0/260e/262c/264a (o original grava valor << 5 num byte). velocidade/aviso_saude: _InitSimVars (1030:5a70).",
-  "nome": "Tutorial.Ant",
-  "titulo": "Tutorial Game",
+  "nome": {"banco": "SHARED", "tipo": 4, "id": 1800, "indice": 0},
+  "titulo": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x17dd"},
   "velocidade": 1,
   "aviso_saude": 30,
   "patches": [

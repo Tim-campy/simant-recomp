@@ -214,7 +214,7 @@ pub fn desenhar_janela(
                     _ => pendentes.push(ob.nome.clone()),
                 }
             }
-            Conteudo::Janela | Conteudo::Area | Conteudo::Outro(_) => {}
+            Conteudo::Janela | Conteudo::Area | Conteudo::Titulo { .. } | Conteudo::Outro(_) => {}
         }
     }
     pendentes

@@ -46,7 +46,10 @@ pub enum Conteudo {
     Contorno,
     Relevo { espessura: u8, invertido: bool, preencher: bool },
     Texto { fonte: u8, texto: String, preencher: bool },
-    /// Tipos sem desenho próprio (4, 7, 8, 12, 18) ou desconhecidos.
+    /// Tipo 18: título da janela (texto ASCIIZ a partir de 0x2E, como o tipo 16), desenhado pela
+    /// moldura da janela e não por `_win_DrawObjectI`. Os bytes viram caracteres Latin-1.
+    Titulo { texto: String },
+    /// Tipos sem desenho próprio (4, 7, 8, 12) ou desconhecidos.
     Outro(u8),
 }
 
@@ -120,6 +123,9 @@ fn conteudo(tipo: u8, ob: &[u8]) -> Conteudo {
         13 => Conteudo::BotaoBitmap { selecionado: palavra(0x28), normal: palavra(0x2A) },
         15 => Conteudo::Contorno,
         16 | 17 => Conteudo::Texto { fonte: byte(0x28), texto: texto(0x2E), preencher: tipo == 17 },
+        18 => Conteudo::Titulo {
+            texto: ob.get(0x2E..).map(|d| d.iter().take_while(|&&b| b != 0).map(|&b| b as char).collect()).unwrap_or_default(),
+        },
         19..=22 => Conteudo::Relevo {
             espessura: byte(0x28),
             invertido: tipo == 20 || tipo == 22,

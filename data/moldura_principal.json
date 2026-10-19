@@ -1,6 +1,6 @@
 {
   "_comentario": "Barra de título e menu de sistema da janela principal do Windows 3.1 (a janela do SimAnt abre maximizada: _InitInstance chama ShowWindow com SW_SHOWMAXIMIZED; a moldura fica fora da tela e sobram o título, linhas 0-17 mais a linha preta 18, e a barra de menus, 19-37). Só é desenhada com data/video.json -> moldura_windows31 = true (o padrão do port é false: a janela do sistema atual já tem título). Medido na bancada VGA (re_trabalho/agente_menus/m00 e m05b; re_trabalho/moldura/s00-s16, roteiro tests/referencias/roteiros/qemu_ui_moldura_principal.txt). Ver docs/spec/telas/menus.md §8 e engine/src/core/moldura_principal.rs.",
-  "texto": "SimAnt",
+  "texto": {"exe": "SIMANTW.EXE", "segmento": 10, "offset": "0x0626"},
   "altura": 18,
   "lado_botao": 18,
   "fontes": [6, 0],

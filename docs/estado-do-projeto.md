@@ -35,7 +35,7 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 | 7 | Som e música | 88% (86%) | 72% (65%) | efeitos e músicas de regras, Experimental, diálogos e File → New ligados; sintetizador FM (OPL) próprio como padrão, com o banco ajustado contra as 28 músicas gravadas do original (nível −0,1 dB em média em relação à abertura, era +3,4; curva de velocidade, perfis harmônicos, percussão com as notas mudas do original); efeitos dentro do jogo sem captura |
 | 8 | Modos (Quick, Completo, Experimental, Tutorial) | 94% (93%) | 86% (84%) | os quatro têm vetores e o jogo novo de cada um conferido antes do 1º tick; tutorial conferido da lição 1 ao fim; PLACE, `_SpecialXfer` ao vivo e avisos do Experimental feitos |
 | 9 | Salvar/carregar | 98% (95%) | 90% | `.ANT` aceito pelo original; Load com `_RandYard`; Load Game no "Select a Game"; preferências com o `WIN.INI` do usuário como origem (2026-10-19) |
-| 10 | Mods (dados + Lua) | 92% (90%) | n/a | API 0.34; dados mesclados por chave; ganchos dentro do tick; 42 `data/*.json` sobrescrevíveis (mais o `save_layout.json`, que não é) |
+| 10 | Mods (dados + Lua) | 92% (90%) | n/a | API 0.35 (textos do original lidos da instalação, `lancamento.md` §6); dados mesclados por chave; ganchos dentro do tick; 42 `data/*.json` sobrescrevíveis (mais o `save_layout.json`, que não é) |
 | 11 | Ferramentas e testes | 92% (90%) | n/a | 44 ferramentas em `tools/`, bancada QEMU com gdbstub (VGA e SVGA, `tick_chamada` para o jogo novo), 618 testes |
 | 12 | Documentação | 92% (90%) | n/a | 46 specs (~8,8 mil linhas), divergências revistas (33 em aberto, 56 resolvidas) |
 

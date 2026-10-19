@@ -980,7 +980,7 @@ mod testes {
     use super::*;
 
     fn cfg() -> ConfigQuintalMapa {
-        ConfigQuintalMapa::de_json(include_str!("../../../data/quintal_mapa.json")).unwrap()
+        ConfigQuintalMapa::de_json(&crate::recursos::marcar_referencias(include_str!("../../../data/quintal_mapa.json"))).unwrap()
     }
 
     #[test]

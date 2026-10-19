@@ -87,9 +87,11 @@ pub struct ConfigCaixaMensagem {
     pub grupos_botoes: Vec<(usize, i16, Vec<i16>)>,
     pub titulo_load: String,
     pub pergunta_load: String,
-    /// Título da pergunta de `_MenuQuit` ("SimAnt Quit"); o texto e os botões são os do Load.
-    #[serde(default = "titulo_quit_padrao")]
-    pub titulo_quit: String,
+    /// Título da pergunta de `_MenuQuit` (SIMANTW.EXE 10:1650; o port traz a referência); o texto e os
+    /// botões são os do Load. Sem ele (um mod que troca `caixa_mensagem` inteira sem a chave), vale
+    /// o título do Load.
+    #[serde(default)]
+    pub titulo_quit: Option<String>,
     pub titulo_mensagem: String,
     pub salvo: String,
     pub sim: String,
@@ -101,10 +103,6 @@ pub struct ConfigCaixaMensagem {
 
 fn topo_na_tela_padrao() -> i16 {
     38
-}
-
-fn titulo_quit_padrao() -> String {
-    "SimAnt Quit".into()
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -396,7 +394,8 @@ impl CaixaMensagem {
     /// `_MenuQuit` (`1000:d628`): "SimAnt Quit / Do you want to save the current ant hill?" com Yes, No
     /// e Cancel, No como padrão (`MB_DEFBUTTON2`), como a do Load [bancada: m19].
     pub fn pergunta_sair(cfg: &ConfigDialogos) -> CaixaMensagem {
-        CaixaMensagem { titulo: cfg.caixa_mensagem.titulo_quit.clone(), ..CaixaMensagem::pergunta_load(cfg) }
+        let m = &cfg.caixa_mensagem;
+        CaixaMensagem { titulo: m.titulo_quit.clone().unwrap_or_else(|| m.titulo_load.clone()), ..CaixaMensagem::pergunta_load(cfg) }
     }
 
     /// `_PopMsg("%s\nSaved correctly")`: título "Message", ícone de informação e OK; `arquivo` é o
@@ -725,12 +724,14 @@ mod testes {
     use super::*;
 
     fn cfg() -> ConfigDialogos {
-        serde_json::from_str(include_str!("../../../data/dialogos.json")).unwrap()
+        serde_json::from_str(&crate::recursos::marcar_referencias(include_str!("../../../data/dialogos.json"))).unwrap()
     }
 
     #[test]
     fn ok_com_curinga_nao_escolhe_e_nome_vira_caminho() {
-        let c = cfg();
+        // O campo inicial vem do SIMANTW.EXE (referência); aqui, um curinga qualquer.
+        let mut c = cfg();
+        c.arquivo.campo_inicial = "*.ant".into();
         let mut d = DialogoArquivo::new(false, Path::new("nao_existe"), &c);
         assert_eq!(d.campo, "*.ant");
         assert_eq!(d.tecla("Return", &c), RespostaArquivo::Nada);

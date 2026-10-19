@@ -685,7 +685,7 @@ mod testes {
     use super::*;
 
     fn barra() -> BarraMenus {
-        let cfg: ConfigBarraMenus = serde_json::from_str(include_str!("../../../data/barra_menus.json")).unwrap();
+        let cfg: ConfigBarraMenus = serde_json::from_str(&crate::recursos::marcar_referencias(include_str!("../../../data/barra_menus.json"))).unwrap();
         let menu = MenuBanco {
             titulos: vec!["&File".into(), "&Speed".into()],
             itens: vec![

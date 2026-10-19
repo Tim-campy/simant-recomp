@@ -236,7 +236,7 @@ mod testes {
     use super::*;
 
     fn cfg() -> ConfigHistorico {
-        let t: serde_json::Value = serde_json::from_str(include_str!("../../../data/janelas.json")).unwrap();
+        let t: serde_json::Value = serde_json::from_str(&crate::recursos::marcar_referencias(include_str!("../../../data/janelas.json"))).unwrap();
         serde_json::from_value(t["historico"].clone()).unwrap()
     }
 

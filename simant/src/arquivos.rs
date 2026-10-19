@@ -273,8 +273,10 @@ mod testes {
     fn pergunta_do_load_leva_ao_save_as_ou_ao_load() {
         // Só a máquina de estados (sem sessão): Yes → Save As, No → Load, Cancel → nada.
         let cfg: engine::core::dialogos::ConfigDialogos =
-            serde_json::from_str(&std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/dialogos.json")).unwrap())
-                .unwrap();
+            serde_json::from_str(&engine::recursos::marcar_referencias(
+                &std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/dialogos.json")).unwrap(),
+            ))
+            .unwrap();
         let m = CaixaMensagem::pergunta_load(&cfg);
         assert_eq!(m.botoes.len(), 3);
         assert_eq!(m.padrao, 1);

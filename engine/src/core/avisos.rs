@@ -1004,7 +1004,7 @@ mod testes {
     use super::*;
 
     fn cfg() -> ConfigAvisos {
-        ConfigAvisos::de_json(include_str!("../../../data/mensagens.json")).unwrap()
+        ConfigAvisos::de_json(&crate::recursos::marcar_referencias(include_str!("../../../data/mensagens.json"))).unwrap()
     }
 
     #[test]
@@ -1042,10 +1042,14 @@ mod testes {
 
     #[test]
     fn velocidade_mostra_o_texto_do_dgroup() {
-        let mut a = Avisos::new(cfg());
+        // O texto é o da referência (SIMANTW.EXE 10:0177); sem a instalação, a marca de marcar_referencias.
+        let c = cfg();
+        let rapida = TextoFaixa::Literal(c.faixa.velocidade[2].clone());
+        assert!(c.faixa.velocidade[2].contains("10:0177"));
+        let mut a = Avisos::new(c);
         a.mensagem_de_velocidade(2, 10);
-        assert_eq!(a.texto_da_faixa(10), Some(&TextoFaixa::Literal("Game speed now fast.".into())));
-        assert_eq!(a.texto_da_faixa(10 + 270), Some(&TextoFaixa::Literal("Game speed now fast.".into())));
+        assert_eq!(a.texto_da_faixa(10), Some(&rapida));
+        assert_eq!(a.texto_da_faixa(10 + 270), Some(&rapida));
         assert_eq!(a.texto_da_faixa(10 + 271), None);
     }
 
