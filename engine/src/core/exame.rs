@@ -36,9 +36,10 @@ pub struct ConfigExame {
     pub ajuste_canto: [i32; 2],
     /// Na primeira abertura da sessão a área cliente (o canto mais `largura_borda`) vai para o
     /// múltiplo deste valor mais próximo (`gerenciador::alinhar_cliente_ao_criar`; 8 = um byte em 16
-    /// cores). 1 = sem alinhamento.
-    #[serde(default = "um")]
-    pub alinhamento_ao_criar: i32,
+    /// cores, 1 = sem alinhamento). Ausente (padrão, API 0.30): o `alinhamento_x` do perfil de driver
+    /// (`aplicar_driver`); um mod pode fixá-lo.
+    #[serde(default)]
+    pub alinhamento_ao_criar: Option<i32>,
     #[serde(default)]
     pub largura_borda: Option<i16>,
     #[serde(default)]
@@ -73,6 +74,12 @@ impl JanelaExame {
         Ok(JanelaExame { cfg, janela, listas, ja_aberta: false })
     }
 
+    /// O alinhamento da criação vem do perfil de driver, se os dados não o fixam
+    /// (docs/spec/telas/resolucao.md §7).
+    pub fn aplicar_driver(&mut self, driver: &super::resolucao::PerfilDriver) {
+        self.cfg.alinhamento_ao_criar.get_or_insert(i32::from(driver.alinhamento_x));
+    }
+
     /// Tamanho (largura, altura) do objeto 0.
     fn tamanho(&self) -> (i32, i32) {
         let r = self.janela.objetos[0].retangulo;
@@ -103,7 +110,7 @@ impl JanelaExame {
         let (mut x, y) = self.canto(celula, area, tela);
         if !self.ja_aberta {
             let b = i32::from(self.cfg.largura_borda.unwrap_or(0));
-            x = super::gerenciador::alinhar_cliente_ao_criar(x + b, self.cfg.alinhamento_ao_criar) - b;
+            x = super::gerenciador::alinhar_cliente_ao_criar(x + b, self.cfg.alinhamento_ao_criar.unwrap_or(1)) - b;
             self.ja_aberta = true;
         }
         (x, y)
@@ -159,7 +166,3 @@ impl JanelaExame {
     }
 }
 
-/// Sem alinhamento (padrão de `alinhamento_ao_criar`).
-fn um() -> i32 {
-    1
-}

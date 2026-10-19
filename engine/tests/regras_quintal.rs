@@ -277,6 +277,31 @@ fn fim_do_jogo_completo() {
     assert!(e.eventos.contains(&Evento::Mensagem(10057)), "sem vermelhas e casa à venda: vitória");
 }
 
+/// `_LastColonyPopR` (fora do save): 1 depois de `_InitSimYard` (jogo novo e Load), então a primeira
+/// passada do Jogo Completo sem vermelhas mostra a 10052 mesmo que a passada anterior (de antes do
+/// Load) já não tivesse vermelhas; a segunda não repete. Fora do Jogo Completo nada é gravado.
+#[test]
+fn ultima_populacao_vermelha_comeca_em_1() {
+    let t = tabelas();
+    let mut e = Estado::vazio();
+    e.partida.tipo_jogo = 2;
+    e.preta.populacao = 3;
+    e.preta.castas = [1, 3, 0, 0, 0, 1];
+    e.ultimas_colonias_vermelhas = Some(1);
+    simular_colonias(&mut e, &t);
+    assert!(e.eventos.contains(&Evento::Mensagem(10052)));
+    assert_eq!(e.ultimas_colonias_vermelhas, Some(0));
+    e.eventos.clear();
+    simular_colonias(&mut e, &t);
+    assert!(!e.eventos.contains(&Evento::Mensagem(10052)));
+
+    let mut q = Estado::vazio();
+    q.partida.tipo_jogo = 1;
+    q.ultimas_colonias_vermelhas = Some(1);
+    simular_colonias(&mut q, &t);
+    assert_eq!(q.ultimas_colonias_vermelhas, Some(1));
+}
+
 /// Q-U10: vetores de tick do original. Até `_DoSimYard` os ticks 79–83 não sorteiam nada (nenhum é
 /// múltiplo de 32 nem de 64), então o S da entrada do tick é o S de `_DoSimYard`. Os campos do
 /// quintal depois do tick devem bater com o original.

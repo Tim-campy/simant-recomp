@@ -1203,6 +1203,10 @@ pub struct Estado {
     /// (`TabelasCasa::passo_queda`): gravado quando um patch da casa é gerado; antes disso, o de
     /// `_DROPdir` = 0 (variável zerada na carga do programa).
     pub passo_queda: (u8, u8),
+    /// `_LastColonyPopR` (fora do save): o `_ColonyTotalRed` da última passada de `_SimColonies` no
+    /// Jogo Completo; `_InitSimYard` põe 1 (jogo novo e Load, que chama `_RandYard`). `None` = não se
+    /// sabe (estado lido de um vetor no meio da partida): vale o `_ColonyTotalRed` de antes da passada.
+    pub ultimas_colonias_vermelhas: Option<i16>,
     /// Pedidos à interface acumulados desde a última vez que foram retirados.
     pub eventos: Vec<Evento>,
     /// A janela de edição para os desenhos que o original faz DENTRO do tick (`_GotoMyAnt`,
@@ -1278,6 +1282,7 @@ impl Estado {
             precisa_salvar: false,
             camada_edicao: -1,
             passo_queda: (0, 255),
+            ultimas_colonias_vermelhas: None,
             eventos: Vec::new(),
             edicao_no_tick: None,
             palpos_aranha: 0,

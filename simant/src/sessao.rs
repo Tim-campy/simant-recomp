@@ -193,7 +193,10 @@ impl Sessao<'_> {
         let menus_cfg: ConfigMenus = recursos.dados(menus::ARQUIVO_CONFIG)?;
         let dialogos_cfg = engine::core::dialogos::ConfigDialogos::carregar(recursos)?;
         let mapa = engine::core::janela_mapa::JanelaMapa::carregar(recursos)?;
-        let janela_exame = engine::core::exame::JanelaExame::carregar(recursos)?;
+        let mut janela_exame = engine::core::exame::JanelaExame::carregar(recursos)?;
+        janela_exame.aplicar_driver(&interface.driver);
+        let mut mini = engine::core::mini_mapa::MiniMapa::carregar(recursos)?;
+        mini.aplicar_driver(&interface.driver);
         let info = engine::core::info::JanelaInfo::new(recursos.dados(engine::core::info::ARQUIVO_CONFIG)?);
         let mut s = Sessao {
             recursos,
@@ -213,7 +216,7 @@ impl Sessao<'_> {
             dialogos_cfg,
             dialogo: None,
             mapa,
-            mini: engine::core::mini_mapa::MiniMapa::carregar(recursos)?,
+            mini,
             janela_exame,
             exame: None,
             info,

@@ -800,10 +800,11 @@ fn inseticida(e: &mut Estado, c: Contexto, plano: i32, sub: u8, x: i32, y: i32) 
                 }
                 let v = e.superficie.mapa.em(px, py).unwrap_or(0);
                 if (r.leao_de..=r.leao_ate).contains(&v) {
-                    // Sem formiga-leão na lista com esse centro, o original passaria −1 a
-                    // `_KillAntLion` (escrita fora da tabela); o port não faz nada.
-                    if let Some(k) = inimigos::achar_formiga_leao(e, px, py) {
-                        inimigos::matar_formiga_leao(e, c.inimigos, k);
+                    // Sem formiga-leão na lista com esse centro, o original passa −1 a
+                    // `_KillAntLion` (inimigos.md §1.4): ver `matar_formiga_leao_sem_entrada`.
+                    match inimigos::achar_formiga_leao(e, px, py) {
+                        Some(k) => inimigos::matar_formiga_leao(e, c.inimigos, k),
+                        None => inimigos::matar_formiga_leao_sem_entrada(e),
                     }
                 }
             }

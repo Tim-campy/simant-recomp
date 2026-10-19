@@ -109,8 +109,27 @@ pub(crate) fn tratar_modal(s: &mut Sessao, ev: &sdl2::event::Event) -> Option<Mo
 /// Partida com janela. Preferências do jogador (o `[SimAnt]` do `WIN.INI` do original,
 /// simant/src/preferencias.rs): lidas ao abrir — as opções só fora de um `.ANT` (`de_save`), que
 /// traz as suas; os botões configuráveis sempre — e gravadas ao sair com o que estiver valendo.
+/// Sem o arquivo do port (primeira partida), a origem é o `WIN.INI` do usuário, se houver.
 pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool, de_save: bool) -> Result<(), String> {
-    let prefs = o.preferencias.as_deref().map(preferencias::Preferencias::ler);
+    let prefs = match (&o.preferencias, &o.win_ini) {
+        (Some(arq), Some(ini)) if !arq.exists() => match std::fs::read(ini) {
+            Ok(bytes) => {
+                println!("preferências: {} (seção [SimAnt]), até a primeira gravação", ini.display());
+                let p = &s.partida;
+                Some(preferencias::Preferencias::do_win_ini(
+                    &String::from_utf8_lossy(&bytes),
+                    &p.estado.partida.opcoes,
+                    &p.funcoes_botoes,
+                    &p.funcoes_botoes_quintal,
+                ))
+            }
+            Err(e) => {
+                eprintln!("preferências: {}: {e}", ini.display());
+                None
+            }
+        },
+        (arq, _) => arq.as_deref().map(preferencias::Preferencias::ler),
+    };
     if let Some(p) = &prefs {
         if !de_save {
             p.aplicar_opcoes(&mut s.partida.estado.partida.opcoes);
@@ -164,6 +183,11 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
     loop {
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
+            // `GetAsyncKeyState(VK_LBUTTON) & 1` do fim da volta de `MYTIMERFUNC`: qualquer clique
+            // esquerdo (em qualquer lugar) marca o bit até o laço consultá-lo.
+            if let Event::MouseButtonDown { mouse_btn: MouseButton::Left, .. } = ev {
+                s.partida.botao_esquerdo_apertado();
+            }
             // Barra de menus (e About/Status) primeiro; o resto segue com y na área cliente.
             let modal = s.dialogo.is_some()
                 || s.partida.avisos.tem_modal()

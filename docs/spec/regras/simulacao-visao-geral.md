@@ -72,6 +72,8 @@ Consequências:
 
 Contadores usados aqui (DGROUP, sem nome no `.SYM`): `0x02EE` atraso desde o último tick; `0x02F0/0x02F2` quadros (32 bits); `0x02F4` trava de reentrada.
 
+**Botão esquerdo** [visto no código, `1000:2440`]: o teste de saída é `ou` em curto-circuito, então `GetAsyncKeyState(VK_LBUTTON)` só é chamado quando as mensagens drenadas ainda não bastam, e o bit 0 testado quer dizer "apertado desde a última consulta" (o clique pode ter sido em qualquer lugar, antes ou durante o laço). Na prática, em fast e ultra um clique encerra a chamada no fim da volta seguinte: menos ticks naquele período, e o clique é tratado logo. **Port** (2026-10-19): `Partida::botao_esquerdo_apertado` (chamado a cada clique esquerdo da janela) marca o bit, e `mensagem_de_timer` o consome no mesmo ponto do teste; teste `clique_esquerdo_encerra_o_laco_de_mytimerfunc`. Não reproduzido: outras consultas de `GetAsyncKeyState(VK_LBUTTON)` no original (que também zerariam o bit) [não procuradas].
+
 ## 3. Velocidade (menu Speed)
 
 **Fato visto no código.** `_GameSpeed` (`8:8614`) indexa `_SpeedDelayVals` (`8:8616`, 4 palavras com sinal). Valores lidos do `SIMANTW.EXE` (segmento 8, offset 0x8616): `6, 2, 0, -1`. A ação de menu em `_DoUserButton` (`1000:04c4`, caso 6) avança a velocidade em ciclo 0→1→2→3→0 e mostra a mensagem correspondente (strings do DGROUP `0x014B`, `0x0160`, `0x0177`, `0x018C`).

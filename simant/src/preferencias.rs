@@ -12,6 +12,11 @@
 //! O port grava `preferencias.json` na pasta de dados do usuário do sistema (`SDL_GetPrefPath`;
 //! no Windows, `%APPDATA%\SimAnt recomp\SimAnt\`), fora do repositório e da pasta do jogo. Só a
 //! partida com janela lê e grava; as execuções sem janela (exportações, `--ticks`) não.
+//!
+//! Enquanto esse arquivo não existe (a primeira partida), a origem das preferências é a seção
+//! `[SimAnt]` do `WIN.INI` da instalação do usuário, se houver uma (`--win-ini ARQ`, ou
+//! `WINDOWS/WIN.INI` subindo da pasta do jogo: [`procurar_win_ini`]), lida como o `GetProfileInt` do
+//! original. O port só lê o `WIN.INI`; nunca grava nele (docs/decisoes.md).
 
 use std::path::{Path, PathBuf};
 
@@ -107,6 +112,32 @@ impl Preferencias {
         }
     }
 
+    /// A seção `[SimAnt]` de um `WIN.INI` como o `WINMAIN` a lê: `GetProfileInt` de cada chave com o
+    /// valor do momento como padrão (`opcoes`, `funcoes`, `funcoes_quintal`). Seção e chaves sem
+    /// diferença de maiúsculas, como no Windows. Uma opção diferente de 0 vira 1 (o original guarda o
+    /// número lido; só muda algo com um valor que não seja 0 nem 1 no `WIN.INI`).
+    pub fn do_win_ini(texto: &str, opcoes: &[i16; 6], funcoes: &[u16], funcoes_quintal: &[u16]) -> Preferencias {
+        let secao = secao_ini(texto, "SimAnt");
+        let inteiro = |chave: &str, padrao: i32| -> i32 {
+            secao.iter().find(|(k, _)| k.eq_ignore_ascii_case(chave)).map_or(padrao, |(_, v)| profile_int(v))
+        };
+        let nomes = ["autotrack", "music", "effects", "events", "messages", "silly"];
+        let o: Vec<bool> = nomes.iter().zip(opcoes).map(|(n, &v)| inteiro(n, i32::from(v)) != 0).collect();
+        let botoes = |prefixo: &str, atuais: &[u16]| -> Vec<u16> {
+            atuais.iter().enumerate().map(|(i, &v)| inteiro(&format!("{prefixo}{i}"), i32::from(v)) as u16).collect()
+        };
+        Preferencias {
+            auto_track: Some(o[0]),
+            musica: Some(o[1]),
+            efeitos: Some(o[2]),
+            eventos: Some(o[3]),
+            mensagens: Some(o[4]),
+            silly: Some(o[5]),
+            botoes_faixa: Some(botoes("mapuserbutton", funcoes)),
+            botoes_quintal: (!funcoes_quintal.is_empty()).then(|| botoes("yarduserbutton", funcoes_quintal)),
+        }
+    }
+
     /// O que gravar ao sair: as opções e os botões do momento (`WriteProfileString` de tudo).
     pub fn do_momento(opcoes: &[i16; 6], funcoes: &[u16], funcoes_quintal: &[u16]) -> Preferencias {
         let b = |i: usize| Some(opcoes[i] != 0);
@@ -123,6 +154,56 @@ impl Preferencias {
     }
 }
 
+/// Pares (chave, valor) de uma seção de um arquivo `.INI` (a primeira com esse nome, sem diferença de
+/// maiúsculas). Linhas sem `=` e comentários (`;`) são ignorados.
+fn secao_ini<'a>(texto: &'a str, nome: &str) -> Vec<(&'a str, &'a str)> {
+    let mut dentro = false;
+    let mut pares = Vec::new();
+    for linha in texto.lines().map(str::trim) {
+        if let Some(cabecalho) = linha.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
+            if dentro {
+                break;
+            }
+            dentro = cabecalho.trim().eq_ignore_ascii_case(nome);
+        } else if dentro && !linha.starts_with(';') {
+            if let Some((k, v)) = linha.split_once('=') {
+                pares.push((k.trim(), v.trim()));
+            }
+        }
+    }
+    pares
+}
+
+/// Conversão do `GetProfileInt`: os dígitos decimais do começo; sem dígito, 0.
+fn profile_int(valor: &str) -> i32 {
+    let digitos: String = valor.trim_start().chars().take_while(char::is_ascii_digit).collect();
+    digitos.parse::<i64>().map_or(0, |v| v.min(i64::from(u16::MAX)) as i32)
+}
+
+/// Um `WIN.INI` da instalação do usuário: `WINDOWS/WIN.INI` na pasta do jogo ou em uma das duas de
+/// cima (`C:\MAXIS\ANTWIN` → `C:\WINDOWS`), sem diferença de maiúsculas.
+pub fn procurar_win_ini(pasta_jogo: &Path) -> Option<PathBuf> {
+    let mut base = Some(pasta_jogo);
+    for _ in 0..3 {
+        let b = base?;
+        if let Some(arq) = filho_sem_caixa(b, "WINDOWS").and_then(|w| filho_sem_caixa(&w, "WIN.INI")) {
+            if arq.is_file() {
+                return Some(arq);
+            }
+        }
+        base = b.parent();
+    }
+    None
+}
+
+fn filho_sem_caixa(pasta: &Path, nome: &str) -> Option<PathBuf> {
+    std::fs::read_dir(pasta)
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .find(|p| p.file_name().is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(nome)))
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;
@@ -136,6 +217,42 @@ mod testes {
         let mut f = vec![15, 0, 1, 3, 7, 6, 5, 10];
         p.aplicar_botoes(&mut f);
         assert_eq!(f, vec![15, 0, 1, 3, 7, 6, 5, 10], "sem botões no arquivo, ficam os do port");
+    }
+
+    #[test]
+    fn win_ini_como_o_getprofileint() {
+        let texto = concat!(
+            "[Windows]\r\nload=\r\n\r\n[simant]\r\nAutoTrack=1\r\nmusic=0\r\nsilly=x\r\n; comentário\r\n",
+            "mapuserbutton1=12\r\nyarduserbutton7=  4 \r\n[Outra]\r\nevents=0\r\n"
+        );
+        let p = Preferencias::do_win_ini(texto, &[0, 1, 1, 1, 1, 1], &[15, 0, 1, 3, 7, 6, 5, 10], &[15, 0, 1, 3, 7, 6, 5, 10]);
+        let mut o = [0; 6];
+        p.aplicar_opcoes(&mut o);
+        // Chaves ausentes ficam com o valor do momento; "x" vale 0; a seção [Outra] não conta.
+        assert_eq!(o, [1, 0, 1, 1, 1, 0]);
+        let mut f = vec![0; 8];
+        p.aplicar_botoes(&mut f);
+        assert_eq!(f, vec![15, 12, 1, 3, 7, 6, 5, 10]);
+        p.aplicar_botoes_quintal(&mut f);
+        assert_eq!(f[7], 4);
+        // Sem a seção: tudo como estava.
+        let nada = Preferencias::do_win_ini("[Windows]\nload=\n", &[0, 1, 1, 1, 1, 0], &[15, 0], &[]);
+        let mut o = [9; 6];
+        nada.aplicar_opcoes(&mut o);
+        assert_eq!(o, [0, 1, 1, 1, 1, 0]);
+        assert_eq!(nada.botoes_quintal, None);
+    }
+
+    #[test]
+    fn win_ini_achado_subindo_da_pasta_do_jogo() {
+        let raiz = std::env::temp_dir().join(format!("simant_winini_{}", std::process::id()));
+        let jogo = raiz.join("MAXIS").join("ANTWIN");
+        std::fs::create_dir_all(&jogo).unwrap();
+        assert_eq!(procurar_win_ini(&jogo), None);
+        std::fs::create_dir_all(raiz.join("Windows")).unwrap();
+        std::fs::write(raiz.join("Windows").join("win.ini"), "[SimAnt]\n").unwrap();
+        assert_eq!(procurar_win_ini(&jogo), Some(raiz.join("Windows").join("win.ini")));
+        let _ = std::fs::remove_dir_all(&raiz);
     }
 
     #[test]

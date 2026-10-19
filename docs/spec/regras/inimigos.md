@@ -96,6 +96,20 @@ Observações (fato visto no código):
 
 Mesma remoção do estado 1 (centro = 0x3F, deslocamento da lista), sem mensagem. Chamada pela ferramenta Inseticida do modo Experimental (`_ExpKillAnts` `1010:7d5c`) quando o tile atingido está em 0x38–0x3E; a formiga-leão é achada por `_FindInLionList` (`1030:4b12`).
 
+**`k` = −1** (tile de formiga-leão sem entrada na lista: `_FindInLionList` devolve −1 e `_ExpKillAnts` chama `_KillAntLion(-1)` sem testar) [visto no código, `1030:4b58`; não testado no original]. O original lê e grava a "vaga −1" de cada vetor da lista, que é o último byte da variável anterior no DGROUP (nomes do `.SYM`):
+
+| Vetor | Vaga −1 | O que é |
+|---|---|---|
+| `_LionListX` (`9:809c`) | `9:809b` | byte alto do seletor de `_EggStr` (ponteiro far, `9:8098`) |
+| `_LionListY` (`9:80bc`) | `9:80bb` | byte alto de `_LastThemeSong` (`9:80ba`; contador 0–2 do tema, em geral 0) |
+| `_LionListT` (`9:7d4e`) | `9:7d4d` | byte alto de `_BoyMsgCnt` (`9:7d4a`, 32 bits) |
+| `_LionListM` (`9:7a68`) | `9:7a67` | byte alto do y de `_CenterPnt` (`9:7a64`) |
+| `_LionListS` (`9:7d34`) | `9:7d33` | byte alto de `_mapOutBuf` (`9:7d32`, alça de memória) |
+
+Efeito: (1) `_SetMap(1, X[−1], Y[−1], 0x3F)`: um 0x3F no `_MapA` em (byte alto do seletor de `_EggStr`, byte alto de `_LastThemeSong`), se couber no mapa — com `_LastThemeSong` < 256, na linha 0; (2) com `_LionIndex` > 0, o contador cai 1 e o deslocamento começa na vaga −1: as vagas −1 … n−1 recebem as 0 … n, ou seja, **a formiga-leão 0 sai da lista** (o tile dela fica no mapa, parado) e os cinco bytes da tabela acima recebem os campos dela (X → seletor de `_EggStr`, Y → `_LastThemeSong`, T → `_BoyMsgCnt`, M → `_CenterPnt`, S → `_mapOutBuf`). Com `_LionIndex` = 0 só o `_SetMap`. O tile atingido não muda. As gravações no seletor de `_EggStr` e na alça `_mapOutBuf` podem corromper a interface do original depois [hipótese: não observado].
+
+**Port** (2026-10-19, `inimigos::matar_formiga_leao_sem_entrada`): reproduz o que fica no estado da partida (e no save): a saída da entrada 0 e o contador, o byte alto de `_BoyMsgCnt` (o balão do menino passa a esperar 2²⁴ × T do relógio do Mac, na prática nunca mais aparece se T > 0) e o de `_LastThemeSong` (o próximo tema volta ao primeiro). Não reproduz o `_SetMap` (o x é um seletor de memória do Windows, sem equivalente) nem as gravações em `_EggStr`, `_CenterPnt` e `_mapOutBuf` (interface do Windows; reproduzi-las não é seguro). Teste `inseticida_sem_entrada_na_lista_tira_a_formiga_leao_0`. Antes o port não fazia nada.
+
 ## 2. Aranha
 
 ### 2.1 Estado e coordenadas
@@ -401,7 +415,7 @@ Verificado:
 - **Vetores de tick** (`tests/referencias/ticks/`, [testes-tick.md](testes-tick.md)), ticks 79–83: partindo do "estado antes", formigas-leão, aranha (andando, sem virar) e lagarta saem iguais ao "estado depois". Como quintal e água sorteiam antes dos inimigos no tick, a semente S no momento dos inimigos não é conhecida; a comparação de sorteios exige as outras partes do tick.
 
 - **Vetores de tick da quinta rodada** (2026-10-18, `tools/cenarios_regras.py` a partir do snapshot `rico`, [testes-tick.md](testes-tick.md#quinta-rodada-2026-10-18-regras-não-verificadas-da-revisão)), todos 307/307 com S, R e vida iguais: cerco da aranha com 9 pretas (`aranha_cerco`: estado 5, `_DeathCnt = 500`, mensagem 10046, vingança 2 → 3 e `_MeSMode = 7`), com 6 (`aranha_foge`: estado 4) e com `_SpidRevenge = 4` (`aranha_vinganca`: `_MeSMode = 8`); faro (`aranha_faro`: `_SFoundAnt` de trás para frente, perseguição, `_EatCnt = 11`, `_DeadAntHere`); laser (`aranha_laser`: duas mortes pelo `_SpiderScan` num leque de pretas); cerco da formiga-leão (`leao_cerco`: 7 vizinhas, 10050, centro 0x3F, lista deslocada); aranha do jogador pela interface do original (`aranha_jogador`: tecla X e clique na aranha, andar, correr, modo alvo com `_MeSMode = 6` e comer com `_EatCnt = 50`); a aranha do jogador cercada (`aranha_jogador_cercada`, `_YellowDeath(3)`) e saindo do mapa (`aranha_jogador_fora`, `_YellowDeath(4)`); a amarela comida pela formiga-leão (`amarela_morte_leao`, `_YellowDeath(2)`). Achado: **o cerco não roda para a aranha do jogador com `_SMode` 0 ou 1** — o controle do jogador (2.7) substitui o resto de `_MoveSpider`, como a seção 2.2 já dizia; ela só é cercada perseguindo ou comendo.
-- **Pendente:** a amarela comida pela aranha (`amarela_morte_aranha/1793`, `_YellowDeath(1)`): 294/307. Causa isolada com breakpoints em `_SRand1` e nas funções de desenho (`cenarios_regras.py contar_aranha`): o original sorteia 4 passos de S a mais, `S1(4)` de `_DrawPalps` em três desenhos da janela de edição dentro do tick (o de `_GotoMyAnt` na morte, o de antes do laço de `_AnimYellowFight` e o do 1º quadro; a aranha está à vista e com `_SMode` ≥ 2) e o `S1(2)` de `_SpiderDialog` (opção "Events"). O port não desenha dentro do tick ([rng.md](rng.md), "Fora"). Não é erro de regra; a morte pela formiga-leão, sem a aranha à vista, bate (contagem de controle `contar_leao`).
+- **Resolvido em 2026-10-18 (desenho dentro do tick, [rng.md](rng.md)); histórico:** a amarela comida pela aranha (`amarela_morte_aranha/1793`, `_YellowDeath(1)`) dava 294/307, hoje 307/307. Causa isolada com breakpoints em `_SRand1` e nas funções de desenho (`cenarios_regras.py contar_aranha`): o original sorteia 4 passos de S a mais, `S1(4)` de `_DrawPalps` em três desenhos da janela de edição dentro do tick (o de `_GotoMyAnt` na morte, o de antes do laço de `_AnimYellowFight` e o do 1º quadro; a aranha está à vista e com `_SMode` ≥ 2) e o `S1(2)` de `_SpiderDialog` (opção "Events"). O port não desenha dentro do tick ([rng.md](rng.md), "Fora"). Não é erro de regra; a morte pela formiga-leão, sem a aranha à vista, bate (contagem de controle `contar_leao`).
 
 Não verificado contra o original: a pedrinha cuspida pela formiga-leão e o desenho do laser (`_DoLaserFire`).
 
