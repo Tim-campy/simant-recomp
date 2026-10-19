@@ -786,6 +786,22 @@ pub fn aplicar_acao(
         let t = super::amarela::TabelasAmarela::padrao();
         return Ok(format!("{:?}", super::misterio::botao_misterio(e, &mut regras, t)));
     }
+    if let Some(cs) = acao["comandos"].as_array() {
+        // Teclas de comando da amarela com o jogo pausado (`_YellowCommandKey` → `_YellowCommand`,
+        // formiga-amarela.md §10.3/§11.4). `_UnRecruit` lê `_TemBModePop[6]` do último tick, que
+        // não está no save: vem da bancada em "defesa_ultimo_tick".
+        if let Some(n) = acao["defesa_ultimo_tick"].as_i64() {
+            e.modos_do_tick[0][6] = n as i16;
+        }
+        let t = super::amarela::TabelasAmarela::padrao();
+        let mut ctl = super::amarela::ControleJogador::default();
+        let mut ok = Vec::new();
+        for c in cs {
+            let c = c.as_u64().ok_or("comando inválido")? as u8;
+            ok.push(super::amarela::comando(e, t, &mut ctl, c));
+        }
+        return Ok(format!("{ok:?}"));
+    }
     if let Some(m) = acao.get("desenho_quintal").and_then(|v| v.as_i64()) {
         // Entre dois ticks com a Yard/House View aberta e na frente: um redesenho do quintal.
         return Ok(format!("{} passos de S", super::desenho::desenhar_quintal(e, m as i16)));
