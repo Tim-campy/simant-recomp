@@ -17,13 +17,13 @@ Endereços de variáveis seguem o formato do `symbols.tsv`: `segmento lógico:of
 | Situação | Chamada | Fonte |
 |---|---|---|
 | Início do jogo, retomada e fim de diálogos | `SetTimer(_rootWnd, id 0, 17 ms, MYTIMERFUNC)` | `WINMAIN` `1000:3fda`; `_RestartSimulation` `1000:0034` (bytes `ff 36 78 cd 6a 00 6a 11 ff 36 42 00 ff 36 40 00 9a…`: empilha `_rootWnd`, 0, 0x11 e o ponteiro `_lpTimerFunc` `10:0040`) |
-| Aplicativo perde o foco (`WM_ACTIVATEAPP` com wParam = 0) | o mesmo temporizador, refeito com **170 ms** (0xAA) | `MAINWNDPROC` `1000:2930` |
+| Aplicativo perde o foco (`WM_ACTIVATEAPP` com wParam = 0) | o mesmo temporizador, refeito com **170 ms** (0xAA) no código; **na bancada o ritmo não muda** (61 ticks em 10 s ativa, inativa com a Task List e minimizada; 2026-10-19, roteiro `qemu_ui_moldura_principal.txt`) | `MAINWNDPROC` `1000:2930` |
 | Aplicativo volta ao foco | volta para 17 ms | `MAINWNDPROC` `1000:2930` |
 | Diálogos, menus, salvar (`_SaveGame`) | `KillTimer` antes e `SetTimer` (17 ms) depois | `_DoUserButton` `1000:04c4`, `_DoMenuEntry` `1000:1876` |
 
 `_StopSimulation` (`1000:0000`) e `_RestartSimulation` (`1000:0034`) usam um contador de aninhamento (DGROUP `0x0044`, sem nome no `.SYM`). O primeiro `Stop` mata o temporizador e descarta as mensagens `WM_TIMER` (0x113) pendentes. O temporizador só é refeito quando o contador volta a zero.
 
-[hipótese] 17 ms imita o *tick* de 1/60 s do Macintosh (o jogo é port do Mac). No Windows 3.1, porém, o `SetTimer` tem a resolução do relógio do sistema (18,2 Hz, cerca de 55 ms): o intervalo pedido é arredondado para cima, e o temporizador de 17 ms rende **uma `WM_TIMER` a cada 55 ms**. As `WM_TIMER` não se acumulam. **Verificado na bancada** (2026-10-18, seção 3.1): as taxas medidas em slow e normal são exatamente as que o laço da seção 2 dá com mensagens a cada 55 ms, e o relógio do Mac (`⌊GetTickCount / 55⌋ × 3`) anda 9 por tick em normal (3 períodos de 55 ms). O de 170 ms sem foco viraria 220 ms (4 períodos) [hipótese: não medido].
+[hipótese] 17 ms imita o *tick* de 1/60 s do Macintosh (o jogo é port do Mac). No Windows 3.1, porém, o `SetTimer` tem a resolução do relógio do sistema (18,2 Hz, cerca de 55 ms): o intervalo pedido é arredondado para cima, e o temporizador de 17 ms rende **uma `WM_TIMER` a cada 55 ms**. As `WM_TIMER` não se acumulam. **Verificado na bancada** (2026-10-18, seção 3.1): as taxas medidas em slow e normal são exatamente as que o laço da seção 2 dá com mensagens a cada 55 ms, e o relógio do Mac (`⌊GetTickCount / 55⌋ × 3`) anda 9 por tick em normal (3 períodos de 55 ms). O de 170 ms sem foco viraria 220 ms (4 períodos), mas a bancada mostra o mesmo ritmo sem foco (tabela acima): o port usa 17 ms também sem foco (`data/partida.json`, `intervalo_sem_foco_ms`) [o mecanismo que anula os 170 ms fica em aberto].
 
 ## 2. O que `MYTIMERFUNC` faz a cada chamada
 
@@ -359,7 +359,7 @@ Não verificado: nenhuma parte do tick foi comparada passo a passo com o origina
 
 ## Lacunas
 
-- Taxa de fast/ultra numa máquina real: só limitada por emulação (§3.1 TCG livre; §3.3 com `-icount`, ~3 ticks/s por milhão de instruções/s); nenhuma máquina real medida. Cadência sem foco (170 ms → 220 ms [hipótese]).
+- Taxa de fast/ultra numa máquina real: só limitada por emulação (§3.1 TCG livre; §3.3 com `-icount`, ~3 ticks/s por milhão de instruções/s); nenhuma máquina real medida. Cadência sem foco: medida igual à com foco (2026-10-19); o mecanismo fica em aberto.
 - Detalhes de `_SimColonies`, `_DoSimYard` (menino, cachorro, gato, pássaro, cortador), `_DoAntLions`, `_MoveSpider`, `_DoPillar`/`_DoSow`, `_DoWater`: só a cadência está descrita aqui.
 - `_Feedback`: regras do tutorial e das mensagens de conselho.
 - Retorno exato de `_CalcScore` e o sentido da nota 3.
