@@ -32,10 +32,10 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 | 4 | Jogo ao vivo (laço, relógio, ritmo) | 93% (90%) | 65% | laço de `MYTIMERFUNC` com o clique esquerdo (2026-10-19); slow/normal medidos (3,0/6,0 ticks/s); fast/ultra e relógio do Mac com decisões do port |
 | 5 | Telas e janelas | 94% (85%) | 83% (70%) | todas as janelas alcançáveis existem e foram comparadas (93–100%), inclusive balões, aranha, mapa, mini mapa e Info (51 cartões); tela virtual 640/800/1024 e **perfil de driver** (VGA de 16 cores × 256 cores: alinhamento ao byte e cores do sistema), com as caixas, o WinHelp e a janela 26 conferidos na SVGA |
 | 6 | Diálogos e menus | 90% (60%) | 80% (50%) | barra de menus do Windows (100% nas capturas), About, Status, Quit, Load Game, quadros da janela 26; faltam o menu de sistema da janela principal, o menu de um item do botão de ferramentas no Quick Game e os diálogos internos do WinHelp |
-| 7 | Som e música | 80% (75%) | 35% | efeitos e músicas de regras, Experimental, diálogos e File → New ligados; timbre diferente; **nada comparado de ouvido** (outro agente trabalha na captura do DOSBox-X e no timbre FM) |
+| 7 | Som e música | 85% (80%) | 55% | efeitos e músicas de regras, Experimental, diálogos e File → New ligados; sintetizador FM (OPL) próprio como padrão; abertura comparada com a captura do DOSBox-X (andamento, notas, volume relativo, timbre aproximado); demais músicas e efeitos dentro do jogo sem captura |
 | 8 | Modos (Quick, Completo, Experimental, Tutorial) | 93% (90%) | 83% (80%) | os quatro têm vetores; tutorial conferido da lição 1 ao fim; PLACE, `_SpecialXfer` ao vivo e avisos do Experimental feitos |
 | 9 | Salvar/carregar | 98% (95%) | 90% | `.ANT` aceito pelo original; Load com `_RandYard`; Load Game no "Select a Game"; preferências com o `WIN.INI` do usuário como origem (2026-10-19) |
-| 10 | Mods (dados + Lua) | 92% (90%) | n/a | API 0.30; dados mesclados por chave; ganchos dentro do tick; 41 `data/*.json` sobrescrevíveis (mais o `save_layout.json`, que não é) |
+| 10 | Mods (dados + Lua) | 92% (90%) | n/a | API 0.31; dados mesclados por chave; ganchos dentro do tick; 42 `data/*.json` sobrescrevíveis (mais o `save_layout.json`, que não é) |
 | 11 | Ferramentas e testes | 92% (90%) | n/a | 40 ferramentas em `tools/`, bancada QEMU com gdbstub (VGA e SVGA), 591 testes |
 | 12 | Documentação | 92% (90%) | n/a | 46 specs (~8,8 mil linhas), divergências revistas (33 em aberto, 56 resolvidas) |
 
@@ -104,9 +104,9 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 ### 2.7 Som e música
 
 - **Completo:** 57 efeitos decodificados (8 bits, 4096 Hz); músicas `.MID` com a tabela MCI; opções Music/Sound Effects; silêncio sem foco em todas as telas; linha do tempo dos sons da luta (165 ms); sons das regras, das ferramentas do Experimental, dos marcadores, das trapaças, do Mystery, da troca de patch, do fim de jogo, dos quadros da janela 26 e de File → New (o único item da barra que toca algo no original).
-- **Verificado:** só o formato e o catálogo (quem pede cada som, pelo código). **Nada foi comparado de ouvido com o original.** A gravação pela bancada QEMU (SB16 + OPL2) não serve de referência (`regras/som.md`).
-- **Parcial / decisão do port:** timbre por `rustysynth` + SoundFont ou sintetizador simples, não o OPL/MIDI Mapper; volume relativo efeito/música não medido; efeito novo sempre corta o anterior (o original descarta um pedido no mesmo milissegundo).
-- **Em andamento em paralelo:** captura do áudio do original no DOSBox-X (SB16/OPL3) e timbre FM (outro agente).
+- **Verificado:** formato e catálogo (pelo código). **Desde 2026-10-19, contra a captura do original no DOSBox-X** (SB16 + OPL3, MIDI Mapper "SB16 Ext Synth" da instalação, sem som no PC; `tools/som_dosbox.py`, `regras/som.md` "Áudio do original no DOSBox-X"): na abertura (10001), duração (102,90 s contra 102,99 s de MIDI), andamento, notas e ordem (croma alinhada 0,85 contra 0,43 deslocada), saída mono e o volume relativo música/efeito (a música 20 dB abaixo de um efeito de ganho 1, medido com o efeito 41 pelo mesmo `waveOut`). Os canais 1–10 sem mapas conferem com o `MIDIMAP.CFG`.
+- **Parcial / decisão do port:** timbre por um **sintetizador FM próprio no estilo do OPL** com banco GM próprio (`data/opl_banco.json`), padrão desde 2026-10-19 (`decisoes.md`), mais perto do original que o simples, mas não igual (agudos de 2–4 kHz mais fracos; só os programas da abertura ajustados); SoundFont e o simples continuam selecionáveis. Efeito novo sempre corta o anterior (o original descarta um pedido no mesmo milissegundo).
+- **Não capturado:** as outras 28 músicas e os efeitos dentro do jogo (taxa real dos efeitos de 4096 Hz na SB16, luta, preempção): o `AUTOTYPE` do DOSBox-X não entrega teclas com a janela sem foco, e operar a janela exigiria o PC do usuário.
 - **Não ligados porque o caminho não existe no port:** `_StartAttack` pelo menu e os menus de ferramentas da janela de edição e da janela do mapa (os botões não existem no Windows).
 
 ### 2.8 Modos
@@ -132,7 +132,7 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 
 ### 2.11 Ferramentas e testes
 
-- 40 ferramentas em `tools/` (39 Python e 1 PowerShell: inspetores de formato, extratores de tabelas e `conferir_extracoes.py`, `cenarios_tick.py`/`cenarios_regras.py`/`bancada_mapa.py` da bancada QEMU com gdbstub em VGA e SVGA, comparadores de captura, medição de ritmo e de abertura, `som_original.py`), 74 roteiros, exemplos de `engine/examples/` (exportadores e comparadores).
+- 43 ferramentas em `tools/` (42 Python e 1 PowerShell: inspetores de formato, extratores de tabelas e `conferir_extracoes.py`, `cenarios_tick.py`/`cenarios_regras.py`/`bancada_mapa.py` da bancada QEMU com gdbstub em VGA e SVGA, comparadores de captura, medição de ritmo e de abertura, `som_original.py`, `som_dosbox.py` (captura do áudio do original no DOSBox-X e comparação), `gerar_banco_opl.py` e `ajustar_timbre_fm.py` (banco FM)), 74 roteiros, exemplos de `engine/examples/` (exportadores e comparadores).
 - 591 testes; os de vetores exigem igualdade total; os de arquivos reais avisam e passam sem `SIMANT_DIR`.
 - **Fraqueza:** capturas e `re_trabalho/` ficam fora do git (direitos autorais), então as porcentagens de tela só são reprodutíveis na máquina do usuário; o determinismo da bancada depende do snapshot (QEMU sem `icount`).
 
@@ -196,7 +196,7 @@ Telas
 - Load Game da abertura; Status no Full Game e no Experimental; ajuda dos itens de menu.
 
 Som
-- Tudo o que é audível: timbre, volume relativo, sons da luta no tempo, preempção no mesmo milissegundo, sons da janela 26 (em andamento em paralelo).
+- Comparado só na abertura (andamento, notas, volume relativo, timbre aproximado; `regras/som.md`). Sem captura: as outras músicas, os efeitos dentro do jogo (taxa real na SB16), os sons da luta no tempo, a preempção no mesmo milissegundo e os sons da janela 26.
 
 Diálogos
 - Modalidade dos diálogos de arquivo em relação ao `WM_TIMER` ([hipótese]); rolagem com muitos arquivos e mudança de pasta.
@@ -211,7 +211,7 @@ Esforço relativo: **P** = até um dia de trabalho focado; **M** = alguns dias; 
 
 | Item | Esforço | Referência |
 |---|---|---|
-| Timbre mais próximo do original (FM/OPL) e comparação de ouvido com a captura do DOSBox-X | M | `regras/som.md`, `formatos/som.md`; **em andamento por outro agente** |
+| Timbre FM: ajustar os 11 programas restantes e os agudos (2–4 kHz) quando houver captura das outras músicas (exige input no DOSBox-X: o `AUTOTYPE` não funciona com a janela sem foco) | M | `regras/som.md` "Áudio do original no DOSBox-X", `formatos/som.md` "Sintetizador FM" |
 | Resíduos da tela virtual e do perfil de driver: cores do sistema na abertura, posição guardada do WinHelp, cores do `svga256` além do título e do fundo | P–M | `telas/resolucao.md` §7, `divergencias.md` (linhas de 2026-10-19) |
 
 Não há outro item de alto impacto: tudo o que o jogador alcança no original existe no port (a tela virtual e o perfil de driver entraram no `main` em 2026-10-19).
@@ -241,7 +241,7 @@ Não há outro item de alto impacto: tudo o que o jogador alcança no original e
 
 | Item | Esforço |
 |---|---|
-| Comparação de áudio com o original (DOSBox-X com SB16/OPL3 e captura de WAV; em andamento) | M |
+| Captura das outras músicas e dos efeitos dentro do jogo no DOSBox-X (a abertura e o nível de um efeito já estão: `tools/som_dosbox.py`) | M |
 | Vetores ou casos para os ramos raros de §3 (morte natural, proporção de vitórias, revoada natural, estratégia vermelha, recrutamento, N-02/04/05/08/11, afogamento, lista A cheia, `_KillAntLion(-1)`, Load de Jogo Completo sem vermelhas) | M |
 | Capturas: rainha amarela 0xFE, Load Game da abertura, Status no Full/Experimental, telas maiores, avisos do Experimental, faixa 35 com botões trocados, o que se vê depois de `_XferPatch` | P |
 | Saves gerados na bancada logo depois de Tutorial/Full/Experimental para os ramos da geração | P |
@@ -259,7 +259,7 @@ Não há outro item de alto impacto: tudo o que o jogador alcança no original e
 8. **Evidência fora do git.** Capturas, `re_trabalho/` e pseudocódigo não são versionados (direitos autorais); as porcentagens de tela não podem ser refeitas por terceiros sem o jogo e a bancada.
 9. **Ritmo de mudança da API de mods** (0.20 a 0.28 em dois dias). A mesclagem por chave (0.26) protege mods de dados; scripts dependem de nomes de campos que ainda mudam.
 10. **Comentários com `[hipótese]`, "ainda não" ou "[lacuna]" no código** (`engine/src`, `simant/src`): 55 linhas nesta revisão; nenhum `todo!` ou `unimplemented!`. Não foram reconferidos um a um nesta rodada.
-11. **Trabalho em paralelo e perfil de driver.** O áudio (captura e timbre FM) está em outro branch; a porcentagem da área 7 muda quando ele entrar, e `regras/som.md` e `divergencias.md` terão conflitos de merge prováveis. O perfil padrão é `vga` (a bancada de referência); quem compara com o original no DOSBox-X de 256 cores deve usar `svga256`/`s3_dosbox`, e as capturas antigas feitas lá têm de ser lidas com esse perfil.
+11. **Perfil de driver.** (O áudio — captura no DOSBox-X e timbre FM — entrou em 2026-10-19.) O perfil padrão é `vga` (a bancada de referência); quem compara com o original no DOSBox-X de 256 cores deve usar `svga256`/`s3_dosbox`, e as capturas antigas feitas lá têm de ser lidas com esse perfil.
 12. ~~Ordem das janelas fixa nas animações da amarela~~ (resolvido em 2026-10-18: a interface grava a ordem real). ~~Cauda da amarela rainha na reconstrução da vida~~ (feito em 2026-10-18, branch dos balões).
 
 ## 6. Porcentagem geral estimada
@@ -274,15 +274,15 @@ Pesos por área, pensados no que importa para quem joga um port completo (as reg
 | Jogo ao vivo | 8 | 93 | 744 | 65 | 520 |
 | Telas e janelas | 15 | 94 | 1.410 | 83 | 1.245 |
 | Diálogos e menus | 8 | 90 | 720 | 80 | 640 |
-| Som e música | 6 | 80 | 480 | 35 | 210 |
+| Som e música | 6 | 85 | 510 | 55 | 330 |
 | Modos | 8 | 93 | 744 | 83 | 664 |
 | Salvar/carregar | 4 | 98 | 392 | 90 | 360 |
 | Mods | 5 | 92 | 460 | n/a | — |
 | Ferramentas e testes | 3 | 92 | 276 | n/a | — |
 | Documentação | 3 | 92 | 276 | n/a | — |
-| **Total** | **100** | | **9.359** | | **6.844** (peso 89) |
+| **Total** | **100** | | **9.389** | | **6.964** (peso 89) |
 
-- **Implementado:** 9.359 / 100 = **≈ 94%** (era 8.775, ≈ 88%).
-- **Verificado contra o original** (só as áreas 1–9, peso 89): 6.844 / 89 = **≈ 77%** (era 6.220, ≈ 70%).
+- **Implementado:** 9.389 / 100 = **≈ 94%** (era 8.775, ≈ 88%; 9.359 antes do caminho FM).
+- **Verificado contra o original** (só as áreas 1–9, peso 89): 6.964 / 89 = **≈ 78%** (era 6.220, ≈ 70%; 6.844 antes da captura de áudio).
 
-Leitura: a simulação está praticamente completa e amarrada ao original por vetores de tick inteiros; a interface alcançável pelo jogador existe inteira e foi comparada com capturas na maior parte. O que separa o port de "completo" é o som (timbre e comparação de ouvido, em andamento em paralelo) e a ordem de `_SpecialXfer` dentro do tick; o resto são resíduos pequenos (§4). O que separa de "verificado" são os ramos raros das regras (§3), o áudio e as poucas janelas sem captura nas resoluções maiores e em 256 cores.
+Leitura: a simulação está praticamente completa e amarrada ao original por vetores de tick inteiros; a interface alcançável pelo jogador existe inteira e foi comparada com capturas na maior parte. O que separa o port de "completo" é o som (timbre FM aproximado; só a abertura comparada com a captura) e a ordem de `_SpecialXfer` dentro do tick; o resto são resíduos pequenos (§4). O que separa de "verificado" são os ramos raros das regras (§3), o áudio e as poucas janelas sem captura nas resoluções maiores e em 256 cores.

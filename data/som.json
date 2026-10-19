@@ -1,5 +1,5 @@
 {
-  "_comentario": "Som e música. Ver docs/spec/formatos/som.md e docs/spec/regras/som.md. Efeitos: objetos tipo 5 do banco SOUND, pelo id de Evento::Som. Músicas: Evento::Musica(id do cabeçalho tipo 18) -> 'musicas' (tabela do original, lida da RAM do jogo) -> <pasta_musicas>/<nome>.mid da pasta do jogo. fonte_musica 'banco' usa o tipo 20 e a transposição do cabeçalho (modo Sound Blaster). canais_midi: só o arranjo estendido dos .MID (o básico, 13-16, repete as notas).",
+  "_comentario": "Som e música. Ver docs/spec/formatos/som.md e docs/spec/regras/som.md. Efeitos: objetos tipo 5 do banco SOUND, pelo id de Evento::Som. Músicas: Evento::Musica(id do cabeçalho tipo 18) -> 'musicas' (tabela do original, lida da RAM do jogo) -> <pasta_musicas>/<nome>.mid da pasta do jogo. fonte_musica 'banco' usa o tipo 20 e a transposição do cabeçalho (modo Sound Blaster). canais_midi: só o arranjo estendido dos .MID (o básico, 13-16, repete as notas; é o que o MIDI Mapper 'SB16 Ext Synth' da instalação toca). sintetizador: 'fm' (OPL próprio + banco data/opl_banco.json, o timbre da Sound Blaster; fm.banco_op2 = caminho de um banco .op2 do usuário, lido em tempo de execução), 'soundfont' (rustysynth + soundfont) ou 'simples'. volume_musica = volume_efeitos mantém a proporção medida no original (música -20 dB abaixo de um efeito de ganho 1; docs/spec/regras/som.md).",
   "taxa_efeitos": 4096,
   "taxa_saida": 44100,
   "volume_musica": 0.5,
@@ -10,6 +10,8 @@
   "canais_midi": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
   "canal_percussao": 10,
   "soundfont": null,
+  "sintetizador": "fm",
+  "fm": { "banco": "opl_banco.json", "banco_op2": null, "ganho": 1.0 },
   "musica_abertura": 10001,
   "musica_jogo_novo": 10001,
   "cauda_exportacao_s": 1.5,
