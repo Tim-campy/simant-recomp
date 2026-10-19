@@ -59,6 +59,21 @@ pub(crate) struct Sessao<'a> {
     pub(crate) ajuda: ajuda_ui::AjudaUi,
     /// Barra de menus e as janelas abertas por ela (simant/src/menus_ui.rs).
     pub(crate) menus: menus_ui::MenusUi,
+    /// Janela de edição congelada depois de uma troca de patch (`_XferPatch` pelo duplo clique no
+    /// quintal): o original só redesenha o buffer da edição no próximo tick ou numa navegação, então
+    /// até lá ela mostra o patch antigo (bancada, `cenarios_raros.py vista_xfer`; telas/quintal.md §8).
+    pub(crate) edicao_congelada: Option<EdicaoCongelada>,
+}
+
+/// O que a janela de edição mostrava antes da troca de patch e quando o congelamento acaba.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct EdicaoCongelada {
+    /// Vista (e polegares) de antes da troca.
+    pub(crate) vista_antiga: engine::core::edicao::VistaEdicao,
+    /// Vista logo depois da troca: se o jogador navegar (ela muda), a janela é redesenhada.
+    pub(crate) vista_nova: engine::core::edicao::VistaEdicao,
+    /// `_GameTime` da troca: o tick seguinte redesenha.
+    pub(crate) tempo: u32,
 }
 
 /// Para quem vai a escolha do menu aberto.
@@ -224,6 +239,7 @@ impl Sessao<'_> {
             menu_mod: None,
             ajuda: ajuda_ui::AjudaUi::carregar(recursos)?,
             menus: menus_ui::MenusUi::carregar(recursos)?,
+            edicao_congelada: None,
         };
         for a in abertas.into_iter().flatten() {
             s.depois_de_abrir(a);
@@ -263,7 +279,16 @@ impl Sessao<'_> {
     }
 
     pub(crate) fn quadro_rgb(&mut self) -> Result<Vec<u8>, String> {
-        self.tela.atualizar(&self.partida.estado);
+        // Depois da troca de patch, a edição fica com o desenho de antes até o próximo tick ou até
+        // uma navegação (o buffer da janela só é refeito por `_UpdateWindows` ou pela rolagem).
+        if let Some(c) = self.edicao_congelada {
+            if self.partida.estado.partida.tempo != c.tempo || self.partida.nav.vista != c.vista_nova {
+                self.edicao_congelada = None;
+            }
+        }
+        if self.edicao_congelada.is_none() {
+            self.tela.atualizar(&self.partida.estado);
+        }
         if let Some((plano, q)) = self.partida.quadro_animado() {
             self.tela.mostrar_quadro_animado(plano, q);
         }
@@ -298,9 +323,13 @@ impl Sessao<'_> {
         let largura = self.tela.cfg.largura as usize;
         let linhas_faixa = (self.interface.moldura.faixa.altura.max(0) as usize).min(self.tela.cfg.altura as usize);
         let mut faixa_salva = Vec::new();
+        let mut nav = self.partida.nav.clone();
+        if let Some(c) = self.edicao_congelada {
+            nav.vista = c.vista_antiga;
+        }
         let (mut q, mut pendentes) = {
             let s: &Sessao = self;
-            s.tela.compor_com(s.recursos, &s.interface, &s.partida.nav, &mut |q| {
+            s.tela.compor_com(s.recursos, &s.interface, &nav, &mut |q| {
                 faixa_salva = q.pixels[..largura * linhas_faixa].to_vec();
                 s.desenhar_janelas(q, atras)
             })?

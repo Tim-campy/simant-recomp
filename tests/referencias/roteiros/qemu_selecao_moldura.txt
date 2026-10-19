@@ -1,0 +1,35 @@
+# Barra de título e barra de menus com o "Select a Game" da abertura (snapshot sel2 do overlay ov_modos):
+# o que a tela mostra em cima da área cliente e se a barra de menus responde (Alt+F, clique no File,
+# clique na caixa do menu de sistema, Alt+Espaço). Cada tentativa parte do snapshot (Esc no "Select a
+# Game" é o Cancel: o SimAnt encerra). Capturas em re_trabalho/fork345/sel/ (fora do git). Numa cópia:
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_selecao_moldura.txt --overlay re_trabalho/fork345/ov_sel.qcow2
+snapshot_carregar sel2
+esperar 3
+capturar re_trabalho/fork345/sel/m1_selecao.png
+teclas alt+f
+esperar 2
+capturar re_trabalho/fork345/sel/m2_alt_f.png
+teclas ret
+esperar 2
+capturar re_trabalho/fork345/sel/m3_alt_f_enter.png
+snapshot_carregar sel2
+esperar 2
+clicar_em 20 27
+esperar 2
+capturar re_trabalho/fork345/sel/m4_clique_file.png
+snapshot_carregar sel2
+esperar 2
+clicar_em 8 8
+esperar 2
+capturar re_trabalho/fork345/sel/m5_clique_caixa.png
+snapshot_carregar sel2
+esperar 2
+teclas alt+spc
+esperar 2
+capturar re_trabalho/fork345/sel/m6_alt_espaco.png
+snapshot_carregar sel2
+esperar 2
+clicar_em 611 8
+esperar 3
+capturar re_trabalho/fork345/sel/m7_minimizar.png
+fim

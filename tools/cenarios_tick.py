@@ -18,6 +18,7 @@ Cenários (função cenario_<nome>; cada uma prepara e devolve a lista de passos
               uma vermelha (duplo clique), com cliques calculados a partir de _MapPnt
     luta      duplo clique numa vermelha (ordem 3) logo depois de uma compactação da lista A
     luta_quadros  como luta_vizinha, com a tela capturada em cada quadro de _AnimYellowFight
+    baloes_menino  os 23 textos do balão do menino na Yard View (captura e estado por texto; tools/comparar_baloes_menino.py)
 Protocolo e formato: docs/spec/regras/testes-tick.md. Snapshot "rico": tests/referencias/roteiros/qemu_snapshot_rico.txt.
 """
 import argparse
@@ -1081,6 +1082,38 @@ def cenario_tela_menino(c: Sessao, saida, n):
     return capturar_vistas(c, saida, "menino", [
         ("superficie", [], 1), ("superficie_b", [], 1), ("quintal", ["ctrl+y"], 2), ("quintal_b", [], 1),
         ("mapa", ["ctrl+8", "ctrl+m"], 2)])
+
+
+def cenario_baloes_menino(c: Sessao, saida, n):
+    """Os 23 textos do balão do menino (lista 4/1200, `_DrawSimKid`) na Yard View: com a janela do
+    quintal na frente, na entrada de um tick escreve `_BoyMessOn` = 1, `_BoyMsgOffset` = k, `_BoyHere`
+    = 1 e `_BoyMsgCnt` no futuro; roda um tick (o quintal é redesenhado) e, parado na entrada do
+    seguinte, captura a tela e grava o estado (`balao_KK.ANT`; o port o desenha com
+    `--save balao_KK.ANT --quintal 0 --exportar-tela-jogo`). `n` = quantos textos (padrão 23)."""
+    pasta = Path(saida).resolve()
+    pasta.mkdir(parents=True, exist_ok=True)
+    c.teclas("ctrl+y")
+    time.sleep(2)
+    c.entrada()
+    reg = []
+    for k in range(min(n, 23) if n != 10 else 23):
+        # Se o menino entrou em casa no tick (_BoyHere = 0: não é desenhado na Yard View), tenta de novo.
+        for _ in range(40):
+            for nome, v in (("BoyMessOn", 1), ("BoyMsgOffset", k), ("BoyHere", 1)):
+                c.escrever(nome, v)
+            c.escrever("BoyMsgCnt", 0x7FFFFFFF, 4)
+            c.avancar(1)
+            c.mj.sessao_gdb()
+            if c.ler("BoyHere") != 0:
+                break
+        (pasta / f"balao_{k:02d}.ANT").write_bytes(c.mj.estado())
+        r = {"k": k, "BoyMessOn": c.ler("BoyMessOn"), "BoyMsgOffset": c.ler("BoyMsgOffset", sinal=True),
+             "BoyHere": c.ler("BoyHere"), "BoyX": c.ler("BoyX"), "BoyY": c.ler("BoyY")}
+        tela(c, saida, f"balao_{k:02d}")
+        c.log(f"balão {k}: {r}")
+        reg.append(r)
+    (pasta / "baloes_menino.json").write_text(json.dumps(reg, indent=1) + "\n", encoding="utf-8")
+    return []
 
 
 def cenario_tela_revoada(c: Sessao, saida, n):

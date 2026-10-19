@@ -95,12 +95,23 @@ fn compor_rgb(t: &engine::core::telas::Tela, recursos: &Recursos, interface: &In
     Ok(para_rgb(&quadro.pixels, cores))
 }
 
-fn exportar(seq: &Sequencia, recursos: &Recursos, interface: &Interface, cores: &[[u8; 3]], dir: &Path) -> Result<(), String> {
+/// `--exportar-telas`: a área cliente de cada tela da abertura; com `--moldura`, a janela inteira
+/// (título, barra de menus e área cliente: a tela inteira da bancada, telas/menus.md §8).
+fn exportar(seq: &Sequencia, recursos: &Recursos, interface: &Interface, cores: &[[u8; 3]], dir: &Path, moldura: bool) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     for t in &seq.telas {
-        let rgb = compor_rgb(t, recursos, interface, cores)?;
+        let mut rgb = compor_rgb(t, recursos, interface, cores)?;
+        let mut altura = t.altura;
+        if moldura {
+            let mut menus = menus_ui::MenusUi::carregar(recursos)?;
+            menus.ligar_moldura(recursos, t.largura)?;
+            let titulo = engine::core::moldura_principal::EstadoTitulo { ativa: true, ..Default::default() };
+            let estado = engine::core::barra_menus::EstadoMenus::default();
+            rgb = menus_ui::compor_barras(&menus, interface, cores, &titulo, &estado, &rgb, t.largura as usize, t.altura as usize);
+            altura += menus.altura() as u32;
+        }
         let caminho = dir.join(format!("{}.png", t.nome));
-        salvar_png(&caminho, t.largura, t.altura, &rgb)?;
+        salvar_png(&caminho, t.largura, altura, &rgb)?;
         println!("{}", caminho.display());
     }
     Ok(())
@@ -156,7 +167,16 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
     use sdl2::pixels::PixelFormatEnum;
 
     let (lw, lh) = seq.telas.first().map(|t| (t.largura, t.altura)).unwrap_or((640, 480));
-    let Janela { sdl, mut canvas } = abrir_janela("SimAnt", lw, lh, &o.video)?;
+    // O original já mostra a janela principal maximizada na abertura: a barra de menus (e o título,
+    // com `moldura_windows31`) em cima da área cliente, paradas: nem o Alt+F, nem o clique no File,
+    // na caixa ou no minimizar fazem nada no "Select a Game" (bancada, qemu_selecao_moldura.txt;
+    // telas/menus.md §8).
+    let mut menus = menus_ui::MenusUi::carregar(recursos)?;
+    if o.video.moldura_windows31 {
+        menus.ligar_moldura(recursos, lw)?;
+    }
+    let barras = menus.altura();
+    let Janela { sdl, mut canvas } = abrir_janela("SimAnt", lw, lh + barras as u32, &o.video)?;
     let criador = canvas.texture_creator();
     let mut eventos = sdl.event_pump()?;
     let selecao = modos::selecao_da_abertura(recursos, interface)?;
@@ -165,6 +185,7 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
 
     let mut rep = Reprodutor::new(seq);
     let mut desenhada: Option<String> = None;
+    let mut ativa_desenhada = true;
     let mut textura = None;
     let inicio = Instant::now();
     let mut antes = inicio;
@@ -185,6 +206,14 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
         let escolhendo = rep.atual().is_some_and(|t| t.nome == selecao.cfg.tela);
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
+            // Coordenadas da janela → área cliente (as barras ficam em cima e não respondem).
+            let ev = menus_ui::deslocar(ev, barras);
+            // Clique nas barras: nada (medido no "Select a Game"; no título, [hipótese] o mesmo).
+            if let Event::MouseButtonDown { y, .. } | Event::MouseButtonUp { y, .. } = ev {
+                if y < 0 {
+                    continue;
+                }
+            }
             if matches!(ev, Event::Quit { .. }) {
                 return Ok(None);
             }
@@ -226,12 +255,11 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
         let agora = Instant::now();
         rep.passar_tempo((agora - antes).as_millis() as u64);
         antes = agora;
-        if o.sair_apos_ms.is_some_and(|ms| (agora - inicio).as_millis() as u64 >= ms) {
-            return Ok(None);
-        }
 
         let Some(tela) = rep.atual() else { break };
-        if desenhada.as_deref() != Some(tela.nome.as_str()) {
+        // O título fica inativo sem o foco do sistema ou com o "Load Ant Hill" (diálogo) por cima.
+        let ativa = janela_ativa(canvas.window()) && load.is_none();
+        if desenhada.as_deref() != Some(tela.nome.as_str()) || ativa != ativa_desenhada {
             let rgb = match &load {
                 Some(l) => {
                     // O original fecha o "Select a Game" antes de abrir o "Load Ant Hill" (bancada,
@@ -244,17 +272,30 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
                 }
                 None => compor_rgb(tela, recursos, interface, cores)?,
             };
-            let mut t = criador
-                .create_texture_static(PixelFormatEnum::RGB24, tela.largura, tela.altura)
-                .map_err(|e| e.to_string())?;
+            let titulo = engine::core::moldura_principal::EstadoTitulo { ativa, ..Default::default() };
+            let estado = engine::core::barra_menus::EstadoMenus::default();
+            let rgb = menus_ui::compor_barras(&menus, interface, cores, &titulo, &estado, &rgb, tela.largura as usize, tela.altura as usize);
+            let altura = tela.altura + barras as u32;
+            let mut t = criador.create_texture_static(PixelFormatEnum::RGB24, tela.largura, altura).map_err(|e| e.to_string())?;
             t.update(None, &rgb, tela.largura as usize * 3).map_err(|e| e.to_string())?;
-            canvas.set_logical_size(tela.largura, tela.altura).map_err(|e| e.to_string())?;
+            canvas.set_logical_size(tela.largura, altura).map_err(|e| e.to_string())?;
             textura = Some(t);
             desenhada = Some(tela.nome.clone());
+            ativa_desenhada = ativa;
         }
         canvas.clear();
         if let Some(t) = &textura {
             canvas.copy(t, None, None)?;
+        }
+        if o.sair_apos_ms.is_some_and(|ms| (agora - inicio).as_millis() as u64 >= ms) {
+            // Como na partida (jogo.rs): o quadro da abertura lido antes do present.
+            if let Some(c) = &o.capturar_janela {
+                let (w, h) = canvas.output_size()?;
+                let px = canvas.read_pixels(None, PixelFormatEnum::RGB24)?;
+                salvar_png(c, w, h, &px)?;
+                println!("{} ({w} × {h})", c.display());
+            }
+            return Ok(None);
         }
         canvas.present();
     }
@@ -525,7 +566,7 @@ fn principal() -> Result<(), String> {
     let mut interface = Interface::carregar(&recursos, tela_virtual.tabela_posicoes)?;
     interface.area = [tela_virtual.largura as i16, tela_virtual.altura as i16];
     match &o.exportar {
-        Some(dir) => exportar(&seq, &recursos, &interface, &cores, dir),
+        Some(dir) => exportar(&seq, &recursos, &interface, &cores, dir, o.video.moldura_windows31),
         None => Ok(()),
     }
 }
@@ -590,5 +631,35 @@ mod testes {
     fn lista_de_acoes_da_linha_de_comando() {
         assert_eq!(ler_acoes("superficie, linha_direita").unwrap(), vec![Acao::Superficie, Acao::LinhaDireita]);
         assert!(ler_acoes("voar").is_err());
+    }
+
+    /// Com `moldura_windows31`, a abertura exportada é a janela inteira da bancada (640 × 480: título,
+    /// barra de menus e área cliente); sem ela, só a área cliente (as comparações antigas).
+    #[test]
+    fn abertura_com_a_moldura_tem_a_tela_inteira() {
+        let raiz = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz.join("SimAnt-T/MAXIS/ANTWIN"));
+        if !jogo.join("SHARED.NDX").is_file() {
+            eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+            return;
+        }
+        let dados = raiz.join("data");
+        let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
+        let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
+        let regra: engine::core::resolucao::ConfigResolucao = recursos.dados(engine::core::resolucao::ARQUIVO).unwrap();
+        let tv = regra.tela([640, 480]).unwrap();
+        let mut seq: Sequencia = recursos.dados("telas.json").unwrap();
+        tv.aplicar_sequencia(&mut seq);
+        let mut interface = Interface::carregar(&recursos, tv.tabela_posicoes).unwrap();
+        interface.area = [tv.largura as i16, tv.altura as i16];
+        let dir = std::env::temp_dir().join(format!("simant_abertura_moldura_{}", std::process::id()));
+        for (moldura, altura) in [(false, 442), (true, 480)] {
+            exportar(&seq, &recursos, &interface, &cores, &dir, moldura).unwrap();
+            let dec = png::Decoder::new(std::fs::File::open(dir.join("selecao.png")).unwrap());
+            let info = dec.read_info().unwrap();
+            assert_eq!((info.info().width, info.info().height), (640, altura));
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -14,7 +14,7 @@
 ## Conteúdo visual
 
 - A janela `0x300` é a janela 3 (`titleWin`), com os objetos `titlePic1` (bitmap 2000) e `titlePic2` (bitmap 2001). Fato visto nos dados; ver [../formatos/janela.md](../formatos/janela.md).
-- **Observado no original (DOSBox-X, 2026-10-16):** ao iniciar `SIMANTW.EXE`, a área cliente mostra a faixa de ferramentas (janela 34) e a janela de título com borda, sem nenhuma tela "Maxis Presents" antes. O port reproduz isso com 99,98% dos pixels iguais (a diferença é o cursor). Captura: `tests/referencias/capturas/titulo_800x600.png`.
+- **Observado no original (DOSBox-X, 2026-10-16):** ao iniciar `SIMANTW.EXE`, a área cliente mostra a faixa de ferramentas (janela 34) e a janela de título com borda, sem nenhuma tela "Maxis Presents" antes. O port reproduz isso com 99,98% dos pixels iguais (a diferença é o cursor). Captura: `tests/referencias/capturas/titulo_800x600.png`. Em cima da área cliente o original já mostra a barra de título e a barra de menus da janela principal (maximizada), paradas durante a abertura; o port desenha a barra de menus e, com `moldura_windows31`, o título (menus.md §8, 2026-10-19).
 - **Em aberto:** onde entram os bitmaps "Maxis Presents" (2/28000, 2/28003).
 
 ## Sequência de inicialização
