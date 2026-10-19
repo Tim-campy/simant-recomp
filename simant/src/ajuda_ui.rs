@@ -52,7 +52,10 @@ pub fn abrir_contexto(s: &mut Sessao, ctx: u32) {
     s.ajuda.ultimo_contexto = Some(ctx);
     if s.ajuda.visor.is_none() {
         match VisorAjuda::carregar(s.recursos, &s.cores) {
-            Ok(v) => s.ajuda.visor = Some(v),
+            Ok(mut v) => {
+                v.na_tela(s.tela.cfg.largura as i16, s.tela.cfg.altura as i16);
+                s.ajuda.visor = Some(v)
+            }
             Err(e) => {
                 eprintln!("ajuda: {e}");
                 return;
@@ -329,7 +332,7 @@ mod testes {
         let dados = raiz.join("data");
         let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
         let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
-        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
         let save = raiz.join("tests/referencias/saves/QUICK2.ANT");
         let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
         assert!(!clique(&mut s, 192, 278 - 37), "sem o modo, o clique segue o caminho normal");

@@ -13,7 +13,6 @@ use engine::core::quadro::Quadro;
 use engine::core::sobre::{Fase, Sobre};
 use engine::core::telas::Interface;
 use engine::formats::save::{JogoSalvo, LayoutSave};
-use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 use engine::rules::estado::Estado;
 
@@ -22,7 +21,7 @@ fn main() {
     let bancos = ["SHARED", "WINGANT", "SOUND"].map(String::from);
     let r = Recursos::abrir(Path::new(&a[1]), &bancos, Path::new("data"), None).unwrap();
     let interface = Interface::carregar(&r, 0).unwrap();
-    let cores = r.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+    let cores = engine::paleta::carregar_rgb(&r).unwrap();
     let cfg: ConfigBarraMenus = r.dados(engine::core::barra_menus::ARQUIVO_CONFIG).unwrap();
     let mut q = Quadro::new(640, 442, 255);
     match a[3].as_str() {

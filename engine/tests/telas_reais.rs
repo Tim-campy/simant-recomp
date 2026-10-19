@@ -22,10 +22,19 @@ fn recursos() -> Option<Recursos> {
     Some(Recursos::abrir(&jogo, &bancos, &raiz().join("data"), None).unwrap())
 }
 
+/// As telas validadas são as do DOSBox-X (800×600, S3 Trio, 256 cores): tabela 9/8 e o perfil de
+/// driver `s3_dosbox` de data/resolucao.json (sem alinhamento ao byte, com o pixel a mais do contorno).
+fn interface_dosbox(r: &Recursos) -> Interface {
+    let mut interface = Interface::carregar(r, 8).unwrap();
+    let regra: engine::core::resolucao::ConfigResolucao = r.dados(engine::core::resolucao::ARQUIVO).unwrap();
+    interface.driver = regra.perfil(Some("s3_dosbox")).unwrap();
+    interface
+}
+
 #[test]
 fn titulo_igual_ao_validado_contra_o_original() {
     let Some(r) = recursos() else { return };
-    let interface = Interface::carregar(&r, 8).unwrap();
+    let interface = interface_dosbox(&r);
     let seq: Sequencia = r.dados("telas.json").unwrap();
     let tela = seq.telas.iter().find(|t| t.nome == "titulo").unwrap();
     let (q, pendentes) = compor(tela, &r, &interface).unwrap();
@@ -48,7 +57,7 @@ fn selecao_igual_a_validada_contra_o_original() {
     // Comparada com tests/referencias/capturas/novo_jogo.png: 99,87% iguais; diferem só o cursor e os
     // botões configuráveis ribUserDef1E/1G da faixa (estado definido por _SetUserButton em tempo de execução).
     let Some(r) = recursos() else { return };
-    let interface = Interface::carregar(&r, 8).unwrap();
+    let interface = interface_dosbox(&r);
     let seq: Sequencia = r.dados("telas.json").unwrap();
     let tela = seq.telas.iter().find(|t| t.nome == "selecao").unwrap();
     let (q, pendentes) = compor(tela, &r, &interface).unwrap();

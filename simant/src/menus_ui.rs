@@ -367,7 +367,6 @@ pub fn compor(s: &Sessao, cliente: &[u8]) -> Vec<u8> {
 mod testes {
     use super::*;
     use crate::{ConfigJogo, Origem};
-    use engine::paleta::Paleta;
     use engine::rules::geracao::TipoJogo;
     use engine::rules::rng::GeradorR;
     use std::path::PathBuf;
@@ -386,7 +385,7 @@ mod testes {
         let dados = raiz().join("data");
         let cfg: ConfigJogo = serde_json::from_str(&std::fs::read_to_string(dados.join("jogo.json")).unwrap()).unwrap();
         let recursos = Recursos::abrir(&jogo, &cfg.bancos, &dados, None).unwrap();
-        let cores = recursos.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+        let cores = engine::paleta::carregar_rgb(&recursos).unwrap();
         let save = raiz().join("tests/referencias/saves/QUICK2.ANT");
         let mut s = Sessao::abrir(&recursos, &dados, Origem::Save(&save, GeradorR::default(), TipoJogo::Rapido), cores).unwrap();
         f(&mut s);

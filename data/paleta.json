@@ -1,8 +1,8 @@
 {
-  "_comentario": "Índices 0-15: paleta padrão de 16 cores do Windows (7 = cinza escuro, 8 = cinza claro), confirmada pixel a pixel contra o DOSBox-X. Índices 16+: cores do sistema do Windows no ambiente de referência (16 = borda/título ativo, 17 = fundo da aplicação). Ver docs/spec/formatos/bitmap.md e janela.md",
+  "_comentario": "Índices 0-15: paleta padrão de 16 cores do Windows (7 = cinza escuro, 8 = cinza claro), confirmada pixel a pixel contra o DOSBox-X. Índices 16+: cores do sistema do Windows (16 = título ativo e moldura de diálogo, 17 = fundo da aplicação), as padrão do driver de vídeo (recurso OEMBIN 1 do .DRV): aqui as do VGA.DRV de 16 cores, a referência do port; o perfil de driver de data/resolucao.json (perfis_driver → cores_sistema) as troca (256 cores: #a4c8f0 e #fffbf0, como no DOSBox-X e na bancada SVGA). Ver docs/spec/formatos/bitmap.md e janela.md",
   "cores": [
     "#000000", "#800000", "#008000", "#808000", "#000080", "#800080", "#008080", "#808080",
     "#c0c0c0", "#ff0000", "#00ff00", "#ffff00", "#0000ff", "#ff00ff", "#00ffff", "#ffffff",
-    "#a6caf0", "#fffbf0"
+    "#000080", "#ffffff"
   ]
 }

@@ -13,7 +13,6 @@ use std::path::Path;
 use engine::core::ajuda::VisorAjuda;
 use engine::core::quadro::Quadro;
 use engine::core::telas::Interface;
-use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 
 fn main() {
@@ -25,7 +24,7 @@ fn main() {
     let bancos = ["SHARED", "WINGANT", "SOUND"].map(String::from);
     let r = Recursos::abrir(Path::new(&a[1]), &bancos, Path::new("data"), None).unwrap();
     let interface = Interface::carregar(&r, 0).unwrap();
-    let cores = r.dados::<Paleta>("paleta.json").unwrap().rgb().unwrap();
+    let cores = engine::paleta::carregar_rgb(&r).unwrap();
     let mut v = VisorAjuda::carregar(&r, &cores).unwrap();
     let num = |s: &str| s.strip_prefix("0x").map_or_else(|| s.parse::<i64>().unwrap(), |h| i64::from_str_radix(h, 16).unwrap());
     let mut i = 3;
