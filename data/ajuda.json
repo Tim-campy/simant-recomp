@@ -53,7 +53,7 @@
     "salto": 2,
     "trilho": 8
   },
-  "_janelas": "Menus, Search, History e popups do WinHelp 3.1 (engine/src/core/ajuda_janelas.rs, docs/spec/telas/ajuda.md §4). Medidas da bancada QEMU (re_trabalho/agente_ui/winhelp/medidas.md, capturas w01–w06, s01–s09, p01–p05). Retângulos [x0, y0, x1, y1] inclusivos, relativos ao canto externo da janela de ajuda (tela do original: x − 213, y − 2). Cores: índices das 16 do Windows (0 preto, 4 azul-escuro, 7 cinza-claro, 8 cinza-escuro, 11 amarelo, 15 branco). Os itens dos menus que o port não tem (Open, Print, Copy, Annotate, Define, How to Use Help, Always on Top, About Help) só fecham o menu [divergência]. popup.largura e a posição do popup vêm de uma só amostra [hipótese].",
+  "_janelas": "Menus, Search, History e popups do WinHelp 3.1 (engine/src/core/ajuda_janelas.rs, docs/spec/telas/ajuda.md §4). Medidas da bancada QEMU (re_trabalho/agente_ui/winhelp/medidas.md, capturas w01–w06, s01–s09, p01–p05). Retângulos [x0, y0, x1, y1] inclusivos, relativos ao canto externo da janela de ajuda (tela do original: x − 213, y − 2). Cores: índices das 16 do Windows do port (data/paleta.json: 0 preto, 4 azul-escuro, 7 cinza-escuro, 8 cinza-claro, 11 amarelo, 15 branco). Os itens dos menus que o port não tem (Open, Print, Copy, Annotate, Define, How to Use Help, Always on Top, About Help) só fecham o menu [divergência]. popup.largura e a posição do popup vêm de uma só amostra [hipótese].",
   "janelas": {
     "fonte_menu": 6,
     "fonte_dialogo": 7,
