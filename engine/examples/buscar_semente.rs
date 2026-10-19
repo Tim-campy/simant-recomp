@@ -3,6 +3,7 @@
 //! que depende de sorteio (a semente encontrada é escrita na entrada do mesmo tick, `SementeS`, e o
 //! tick é gravado de novo: o vetor confere o ramo no original).
 //! Uso: cargo run -p engine --release --example buscar_semente -- DIR_TICK SIMBOLO [VALOR|nz] [MAX]
+//! (SIMBOLO pode ser `NOME[i]`: só o byte i do bloco, ex.: `LionListM[0]`)
 //! Ex.: buscar_semente re_trabalho/b/tick_001711 JustToBeMean nz 5
 use std::path::Path;
 
@@ -29,8 +30,16 @@ fn main() {
         let mut r = regras_do_vetor(&v);
         tick(&mut e, &mut r);
         let save = e.para_save(&layout).expect("save");
-        let b = save.bloco(&a[1]).expect("símbolo");
-        let valor = b.iter().rev().fold(0u64, |acc, &x| acc << 8 | u64::from(x));
+        // "NOME[i]": só o byte i do bloco
+        let (nome, byte) = match a[1].split_once('[') {
+            Some((n, i)) => (n, i.trim_end_matches(']').parse::<usize>().ok()),
+            None => (a[1].as_str(), None),
+        };
+        let b = save.bloco(nome).expect("símbolo");
+        let valor = match byte {
+            Some(i) => u64::from(b[i]),
+            None => b.iter().rev().fold(0u64, |acc, &x| acc << 8 | u64::from(x)),
+        };
         let ok = if alvo == "nz" { valor != 0 } else { valor == alvo.parse::<u64>().unwrap_or(0) };
         if ok {
             println!("semente {s:#06x}: {} = {valor}", a[1]);

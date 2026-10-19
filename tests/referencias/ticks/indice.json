@@ -77,7 +77,9 @@
   "revoada_limiar",
   "queda_casa_cozinha",
   "queda_casa_ladrilhos",
-  "queda_casa_azulejo"
+  "queda_casa_azulejo",
+  "leao_pedrinha",
+  "volta_cycle"
  ],
  "snapshot": "quick",
  "semente_s_forcada": null,

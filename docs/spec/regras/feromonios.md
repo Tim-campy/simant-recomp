@@ -73,7 +73,7 @@ O alarme se espalha e perde intensidade. Um pico isolado de 200 vira 100 no cent
 
 **Fato visto no código** (`1028:9380`): a cópia inteira é feita antes (primeiro laço), e o segundo laço lê só a cópia e grava só o mapa; a varredura é coluna a coluna, mas, como lê a cópia, a ordem não importa. Os 4 vizinhos são somados como inteiros sem sinal; não há volta nas bordas (diferente da leitura de direção, seção 4).
 
-**"Tick" quer dizer `_Cycle`, não `_GameTime`** (fato visto no código, `_DoAntSim`): `_Cycle` vai de 0 a 0x1000 e então volta a 0. Os valores 0x1000 e 0 são ambos ≡ 0 (mod 128), então a suavização do alarme roda em dois ticks seguidos a cada 4097 ticks, e daí em diante as fases ficam defasadas de `_GameTime` em 1 por volta.
+**"Tick" quer dizer `_Cycle`, não `_GameTime`** (fato visto no código, `_DoAntSim`): `_Cycle` vai de 0 a 0x1000 e então volta a 0. Os valores 0x1000 e 0 são ambos ≡ 0 (mod 128), então a suavização do alarme roda em dois ticks seguidos a cada 4097 ticks, e daí em diante as fases ficam defasadas de `_GameTime` em 1 por volta. **Conferido no original (2026-10-19, vetor `volta_cycle`, 307/307):** com `_Cycle` = 4095 escrito na entrada, os ticks 4095 → 0x1000 e 0x1000 → 0 rodam os dois a fase 0 (`_ListIndexA` 108 → 57 → 56 pela compactação, `_HistStart` 25 → 26 → 27, a alimentação de `_HealthB` nos dois); o seguinte (0 → 1) não.
 
 [hipótese] Meia-vida aproximada: a trilha cai pela metade a cada 128 ticks, além do desgaste por uso. O cheiro de ninho só perde 1 a cada 128 ticks, ou seja, dura muito.
 
@@ -169,6 +169,6 @@ Testes: `cargo test -p engine` roda os casos construídos a partir desta spec (m
 - Leitura dos cheiros pela formiga amarela e pela aranha (`_SpiderScan`), se houver.
 - Mapa de saídas dos ninhos (`_ExitMapB/R`, `_FixExitMapB/R`, `_GetExitDirB`, `_GetEnterDirB`): é o "cheiro" interno do ninho e merece documento próprio.
 - Qual tecla diminui o cheiro na ferramenta Experimental (`GetAsyncKeyState` sem o argumento visível no pseudocódigo).
-- Conferir no original, com os vetores de tick, as previsões do port: suavização dupla na volta de `_Cycle` (0x1000 → 0) e o giro duplo de `_GetNestDir`.
+- Giro duplo de `_GetNestDir`: nos vetores de tick do repositório (todos 307/307), as carregadoras da superfície em modo 3 que seguem no modo 3 mudam a direção em 0 (196 casos), ±45° (359), **±90° (91)** e 135° (2) num tick (contagem de 2026-10-19 fora dos ticks de compactação). Os ±90° não caberiam num giro só de `_GetNestDir`; como o port reproduz esses ticks inteiros, o giro duplo está confirmado de forma indireta (sem um caso isolado só dele). A suavização dupla na volta de `_Cycle` foi conferida em 2026-10-19 (`volta_cycle`).
 - `_GetRandDir`, `_GetDefendDir` e `_GetRedDefendDir` estão em `rules/superficie.rs` (privadas); a direção dentro dos ninhos ainda não foi portada.
 - As etapas do tick (`_FillHoles*`, `_ColonySmell*`, `_SmoothAlarm`) são chamadas por `rules/tick.rs` (fases 1 e 3 e `_FullCount`) via `superficie::rodar_fase_de_cheiro`, que converte os mapas do `Estado` (`Grade`) para `feromonios::Feromonios` e de volta.

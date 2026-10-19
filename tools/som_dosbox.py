@@ -10,6 +10,7 @@ Os arquivos do jogo são copiados para re_trabalho/som/C (fora do git); SimAnt-T
 Uso:
   python -I tools/som_dosbox.py capturar SAIDA.wav [--segundos 120] [--video] [--som-inicio EFEITO.wav]
                                     [--autotype "-w 40 -p 1 enter"]
+  python -I tools/som_dosbox.py musicas PASTA [NOME ...]     (as outras músicas, sem input)
   python -I tools/som_dosbox.py midi ARQ.mid [--canais 1-10] [--ate 10]
   python -I tools/som_dosbox.py niveis ARQ.wav [--janela 1]
   python -I tools/som_dosbox.py comparar ORIGINAL.wav PORT.wav [--midi ARQ.mid] [--png saida.png]
@@ -74,6 +75,9 @@ mpu401 = intelligent
 mididevice = none
 [dos]
 ver = 6.22
+# com o layout automático (BR nesta máquina) o AUTOTYPE não entrega nada; com o US entrega, mesmo
+# com a janela minimizada e sem foco (2026-10-19)
+keyboardlayout = us
 [autoexec]
 mount c "{trab}\C"
 c:
@@ -153,6 +157,31 @@ def capturar(saida, segundos, autotype, oplemu, video=False, som_inicio=None):
         shutil.copyfile(avis[-1], os.path.splitext(saida)[0] + ".avi")
         print(f"vídeo: {os.path.splitext(saida)[0]}.avi (quadros-chave: subcomando 'quadros')")
     print(f"{saida}: {(os.path.getsize(saida) - 44) / 176400:.1f} s")
+
+
+def capturar_musicas(pasta, nomes, oplemu, folga=20):
+    """Grava as outras músicas pelo mesmo caminho da abertura, sem input: na CÓPIA do jogo
+    (re_trabalho/som/C), o GAMETHME.MID é trocado pela música pedida, e o jogo a toca ao abrir (MCI →
+    MIDI Mapper → sb16fm.drv, o mesmo caminho de todas as músicas no Windows). O original é reposto no
+    fim. Uma gravação por música, com a duração das notas do MIDI + `folga` s."""
+    copia = preparar_copia(os.path.join(raiz_principal(), "SimAnt-T"))
+    som = os.path.join(copia, "MAXIS", "ANTWIN", "SOUND")
+    arqs = {x.upper(): os.path.join(som, x) for x in os.listdir(som)}
+    tema = arqs["GAMETHME.MID"]
+    guarda = os.path.join(TRABALHO, "GAMETHME.ORIGINAL.MID")
+    if not os.path.exists(guarda):
+        shutil.copyfile(tema, guarda)
+    os.makedirs(pasta, exist_ok=True)
+    try:
+        for nome in nomes:
+            arq = arqs[nome.upper() + ".MID"]
+            fim = max(t + d for t, _, _, _, d, _ in ler_midi(arq))
+            shutil.copyfile(arq, tema)
+            saida = os.path.join(pasta, nome.lower() + ".wav")
+            print(f"{nome}: notas até {fim:.1f} s")
+            capturar(saida, int(fim + folga), "", oplemu)
+    finally:
+        shutil.copyfile(guarda, tema)
 
 
 def minimizar(pid):
@@ -400,10 +429,12 @@ def comparar(orig, port, arq_midi=None, png=None, desloc_max_s=2.0):
     print(f"andamento: melhor escala do port {escala:.4f} (croma {sim_m:.3f}, deslocamento {k / qps:.2f} s); "
           f"com 1,0000: croma {sim1[0]:.3f}, deslocamento {sim1[2] / qps:.2f} s")
     controle = np.mean([semelhanca(co_t, np.roll(cp_t, r, axis=0), ativo_t, sim1[2]) for r in (37, 91, 173)])
+    res = dict(dur_o=fo - io, dur_p=fp - ip, escala_melhor=float(escala), croma_melhor=float(sim_m), croma1=float(sim1[0]),
+               controle=float(controle))
     print(f"   controle (port deslocado 0,9-4 s): croma {controle:.3f}")
     k = sim1[2]
-    if arq_midi:
-        notas = [x for x in ler_midi(arq_midi) if x[1] <= 9]
+    notas = [x for x in ler_midi(arq_midi) if x[1] <= 9] if arq_midi else []
+    if notas:
         rolo = np.zeros((len(mo), 12))
         for t, _, nota, vel, dur, _ in notas:
             a_ = int((t + io) * qps)
@@ -414,6 +445,7 @@ def comparar(orig, port, arq_midi=None, png=None, desloc_max_s=2.0):
         melhor = max((float((co_t[tem.nonzero()[0]] * np.roll(rolo, d, axis=0)[tem.nonzero()[0]]).sum(1).mean()), d)
                      for d in range(-int(qps), int(qps) + 1))
         ctrl = np.mean([float((co_t[tem] * np.roll(rolo, melhor[1] + r, axis=0)[tem]).sum(1).mean()) for r in (37, 91, 173)])
+        res["croma_midi"], res["controle_midi"] = float(melhor[0]), float(ctrl)
         print(f"notas do MIDI (canais 1-9, croma da transcrição) contra o original: {melhor[0]:.3f} "
               f"(ajuste {melhor[1] / qps:+.2f} s); controle deslocado {ctrl:.3f}")
         fim_m = max(x[0] + x[4] for x in notas)
@@ -427,6 +459,10 @@ def comparar(orig, port, arq_midi=None, png=None, desloc_max_s=2.0):
     eo = (a**2).sum(1)
     ativo = eo > np.percentile(eo, 30)
     sim = (croma(a, fr) * croma(b, fr)).sum(1)
+    # Envelope (energia por quadro em dB, alinhada): serve também para a percussão pura.
+    la, lb = 10 * np.log10((a**2).sum(1) + 1e-9), 10 * np.log10((b**2).sum(1) + 1e-9)
+    res["envelope"] = float(np.corrcoef(la, lb)[0, 1])
+    res["envelope_controle"] = float(np.mean([np.corrcoef(la, np.roll(lb, r))[0, 1] for r in (37, 91, 173)]))
     # Timbre: centróide espectral e distribuição de energia por faixa.
     def centroide(mag):
         e = mag**2
@@ -448,13 +484,46 @@ def comparar(orig, port, arq_midi=None, png=None, desloc_max_s=2.0):
     sp = 10 * np.log10((b[ativo] ** 2).mean(0) + 1e-12)
     ok = (fr > 60) & (fr < 8000)
     so, sp = so[ok] - so[ok].max(), sp[ok] - sp[ok].max()
+    res.update(cent_o=float(centroide(a)[ativo].mean()), cent_p=float(centroide(b)[ativo].mean()), dist_o=do.tolist(), dist_p=dp.tolist(),
+               esp_corr=float(np.corrcoef(so, sp)[0, 1]), esp_dif=float(np.abs(so - sp).mean()))
     print(f"espectro médio (60 Hz-8 kHz): correlação {np.corrcoef(so, sp)[0, 1]:.3f}, diferença média {np.abs(so - sp).mean():.1f} dB")
     ro = np.sqrt((xo[int(io * taxa) : int(fo * taxa)] ** 2).mean())
     rp = np.sqrt((xp[int(ip * taxa) : int(fp * taxa)] ** 2).mean())
     print(f"RMS no trecho com som: original {ro:.4f} ({20 * np.log10(ro):.1f} dBFS), port {rp:.4f} ({20 * np.log10(rp):.1f} dBFS)")
+    res.update(rms_o=float(20 * np.log10(ro)), rms_p=float(20 * np.log10(rp)))
     if png:
         desenhar(png, a, b, fr, qps)
-    return dict(escala=escala, desloc_s=k / qps, croma=float(sim[ativo].mean()))
+    res.update(escala=float(escala), desloc_s=k / qps, croma=float(sim[ativo].mean()))
+    return res
+
+
+def comparar_todas(pasta_orig, pasta_port, pasta_midi, saida_json):
+    """Compara cada WAV de `pasta_orig` (nome.wav, de `musicas`) com o do port (ID_nome.wav de
+    --exportar-som) e grava as medidas em JSON; imprime uma tabela."""
+    import io
+    import json
+    from contextlib import redirect_stdout
+    port = {x.split("_", 1)[1][:-4].lower(): os.path.join(pasta_port, x) for x in os.listdir(pasta_port) if x.endswith(".wav")}
+    midis = {x[:-4].lower(): os.path.join(pasta_midi, x) for x in os.listdir(pasta_midi) if x.upper().endswith(".MID")}
+    tudo = {}
+    for x in sorted(os.listdir(pasta_orig)):
+        nome = x[:-4].lower()
+        if not x.endswith(".wav") or nome not in port:
+            continue
+        with redirect_stdout(io.StringIO()):
+            try:
+                tudo[nome] = comparar(os.path.join(pasta_orig, x), port[nome], midis.get(nome))
+            except Exception as e:  # noqa: BLE001
+                tudo[nome] = {"erro": str(e)}
+        r = tudo[nome]
+        if "erro" in r:
+            print(f"{nome:10s} erro: {r['erro']}")
+            continue
+        print(f"{nome:10s} dur {r['dur_o']:6.2f}/{r['dur_p']:6.2f} s  croma {r['croma1']:.3f} (controle {r['controle']:.3f})  "
+              f"centróide {r['cent_o']:5.0f}/{r['cent_p']:5.0f} Hz  2-4k {r['dist_o'][4]:.0%}/{r['dist_p'][4]:.0%}  "
+              f"env {r['envelope']:.2f} ({r['envelope_controle']:.2f})  esp {r['esp_corr']:.2f}  RMS {r['rms_o']:6.1f}/{r['rms_p']:6.1f} dBFS")
+    with open(saida_json, "w", encoding="utf-8") as f:
+        json.dump(tudo, f, indent=1)
 
 
 def desenhar(png, a, b, fr, qps):
@@ -569,6 +638,10 @@ def main():
     c.add_argument("--oplemu", default="default")
     c.add_argument("--video", action="store_true")
     c.add_argument("--som-inicio", help="WAV tocado pelo Windows ao iniciar (som 'Windows Start')")
+    mu = sub.add_parser("musicas")
+    mu.add_argument("pasta")
+    mu.add_argument("nomes", nargs="*", help="nomes dos .MID (padrão: todos menos GAMETHME)")
+    mu.add_argument("--oplemu", default="default")
     q = sub.add_parser("quadros")
     q.add_argument("avi")
     q.add_argument("pasta")
@@ -586,6 +659,10 @@ def main():
     h.add_argument("desloc", type=float, help="início da música no original (s)")
     h.add_argument("port")
     h.add_argument("canal", type=int)
+    ct = sub.add_parser("comparar_todas")
+    ct.add_argument("pasta_orig")
+    ct.add_argument("pasta_port")
+    ct.add_argument("saida_json")
     k = sub.add_parser("comparar")
     k.add_argument("original")
     k.add_argument("port")
@@ -595,6 +672,12 @@ def main():
     a = ap.parse_args()
     if a.cmd == "capturar":
         capturar(a.saida, a.segundos, a.autotype, a.oplemu, a.video, a.som_inicio)
+    elif a.cmd == "musicas":
+        nomes = a.nomes or sorted(x[:-4].lower() for x in os.listdir(os.path.join(raiz_principal(), "SimAnt-T", "MAXIS", "ANTWIN", "SOUND"))
+                                   if x.upper().endswith(".MID") and x.upper() != "GAMETHME.MID")
+        capturar_musicas(a.pasta, nomes, a.oplemu)
+    elif a.cmd == "comparar_todas":
+        comparar_todas(a.pasta_orig, a.pasta_port, os.path.join(raiz_principal(), "SimAnt-T", "MAXIS", "ANTWIN", "SOUND"), a.saida_json)
     elif a.cmd == "quadros":
         quadros_chave(a.avi, a.pasta, a.cada)
     elif a.cmd == "midi":

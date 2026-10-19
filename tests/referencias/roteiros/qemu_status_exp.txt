@@ -1,0 +1,13 @@
+# Status (Window → Status, Ctrl+T, _ScoreDialog) no Experimental (snapshot exp do ov_exp2): estado e
+# captura com a janela aberta (VM parada). Saída em re_trabalho/ag8/status/ (fora do git). Cópia do overlay:
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_status_exp.txt --overlay re_trabalho/ag8/ov_exp2.qcow2
+snapshot_carregar exp
+esperar 3
+ler_variavel GamePaused re_trabalho/ag8/status/exp_pausa.bin
+teclas ctrl+t
+esperar 2
+pausar
+estado re_trabalho/ag8/status/exp_estado.ANT
+capturar re_trabalho/ag8/status/exp_status.png
+continuar
+fim

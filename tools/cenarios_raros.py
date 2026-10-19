@@ -920,6 +920,34 @@ def cenario_queda_casa_celula(c: Sessao, saida, n):
     return c.gravar(saida, n, parar=lambda d: d.ler("SpidOn") == 0)
 
 
+def cenario_leao_pedrinha(c: Sessao, saida, n):
+    """Pedrinha cuspida pela formiga-leão (inimigos.md 1.3, I7): pedrinha 0x51 no centro de uma
+    formiga-leão esperando (M = 0) e comida 0x48 no de outra, se houver; com SEMENTE_S (escolhida no
+    port) o S1(512) dá 0 e a armadilha cospe o objeto a 2 células (M 0 → 1, S = 25, centro 0x39)."""
+    import os
+    c.entrada()
+    s = c.save()
+    li = c.ler("LionIndex")
+    esperando = [k for k in range(li) if s.ler("LionListM", k, 1) == 0]
+    c.log(f"LionIndex {li}; esperando {esperando}")
+    for k, v in zip(esperando, (0x51, 0x48)):
+        x, y = s.ler("LionListX", k, 1), s.ler("LionListY", k, 1)
+        mapa_escrever(c, "MapA", x, y, v)
+        c.log(f"formiga-leão {k} em ({x}, {y}): centro <- {v:#x}")
+    if os.environ.get("SEMENTE_S"):
+        c.escrever("SementeS", int(os.environ["SEMENTE_S"], 0))
+    return c.gravar(saida, n)
+
+
+def cenario_volta_cycle(c: Sessao, saida, n):
+    """A volta de _Cycle (simulacao-visao-geral.md §5, feromonios.md): _Cycle = 4095 na entrada; o
+    tick o leva a 0x1000 e o seguinte a 0. Os dois são ≡ 0 (mod 128): compactação da lista A,
+    _FullCount, _HistUpdate e _SmoothAlarm (e a alimentação, mod 64) rodam em dois ticks seguidos."""
+    c.entrada()
+    c.escrever("Cycle", 4095)
+    return c.gravar(saida, max(n, 3))
+
+
 def mortes(bruto):
     """Por tick: vagas que sumiram (T ≠ 0 → 0) em cada lista, com o T e o M de antes, e os contadores
     _BAntsExpired/_RAntsExpired, _BlkQueens/_RedQueens."""

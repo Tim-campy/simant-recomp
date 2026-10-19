@@ -564,7 +564,7 @@ Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md) (comandos `clicar_em`, `t
 | Y4 | Pegar e largar comida (7.1) | duplo clique em comida; depois duplo clique em chão perto do buraco | `_MeType` 0x10 → 0x18, `_MeScent = 200`; trilha preta 200, 199… no caminho; ao largar, tile 0x48 e `_MeType = 0x10` |
 | Y5 | Comer com fome (7.2) | baixar `editHealthY` até a vida atual; duplo clique em comida | `_MeHealth = 100`, `_HealthB` sobe `vida / (_BpopT − 1)`; tile de comida −1 |
 | Y6 | Trofalaxia (7.2) | com fome, duplo clique numa operária preta | ao encostar, mensagem "You feel much better now!", `_MeHealth = 100` |
-| Y7 | Recrutar e liberar (10.3, 11.4) | teclas 1, 2, Ctrl+2, 3, 4 | `_ModePopB[5]` (Defense) +5, +10, todas; metade; 0 |
+| Y7 | Recrutar e liberar (10.3, 11.4) | teclas 1, 2, Ctrl+2, 3, 4 | `_ModePopB[5]` (Defense) +5, +10, todas; metade; 0. **Conferido (2026-10-19, ações `amarela_*` em `tests/referencias/acoes/`, 307/307):** cada tecla com o jogo pausado faz exatamente o `_Recruit`/`_UnRecruit` de superficie.md 9.4, inclusive as listas B e R |
 | Y8 | Alarme (7.3) | tecla 0 na superfície e andar | `_MeDropAlarm = 1`; `_PherMapA` +50 por passo (máx. 200); entrar no ninho desliga |
 | Y9 | Entrar/sair do ninho (6) | clique simples no buraco; depois clique na superfície estando no ninho | `_MePlane` 1 → 2 com (x, y) = (y_buraco, 1), dir 4; saída numa célula vizinha do buraco na direção do destino |
 | Y10 | Coluna 64 (A1) | Experimental: criar buraco na coluna 64 e fazer a amarela entrar | `_MePlane = 2` (preto), enquanto formigas comuns no mesmo buraco vão para a lista R |

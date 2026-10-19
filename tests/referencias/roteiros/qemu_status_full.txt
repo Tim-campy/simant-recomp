@@ -1,0 +1,13 @@
+# Status (Window → Status, Ctrl+T, _ScoreDialog) no Jogo Completo (snapshot full do ov_full): estado e
+# captura com a janela aberta (VM parada). Saída em re_trabalho/ag8/status/ (fora do git). Cópia do overlay:
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_status_full.txt --overlay re_trabalho/ag8/ov_full.qcow2
+snapshot_carregar full
+esperar 3
+ler_variavel GamePaused re_trabalho/ag8/status/full_pausa.bin
+teclas ctrl+t
+esperar 2
+pausar
+estado re_trabalho/ag8/status/full_estado.ANT
+capturar re_trabalho/ag8/status/full_status.png
+continuar
+fim
