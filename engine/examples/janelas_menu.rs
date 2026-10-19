@@ -13,7 +13,6 @@ use engine::core::quadro::Quadro;
 use engine::core::sobre::{Fase, Sobre};
 use engine::core::telas::Interface;
 use engine::formats::save::{JogoSalvo, LayoutSave};
-use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 use engine::rules::estado::Estado;
 

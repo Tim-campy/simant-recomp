@@ -118,7 +118,9 @@ pub struct Borda {
     pub largura: i16,
     pub cor_externa: u8,
     pub cor: u8,
-    /// Pixels a mais em x na origem do conteúdo quando o objeto 0 é contorno (tipo 15) [hipótese].
+    /// Obsoleto desde a API 0.29: o ajuste depende do driver e fica em `data/resolucao.json`
+    /// (`perfis_driver` → `ajuste_x_contorno`). Lido e ignorado, para os mods antigos.
+    #[serde(default)]
     pub ajuste_x_contorno: i16,
 }
 
@@ -146,6 +148,12 @@ pub struct Interface {
     pub moldura: Moldura,
     /// Fontes por índice; None quando o arquivo não existe (como `font5`/`font6` no original).
     pub fontes: Vec<Option<crate::formats::fonte::Fonte>>,
+    /// Regras do driver de vídeo imitado (alinhamento ao byte, ajuste do contorno; data/resolucao.json).
+    pub driver: super::resolucao::PerfilDriver,
+    /// Área cliente da janela principal (largura, altura): a tela virtual menos `linhas_acima`.
+    pub area: [i16; 2],
+    /// Linhas da tela acima da área cliente (título e menus).
+    pub linhas_acima: i16,
 }
 
 fn carregar_fonte(recursos: &crate::recursos::Recursos, nome: &str) -> Result<crate::formats::fonte::Fonte, String> {
@@ -185,12 +193,27 @@ impl Interface {
         let pos = recursos.objeto(Chave { tipo: TIPO_POSICOES, id: tabela_posicoes })?;
         let moldura: Moldura = recursos.dados("interface.json")?;
         let fontes = moldura.fontes.lista.iter().map(|n| carregar_fonte(recursos, n).ok()).collect();
-        Ok(Interface {
-            cores: decodificar_cores(&cab, &tab)?,
-            posicoes: decodificar_posicoes(&pos)?,
-            moldura,
-            fontes,
-        })
+        let (driver, linhas_acima) = if recursos.existe_dado(super::resolucao::ARQUIVO) {
+            let r: super::resolucao::ConfigResolucao = recursos.dados(super::resolucao::ARQUIVO)?;
+            (r.perfil(None)?, r.linhas_acima_da_area_cliente as i16)
+        } else {
+            (Default::default(), 38)
+        };
+        let area = [moldura.largura as i16, moldura.altura as i16];
+        Ok(Interface { cores: decodificar_cores(&cab, &tab)?, posicoes: decodificar_posicoes(&pos)?, moldura, fontes, driver, area, linhas_acima })
+    }
+
+    /// Canto (x, y), na área cliente, de uma caixa de diálogo do Windows de `largura` × `altura`
+    /// (contorno incluído) centrada na tela: `MessageBox` centra o diálogo sem o contorno de 1 pixel
+    /// (metade da sobra, arredondada para baixo) e o x vai para o byte mais próximo
+    /// (`CS_BYTEALIGNWINDOW`) [medido em 640×480 na bancada VGA e em 640, 800 e 1024 na SVGA;
+    /// telas/resolucao.md §3].
+    pub fn centrar_dialogo(&self, largura: i16, altura: i16) -> (i16, i16) {
+        let [w, h] = self.area;
+        let tela_a = h + self.linhas_acima;
+        let x = (w - (largura - 2)).div_euclid(2);
+        let y = (tela_a - (altura - 2)).div_euclid(2);
+        (self.driver.alinhar(x), y - self.linhas_acima)
     }
 
     /// Geometria da janela `id` na área cliente (ver docs/spec/formatos/janela.md, "Posicionamento"):
@@ -208,10 +231,12 @@ impl Interface {
         let t = if ob0.tipo == TIPO_CONTORNO { ob0.byte_28 as i16 } else { 0 };
         let (lw, lh) = if t > 0 { (w - 2 * t - 1, h - 2 * t - 1) } else { (w, h) };
         let b = m.borda.largura;
-        let (ex, ey) = (x + t, y + t + m.faixa.altura);
+        // _win_Open cria a janela no canto da tabela; a área cliente (depois da moldura de diálogo de
+        // `b` pixels) vai para o byte mais próximo (CS_BYTEALIGNCLIENT; telas/resolucao.md §7).
+        let (ex, ey) = (self.driver.alinhar_janela(x + t, b), y + t + m.faixa.altura);
         let externo = Retangulo { esq: ex, topo: ey, dir: ex + lw + 2 * b, base: ey + lh + 2 * b };
         let interno = Retangulo { esq: ex + b, topo: ey + b, dir: ex + b + lw, base: ey + b + lh };
-        let ajuste = if t > 0 { m.borda.ajuste_x_contorno } else { 0 };
+        let ajuste = if t > 0 { self.driver.ajuste_x_contorno } else { 0 };
         let origem = (interno.esq - t + ajuste, interno.topo - t);
         Some(Geometria { origem, externo: Some(externo), interno: Some(interno) })
     }

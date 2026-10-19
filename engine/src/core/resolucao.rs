@@ -71,8 +71,7 @@ impl PerfilDriver {
     /// `x` arredondado ao múltiplo de `alinhamento_x` mais próximo (o meio vai para cima), como o
     /// Windows faz com a área cliente (`CS_BYTEALIGNCLIENT`) e com as caixas de diálogo.
     pub fn alinhar(&self, x: i16) -> i16 {
-        let n = self.alinhamento_x.max(1);
-        (x + n / 2).div_euclid(n) * n
+        super::gerenciador::alinhar_cliente_ao_criar(i32::from(x), i32::from(self.alinhamento_x)) as i16
     }
 
     /// Canto x da janela cuja área cliente começa `margem` pixels à direita dele, alinhada.

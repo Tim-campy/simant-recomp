@@ -16,7 +16,6 @@ use engine::core::telas::Interface;
 use engine::formats::banco::Chave;
 use engine::formats::bitmap::{Bitmap, TIPO_BITMAP};
 use engine::formats::janela::Retangulo;
-use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 
 fn main() {

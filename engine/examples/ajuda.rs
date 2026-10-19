@@ -13,7 +13,6 @@ use std::path::Path;
 use engine::core::ajuda::VisorAjuda;
 use engine::core::quadro::Quadro;
 use engine::core::telas::Interface;
-use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 
 fn main() {

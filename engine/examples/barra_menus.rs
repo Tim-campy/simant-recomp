@@ -13,7 +13,6 @@ use engine::core::quadro::Quadro;
 use engine::core::telas::Interface;
 use engine::formats::banco::Chave;
 use engine::formats::menu::{MenuBanco, TIPO_MENU};
-use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 
 fn main() {

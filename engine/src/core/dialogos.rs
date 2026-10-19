@@ -52,14 +52,17 @@ pub struct Cores {
     pub pasta: u8,
 }
 
-/// Estilo da caixa: espessura da moldura (contorno incluído: esquerda, cima, direita, baixo), a
-/// margem branca em volta do título e o centro na área cliente [medido: a pergunta do Load tem só o
-/// contorno; a "Message" do `_PopMsg`, a moldura de diálogo azul].
+/// Estilo da caixa: espessura da moldura (contorno incluído: esquerda, cima, direita, baixo) e a
+/// margem branca em volta do título [medido: a pergunta do Load tem só o contorno; a "Message" do
+/// `_PopMsg`, a moldura de diálogo azul]. A posição é a regra do Windows
+/// ([`Interface::centrar_dialogo`]: centrada na tela, x no byte).
 #[derive(Clone, Debug, Deserialize)]
 pub struct EstiloCaixa {
     pub borda: [i16; 4],
     pub margem_titulo: i16,
-    pub centro: [i16; 2],
+    /// Obsoleto desde a API 0.29 (o centro medido em 640×480); lido e ignorado.
+    #[serde(default)]
+    pub centro: Option<[i16; 2]>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -134,6 +137,36 @@ pub struct ConfigDialogoArquivo {
     pub caminho: [i16; 2],
     pub recuo_pasta: i16,
     pub texto_pasta: i16,
+}
+
+impl ConfigDialogos {
+    /// `data/dialogos.json` com o diálogo de arquivo no byte do perfil de driver ativo
+    /// (`data/resolucao.json`).
+    pub fn carregar(recursos: &crate::recursos::Recursos) -> Result<ConfigDialogos, String> {
+        use super::resolucao::{ConfigResolucao, ARQUIVO};
+        let mut c: ConfigDialogos = recursos.dados(ARQUIVO_CONFIG)?;
+        if recursos.existe_dado(ARQUIVO) {
+            c.arquivo.aplicar_driver(&recursos.dados::<ConfigResolucao>(ARQUIVO)?.perfil(None)?);
+        }
+        Ok(c)
+    }
+}
+
+impl ConfigDialogoArquivo {
+    /// O diálogo comum fica num lugar fixo em relação à janela principal (o mesmo em 640×480,
+    /// 800×600 e 1024×768); os x de `data/dialogos.json` são os sem alinhamento (256 cores) e o
+    /// Windows põe o canto no byte mais próximo (`CS_BYTEALIGNWINDOW`; telas/resolucao.md §3).
+    pub fn aplicar_driver(&mut self, driver: &super::resolucao::PerfilDriver) {
+        let dx = driver.alinhar(self.externo[0]) - self.externo[0];
+        for c in [&mut self.externo, &mut self.campo, &mut self.lista, &mut self.pastas, &mut self.tipo, &mut self.unidades, &mut self.ok, &mut self.cancelar] {
+            c[0] += dx;
+        }
+        for (_, p) in self.rotulos_abrir.iter_mut().chain(self.rotulos_salvar.iter_mut()) {
+            p[0] += dx;
+        }
+        self.somente_leitura.1[0] += dx;
+        self.caminho[0] += dx;
+    }
 }
 
 /// Conteúdo de data/dialogos.json.
@@ -381,8 +414,13 @@ impl CaixaMensagem {
     }
 
 /// Geometria calculada: externo, interior, título, canto do ícone, y do texto e botões.
-    fn geometria(&self, cfg: &ConfigCaixaMensagem, f: Option<&Fonte>) -> GeometriaCaixa {
-        let est = cfg.estilos.get(self.estilo).or(cfg.estilos.first()).cloned().unwrap_or(EstiloCaixa { borda: [1; 4], margem_titulo: 0, centro: [320, 221] });
+    fn geometria(&self, cfg: &ConfigCaixaMensagem, f: Option<&Fonte>, interface: &Interface) -> GeometriaCaixa {
+        self.geometria_com(cfg, f, |w, h| interface.centrar_dialogo(w, h))
+    }
+
+    /// Como `geometria`, com o canto da caixa (largura, altura → x, y) dado por `canto`.
+    fn geometria_com(&self, cfg: &ConfigCaixaMensagem, f: Option<&Fonte>, canto: impl Fn(i16, i16) -> (i16, i16)) -> GeometriaCaixa {
+        let est = cfg.estilos.get(self.estilo).or(cfg.estilos.first()).cloned().unwrap_or(EstiloCaixa { borda: [1; 4], margem_titulo: 0, centro: None });
         let [be, bt, bd, bb] = est.borda;
         let texto = self.linhas.iter().map(|l| f.map_or(8 * l.len() as i32, |f| largura(f, l))).max().unwrap_or(0) as i16;
         let (_, grupo, xs) =
@@ -397,7 +435,7 @@ impl CaixaMensagem {
         let h_interior = botoes_y + cfg.botao[1] + cfg.margem_baixo;
         let w_interior = (cfg.texto_x + texto + cfg.margem_direita).max(grupo + 2 * cfg.texto_x);
         let (w, h) = (be + w_interior + bd, bt + h_interior + bb);
-        let (x, y) = (est.centro[0] - w / 2, est.centro[1] - h / 2);
+        let (x, y) = canto(w, h);
         let externo = Retangulo { esq: x, topo: y, dir: x + w, base: y + h };
         let interior = Retangulo { esq: x + be, topo: y + bt, dir: x + w - bd, base: y + h - bb };
         let m = est.margem_titulo;
@@ -420,7 +458,7 @@ impl CaixaMensagem {
         let m = &cfg.caixa_mensagem;
         let f = fonte(&m.fontes, interface);
         let c = &cfg.cores;
-        let g = self.geometria(m, f);
+        let g = self.geometria(m, f, interface);
         let e = g.externo;
         q.preencher(e, if g.moldura { c.moldura } else { c.fundo }, if g.moldura { c.moldura } else { c.fundo });
         q.contorno(Retangulo { dir: e.dir - 1, base: e.base - 1, ..e }, c.linha);
@@ -440,9 +478,14 @@ impl CaixaMensagem {
         }
     }
 
+    /// Contorno externo da caixa na área cliente.
+    pub fn externo(&self, interface: &Interface, cfg: &ConfigDialogos) -> Retangulo {
+        self.geometria(&cfg.caixa_mensagem, fonte(&cfg.caixa_mensagem.fontes, interface), interface).externo
+    }
+
     /// Botão sob (x, y).
     pub fn botao_em(&self, interface: &Interface, cfg: &ConfigDialogos, x: i32, y: i32) -> Option<usize> {
-        let g = self.geometria(&cfg.caixa_mensagem, fonte(&cfg.caixa_mensagem.fontes, interface));
+        let g = self.geometria(&cfg.caixa_mensagem, fonte(&cfg.caixa_mensagem.fontes, interface), interface);
         g.botoes.iter().position(|r| contem(*r, x, y))
     }
 
@@ -704,7 +747,7 @@ mod testes {
     fn caixa_de_mensagem_do_load_tem_a_geometria_medida() {
         let c = cfg();
         let m = CaixaMensagem::pergunta_load(&c);
-        let b = m.geometria(&c.caixa_mensagem, None).botoes;
+        let b = m.geometria_com(&c.caixa_mensagem, None, |_, _| (0, 0)).botoes;
         assert_eq!(b.len(), 3);
         assert_eq!((b[1].esq - b[0].esq, b[2].esq - b[0].esq), (74, 150));
         assert_eq!(m.tecla("Return"), Some(1));

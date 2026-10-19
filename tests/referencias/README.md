@@ -45,6 +45,8 @@ Bancada SVGA (QEMU + `vbesvga.drv`, 256 cores; `docs/bancada-qemu.md`, "Bancada 
 | Quick Game (área cliente) | 87,97% | 91,23% | 94,94% | outro mundo (aleatório no original); x da janela de edição (−4) e das de controle (+1), dependentes do driver; cor do título |
 | Quick Game, linhas 380 em diante | 89,84% | 93,39% | 97,32% | as janelas de controle: y iguais nas três resoluções (127 linhas entre 9/0 e 9/8) |
 
+Os números acima são de antes do perfil de driver. Com o perfil `"svga256"` (`data/resolucao.json`; o padrão é `"vga"`), contra as mesmas capturas: título 99,96/99,98/99,99%, Select a Game 99,80/99,87/99,92%, Quick Game 89,34/93,34/96,20% (linhas 380 em diante: 96,21/98,60/99,39%). Com o padrão `"vga"` contra a bancada VGA (640×480): título 99,96% e Select a Game 99,80%. Posições de caixas de mensagem, diálogos de arquivo, WinHelp, janela 26, Info, fim de jogo, About e quintal nas três resoluções: roteiros `qemu_svga*_telas*.txt` e `qemu_svga*_fim.txt`, conferidas no teste `posicoes_por_resolucao_e_driver` (`simant/src/sessao.rs`); ver `docs/spec/telas/resolucao.md` §3 e §7.
+
 O teste `engine/tests/resolucao_reais.rs` confere que a abertura em 800×600 pela regra é a validada contra o DOSBox-X; `simant/src/sessao.rs` (`testes_tela_virtual`), as posições das janelas de controle e o tamanho da tela nas três resoluções. Especificação: `docs/spec/telas/resolucao.md`.
 
 ## Casos de teste de regras (bancada QEMU)

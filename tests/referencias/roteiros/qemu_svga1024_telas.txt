@@ -16,7 +16,7 @@ snapshot_carregar quick
 esperar 2
 teclas alt+f
 esperar 1
-teclas a
+teclas ret
 esperar 4
 capturar re_trabalho/svga/ag1024_about.png
 snapshot_carregar quick

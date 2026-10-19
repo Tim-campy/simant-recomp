@@ -7,7 +7,6 @@ use std::path::Path;
 
 use engine::formats::banco::Chave;
 use engine::formats::bitmap::{Bitmap, TIPO_BITMAP};
-use engine::paleta::Paleta;
 use engine::recursos::Recursos;
 
 fn ids(arg: &str) -> Vec<u16> {
