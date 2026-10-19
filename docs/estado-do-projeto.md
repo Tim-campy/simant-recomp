@@ -196,7 +196,7 @@ Telas
 - Altura mínima da edição e clique comido na janela de trás (`telas/janelas.md` §8, [hipótese]); a fase do xadrez do item acinzentado realçado numa janela em x ímpar; a sombra dos menus das janelas filhas.
 - Cores do mapa (`_ConvColor`, [hipótese]).
 - Clique direito no Experimental e nas janelas de controle, F1 com janela de controle, Shift+F1, Delete, `yardHelpBut`, cursor das ferramentas (`telas/ajuda-contexto.md` §6).
-- Posição do menu de ferramentas no Quick Game; avisos do Experimental na faixa. Faixa 35 aberta com o jogo pausado: o original deixa vazios os números do quintal e as barras de saúde até o próximo redesenho, o port os desenha (`divergencias.md`, 2026-10-19).
+- Posição do menu de ferramentas no Quick Game; avisos do Experimental na faixa. Faixa 35: resolvida em 2026-10-19 (barras e populações desenhadas; vazia só depois do Ctrl+Y até o tick, `divergencias.md`).
 - A janela do mapa atrás logo depois de um Load (o original a desenha; o port a deixa preta na exportação, `divergencias.md`); ajuda dos itens de menu.
 
 Som
