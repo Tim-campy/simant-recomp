@@ -10,6 +10,7 @@
 //! servem aos testes, que montam regras com só algumas partes.
 
 use super::amarela::TabelasAmarela;
+use super::baloes::TabelasBaloes;
 use super::conselhos::{JanelasNaFrente, MemoriaTutor};
 use super::estado::{indice_cor, ConfigSimulacao, Estado, Evento};
 use super::feromonios::{FaseCheiro, TabelasFeromonio};
@@ -113,6 +114,8 @@ pub struct RegrasOriginais {
     pub ninho: TabelasNinho,
     /// `data/amarela.json` (formiga amarela; também usado quando outra parte mata ou alimenta a amarela).
     pub amarela: TabelasAmarela,
+    /// `data/baloes.json` (balões "Silly" da janela de edição: os sorteios do redesenho).
+    pub baloes: TabelasBaloes,
     /// `_TimeTemp` do tutorial (fora do save), mantido entre os ticks.
     pub memoria_tutor: MemoriaTutor,
     /// O que o tutorial sabe da interface (janelas na frente). A interface atualiza a cada quadro.
@@ -129,6 +132,7 @@ impl Default for RegrasOriginais {
             feromonios: TabelasFeromonio::padrao().clone(),
             ninho: TabelasNinho::padrao().clone(),
             amarela: TabelasAmarela::padrao().clone(),
+            baloes: TabelasBaloes::padrao().clone(),
             memoria_tutor: MemoriaTutor::default(),
             interface_tutor: JanelasNaFrente::default(),
         }
@@ -154,6 +158,7 @@ impl RegrasOriginais {
             feromonios: TabelasFeromonio::carregar(r)?,
             ninho: TabelasNinho::carregar(r)?,
             amarela: TabelasAmarela::carregar(r)?,
+            baloes: TabelasBaloes::carregar(r)?,
             memoria_tutor: MemoriaTutor::default(),
             interface_tutor: JanelasNaFrente::default(),
         })

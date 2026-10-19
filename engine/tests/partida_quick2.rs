@@ -229,9 +229,17 @@ fn botoes_da_faixa_e_menu_da_amarela() {
     assert_eq!(b[0].3, None);
     p.botao_usuario(5);
     assert_eq!(p.estado_dos_botoes()[6].3, Some(true));
-    p.definir_funcao_do_botao("ribUserDef1A", 11);
+    p.definir_funcao_do_botao("ribUserDef1A", 11, true);
     assert_eq!(p.funcao_do_botao("ribUserDef1A"), Some(11));
     assert_eq!(p.estado_dos_botoes()[0], ("ribUserDef1A".to_string(), 14484, 14434, Some(false)));
+    // Faixa 35: a mesma tabela padrão; com Shift só o botão escolhido muda, sem Shift os dois de
+    // mesmo índice (_DoUserButton).
+    assert_eq!(p.funcao_do_botao("ribUserDef2A"), Some(15));
+    assert_eq!(p.estado_dos_botoes()[8].0, "ribUserDef2A");
+    p.definir_funcao_do_botao("ribUserDef2B", 8, false);
+    assert_eq!((p.funcao_do_botao("ribUserDef2B"), p.funcao_do_botao("ribUserDef1B")), (Some(8), Some(8)));
+    p.definir_funcao_do_botao("ribUserDef2B", 9, true);
+    assert_eq!((p.funcao_do_botao("ribUserDef2B"), p.funcao_do_botao("ribUserDef1B")), (Some(9), Some(8)));
     // Segurando o botão na própria amarela: menu; o item "Recruit 5" (código 1) recruta.
     let (x, y) = (p.estado.amarela.x as i32, p.estado.amarela.y as i32);
     p.iniciar_espera_do_clique();
@@ -263,11 +271,85 @@ fn clique_do_place_tambem_grava_o_patch_escolhido() {
         .find(|&(x, y)| cfg.patch_em(x, y) == Some((5, 8)))
         .unwrap();
     let mut p = partida();
-    let mut j = JanelaQuintal { aberta: true, na_frente: true, colocando_rainha: true };
-    clicar(&mut j, &cfg, &mut p, ponto.0, ponto.1, false).unwrap();
+    let mut j = JanelaQuintal { aberta: true, na_frente: true, colocando_rainha: true, escolhendo_colonia: false };
+    clicar(&mut j, &cfg, &mut p, ponto.0, ponto.1, false, false).unwrap();
     assert!(!j.colocando_rainha);
     assert_eq!(p.estado.vistas.ponto_quintal, (5, 8));
     assert_eq!(p.nav.pontos[0], (5, 8));
+}
+
+/// `_PlaceQueenInYard`: a simulação para até o clique; com Shift o laço continua enquanto houver
+/// rainhas guardadas; fora do alcance: "That location is out of bounds" (1010[10]).
+#[test]
+fn place_para_a_simulacao_e_shift_repete() {
+    use engine::core::avisos::TextoFaixa;
+    use engine::core::quintal_mapa::{clicar, AcaoQuintal, ConfigQuintalMapa, JanelaQuintal};
+    let cfg = ConfigQuintalMapa::de_json(&ler("quintal_mapa.json")).unwrap();
+    let ponto = |alvo| (0..640).flat_map(|x| (0..442).map(move |y| (x, y))).find(|&(x, y)| cfg.patch_em(x, y) == Some(alvo)).unwrap();
+    let mut p = partida();
+    p.estado.preta.rainhas_guardadas = 2;
+    let mut j = JanelaQuintal::default();
+    j.aplicar(AcaoQuintal::ColocarRainha, &mut p.estado);
+    p.parada_pela_interface = j.colocando_rainha;
+    p.processar_eventos_do_estado();
+    assert!(j.colocando_rainha);
+    let lista = |i| Some(TextoFaixa::Lista { lista: 1010, indice: i });
+    assert_eq!(p.avisos.texto_vigente(p.agora()).cloned(), lista(8));
+    let tempo = p.estado.partida.tempo;
+    p.avancar(2000);
+    assert_eq!(p.estado.partida.tempo, tempo, "a simulação para durante o PLACE");
+    // Fora do alcance (patch atual 11, 8; (0, 0) a mais de 3) com Shift: continua.
+    let (x, y) = ponto((0, 0));
+    clicar(&mut j, &cfg, &mut p, x, y, false, true).unwrap();
+    assert!(j.colocando_rainha);
+    let (x, y) = ponto((10, 8));
+    clicar(&mut j, &cfg, &mut p, x, y, false, true).unwrap();
+    assert!(j.colocando_rainha, "com Shift e outra rainha guardada, continua");
+    assert_eq!(p.estado.preta.rainhas_guardadas, 1);
+    clicar(&mut j, &cfg, &mut p, x, y, false, false).unwrap();
+    assert!(!j.colocando_rainha && !p.parada_pela_interface);
+    assert_eq!(p.estado.preta.rainhas_guardadas, 0);
+    assert_eq!(p.avisos.texto_vigente(p.agora()).cloned(), lista(9), "You have started a new colony");
+    p.avancar(2000);
+    assert!(p.estado.partida.tempo > tempo);
+}
+
+/// `_SpecialXfer` ao vivo: o tick pede a escolha; fechado o quadro 10058, o quintal fica na Strategic
+/// View com "Click on a black colony to continue" e a simulação parada; um patch sem colônia preta é
+/// recusado; o de uma colônia troca de patch.
+#[test]
+fn transferencia_especial_ao_vivo() {
+    use engine::core::quintal_mapa::{clicar, iniciar_escolha_de_colonia, ConfigQuintalMapa, JanelaQuintal, RespostaQuintal};
+    use engine::rules::troca_patch::ResultadoColonia;
+    let cfg = ConfigQuintalMapa::de_json(&ler("quintal_mapa.json")).unwrap();
+    let ponto = |alvo| (0..640).flat_map(|x| (0..442).map(move |y| (x, y))).find(|&(x, y)| cfg.patch_em(x, y) == Some(alvo)).unwrap();
+    let jogo = std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or(raiz().join("SimAnt-T/MAXIS/ANTWIN"));
+    if !jogo.join("SHARED.NDX").is_file() {
+        eprintln!("AVISO: arquivos do jogo não encontrados; teste ignorado");
+        return;
+    }
+    let r = engine::recursos::Recursos::abrir(&jogo, &["SHARED".to_string()], &raiz().join("data"), None).unwrap();
+    let mut p = partida();
+    p.regras.geracao = Some(engine::rules::geracao::TabelasGeracao::carregar(&r).unwrap());
+    p.estado.partida.tipo_jogo = 2;
+    p.estado.preta.populacao_quintal.0[5 * 16 + 8] = 9;
+    p.estado.eventos.push(engine::rules::estado::Evento::EscolherColonia);
+    p.processar_eventos_do_estado();
+    assert!(p.escolher_colonia);
+    let mut j = JanelaQuintal::default();
+    assert!(iniciar_escolha_de_colonia(&mut j, &mut p));
+    assert_eq!(p.estado.vistas.modo_quintal, 2);
+    let tempo = p.estado.partida.tempo;
+    p.avancar(2000);
+    assert_eq!(p.estado.partida.tempo, tempo, "parada durante a escolha");
+    let (x, y) = ponto((4, 8));
+    let r = clicar(&mut j, &cfg, &mut p, x, y, false, false).unwrap();
+    assert_eq!(r, RespostaQuintal::Colonia(ResultadoColonia::SemColonia));
+    let (x, y) = ponto((5, 8));
+    let r = clicar(&mut j, &cfg, &mut p, x, y, false, false).unwrap();
+    assert!(matches!(r, RespostaQuintal::Colonia(ResultadoColonia::Trocou(_))), "{r:?}");
+    assert!(!p.escolher_colonia && !j.escolhendo_colonia);
+    assert_eq!(p.estado.ambiente.patch, (5, 8));
 }
 
 /// O relógio do Mac da partida começa no maior prazo guardado no save (`_CatDelay` 2669 no QUICK2):

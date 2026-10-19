@@ -40,6 +40,8 @@
     "fundar_fim": 20001,
     "virou_rainha": 11006
   },
+  "_imagem_trofalaxia": "Bitmap do quadro de _YellowDialog chamado por _EatMyFood(1) (1020:8cda): 0x2396.",
+  "imagem_trofalaxia": 9110,
   "mensagens": {
     "luta_atacou": 10030,
     "luta_atacada": 10032,
@@ -72,7 +74,7 @@
     "tempo_sem_vida": "_DoAntSimY: morre quando _MeHealthCntDwn passa disto",
     "raio_aranha": "_DoLifeExchange 1020:6842: (16·dx)² + (16·dy)² < 512 até a aranha",
     "custo_doar": "_EatMyFood tipo 2: vida doada",
-    "janela_edicao_na_frente": "[hipótese] estado da interface assumido pelo port (_win_IsWinInFront(0))",
+    "janela_edicao_na_frente": "_win_IsWinInFront(0): valor usado sem interface (vetores, testes); na partida ao vivo a interface o troca a cada quadro pela ordem real das janelas (simant/src/sessao.rs, atualizar_janelas_desenho)",
     "quadros_luta": "_AnimYellowFight 1028:7e56, código 0",
     "quadros_choque": "_AnimYellowFight, código 10",
     "quadros_morte_atras": "_AnimYellowFight, códigos 1–9 sem a janela de edição à frente",

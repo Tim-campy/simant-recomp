@@ -34,6 +34,107 @@ pub mod ids {
     pub const MUSICA_RAINHA: u16 = 0x2AFB;
     /// Som de erro das recusas (`_myBeginSound(1, …)`).
     pub const SOM_ERRO: u16 = 1;
+    /// Lista SHARED 4/1010 (`_WindPromptStrs`) e as entradas usadas na faixa por
+    /// `_PlaceQueenInYard` e `_SpecialXfer`.
+    pub const LISTA_FAIXA: u16 = 1010;
+    pub const SEM_RAINHAS: u8 = 7;
+    pub const CLIQUE_PARA_RAINHA: u8 = 8;
+    pub const COLONIA_NOVA: u8 = 9;
+    pub const FORA_DOS_LIMITES: u8 = 10;
+    pub const RAINHAS_SO_NO_COMPLETO: u8 = 16;
+    pub const SEM_COLONIA_ALI: u8 = 19;
+    pub const CLIQUE_NUMA_COLONIA: u8 = 20;
+    /// Durações (`_EditMessage`): 0xB4, 0x78 e "permanente" (0xFFFE).
+    pub const DURACAO_SEM_RAINHAS: u16 = 0xB4;
+    pub const DURACAO_AVISO: u16 = 0x78;
+    pub const PERMANENTE: u16 = 0xFFFE;
+}
+
+/// `_EditMessage(_WindPromptStrs[indice], duracao, 0, 1)` (importante).
+fn faixa(e: &mut Estado, indice: u8, duracao: u16) {
+    e.eventos.push(Evento::MensagemFaixa(super::estado::MensagemFaixa { lista: ids::LISTA_FAIXA, indice, duracao, importante: true }));
+}
+
+/// Começo de `_PlaceQueenInYard` (botão PLACE): sem rainhas guardadas, som de erro e a mensagem
+/// ("You have no new queens to drop" no Jogo Completo, senão "Place queens in Full Game only") e
+/// devolve false. Com rainhas: `_LayDownQueenMode` 1 → 0 e a mensagem permanente "Click in yard to
+/// place new queen"; a simulação fica parada até o clique (quintal.md §5.3).
+pub fn iniciar_colocacao(e: &mut Estado) -> bool {
+    if e.preta.rainhas_guardadas < 1 {
+        e.eventos.push(Evento::Som(ids::SOM_ERRO));
+        let i = if e.partida.tipo_jogo == 2 { ids::SEM_RAINHAS } else { ids::RAINHAS_SO_NO_COMPLETO };
+        faixa(e, i, ids::DURACAO_SEM_RAINHAS);
+        return false;
+    }
+    if e.controles.modo_por_rainha == 1 {
+        e.controles.modo_por_rainha = 0;
+    }
+    faixa(e, ids::CLIQUE_PARA_RAINHA, ids::PERMANENTE);
+    true
+}
+
+/// O laço de `_PlaceQueenInYard` continua depois deste clique? Só com Shift apertado e, se a rainha
+/// foi colocada, com outra guardada. Continuando, a mensagem do clique volta.
+pub fn continuar_colocacao(e: &mut Estado, r: ResultadoRainha, shift: bool) -> bool {
+    let continua = shift && matches!(r, ResultadoRainha::ForaDoAlcance | ResultadoRainha::Colocada { restam: 1.. });
+    if continua {
+        faixa(e, ids::CLIQUE_PARA_RAINHA, ids::PERMANENTE);
+    }
+    continua
+}
+
+/// `_EditMessage(0, …)`: limpa a faixa (o laço de escolha acabou sem clique).
+pub fn limpar_faixa(e: &mut Estado) {
+    e.eventos.push(Evento::MensagemFaixa(super::estado::MensagemFaixa { lista: 0, indice: 0, duracao: 0, importante: true }));
+}
+
+/// O que um clique de `_SpecialXfer` fez.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ResultadoColonia {
+    /// Fora do quintal: som de erro e "That location is out of bounds".
+    ForaDoQuintal,
+    /// Sem colônia preta no patch: som de erro e "There is no black colony there.".
+    SemColonia,
+    /// Escolhida: `_XferPatch` para ela.
+    Trocou(ResultadoTroca),
+}
+
+/// Começo de `_SpecialXfer` (`1000:7eb6`): zera a colônia preta do patch atual no mapa do quintal,
+/// Strategic View (`_YardMode = 2`, `_ColonyUpdateFlag = 1`), `_SetMapPlane(0)` e a mensagem
+/// permanente "Click on a black colony to continue". A interface traz o quintal para a frente e
+/// espera o clique (a simulação fica parada).
+pub fn iniciar_transferencia_especial(e: &mut Estado) {
+    let (cx, cy) = e.ambiente.patch;
+    if let Some(i) = indice_patch(cx, cy) {
+        e.preta.populacao_quintal.0[i] = 0;
+    }
+    e.vistas.modo_quintal = 2;
+    e.ambiente.atualizar_colonias = 1;
+    // `_SetMapPlane(0)`: plano e modo do mapa 0. Na bancada `_OldMapPlane` terminou como estava (0),
+    // e não com o plano anterior [em aberto: quem o repõe].
+    e.vistas.plano = 0;
+    e.vistas.modo_mapa = 0;
+    faixa(e, ids::CLIQUE_NUMA_COLONIA, ids::PERMANENTE);
+}
+
+/// Um clique de `_SpecialXfer` no patch (x, y): só uma colônia preta encerra a escolha, com a música
+/// da rainha, `_YMapPnt` = patch e `_XferPatch`; depois a faixa é limpa.
+pub fn escolher_colonia(e: &mut Estado, tab: &TabelasGeracao, cfg: &ConfigSimulacao, x: i16, y: i16) -> Result<ResultadoColonia, String> {
+    let Some(i) = indice_patch(x, y) else {
+        e.eventos.push(Evento::Som(ids::SOM_ERRO));
+        faixa(e, ids::FORA_DOS_LIMITES, ids::DURACAO_AVISO);
+        return Ok(ResultadoColonia::ForaDoQuintal);
+    };
+    if e.preta.populacao_quintal.0[i] == 0 {
+        e.eventos.push(Evento::Som(ids::SOM_ERRO));
+        faixa(e, ids::SEM_COLONIA_ALI, ids::DURACAO_AVISO);
+        return Ok(ResultadoColonia::SemColonia);
+    }
+    e.eventos.push(Evento::Musica(ids::MUSICA_RAINHA));
+    e.vistas.ponto_quintal = (x, y);
+    let r = trocar_patch(e, tab, cfg)?;
+    limpar_faixa(e);
+    Ok(ResultadoColonia::Trocou(r))
 }
 
 /// Índice do patch nos mapas `_YMapPop*` (`x * 16 + y`), se está no quintal.
@@ -131,6 +232,9 @@ pub fn aplicar_patch(e: &mut Estado, m: &Mundo, cfg: &ConfigSimulacao) -> Result
     // _MakeMap / _OverlayTileSet.
     e.ambiente.terreno = i16::from(m.terreno);
     e.ambiente.barreira = if m.terreno == 0 { ini.barreira_quintal } else { ini.barreira_casa };
+    if m.terreno == 1 {
+        e.passo_queda = m.passo_queda;
+    }
     e.superficie.mapa = Grade::de_bytes(SUPERFICIE, m.mapa_a.clone())?;
     e.superficie.vida = Grade::de_bytes(SUPERFICIE, m.vida_a.clone())?;
     for (n, mapa, saida, vida) in [
@@ -301,6 +405,8 @@ pub fn colocar_rainha(e: &mut Estado, x: i16, y: i16) -> ResultadoRainha {
     }
     let (x0, y0, x1, y1) = alcance_rainha(e);
     let Some(i) = indice_patch(x, y).filter(|_| (x0..=x1).contains(&x) && (y0..=y1).contains(&y)) else {
+        e.eventos.push(Evento::Som(ids::SOM_ERRO));
+        faixa(e, ids::FORA_DOS_LIMITES, ids::DURACAO_AVISO);
         return ResultadoRainha::ForaDoAlcance;
     };
     e.eventos.push(Evento::Musica(ids::MUSICA_RAINHA));
@@ -308,7 +414,9 @@ pub fn colocar_rainha(e: &mut Estado, x: i16, y: i16) -> ResultadoRainha {
     p.rainhas_guardadas -= 1;
     p.populacao_quintal.0[i] = p.populacao_quintal.0[i].wrapping_add(1);
     p.colonias_fundadas += 1;
-    ResultadoRainha::Colocada { restam: p.rainhas_guardadas }
+    let restam = p.rainhas_guardadas;
+    faixa(e, ids::COLONIA_NOVA, ids::DURACAO_AVISO);
+    ResultadoRainha::Colocada { restam }
 }
 
 #[cfg(test)]
@@ -338,7 +446,8 @@ mod testes {
         assert_eq!(e.preta.colonias_fundadas, 1);
         // O próprio patch atual também é aceito.
         assert_eq!(colocar_rainha(&mut e, 11, 8), ResultadoRainha::Colocada { restam: 0 });
-        assert_eq!(e.retirar_eventos(), vec![Evento::Musica(ids::MUSICA_RAINHA), Evento::Musica(ids::MUSICA_RAINHA)]);
+        let musicas: Vec<_> = e.retirar_eventos().into_iter().filter(|ev| matches!(ev, Evento::Musica(_))).collect();
+        assert_eq!(musicas, vec![Evento::Musica(ids::MUSICA_RAINHA), Evento::Musica(ids::MUSICA_RAINHA)]);
     }
 
     #[test]

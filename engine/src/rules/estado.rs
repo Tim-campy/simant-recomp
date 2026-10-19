@@ -967,6 +967,13 @@ grupo_do_save! {
 pub enum Evento {
     /// Texto de SHARED tipo 4 (`_PictStrnDialog`), pelo id decimal (ex.: 10010).
     Mensagem(u16),
+    /// `_YellowDialog(bitmap)` (`1000:8262`): quadro com imagem da amarela (trofalaxia: 9110). A
+    /// interface só o mostra com Options → Events.
+    QuadroAmarela(u16),
+    /// `_SpecialXfer` (`1000:7eb6`): depois do quadro 10058, o jogador escolhe outra colônia preta no
+    /// mapa do quintal. A interface chama `troca_patch::iniciar_transferencia_especial` e, no clique,
+    /// `troca_patch::escolher_colonia` (no original, dentro do tick; no port, logo depois).
+    EscolherColonia,
     /// Música (`_myBeginSong`), pelo id do cabeçalho tipo 18 do banco SOUND.
     Musica(u16),
     /// Efeito sonoro (`_myBeginSound`), pelo id do objeto tipo 5 do banco SOUND
@@ -1040,30 +1047,40 @@ pub struct MensagemFaixa {
     pub importante: bool,
 }
 
-/// Contadores de balões de fala zerados no começo do tick (simulacao-visao-geral.md §5, passo 3).
+/// Balões de fala da janela de edição (opção "Silly"), fora do save. O tick só anota onde há
+/// balão (`_FightBalloons` & cia.); os sorteios e a escolha do balão são do desenho
+/// (`rules::baloes`). Especificação: docs/spec/telas/baloes.md.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Baloes {
-    /// `_FightBalloonCnt`, `_RestBalloonCnt`, `_QueenBalloonCnt`, `_EggBalloonCnt`.
-    pub luta: i16,
-    pub descanso: i16,
-    pub rainha: i16,
-    pub ovo: i16,
-    /// `_LastFightPnt`, `_LastRestPnt`, `_LastQueenPnt`, `_LastEggPnt` (−1 = nenhum).
-    pub ultimo_luta: (i16, i16),
-    pub ultimo_descanso: (i16, i16),
-    pub ultimo_rainha: (i16, i16),
-    pub ultimo_ovo: (i16, i16),
+    /// `_FightBalloonCnt`, `_RestBalloonCnt`, `_QueenBalloonCnt`, `_EggBalloonCnt` (índice:
+    /// `rules::baloes::TipoBalao`); zerados no começo do tick com "Silly".
+    pub contagem: [i16; 4],
+    /// `_LastFightPnt` & cia. (célula; −1 = nenhum) e `_Last*Plane`.
+    pub ultimo: [(i16, i16); 4],
+    pub ultimo_plano: [i16; 4],
+    /// `_CurFightPnt` & cia. (célula do balão mostrado) e `_Cur*Plane`.
+    pub atual: [(i16, i16); 4],
+    pub atual_plano: [i16; 4],
+    /// `_editWidth` e `_editHeight` (a interface informa antes do tick).
+    pub vista: (i16, i16),
+    /// Por fala (`rules::baloes::Fala`): prazo em `_TickCount`, balão ligado e índice da fala.
+    pub prazo: [u32; 6],
+    pub ligado: [bool; 6],
+    pub indice: [i16; 6],
+    /// `DGROUP:0x72f4`: `_SMode` visto pelo último balão da aranha.
+    pub modo_aranha_visto: i16,
+    /// `_CurBalloonCnt` e a lista de balões do redesenho (`_AddMsgBalloon`, até 6).
+    pub pedidos: [Option<crate::rules::baloes::Balao>; 6],
+    pub quantidade: i16,
+    /// O balão desenhado no último redesenho da janela de edição (`_DrawBalloons` desenha um só).
+    pub desenhado: Option<crate::rules::baloes::Balao>,
 }
 
 impl Baloes {
+    /// Passo 3 do tick (`_DoAntSim`): zera as contagens e os últimos pontos (os planos ficam).
     pub fn zerar(&mut self) {
-        *self = Baloes {
-            ultimo_luta: (-1, -1),
-            ultimo_descanso: (-1, -1),
-            ultimo_rainha: (-1, -1),
-            ultimo_ovo: (-1, -1),
-            ..Baloes::default()
-        };
+        self.contagem = [0; 4];
+        self.ultimo = [(-1, -1); 4];
     }
 }
 
@@ -1168,6 +1185,10 @@ pub struct Estado {
     /// 4 trilha vermelha. Ligada pelo alarme da amarela (`_SetAlarmDropState`) e pelos botões de
     /// cheiro da faixa (jogo.md, "Camada de cheiro na janela de edição").
     pub camada_edicao: i16,
+    /// `_DROPdir` (`9:9c66`, fora do save) já resolvido no passo (dx, dy) da comida que cai na casa
+    /// (`TabelasCasa::passo_queda`): gravado quando um patch da casa é gerado; antes disso, o de
+    /// `_DROPdir` = 0 (variável zerada na carga do programa).
+    pub passo_queda: (u8, u8),
     /// Pedidos à interface acumulados desde a última vez que foram retirados.
     pub eventos: Vec<Evento>,
 }
@@ -1227,6 +1248,7 @@ impl Estado {
             relogio_mac: None,
             precisa_salvar: false,
             camada_edicao: -1,
+            passo_queda: (0, 255),
             eventos: Vec::new(),
         }
     }
@@ -1517,6 +1539,9 @@ impl Estado {
         // Mapas, listas e vida.
         e.ambiente.terreno = m.terreno as i16;
         e.ambiente.barreira = if m.terreno == 0 { ini.barreira_quintal } else { ini.barreira_casa };
+        if m.terreno == 1 {
+            e.passo_queda = m.passo_queda;
+        }
         e.superficie.mapa = Grade::de_bytes(SUPERFICIE, m.mapa_a.clone())?;
         e.superficie.vida = Grade::de_bytes(SUPERFICIE, m.vida_a.clone())?;
         e.ninho_b.mapa = Grade::de_bytes(NINHO, m.mapa_b.clone())?;

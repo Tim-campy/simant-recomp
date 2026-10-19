@@ -291,7 +291,7 @@ Entre as formas há um byte 0 (`1048:2355`, `1048:235f`).
 
 ### 5.2 No port
 
-`engine/src/rules/casa.rs` executa as receitas de `data/casa.json`, gerado por `tools/extrair_casa.py` (formas lidas do `SIMANTW.EXE`; receitas escritas no script a partir desta seção, com o endereço de cada rotina). Cada patch é uma lista de operações (`preencher`, `celula`, `sortear`, `moldura`, `trocar`, `forma`, `ladrilhos`, `queda`, `rotina`); as rotinas acima são entradas de `rotinas`. Um mod pode redesenhar qualquer cômodo trocando a receita ou as formas; o carregamento recusa operações fora do mapa, `S(0)` e rotinas em laço. `Mundo::gerar_patch` chama a casa quando `n ≤ 37` e guarda `_DROPdir` em `Mundo::queda` (o `Estado` ainda não tem esse campo: a comida que cai na casa continua sumindo, ver formiga-amarela.md).
+`engine/src/rules/casa.rs` executa as receitas de `data/casa.json`, gerado por `tools/extrair_casa.py` (formas lidas do `SIMANTW.EXE`; receitas escritas no script a partir desta seção, com o endereço de cada rotina). Cada patch é uma lista de operações (`preencher`, `celula`, `sortear`, `moldura`, `trocar`, `forma`, `ladrilhos`, `queda`, `rotina`); as rotinas acima são entradas de `rotinas`. Um mod pode redesenhar qualquer cômodo trocando a receita ou as formas; o carregamento recusa operações fora do mapa, `S(0)` e rotinas em laço. `Mundo::gerar_patch` chama a casa quando `n ≤ 37` e guarda `_DROPdir` em `Mundo::queda` e o passo da queda em `Mundo::passo_queda`, que vai para `Estado::passo_queda` quando o patch é aplicado (a comida que cai na casa: superficie.md 8.2).
 
 ### 5.3 Verificação no original (bancada QEMU, 2026-10-17)
 
@@ -338,7 +338,7 @@ Verificado (teste `engine/tests/geracao_quick2.rs`, roda com `SIMANT_DIR` aponta
 
 Não verificado contra o original (implementado conforme o código, sem caso de teste real): `_DigOutBNest/RNest` (só acontece com mais de uma formiga por colônia, em `_XferPatch`), os ramos de Tutorial, Full Game e Experimental de `_InitYelloAnt`/`_RandWorld`, `_AddFood` com parâmetro ≥ 0 e `_MakeNewHoleR` na casa. (`_DigOutBNest`, `_MakeNewHoleB`, `_AddFood(−1)` e a linha da superfície dos ninhos na casa foram conferidos em §5.3.) A sequência R de `novo_jogo` (192 chamadas a `_RRand`) segue a spec, mas o estado de R no momento do clique não está no save.
 
-Fora do escopo desta implementação (lacunas): `_XferPatch` (o estado do jogo; a geração do patch é `Mundo::gerar_patch`), `_DROPdir` no `Estado` (fica em `Mundo::queda`), feromônios, `_ClearHistory`, `_CountAnts`, `_ResetYellowVars`, vistas (`_MapPnt`, `_AMapPnt`...), `_DigMyTile` (a formiga amarela nascendo em terra devolve erro) e as demais variáveis zeradas por `_RandYard` que não são estado do mapa.
+Fora do escopo desta implementação (lacunas): `_XferPatch` (o estado do jogo; a geração do patch é `Mundo::gerar_patch`), feromônios, `_ClearHistory`, `_CountAnts`, `_ResetYellowVars`, vistas (`_MapPnt`, `_AMapPnt`...), `_DigMyTile` (a formiga amarela nascendo em terra devolve erro) e as demais variáveis zeradas por `_RandYard` que não são estado do mapa.
 
 ## Como testar contra o original
 
