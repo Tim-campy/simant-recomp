@@ -86,7 +86,7 @@ pub struct ConfigSom {
     /// SoundFont (.sf2) para o `rustysynth`; sem ela, o sintetizador simples. Relativo à pasta atual.
     #[serde(default)]
     pub soundfont: Option<String>,
-    /// Sintetizador (API 0.30). Ausente: SoundFont se houver uma, senão o simples (como até a 0.29).
+    /// Sintetizador (API 0.31). Ausente: SoundFont se houver uma, senão o simples (como até a 0.30).
     #[serde(default)]
     pub sintetizador: Option<TipoSintetizador>,
     #[serde(default)]
