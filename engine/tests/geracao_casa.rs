@@ -238,10 +238,17 @@ fn casa_igual_ao_original_depois_de_xfer_patch() {
         ("CASA_1_0", 1, 0),
         ("CASA_2_4", 2, 4),
         ("CASA_2_5", 2, 5),
+        // 2026-10-19: a receita que faltava, o patch 8 (clipe e mesa), com 20 pretas e 20 vermelhas.
+        ("CASA_0_8", 0, 8),
+        // 2026-10-19: patches do quintal com 20 pretas e 20 vermelhas escritas (_DigOutBNest e
+        // _DigOutRNest fora da casa; também _MakeYardPatch, formigas-leão e lagarta num patch novo).
+        ("QUINTAL_3_4", 3, 4),
+        ("QUINTAL_6_10", 6, 10),
     ] {
         let j = JogoSalvo::abrir(&layout, &raiz().join(format!("tests/referencias/saves/{arquivo}.ANT"))).unwrap();
         let bloco = |s: &str| j.bloco(s).unwrap().to_vec();
-        assert_eq!(j.u16("TERRAINset").unwrap(), 1, "{arquivo}");
+        let casa = px < 2 || (px == 2 && py <= 5);
+        assert_eq!(j.u16("TERRAINset").unwrap(), u16::from(casa), "{arquivo}");
         let n = (px * 16 + py) as usize;
         let k = (py * 12 + px) as usize;
         let sementes = bloco("YMapSeeds");
@@ -257,8 +264,11 @@ fn casa_igual_ao_original_depois_de_xfer_patch() {
             ("MapR", &m.mapa_r),
             ("ExitMapB", &m.saida_b),
             ("ExitMapR", &m.saida_r),
+            ("HoleMapB", &m.buracos_b.to_vec()),
+            ("HoleMapR", &m.buracos_r.to_vec()),
         ] {
             let orig = bloco(nome);
+            assert_eq!(orig.len(), port.len(), "{arquivo}: {nome}");
             let dif = orig.iter().zip(port.iter()).filter(|(a, b)| a != b).count();
             assert_eq!(dif, 0, "{arquivo}: {nome} com {dif} células diferentes (pretas {pretas}, vermelhas {vermelhas})");
         }

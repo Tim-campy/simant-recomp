@@ -1,0 +1,31 @@
+# Jogo novo escolhido durante a partida (File -> New, Ctrl+N): do snapshot "quick" (Quick Game rodando), pausa pelo
+# menu (Shift+0), grava o estado e as sementes, Ctrl+N, "Select a Game", Full Game; para no CALL do primeiro _DoAntSim
+# (tick_chamada) ou, se o jogo novo vier pausado, grava assim mesmo. Ver docs/spec/regras/geracao-mundo.md §8.
+# Uso: python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_novo_na_partida.txt --overlay <cópia do c_overlay.qcow2>
+snapshot_carregar quick
+esperar 3
+teclas shift+0
+esperar 2
+capturar re_trabalho/ag_fecha/novo_pausado.png
+pausar
+estado re_trabalho/ag_fecha/novo_antes.ANT
+extras re_trabalho/ag_fecha/novo_antes_extras.json
+continuar
+teclas ctrl+n
+esperar 5
+capturar re_trabalho/ag_fecha/novo_selecao.png
+pausar
+extras re_trabalho/ag_fecha/novo_selecao_extras.json
+continuar
+mouse_canto
+mover 265 300
+esperar 1
+clicar
+esperar_variavel CurGameType 2 30
+esperar 6
+capturar re_trabalho/ag_fecha/novo_full.png
+pausar
+estado re_trabalho/ag_fecha/novo_full.ANT
+extras re_trabalho/ag_fecha/novo_full_extras.json
+continuar
+fim
