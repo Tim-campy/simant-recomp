@@ -410,7 +410,17 @@ fn transferencia_especial_dentro_do_tick_ao_vivo() {
     // Ao vivo: o tick para na escolha.
     let mut a = nova();
     a.rodar_tick();
-    assert!(a.escolher_colonia && a.tick_esperando_colonia());
+    assert!(a.tick_esperando_colonia());
+    // A apresentação do tick até a escolha (_SpecialXfer vem depois do quadro 10058).
+    while !a.escolher_colonia {
+        if a.animando() {
+            a.avancar(10_000);
+        } else {
+            assert!(a.avisos.tem_modal(), "a apresentação só para numa animação ou num quadro");
+            a.pular_modal();
+            a.fechar_modal();
+        }
+    }
     let mut j = JanelaQuintal::default();
     assert!(iniciar_escolha_de_colonia(&mut j, &mut a) || a.avisos.tem_modal());
     while a.avisos.tem_modal() {

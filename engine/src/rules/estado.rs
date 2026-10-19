@@ -1013,6 +1013,14 @@ pub enum Evento {
     /// inteiro, inclusive a simulação). A interface mostra os quadros e não roda ticks nesse tempo.
     /// Não muda o estado (regras/formiga-amarela.md §10.2).
     Animacao(Box<AnimacaoDaAmarela>),
+    /// Um redesenho da janela de edição dentro do tick (`_DoEditUpdateDraw`, `_UpdateEdit` depois de
+    /// um `_CenterEdit` que moveu a vista): o plano mostrado e a janela como ela foi desenhada
+    /// naquele instante. A interface apresenta os pedidos do tick em ordem (a linha do tempo de
+    /// `core::partida`): enquanto um quadro modal ou uma animação seguram a apresentação, a janela
+    /// de edição mostra o último instantâneo, como o original, que fica parado no meio do tick com a
+    /// janela desenhada até ali (regras/formiga-amarela.md §9.4). Não muda o estado; não vai aos
+    /// scripts.
+    Instantaneo { plano: i16, quadro: Box<QuadroAnimacao> },
 }
 
 /// Animação da amarela (`_AnimYellowFight`, `1028:7e56`): o plano animado e, para cada quadro, a

@@ -44,7 +44,7 @@ use crate::rules::inimigos::TabelasInimigos;
 use crate::rules::tick::{Regras, RegrasAmarela, RegrasConselhos, RegrasInimigos, RegrasNinho, RegrasQuintal, RegrasSuperficie};
 
 /// Versão da API de mods que os scripts veem em `API_VERSAO`.
-pub const VERSAO_API: &str = "0.36";
+pub const VERSAO_API: &str = "0.37";
 
 /// Tamanho máximo do texto de `mostrar_mensagem` (caracteres).
 pub const MAX_TEXTO_MENSAGEM: usize = 120;
@@ -1693,6 +1693,11 @@ fn tabela_evento(lua: &Lua, ev: &Evento) -> mlua::Result<Table> {
             t.set("plano", a.plano)?;
             t.set("quadros", a.quadros.len())?;
             t.set("espera_ms", a.espera_ms)?;
+        }
+        // A partida não repassa os instantâneos aos scripts (só apresentação).
+        Evento::Instantaneo { plano, .. } => {
+            t.set("tipo", "instantaneo")?;
+            t.set("plano", *plano)?;
         }
     }
     Ok(t)
