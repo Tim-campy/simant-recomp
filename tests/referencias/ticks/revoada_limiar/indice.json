@@ -1,0 +1,88 @@
+{
+ "_comentario": "Vetores de tick do SimAnt original (bancada QEMU). Ver docs/spec/regras/testes-tick.md.",
+ "gerado_em": "2026-10-19",
+ "gerador": "tools/cenarios_regras.py",
+ "snapshot": "rico",
+ "descricao": "_FlyAwayR no limiar: contagem com 20 reprodutores vermelhos não arma; com 21 arma no tick da contagem",
+ "passos": [
+  "GameTime 1728, FlyAwayR 0, CastePopR 14000f000600060000000100",
+  "reprodutores vermelhos 6, operárias 14",
+  "R[49] em (30, 10) T 0x93 -> 0xa3",
+  "A[3] em (96, 58) T 0x97 -> 0xa7 M 14",
+  "A[5] em (99, 60) T 0x93 -> 0xa3 M 14",
+  "A[12] em (124, 19) T 0x96 -> 0xa6 M 14",
+  "A[13] em (80, 24) T 0x97 -> 0xa7 M 14",
+  "A[15] em (111, 10) T 0x90 -> 0xa0 M 14",
+  "A[19] em (117, 25) T 0x94 -> 0xa4 M 14",
+  "A[21] em (92, 19) T 0x97 -> 0xa7 M 14",
+  "A[34] em (111, 2) T 0x96 -> 0xa6 M 14",
+  "A[36] em (99, 31) T 0x93 -> 0xa3 M 14",
+  "A[45] em (93, 21) T 0x96 -> 0xa6 M 14",
+  "A[46] em (70, 18) T 0x90 -> 0xa0 M 14",
+  "A[68] em (80, 18) T 0x96 -> 0xa6 M 14",
+  "A[121] em (104, 27) T 0x97 -> 0xa7 M 14",
+  "depois da contagem com 20: FlyAwayR 0, CastePopR 160001000600140000000100",
+  "R[27] em (31, 9) T 0x94 -> 0xa4",
+  "depois da contagem com 21: FlyAwayR 198, CastePopR 180000000600150000000100"
+ ],
+ "primeira_entrada": {
+  "SementeS": 50128,
+  "SementeR": 106997626,
+  "gameCycles": 205488,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "DROPdir": 0,
+  "GameTime": 1711,
+  "Cycle": 1711,
+  "posicao": "entrada"
+ },
+ "seletores_dados": {
+  "10": "0x1527",
+  "8": "0x1537",
+  "9": "0x152f"
+ },
+ "retorno_DoAntSim": "156f:2688",
+ "extras": {
+  "SementeS": [
+   "SementeS",
+   2
+  ],
+  "SementeR": [
+   "SementeR",
+   4
+  ],
+  "gameCycles": [
+   "gameCycles",
+   4
+  ],
+  "Tindex": [
+   "Tindex",
+   2
+  ],
+  "GlobalKey": [
+   "GlobalKey",
+   2
+  ],
+  "TimeTemp": [
+   "TimeTemp",
+   4
+  ],
+  "DROPdir": [
+   "DROPdir",
+   2
+  ]
+ },
+ "ticks": [
+  "tick_001791",
+  "tick_001855"
+ ],
+ "selecao": [
+  "1791",
+  "1855"
+ ],
+ "pendentes": {},
+ "vida_nao_reconstruivel": {
+  "*": "vagas mortas (T = 0) paradas nas células dos buracos e formigas que dividem célula: a reconstrução de _DoLoadInitializations (o menor índice vence) não dá a vida em memória (ver colonia_5min); a preparação também escreve marcas no mapa de vida"
+ }
+}

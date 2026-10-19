@@ -1,0 +1,23 @@
+# Cancel do Load Game da abertura: "Select a Game" (snapshot sel2 do overlay ov_modos) → Load Game →
+# "Load Ant Hill" → Esc (Cancel) → o que aparece; depois Quick Game no que voltou. Capturas em
+# re_trabalho/ag8/load_cancel/ (fora do git). Uma cópia do overlay, nunca o padrão:
+# python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_load_abertura_cancelar.txt --overlay re_trabalho/ag8/ov_modos.qcow2
+snapshot_carregar sel2
+esperar 3
+capturar re_trabalho/ag8/load_cancel/c1_selecao.png
+clicar_em 345 375
+esperar 4
+capturar re_trabalho/ag8/load_cancel/c2_dialogo.png
+teclas esc
+esperar 1
+capturar re_trabalho/ag8/load_cancel/c3_cancel_1s.png
+esperar 4
+capturar re_trabalho/ag8/load_cancel/c4_cancel_5s.png
+clicar_em 345 228
+esperar 8
+capturar re_trabalho/ag8/load_cancel/c5_quick.png
+pausar
+ler_variavel CurGameType re_trabalho/ag8/load_cancel/c5_tipo.bin
+ler_variavel GameTime re_trabalho/ag8/load_cancel/c5_gametime.bin
+continuar
+fim

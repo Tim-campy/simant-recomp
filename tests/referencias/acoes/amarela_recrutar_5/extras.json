@@ -1,0 +1,32 @@
+{
+ "antes": {
+  "SementeS": 15986,
+  "SementeR": 4144515450,
+  "gameCycles": 207544,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "DROPdir": 0,
+  "GameTime": 1720,
+  "Cycle": 1720,
+  "posicao": "livre"
+ },
+ "depois": {
+  "SementeS": 15986,
+  "SementeR": 4144515450,
+  "gameCycles": 208247,
+  "Tindex": 0,
+  "GlobalKey": 0,
+  "TimeTemp": 0,
+  "DROPdir": 0,
+  "GameTime": 1720,
+  "Cycle": 1720,
+  "posicao": "livre"
+ },
+ "acao": {
+  "comandos": [
+   1
+  ],
+  "defesa_ultimo_tick": 0
+ }
+}

@@ -834,6 +834,13 @@ def cenario_recrutar(c: Sessao, saida, n):
     c.teclas("shift+0")
     time.sleep(1)
     nomes = c.gravar(saida / "ticks", n)
+    # uma operária preta no ninho preto (lista B, M 0) e uma invasora preta recrutada no vermelho
+    # (lista R, M 6): _Recruit passa à lista B depois da A; _UnRecruit põe M = 7 na lista R
+    s = c.save()
+    xb, yb = topo_do_tunel(s, "MapB", vida_ler(c, "B"))
+    acrescentar_formiga(c, "B", xb, yb, 0x12, 0, 0)
+    xr, yr = topo_do_tunel(s, "MapR", vida_ler(c, "R"))
+    acrescentar_formiga(c, "R", xr, yr, 0x12, 6, 0)
     c.dep.retomar()
     c.teclas("shift+0")
     time.sleep(2)
@@ -904,6 +911,10 @@ def cenario_queda_casa_celula(c: Sessao, saida, n):
     s = c.save()
     c.log(f"_CurYardPnt = {c.ler('CurYardPnt'):#x}; DROPdir {c.ler('DROPdir', 2)}; aranha em agonia em ({x}, {y}) "
           f"tile {s.celula('MapA', x, y):#x}; abaixo {[hex(s.celula('MapA', x, k)) for k in range(y, min(64, y + 8))]}")
+    if os.environ.get("CASA_TILE"):
+        # nenhum tile da cozinha nem dos ladrilhos faz a comida cair (todos < 4 ou ≥ 0x40): um 0x3F
+        # (fiapo do carpete) é escrito na célula
+        mapa_escrever(c, "MapA", x, y, int(os.environ["CASA_TILE"], 0))
     cr.aranha_em(c, x, y, modo=5)
     c.escrever("DeathCnt", 3)
     return c.gravar(saida, n, parar=lambda d: d.ler("SpidOn") == 0)

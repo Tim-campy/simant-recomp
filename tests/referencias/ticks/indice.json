@@ -68,7 +68,16 @@
   "revoada_natural",
   "queda_casa_carpete_esq",
   "queda_casa_carpete_dir",
-  "amarela_rainha"
+  "amarela_rainha",
+  "estrategia_malvada",
+  "estrategia_vermelha_populosa",
+  "estrategia_vermelha_sorteio",
+  "estrategia_preta_desespero",
+  "recrutadas",
+  "revoada_limiar",
+  "queda_casa_cozinha",
+  "queda_casa_ladrilhos",
+  "queda_casa_azulejo"
  ],
  "snapshot": "quick",
  "semente_s_forcada": null,
