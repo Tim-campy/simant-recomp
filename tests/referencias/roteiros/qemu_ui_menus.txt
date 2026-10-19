@@ -1,0 +1,100 @@
+# Barra de menus do Windows (File, Window, View, Options, Speed), About, Status (Ctrl+T) e Quit.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_menus.txt --overlay re_trabalho/qemu/ov_menus_quick.qcow2
+# (o overlay é uma cópia do c_overlay.qcow2 com o snapshot "quick")
+snapshot_carregar quick
+esperar 3
+mouse_canto
+mover 600 300
+esperar 1
+capturar re_trabalho/agente_menus/m00_barra.png
+# Menus pelo teclado: Alt+F abre o File com o primeiro item realçado; setas para a direita trocam de menu.
+teclas alt+f
+esperar 1
+capturar re_trabalho/agente_menus/m01_file_teclado.png
+teclas down
+esperar 1
+capturar re_trabalho/agente_menus/m01b_file_baixo.png
+teclas right
+esperar 1
+capturar re_trabalho/agente_menus/m02_window.png
+teclas right
+esperar 1
+capturar re_trabalho/agente_menus/m03_view.png
+teclas right
+esperar 1
+capturar re_trabalho/agente_menus/m04_options.png
+teclas right
+esperar 1
+capturar re_trabalho/agente_menus/m05_speed.png
+teclas right
+esperar 1
+capturar re_trabalho/agente_menus/m05b_direita_do_speed.png
+teclas esc
+esperar 1
+capturar re_trabalho/agente_menus/m06_esc1.png
+teclas esc
+esperar 1
+capturar re_trabalho/agente_menus/m07_esc2.png
+# Só Alt (realça o título File sem abrir)
+teclas alt
+esperar 1
+capturar re_trabalho/agente_menus/m08_so_alt.png
+teclas esc
+esperar 1
+# Pelo mouse: clique no título File (abre sem realçar item)
+clicar_em 20 27
+esperar 1
+capturar re_trabalho/agente_menus/m09_file_mouse.png
+teclas esc
+esperar 1
+# Pausa: o item do Speed vira "Un&pause"
+teclas shift+0
+esperar 1
+teclas alt+s
+esperar 1
+capturar re_trabalho/agente_menus/m10_speed_pausado.png
+teclas esc
+teclas esc
+teclas shift+0
+esperar 1
+# Options com AutoTrack e Silly ligados
+teclas ctrl+g
+esperar 1
+teclas alt+o
+esperar 1
+capturar re_trabalho/agente_menus/m11_options_autotrack.png
+teclas esc
+teclas esc
+teclas ctrl+g
+esperar 1
+# About pelo menu (clique no título e no item)
+clicar_em 20 27
+esperar 1
+clicar_em 34 46
+esperar 1
+capturar re_trabalho/agente_menus/m12_about_1s.png
+esperar 3
+capturar re_trabalho/agente_menus/m13_about_4s.png
+esperar 8
+capturar re_trabalho/agente_menus/m14_about_12s.png
+esperar 20
+capturar re_trabalho/agente_menus/m15_about_32s.png
+clicar_em 320 240
+esperar 2
+capturar re_trabalho/agente_menus/m16_about_fechado.png
+# Status (Ctrl+T)
+teclas ctrl+t
+esperar 2
+capturar re_trabalho/agente_menus/m17_status.png
+clicar_em 320 240
+esperar 2
+capturar re_trabalho/agente_menus/m18_status_fechado.png
+# Quit (Ctrl+Q): a pergunta de salvar; Esc = Cancel
+teclas ctrl+q
+esperar 2
+capturar re_trabalho/agente_menus/m19_quit.png
+teclas esc
+esperar 2
+capturar re_trabalho/agente_menus/m20_quit_cancelado.png
+# Status no Full Game e no Experimental não (o snapshot é Quick); Window > Help (F1) fica para a ajuda.
+fim

@@ -55,6 +55,8 @@ pub(crate) struct Sessao<'a> {
     pub(crate) menu_mod: Option<engine::core::menus_mods::MenuModAberto>,
     /// Ajuda: modo de ajuda, contextos e cursores (simant/src/ajuda_ui.rs).
     pub(crate) ajuda: ajuda_ui::AjudaUi,
+    /// Barra de menus e as janelas abertas por ela (simant/src/menus_ui.rs).
+    pub(crate) menus: menus_ui::MenusUi,
 }
 
 /// Para quem vai a escolha do menu aberto.
@@ -188,6 +190,7 @@ impl Sessao<'_> {
             menus_mods_cfg: recursos.dados(engine::core::menus_mods::ARQUIVO_CONFIG)?,
             menu_mod: None,
             ajuda: ajuda_ui::AjudaUi::carregar(recursos)?,
+            menus: menus_ui::MenusUi::carregar(recursos)?,
         };
         for a in abertas.into_iter().flatten() {
             s.depois_de_abrir(a);
@@ -284,6 +287,7 @@ impl Sessao<'_> {
         self.desenhar_gerente(&mut q);
         ajuda_ui::desenhar(self, &mut q);
         mods_ui::desenhar(self, &mut q);
+        pendentes.extend(menus_ui::desenhar_no_cliente(self, &mut q));
         self.desenhar_dialogo(&mut q);
         if !pendentes.is_empty() {
             eprintln!("tela de jogo: não desenhado ainda: {}", pendentes.join(", "));

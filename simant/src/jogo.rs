@@ -128,7 +128,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
     use sdl2::mouse::MouseButton;
     use sdl2::pixels::PixelFormatEnum;
 
-    let (lw, lh) = (s.tela.cfg.largura, s.tela.cfg.altura);
+    // A janela tem a barra de menus em cima da área cliente (simant/src/menus_ui.rs).
+    let (lw, lh) = (s.tela.cfg.largura, s.tela.cfg.altura + s.menus.altura() as u32);
     let Janela { sdl, mut canvas } = abrir_janela(titulo, lw, lh, &o.video)?;
     let criador = canvas.texture_creator();
     let mut textura = criador.create_texture_static(PixelFormatEnum::RGB24, lw, lh).map_err(|e| e.to_string())?;
@@ -154,6 +155,29 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
     loop {
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
+            // Barra de menus (e About/Status) primeiro; o resto segue com y na área cliente.
+            let modal = s.dialogo.is_some()
+                || s.partida.avisos.tem_modal()
+                || s.menu.is_some()
+                || s.menu_mod.is_some()
+                || s.modos.escolhendo
+                || s.modos.menu_aberto
+                || s.exame.is_some()
+                || modos::segurando(s);
+            let ev = match menus_ui::evento(s, ev, modal) {
+                menus_ui::Filtro::Passar(ev) => ev,
+                menus_ui::Filtro::Tratada(r) => {
+                    redesenhar |= r;
+                    continue;
+                }
+                menus_ui::Filtro::Comando(c) => {
+                    redesenhar = true;
+                    if menus_ui::executar(s, c, o.salvar.as_deref()) == menus_ui::Depois::Sair {
+                        return Ok(());
+                    }
+                    continue;
+                }
+            };
             if s.exame.is_some() || modos::segurando(s) {
                 // _MagnifyMenu e _DrawCastePopUp: a janela fica enquanto o botão (ou Espaço/Insert)
                 // estiver apertado; a simulação não anda.
@@ -192,11 +216,13 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     }
                     _ => continue,
                 };
-                if let arquivos::RespostaDialogo::Carregar(p) = r {
-                    match arquivos::carregar(s, &p, o) {
+                match r {
+                    arquivos::RespostaDialogo::Carregar(p) => match arquivos::carregar(s, &p, o) {
                         Ok(nova) => *s = nova,
                         Err(e) => eprintln!("erro no Load: {e}"),
-                    }
+                    },
+                    arquivos::RespostaDialogo::Sair => return Ok(()),
+                    arquivos::RespostaDialogo::Nada => {}
                 }
                 redesenhar = true;
                 continue;
@@ -231,7 +257,12 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     }
                     redesenhar = true;
                 }
-                Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return Ok(()),
+                // Fechar a janela (SC_CLOSE/WM_QUERYENDSESSION → _MenuQuit) e Esc (extensão do port):
+                // a pergunta do Quit.
+                Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+                    s.abrir_pergunta_sair();
+                    redesenhar = true;
+                }
                 Event::Window { win_event: WindowEvent::Exposed, .. } => redesenhar = true,
                 Event::Window { win_event: WindowEvent::Minimized, .. } => minimizada = true,
                 Event::Window { win_event: WindowEvent::Restored | WindowEvent::Maximized, .. } => {
@@ -449,9 +480,18 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         }
         // Com o "Select a Game" aberto (Ctrl+N), a simulação fica parada (_SetPause(1) em _NewGame).
         s.atualizar_janelas_desenho(minimizada);
-        if !s.modos.escolhendo && !s.modos.menu_aberto && s.dialogo.is_none() && s.exame.is_none() && !modos::segurando(s) && s.menu_mod.is_none() {
+        // Menu da barra aberto: o laço de menu do Windows não deixa o jogo andar (bancada).
+        if !s.modos.escolhendo
+            && !s.modos.menu_aberto
+            && s.dialogo.is_none()
+            && s.exame.is_none()
+            && !modos::segurando(s)
+            && s.menu_mod.is_none()
+            && !s.menus.prende_simulacao()
+        {
             s.partida.avancar(ms);
         }
+        redesenhar |= menus_ui::passar_tempo(s);
         let pedidos = s.registrar_eventos();
         audio.tratar(&pedidos, &s.partida.estado.partida.opcoes);
         redesenhar |= s.partida.tomar_redesenho();
@@ -463,7 +503,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
             redesenhar = true;
         }
         if redesenhar {
-            let rgb = s.quadro_rgb()?;
+            let cliente = s.quadro_rgb()?;
+            let rgb = menus_ui::compor(s, &cliente);
             textura.update(None, &rgb, lw as usize * 3).map_err(|e| e.to_string())?;
             redesenhar = false;
         }

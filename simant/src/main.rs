@@ -31,6 +31,7 @@ use opcoes::*;
 use sessao::*;
 
 mod janelas_ui;
+mod menus_ui;
 mod mods_ui;
 mod modos;
 
@@ -136,14 +137,16 @@ fn abrir_janela(titulo: &str, largura: u32, altura: u32, cfg: &video::ConfigVide
     Ok(Janela { sdl, canvas })
 }
 
+/// O que a abertura decidiu.
+enum SaidaAbertura {
+    /// Jogo novo do tipo escolhido no "Select a Game".
+    Jogo(engine::core::selecao::Escolha),
+    /// "Load Game" e o arquivo escolhido no "Load Ant Hill".
+    Carregar(PathBuf),
+}
+
 /// Abertura até o "Select a Game"; devolve a escolha feita nele (None = saiu).
-fn executar(
-    seq: Sequencia,
-    recursos: &Recursos,
-    interface: &Interface,
-    cores: &[[u8; 3]],
-    o: &Opcoes,
-) -> Result<Option<engine::core::selecao::Escolha>, String> {
+fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &[[u8; 3]], o: &Opcoes) -> Result<Option<SaidaAbertura>, String> {
     use sdl2::event::Event;
     use sdl2::keyboard::Keycode;
     use sdl2::pixels::PixelFormatEnum;
@@ -162,19 +165,50 @@ fn executar(
     let inicio = Instant::now();
     let mut antes = inicio;
 
+    // "Load Ant Hill" aberto pelo Load Game (arquivos.rs).
+    let mut load: Option<arquivos::LoadNaAbertura> = None;
+    let escolher = |e: engine::core::selecao::Escolha, load: &mut Option<arquivos::LoadNaAbertura>| -> Result<Option<SaidaAbertura>, String> {
+        match e {
+            engine::core::selecao::Escolha::Carregar => {
+                *load = Some(arquivos::LoadNaAbertura::abrir(recursos)?);
+                Ok(None)
+            }
+            e => Ok(Some(SaidaAbertura::Jogo(e))),
+        }
+    };
+
     while !rep.terminou() {
         let escolhendo = rep.atual().is_some_and(|t| t.nome == selecao.cfg.tela);
-        for ev in eventos.poll_iter() {
+        let lote: Vec<Event> = eventos.poll_iter().collect();
+        for ev in lote {
+            if matches!(ev, Event::Quit { .. }) {
+                return Ok(None);
+            }
+            if let Some(l) = load.as_mut() {
+                match l.evento(&ev) {
+                    Some(engine::core::dialogos::RespostaArquivo::Escolher(p)) => return Ok(Some(SaidaAbertura::Carregar(p))),
+                    Some(_) => load = None,
+                    None => {}
+                }
+                desenhada = None;
+                continue;
+            }
             match ev {
-                Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return Ok(None),
+                Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return Ok(None),
                 Event::KeyDown { keycode: Some(k), keymod, .. } if escolhendo => {
                     if let Some(e) = selecao.cfg.escolha_da_tecla(&evento_de_tecla(k, keymod)) {
-                        return Ok(Some(e));
+                        if let Some(s) = escolher(e, &mut load)? {
+                            return Ok(Some(s));
+                        }
+                        desenhada = None;
                     }
                 }
                 Event::MouseButtonDown { x, y, .. } if escolhendo => {
                     if let Some(e) = selecao.escolha_em(x, y) {
-                        return Ok(Some(e));
+                        if let Some(s) = escolher(e, &mut load)? {
+                            return Ok(Some(s));
+                        }
+                        desenhada = None;
                     }
                 }
                 Event::KeyDown { keycode: Some(Keycode::Space), .. } => rep.evento(Evento::Espaco),
@@ -194,7 +228,14 @@ fn executar(
 
         let Some(tela) = rep.atual() else { break };
         if desenhada.as_deref() != Some(tela.nome.as_str()) {
-            let rgb = compor_rgb(tela, recursos, interface, cores)?;
+            let rgb = match &load {
+                Some(l) => {
+                    let (mut q, _) = compor(tela, recursos, interface)?;
+                    l.desenhar(&mut q, interface);
+                    para_rgb(&q.pixels, cores)
+                }
+                None => compor_rgb(tela, recursos, interface, cores)?,
+            };
             let mut t = criador
                 .create_texture_static(PixelFormatEnum::RGB24, tela.largura, tela.altura)
                 .map_err(|e| e.to_string())?;
@@ -235,7 +276,12 @@ fn principal() -> Result<(), String> {
         let seq: Sequencia = recursos.dados("telas.json")?;
         let interface = Interface::carregar(&recursos, config.tabela_posicoes)?;
         match executar(seq, &recursos, &interface, &cores, &o)? {
-            Some(e) => match e.tipo_jogo() {
+            Some(SaidaAbertura::Carregar(p)) => {
+                // Load Game na abertura: o Load do começo do programa (como --save).
+                println!("Select a Game: Load Game {}", p.display());
+                o.save = Some(p);
+            }
+            Some(SaidaAbertura::Jogo(e)) => match e.tipo_jogo() {
                 Some(tipo) => {
                     println!("Select a Game: {e:?}");
                     o.novo_jogo = true;
@@ -360,7 +406,13 @@ fn principal() -> Result<(), String> {
                     return Err(format!("--menu sistema@{id}: janela fechada"));
                 }
             }
-            Some(_) => return Err("--menu amarela@X,Y, icones@OBJETO, mod@TECLA[#ITEM] ou sistema@ID".into()),
+            Some(("barra", m)) => {
+                // Barra de menus (menus_ui.rs): menu M aberto, com o item I realçado.
+                let (m, i) = m.split_once(',').map_or((m, None), |(m, i)| (m, i.parse().ok()));
+                let menu = m.parse().map_err(|_| "--menu barra@M[,ITEM]")?;
+                s.menus.barra.estado = engine::core::barra_menus::Estado::Aberto { menu, item: i };
+            }
+            Some(_) => return Err("--menu amarela@X,Y, icones@OBJETO, mod@TECLA[#ITEM], sistema@ID ou barra@M[,ITEM]".into()),
             None => {}
         }
         match o.dialogo.as_deref() {
@@ -374,7 +426,12 @@ fn principal() -> Result<(), String> {
                 let m = engine::core::dialogos::CaixaMensagem::salvo(&s.dialogos_cfg, r"C:\MAXIS\ANTWIN\QUICK1.ANT");
                 s.dialogo = Some(arquivos::Dialogo::Salvo(m, false));
             }
-            Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como ou salvo")),
+            Some("sair") => s.abrir_pergunta_sair(),
+            Some("sobre") => {
+                menus_ui::executar(&mut s, engine::core::barra_menus::ComandoMenu::Sobre, None);
+            }
+            Some("status") => s.menus.status = true,
+            Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como, salvo, sair, sobre ou status")),
             None => {}
         }
         if let Some((x, y)) = o.examinar {

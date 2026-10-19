@@ -19,6 +19,10 @@ pub(crate) enum Dialogo {
     SalvarComo(DialogoArquivo),
     /// "%s Saved correctly"; com `true`, o Load vem depois do OK.
     Salvo(CaixaMensagem, bool),
+    /// "SimAnt Quit: Do you want to save the current ant hill?" (`_MenuQuit`).
+    PerguntaSair(CaixaMensagem),
+    /// Save As pedido pelo Yes da pergunta do Quit (`_SaveGame(0)`); salvo, o jogo termina.
+    SalvarAntesDeSair(DialogoArquivo),
 }
 
 /// O que a interface faz depois de uma entrada no diálogo.
@@ -27,6 +31,8 @@ pub(crate) enum RespostaDialogo {
     Nada,
     /// Carregar este arquivo (nova sessão).
     Carregar(PathBuf),
+    /// Sair do jogo (Quit respondido com No, ou Yes e salvo).
+    Sair,
 }
 
 impl Sessao<'_> {
@@ -51,6 +57,12 @@ impl Sessao<'_> {
         } else {
             Dialogo::Load(self.dialogo_arquivo(false))
         });
+    }
+
+    /// File → Quit (`_MenuQuit`), Ctrl+Q ou fechar a janela: pergunta sempre (não olha
+    /// `_gGameNeedsSaving`).
+    pub(crate) fn abrir_pergunta_sair(&mut self) {
+        self.dialogo = Some(Dialogo::PerguntaSair(CaixaMensagem::pergunta_sair(&self.dialogos_cfg)));
     }
 
     /// File → Save (`_SaveGame(1)`) e Save As (`_SaveGame(0)`): sem arquivo, ou em Save As, o
@@ -92,6 +104,12 @@ impl Sessao<'_> {
                 _ => {}
             },
             Some(Dialogo::Salvo(_, true)) => self.dialogo = Some(Dialogo::Load(self.dialogo_arquivo(false))),
+            // _MenuQuit: Yes = Save As e sai se salvou; No = sai; Cancel = volta ao jogo.
+            Some(Dialogo::PerguntaSair(_)) => match i {
+                0 => self.dialogo = Some(Dialogo::SalvarAntesDeSair(self.dialogo_arquivo(true))),
+                1 => return RespostaDialogo::Sair,
+                _ => {}
+            },
             outro => self.dialogo = outro.filter(|d| !matches!(d, Dialogo::Salvo(..))),
         }
         RespostaDialogo::Nada
@@ -111,6 +129,19 @@ impl Sessao<'_> {
                     self.dialogo = Some(Dialogo::PerguntaLoad(CaixaMensagem::pergunta_load(&self.dialogos_cfg)));
                 }
             }
+            // Cancel no Save As do Yes do Quit: _MenuQuit devolve 0 e o jogo continua.
+            (Dialogo::SalvarAntesDeSair(_), RespostaArquivo::Escolher(p)) => {
+                return match self.salvar(true, Some(&p)) {
+                    Ok(p) => {
+                        println!("{} Saved correctly", p.display());
+                        RespostaDialogo::Sair
+                    }
+                    Err(e) => {
+                        eprintln!("erro ao salvar: {e}");
+                        RespostaDialogo::Nada
+                    }
+                };
+            }
             (Dialogo::SalvarComo(_), RespostaArquivo::Escolher(p)) => {
                 self.gravar_e_avisar(&p, false);
             }
@@ -124,11 +155,11 @@ impl Sessao<'_> {
     pub(crate) fn clicar_no_dialogo(&mut self, x: i32, y: i32, duplo: bool) -> RespostaDialogo {
         let cfg = self.dialogos_cfg.clone();
         let r = match &mut self.dialogo {
-            Some(Dialogo::PerguntaLoad(m) | Dialogo::Salvo(m, _)) => match m.botao_em(&self.interface, &cfg, x, y) {
+            Some(Dialogo::PerguntaLoad(m) | Dialogo::Salvo(m, _) | Dialogo::PerguntaSair(m)) => match m.botao_em(&self.interface, &cfg, x, y) {
                 Some(i) => return self.escolher_botao(i),
                 None => return RespostaDialogo::Nada,
             },
-            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d)) => d.clicar(&cfg, x, y, duplo),
+            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d) | Dialogo::SalvarAntesDeSair(d)) => d.clicar(&cfg, x, y, duplo),
             None => return RespostaDialogo::Nada,
         };
         self.responder_arquivo(r)
@@ -138,11 +169,11 @@ impl Sessao<'_> {
     pub(crate) fn tecla_no_dialogo(&mut self, nome: &str) -> RespostaDialogo {
         let cfg = self.dialogos_cfg.clone();
         let r = match &mut self.dialogo {
-            Some(Dialogo::PerguntaLoad(m) | Dialogo::Salvo(m, _)) => match m.tecla(nome) {
+            Some(Dialogo::PerguntaLoad(m) | Dialogo::Salvo(m, _) | Dialogo::PerguntaSair(m)) => match m.tecla(nome) {
                 Some(i) => return self.escolher_botao(i),
                 None => return RespostaDialogo::Nada,
             },
-            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d)) => d.tecla(nome, &cfg),
+            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d) | Dialogo::SalvarAntesDeSair(d)) => d.tecla(nome, &cfg),
             None => return RespostaDialogo::Nada,
         };
         self.responder_arquivo(r)
@@ -151,7 +182,7 @@ impl Sessao<'_> {
     /// Texto digitado com um diálogo de arquivo aberto.
     pub(crate) fn digitar_no_dialogo(&mut self, texto: &str) {
         let cfg = &self.dialogos_cfg;
-        if let Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d)) = &mut self.dialogo {
+        if let Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d) | Dialogo::SalvarAntesDeSair(d)) = &mut self.dialogo {
             d.digitar(texto, cfg);
         }
     }
@@ -159,12 +190,55 @@ impl Sessao<'_> {
     /// Desenha o diálogo aberto por cima de tudo.
     pub(crate) fn desenhar_dialogo(&self, q: &mut Quadro) {
         match &self.dialogo {
-            Some(Dialogo::PerguntaLoad(m) | Dialogo::Salvo(m, _)) => m.desenhar(q, &self.interface, &self.dialogos_cfg),
-            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d)) => {
+            Some(Dialogo::PerguntaLoad(m) | Dialogo::Salvo(m, _) | Dialogo::PerguntaSair(m)) => m.desenhar(q, &self.interface, &self.dialogos_cfg),
+            Some(Dialogo::SalvarAntesDoLoad(d) | Dialogo::Load(d) | Dialogo::SalvarComo(d) | Dialogo::SalvarAntesDeSair(d)) => {
                 d.desenhar(q, &self.interface, &self.dialogos_cfg)
             }
             None => {}
         }
+    }
+}
+
+/// "Load Game" no "Select a Game" da abertura: o "Load Ant Hill" sobre a tela da abertura (que é da
+/// tela inteira; o diálogo fica `topo_na_tela` linhas abaixo, na área cliente). Não há partida para
+/// salvar, então não há pergunta. Cancel volta ao "Select a Game" (`_DoMenuEntry`: `_LoadGame` falhou
+/// sem jogo → `_NewGame(0)` de novo).
+pub(crate) struct LoadNaAbertura {
+    pub(crate) dialogo: DialogoArquivo,
+    cfg: engine::core::dialogos::ConfigDialogos,
+}
+
+impl LoadNaAbertura {
+    pub(crate) fn abrir(recursos: &Recursos) -> Result<LoadNaAbertura, String> {
+        let cfg: engine::core::dialogos::ConfigDialogos = recursos.dados(engine::core::dialogos::ARQUIVO_CONFIG)?;
+        Ok(LoadNaAbertura { dialogo: DialogoArquivo::new(false, Path::new("."), &cfg), cfg })
+    }
+
+    /// Evento do SDL (coordenadas da tela). `Some` = respondido (arquivo ou Cancel).
+    pub(crate) fn evento(&mut self, ev: &sdl2::event::Event) -> Option<RespostaArquivo> {
+        use sdl2::event::Event;
+        use sdl2::mouse::MouseButton;
+        let topo = i32::from(self.cfg.topo_na_tela);
+        let r = match ev {
+            Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, x, y, .. } => self.dialogo.clicar(&self.cfg, *x, *y - topo, *clicks >= 2),
+            Event::KeyDown { keycode: Some(k), .. } => self.dialogo.tecla(&k.name(), &self.cfg),
+            Event::TextInput { text, .. } => {
+                self.dialogo.digitar(text, &self.cfg);
+                RespostaArquivo::Nada
+            }
+            _ => RespostaArquivo::Nada,
+        };
+        (r != RespostaArquivo::Nada).then_some(r)
+    }
+
+    /// Desenha o diálogo por cima da tela da abertura.
+    pub(crate) fn desenhar(&self, q: &mut Quadro, interface: &Interface) {
+        let topo = self.cfg.topo_na_tela.max(0) as usize;
+        let (w, h) = (q.largura, q.altura.saturating_sub(topo));
+        let mut c = Quadro::new(w, h, 0);
+        c.pixels.copy_from_slice(&q.pixels[topo * w..]);
+        self.dialogo.desenhar(&mut c, interface, &self.cfg);
+        q.pixels[topo * w..].copy_from_slice(&c.pixels);
     }
 }
 

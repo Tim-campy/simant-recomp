@@ -1,0 +1,35 @@
+# Barra de menus, 3.ª rodada: a simulação anda com o Status (Ctrl+T) aberto? Quit com Yes/No.
+# Uso: SIMANT_RAIZ=<raiz> python tools/qemu_bancada.py roteiro tests/referencias/roteiros/qemu_ui_menus3.txt --overlay re_trabalho/qemu/ov_menus_quick.qcow2
+snapshot_carregar quick
+esperar 3
+mouse_canto
+mover 600 300
+ler_variavel GameTime re_trabalho/agente_menus/gt.bin
+esperar 3
+ler_variavel GameTime re_trabalho/agente_menus/gt.bin
+teclas ctrl+t
+esperar 2
+ler_variavel GameTime re_trabalho/agente_menus/gt.bin
+esperar 5
+ler_variavel GameTime re_trabalho/agente_menus/gt.bin
+capturar re_trabalho/agente_menus/o01_status.png
+teclas esc
+esperar 2
+capturar re_trabalho/agente_menus/o02_status_esc.png
+ler_variavel GameTime re_trabalho/agente_menus/gt.bin
+esperar 3
+ler_variavel GameTime re_trabalho/agente_menus/gt.bin
+# Menu aberto: a simulação para?
+teclas alt+f
+esperar 1
+ler_variavel GameTime re_trabalho/agente_menus/gt.bin
+esperar 4
+ler_variavel GameTime re_trabalho/agente_menus/gt.bin
+teclas esc esc
+# Quit pelo menu e No: o jogo fecha
+teclas ctrl+q
+esperar 2
+teclas n
+esperar 4
+capturar re_trabalho/agente_menus/o03_quit_no.png
+fim
