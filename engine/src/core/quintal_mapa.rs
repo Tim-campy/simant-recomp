@@ -591,6 +591,13 @@ impl DesenhoQuintal {
 
     /// Desenha a janela 25 inteira (moldura e conteúdo do `_YardMode` do estado).
     pub fn desenhar_janela(&self, q: &mut Quadro, e: &Estado) {
+        self.desenhar_janela_com_balao(q, e, None);
+    }
+
+    /// Como `desenhar_janela`, com o balão do menino (fonte `balao_menino.fonte`) desenhado **antes da
+    /// chuva**: na bancada as gotas passam por cima do balão (451 pixels nos 23 balões de
+    /// `cenarios_tick.py baloes_menino`, 2026-10-19).
+    pub fn desenhar_janela_com_balao(&self, q: &mut Quadro, e: &Estado, fonte_balao: Option<&Fonte>) {
         let c = &self.cfg;
         let [ex, ey, w, h] = c.externo;
         let externo = Retangulo { esq: ex, topo: ey, dir: ex + w, base: ey + h };
@@ -614,7 +621,7 @@ impl DesenhoQuintal {
             }
         }
         match modo.conteudo {
-            Conteudo::Bichos => self.desenhar_bichos(q, e, modo.mostra_menino_dentro),
+            Conteudo::Bichos => self.desenhar_bichos(q, e, modo.mostra_menino_dentro, fonte_balao),
             Conteudo::Colonias => self.desenhar_colonias(q, e),
             Conteudo::Barras => self.desenhar_barras(q, e),
         }
@@ -686,7 +693,7 @@ impl DesenhoQuintal {
     }
 
     /// Modos 0 e 1 (`_Draw_SimYard`): gato, cachorro, menino, cortador, pássaro, placa e chuva.
-    fn desenhar_bichos(&self, q: &mut Quadro, e: &Estado, menino_dentro: bool) {
+    fn desenhar_bichos(&self, q: &mut Quadro, e: &Estado, menino_dentro: bool, fonte_balao: Option<&Fonte>) {
         let s = &self.cfg.sprites;
         let b = &e.bichos;
         let m = &e.menino;
@@ -731,6 +738,8 @@ impl DesenhoQuintal {
         if e.ambiente.casa_a_venda != 0 {
             self.sprite(q, s.placa.id, i32::from(s.placa.x), i32::from(s.placa.y));
         }
+        // O balão do menino (se pedido) fica embaixo das gotas.
+        self.desenhar_balao_do_menino(q, e, fonte_balao);
         if e.ambiente.chovendo != 0 {
             // O original sorteia as gotas com o gerador S a cada redesenho; o port usa posições
             // pseudoaleatórias próprias (divergência registrada), sem tocar no estado.

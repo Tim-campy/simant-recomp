@@ -120,7 +120,7 @@ pub enum Filtro {
 }
 
 /// Evento com o y deslocado (coordenadas da janela → área cliente).
-fn deslocar(ev: Event, dy: i32) -> Event {
+pub(crate) fn deslocar(ev: Event, dy: i32) -> Event {
     match ev {
         Event::MouseMotion { timestamp, window_id, which, mousestate, x, y, xrel, yrel } => {
             Event::MouseMotion { timestamp, window_id, which, mousestate, x, y: y - dy, xrel, yrel }
@@ -431,21 +431,37 @@ pub fn desenhar_no_cliente(s: &Sessao, q: &mut Quadro) -> Vec<String> {
 /// A janela inteira (barra de título, barra de menus e área cliente) em RGB: `cliente` é o quadro da
 /// área cliente já convertido. `foco`: a janela do sistema está ativa.
 pub fn compor(s: &Sessao, cliente: &[u8], foco: bool) -> Vec<u8> {
-    let h = s.menus.altura() as usize;
+    // Inativa também com um diálogo do Windows por cima (a pergunta do Quit, s12; os diálogos de
+    // arquivo) ou com o WinHelp (outro aplicativo) com o foco.
+    let ativa = foco && s.dialogo.is_none() && !(s.ajuda.aberto && s.ajuda.foco);
+    let apertado = s.menus.apertado.filter(|&(_, dentro)| dentro).map(|(p, _)| p);
+    let titulo = EstadoTitulo { ativa, caixa_realcada: s.menus.barra.sistema_realcado(), apertado };
     let (w, hc) = (s.tela.cfg.largura as usize, s.tela.cfg.altura as usize);
+    compor_barras(&s.menus, &s.interface, &s.cores, &titulo, &estado_menus(s), cliente, w, hc)
+}
+
+/// Barra de título (com `moldura_windows31`) e barra de menus em cima da área cliente `cliente`
+/// (RGB, `w` × `hc`): a imagem da janela inteira. Também a da abertura e do "Select a Game", em que
+/// o original mostra as duas, paradas (bancada, `qemu_selecao_moldura.txt`; telas/menus.md §8).
+#[allow(clippy::too_many_arguments)]
+pub fn compor_barras(
+    menus: &MenusUi,
+    interface: &Interface,
+    cores: &[[u8; 3]],
+    titulo: &EstadoTitulo,
+    estado: &EstadoMenus,
+    cliente: &[u8],
+    w: usize,
+    hc: usize,
+) -> Vec<u8> {
+    let h = menus.altura() as usize;
     // Índice 255 = transparente (mostra a área cliente).
     let mut q = Quadro::new(w, h + hc, 255);
-    if let Some(m) = &s.menus.moldura {
-        // Inativa também com um diálogo do Windows por cima (a pergunta do Quit, s12; os diálogos de
-        // arquivo) ou com o WinHelp (outro aplicativo) com o foco.
-        let ativa = foco && s.dialogo.is_none() && !(s.ajuda.aberto && s.ajuda.foco);
-        let apertado = s.menus.apertado.filter(|&(_, dentro)| dentro).map(|(p, _)| p);
-        let e = EstadoTitulo { ativa, caixa_realcada: s.menus.barra.sistema_realcado(), apertado };
-        let f = m.fontes.iter().find_map(|&i| s.interface.fontes.get(i).and_then(|f| f.as_ref()));
-        m.desenhar(&mut q, f, &e);
+    if let Some(m) = &menus.moldura {
+        let f = m.fontes.iter().find_map(|&i| interface.fontes.get(i).and_then(|f| f.as_ref()));
+        m.desenhar(&mut q, f, titulo);
     }
-    let e = estado_menus(s);
-    s.menus.barra.desenhar(&mut q, fonte(&s.menus.barra.cfg, &s.interface), &e);
+    menus.barra.desenhar(&mut q, fonte(&menus.barra.cfg, interface), estado);
     let mut rgb = Vec::with_capacity(w * (h + hc) * 3);
     for (i, &c) in q.pixels.iter().enumerate() {
         let (y, x) = (i / w, i % w);
@@ -453,7 +469,7 @@ pub fn compor(s: &Sessao, cliente: &[u8], foco: bool) -> Vec<u8> {
             let k = ((y - h) * w + x) * 3;
             rgb.extend_from_slice(&cliente[k..k + 3]);
         } else {
-            rgb.extend_from_slice(&s.cores.get(c as usize).copied().unwrap_or([255, 0, 255]));
+            rgb.extend_from_slice(&cores.get(c as usize).copied().unwrap_or([255, 0, 255]));
         }
     }
     rgb
