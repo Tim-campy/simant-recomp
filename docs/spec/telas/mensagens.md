@@ -72,7 +72,7 @@ As chamadas com `forçar` = 0 (dependem de Events): 10006/10007 (`_XferPatch`), 
 
 ### 3.2 Imagem
 
-O primeiro parâmetro é um bitmap (tipo 2) desenhado acima do texto, ou 0. Mortes da amarela (`_YellowDeath`, `1000:7746`): 10034 → 9155, 10036 → 9152, 10038 → 9150, 10040 → 9154, 10042 → 9151, 10045 → 9156; lições do tutorial: a `imagem` de cada lição em `data/quintal.json` (17000–17009) [código]. Nenhum quadro com imagem foi capturado ainda.
+O primeiro parâmetro é um bitmap (tipo 2) desenhado acima do texto, ou 0. Mortes da amarela (`_YellowDeath`, `1000:7746`): 10034 → 9155, 10036 → 9152, 10038 → 9150, 10040 → 9154, 10042 → 9151, 10045 → 9156, e a luta perdida, 10030/10032 → 9156 (o mesmo `push 0x23c4` em `1000:7ab9`, alcançado do caso 0 em `1000:78a1`; conferido na desmontagem em 2026-10-19, antes o port mostrava esses dois sem imagem); lições do tutorial: a `imagem` de cada lição em `data/quintal.json` (17000–17009) [código]. Nenhum quadro com imagem foi capturado ainda.
 
 ### 3.3 Geometria (`_PictureDialog`, `1000:62bc`, e `_win_DrawPictureWindow`, `1000:61f6`)
 
