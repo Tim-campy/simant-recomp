@@ -10,6 +10,7 @@ use std::time::Instant;
 
 use engine::core::barra_menus::{self, BarraMenus, ComandoMenu, ConfigBarraMenus, EstadoMenus, Resposta};
 use engine::core::janelas::Controle;
+use engine::core::moldura_principal::{self, ComandoPrincipal, ConfigMolduraPrincipal, EstadoTitulo, ParteTitulo};
 use engine::core::navegacao::Acao;
 use engine::core::partida::AcaoPartida;
 use engine::core::quadro::Quadro;
@@ -35,13 +36,43 @@ pub struct MenusUi {
     /// Status aberto.
     pub status: bool,
     relogio: Instant,
+    /// Barra de título do Windows 3.1 em cima da barra (`data/video.json` → `moldura_windows31`).
+    pub moldura: Option<ConfigMolduraPrincipal>,
+    /// Botão do título apertado e se o cursor ainda está nele.
+    apertado: Option<(ParteTitulo, bool)>,
 }
 
 impl MenusUi {
     pub fn carregar(recursos: &Recursos) -> Result<MenusUi, String> {
         let cfg: ConfigBarraMenus = recursos.dados(barra_menus::ARQUIVO_CONFIG)?;
         let menu = MenuBanco::decodificar(&recursos.objeto(Chave { tipo: TIPO_MENU, id: cfg.objeto_menu })?)?;
-        Ok(MenusUi { barra: BarraMenus::new(cfg, menu), alt_sozinho: false, sobre: None, status: false, relogio: Instant::now() })
+        Ok(MenusUi {
+            barra: BarraMenus::new(cfg, menu),
+            alt_sozinho: false,
+            sobre: None,
+            status: false,
+            relogio: Instant::now(),
+            moldura: None,
+            apertado: None,
+        })
+    }
+
+    /// Liga a barra de título e o menu de sistema da janela principal (a janela do port ganha as
+    /// linhas do título; docs/spec/telas/menus.md §8).
+    pub fn ligar_moldura(&mut self, recursos: &Recursos, largura: u32) -> Result<(), String> {
+        let m: ConfigMolduraPrincipal = recursos.dados(moldura_principal::ARQUIVO)?;
+        self.barra.ligar_sistema(&m, largura as i16);
+        self.moldura = Some(m);
+        Ok(())
+    }
+
+    /// Jogo novo ou Load: a moldura da sessão anterior continua.
+    pub fn herdar_moldura(&mut self, antiga: &MenusUi) {
+        if let Some(m) = &antiga.moldura {
+            self.barra.sistema = antiga.barra.sistema.clone();
+            self.barra.topo = antiga.barra.topo;
+            self.moldura = Some(m.clone());
+        }
     }
 
     /// Linhas em cima da área cliente (barra e linha preta).
@@ -81,6 +112,9 @@ pub enum Filtro {
     Tratada(bool),
     /// Item escolhido: o laço executa (`executar`).
     Comando(ComandoMenu),
+    /// Comando do menu de sistema ou dos botões da barra de título da janela principal: o laço
+    /// executa (minimizar a janela do sistema, a pergunta do Quit…).
+    Sistema(ComandoPrincipal),
     /// Segue para o jogo, com as coordenadas já na área cliente.
     Passar(Event),
 }
@@ -106,6 +140,55 @@ fn resposta(r: Resposta) -> Option<Filtro> {
         Resposta::Ignorada => None,
         Resposta::Tratada(m) => Some(Filtro::Tratada(m)),
         Resposta::Comando(c) => Some(Filtro::Comando(c)),
+        Resposta::Sistema(c) => Some(Filtro::Sistema(c)),
+    }
+}
+
+/// Mouse nos botões da barra de título (caixa: duplo clique fecha; minimizar e restaurar: apertar,
+/// arrastar e soltar dentro). A caixa sozinha é tratada pela barra de menus (abre o menu de sistema).
+fn evento_no_titulo(s: &mut Sessao, ev: &Event, livre: bool) -> Option<Filtro> {
+    use sdl2::mouse::MouseButton;
+    let largura = s.tela.cfg.largura as i16;
+    let (x, y) = match *ev {
+        Event::MouseButtonDown { x, y, .. } | Event::MouseMotion { x, y, .. } | Event::MouseButtonUp { x, y, .. } => (x, y),
+        _ => return None,
+    };
+    let parte = s.menus.moldura.as_ref()?.parte_em(largura, x, y);
+    match *ev {
+        Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, .. } if livre || s.menus.barra.ativa() => match parte? {
+            ParteTitulo::Caixa if clicks >= 2 => {
+                // Duplo clique na caixa: SC_CLOSE.
+                s.menus.barra.fechar();
+                Some(Filtro::Sistema(ComandoPrincipal::Fechar))
+            }
+            ParteTitulo::Caixa => None,
+            p @ (ParteTitulo::Minimizar | ParteTitulo::Restaurar) => {
+                s.menus.barra.fechar();
+                s.menus.apertado = Some((p, true));
+                Some(Filtro::Tratada(true))
+            }
+            ParteTitulo::Faixa => {
+                s.menus.barra.fechar();
+                // Duplo clique no título da janela maximizada: SC_RESTORE.
+                Some(if clicks >= 2 { Filtro::Sistema(ComandoPrincipal::Restaurar) } else { Filtro::Tratada(true) })
+            }
+        },
+        // Com um diálogo ou menu do jogo aberto, o título não responde (o clique não vai ao jogo).
+        Event::MouseButtonDown { .. } if parte.is_some() && !s.menus.barra.ativa() => Some(Filtro::Tratada(false)),
+        Event::MouseMotion { .. } => {
+            let (p, dentro) = s.menus.apertado?;
+            let agora = parte == Some(p);
+            s.menus.apertado = Some((p, agora));
+            Some(Filtro::Tratada(agora != dentro))
+        }
+        Event::MouseButtonUp { mouse_btn: MouseButton::Left, .. } => {
+            let (p, _) = s.menus.apertado.take()?;
+            if parte != Some(p) {
+                return Some(Filtro::Tratada(true));
+            }
+            Some(Filtro::Sistema(if p == ParteTitulo::Minimizar { ComandoPrincipal::Minimizar } else { ComandoPrincipal::Restaurar }))
+        }
+        _ => None,
     }
 }
 
@@ -118,6 +201,9 @@ pub fn evento(s: &mut Sessao, ev: Event, modal: bool) -> Filtro {
     // Janelas modais dos menus: About e Status recebem tudo.
     if s.menus.sobre.is_some() || s.menus.status {
         return modal_dos_menus(s, ev);
+    }
+    if let Some(f) = evento_no_titulo(s, &ev, !modal) {
+        return f;
     }
     let e = estado_menus(s);
     let Some(f) = fonte(&s.menus.barra.cfg, &s.interface) else { return Filtro::Passar(deslocar(ev, h)) };
@@ -342,12 +428,22 @@ pub fn desenhar_no_cliente(s: &Sessao, q: &mut Quadro) -> Vec<String> {
     r.unwrap_or_else(|e| vec![e])
 }
 
-/// A janela inteira (barra + área cliente) em RGB: `cliente` é o quadro da área cliente já convertido.
-pub fn compor(s: &Sessao, cliente: &[u8]) -> Vec<u8> {
+/// A janela inteira (barra de título, barra de menus e área cliente) em RGB: `cliente` é o quadro da
+/// área cliente já convertido. `foco`: a janela do sistema está ativa.
+pub fn compor(s: &Sessao, cliente: &[u8], foco: bool) -> Vec<u8> {
     let h = s.menus.altura() as usize;
     let (w, hc) = (s.tela.cfg.largura as usize, s.tela.cfg.altura as usize);
     // Índice 255 = transparente (mostra a área cliente).
     let mut q = Quadro::new(w, h + hc, 255);
+    if let Some(m) = &s.menus.moldura {
+        // Inativa também com um diálogo do Windows por cima (a pergunta do Quit, s12; os diálogos de
+        // arquivo) ou com o WinHelp (outro aplicativo) com o foco.
+        let ativa = foco && s.dialogo.is_none() && !(s.ajuda.aberto && s.ajuda.foco);
+        let apertado = s.menus.apertado.filter(|&(_, dentro)| dentro).map(|(p, _)| p);
+        let e = EstadoTitulo { ativa, caixa_realcada: s.menus.barra.sistema_realcado(), apertado };
+        let f = m.fontes.iter().find_map(|&i| s.interface.fontes.get(i).and_then(|f| f.as_ref()));
+        m.desenhar(&mut q, f, &e);
+    }
     let e = estado_menus(s);
     s.menus.barra.desenhar(&mut q, fonte(&s.menus.barra.cfg, &s.interface), &e);
     let mut rgb = Vec::with_capacity(w * (h + hc) * 3);
@@ -486,6 +582,63 @@ mod testes {
             }
             assert!(matches!(s.dialogo, Some(crate::arquivos::Dialogo::PerguntaSair(_))));
             assert_eq!(s.tecla_no_dialogo("N"), crate::arquivos::RespostaDialogo::Sair);
+        });
+    }
+
+    /// Barra de título do Windows 3.1 (`moldura_windows31`, bancada s00–s16): a barra desce 19 linhas;
+    /// minimizar apertado e solto dentro minimiza, solto fora não; duplo clique na caixa = Close;
+    /// clique na caixa abre o menu de sistema; Alt+Espaço também; ← no File chega à caixa; o Close do
+    /// menu e o Minimize viram comandos do laço.
+    #[test]
+    fn barra_de_titulo_e_menu_de_sistema() {
+        use sdl2::keyboard::{Keycode, Mod};
+        com_sessao(|s| {
+            let sem = s.menus.altura();
+            s.menus.ligar_moldura(s.recursos, s.tela.cfg.largura).unwrap();
+            assert_eq!(s.menus.altura(), sem + 19, "a área cliente começa na linha 38, como na bancada");
+            let k = s.menus.barra.indice_sistema().unwrap();
+            // Minimizar: apertar (botão realçado), sair (solto), voltar e soltar dentro.
+            assert!(matches!(evento(s, clique(611, 8), false), Filtro::Tratada(true)));
+            let mover = |x, y| Event::MouseMotion { timestamp: 0, window_id: 0, which: 0, mousestate: sdl2::mouse::MouseState::from_sdl_state(1), x, y, xrel: 0, yrel: 0 };
+            assert!(matches!(evento(s, mover(611, 108), false), Filtro::Tratada(true)));
+            assert!(matches!(evento(s, soltar(611, 108), false), Filtro::Tratada(true)), "solto fora: nada");
+            evento(s, clique(611, 8), false);
+            assert!(matches!(evento(s, soltar(612, 9), false), Filtro::Sistema(ComandoPrincipal::Minimizar)));
+            // Clique na caixa: o menu de sistema com o Restore realçado (s01).
+            evento(s, clique(8, 8), false);
+            evento(s, soltar(8, 8), false);
+            assert_eq!(s.menus.barra.estado, Estado::Aberto { menu: k, item: Some(0) });
+            assert!(s.menus.barra.sistema_realcado());
+            // Close (7.º item, linhas 116–133 da tela).
+            evento(s, clique(30, 125), false);
+            assert!(matches!(evento(s, soltar(30, 125), false), Filtro::Sistema(ComandoPrincipal::Fechar)));
+            // Move acinzentado: o menu fica aberto.
+            evento(s, tecla(Keycode::Space, Mod::LALTMOD), false);
+            assert_eq!(s.menus.barra.estado, Estado::Aberto { menu: k, item: Some(0) }, "Alt+Espaço (s03)");
+            evento(s, tecla(Keycode::Down, Mod::NOMOD), false);
+            assert_eq!(s.menus.barra.estado, Estado::Aberto { menu: k, item: Some(1) }, "o realce passa pelo acinzentado (s04)");
+            assert!(matches!(evento(s, tecla(Keycode::Return, Mod::NOMOD), false), Filtro::Tratada(false)));
+            evento(s, tecla(Keycode::Escape, Mod::NOMOD), false);
+            assert_eq!(s.menus.barra.estado, Estado::Barra(k), "Esc deixa a caixa realçada (s05)");
+            evento(s, tecla(Keycode::Right, Mod::NOMOD), false);
+            assert_eq!(s.menus.barra.estado, Estado::Barra(0));
+            evento(s, tecla(Keycode::Left, Mod::NOMOD), false);
+            assert_eq!(s.menus.barra.estado, Estado::Barra(k), "← no File (s06)");
+            evento(s, tecla(Keycode::Escape, Mod::NOMOD), false);
+            // Duplo clique na caixa: Close.
+            evento(s, clique(8, 8), false);
+            evento(s, soltar(8, 8), false);
+            let duplo = Event::MouseButtonDown { timestamp: 0, window_id: 0, which: 0, mouse_btn: sdl2::mouse::MouseButton::Left, clicks: 2, x: 8, y: 8 };
+            assert!(matches!(evento(s, duplo, false), Filtro::Sistema(ComandoPrincipal::Fechar)));
+            assert!(!s.menus.barra.ativa());
+            // A área cliente continua recebendo o clique com o y dela.
+            match evento(s, clique(300, 200), false) {
+                Filtro::Passar(Event::MouseButtonDown { y, .. }) => assert_eq!(y, 200 - s.menus.altura()),
+                f => panic!("{f:?}"),
+            }
+            // Desenho: o título (100% contra m00 no exemplo barra_menus) fica nas linhas 0–18.
+            let rgb = compor(s, &vec![0u8; (s.tela.cfg.largura * s.tela.cfg.altura * 3) as usize], true);
+            assert_eq!(rgb.len(), (s.tela.cfg.largura as usize) * (s.tela.cfg.altura as usize + s.menus.altura() as usize) * 3);
         });
     }
 

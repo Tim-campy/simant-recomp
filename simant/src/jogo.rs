@@ -168,7 +168,11 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
     use sdl2::mouse::MouseButton;
     use sdl2::pixels::PixelFormatEnum;
 
-    // A janela tem a barra de menus em cima da área cliente (simant/src/menus_ui.rs).
+    // A janela tem a barra de menus em cima da área cliente (simant/src/menus_ui.rs) e, com
+    // `moldura_windows31`, a barra de título do Windows 3.1 em cima dela.
+    if o.video.moldura_windows31 && s.menus.moldura.is_none() {
+        s.menus.ligar_moldura(s.recursos, s.tela.cfg.largura)?;
+    }
     let (lw, lh) = (s.tela.cfg.largura, s.tela.cfg.altura + s.menus.altura() as u32);
     let Janela { sdl, mut canvas } = abrir_janela(titulo, lw, lh, &o.video)?;
     let criador = canvas.texture_creator();
@@ -222,6 +226,21 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 menus_ui::Filtro::Passar(ev) => ev,
                 menus_ui::Filtro::Tratada(r) => {
                     redesenhar |= r;
+                    continue;
+                }
+                menus_ui::Filtro::Sistema(c) => {
+                    // Menu de sistema e botões da janela principal (docs/spec/telas/menus.md §8).
+                    use engine::core::moldura_principal::ComandoPrincipal as C;
+                    println!("menu de sistema: {c:?}");
+                    match c {
+                        C::Minimizar => canvas.window_mut().minimize(),
+                        C::Restaurar if canvas.window().is_maximized() => canvas.window_mut().restore(),
+                        // SC_CLOSE: MAINWNDPROC chama _MenuQuit (s12).
+                        C::Fechar => s.abrir_pergunta_sair(),
+                        // Switch To… (a Task List do Windows) e os acinzentados: nada no port.
+                        _ => {}
+                    }
+                    redesenhar = true;
                     continue;
                 }
                 menus_ui::Filtro::Comando(c) => {
@@ -549,6 +568,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
             foco = Some(ativa);
             println!("janela {}", if ativa { "ativa" } else { "inativa: som desligado" });
             s.partida.definir_foco(ativa);
+            // O título do Windows 3.1 (se desenhado) fica inativo sem o foco.
+            redesenhar = true;
             audio.foco(ativa);
         }
         let agora = Instant::now();
@@ -627,7 +648,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         }
         if redesenhar {
             let cliente = s.quadro_rgb()?;
-            let rgb = menus_ui::compor(s, &cliente);
+            let rgb = menus_ui::compor(s, &cliente, foco.unwrap_or(true));
             textura.update(None, &rgb, lw as usize * 3).map_err(|e| e.to_string())?;
             redesenhar = false;
         }
