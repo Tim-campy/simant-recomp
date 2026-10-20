@@ -3,7 +3,7 @@
 # na página de releases do GitHub. Checklist e decisões pendentes: docs/lancamento.md.
 #
 # O pacote leva só o que é do projeto: executável (com o launcher dentro: aberto sem opções, ele escolhe
-# a pasta do jogo e as opções), data/, exemplos/mods/, LICENSE, LEIAME, CHANGELOG e os avisos de
+# a pasta do jogo e as opções), data/, exemplos/mods/, LICENSE, LEIAME/README, CHANGELOG (inglês e pt-BR) e os avisos de
 # terceiros (e, no Windows, o SDL2.dll oficial e o simant-console.bat). Nunca leva arquivos do jogo original
 # (SimAnt-T, *.DAT, *.NDX, *.HLP, *.ANT...), re_trabalho, capturas, referencia/qemu, WAVs nem MIDIs:
 # o passo "Conferir o conteúdo" falha o build se algo assim aparecer.
@@ -90,9 +90,12 @@ jobs:
           cp LICENSE-MIT "$dir/LICENSE-MIT.txt"
           cp LICENSE-APACHE "$dir/LICENSE-APACHE.txt"
           cp LEIAME-usuario.md "$dir/LEIAME.txt"
-          if [ -f README-user.md ]; then cp README-user.md "$dir/README.txt"; fi
+          cp README-user.md "$dir/README.txt"
           cp CHANGELOG.md "$dir/CHANGELOG.txt"
-          printf '%s\n' "Coloque aqui os mods que devem ficar ligados (uma pasta por mod, com mod.json)." \
+          cp CHANGELOG.pt-BR.md "$dir/CHANGELOG.pt-BR.txt"
+          printf '%s\n' "Put here the mods that should stay on (one folder per mod, with mod.json)." \
+            "Examples in ../exemplos/mods; see README.txt." "" \
+            "Coloque aqui os mods que devem ficar ligados (uma pasta por mod, com mod.json)." \
             "Exemplos em ../exemplos/mods; ver LEIAME.txt." > "$dir/mods/LEIAME.txt"
           if [ "${{ runner.os }}" = "Windows" ]; then
             cp "vendor/SDL2-${SDL2_VERSAO}/lib/x64/SDL2.dll" "$dir/"
@@ -181,14 +184,15 @@ jobs:
         with:
           path: arquivos
           merge-multiple: true
-      - name: Notas do release (seção da versão no CHANGELOG.md)
+      - name: Notas do release (seção da versão no CHANGELOG.md, em inglês)
         run: |
           versao="${GITHUB_REF_NAME#v}"
           awk -v v="$versao" '
-            /^## \[/ { dentro = index($0, "[" v "]") > 0; next }
+            /^## / { dentro = index($0, "[" v "]") > 0; next }
             dentro { print }
           ' CHANGELOG.md > notas.md
-          printf '\n---\n%s\n' "Este projeto não é afiliado à Maxis nem à Electronic Arts e não distribui arquivos do SimAnt: é preciso ter uma cópia do jogo original (Windows 3.x). Ver LEIAME.txt no pacote." >> notas.md
+          printf '\n---\n%s\n\n%s\n' "This project is not affiliated with Maxis or Electronic Arts and does not distribute any SimAnt file: you need a copy of the original game (Windows 3.x). See README.txt in the package." \
+            "Este projeto não é afiliado à Maxis nem à Electronic Arts e não distribui arquivos do SimAnt: é preciso ter uma cópia do jogo original (Windows 3.x). Ver LEIAME.txt no pacote." >> notas.md
           cat notas.md
       - name: Criar release em rascunho
         env:

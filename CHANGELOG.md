@@ -1,114 +1,120 @@
-# Histórico de versões
+*Leia em português: [CHANGELOG.pt-BR.md](CHANGELOG.pt-BR.md)*
 
-Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); as versões seguem o
-[Versionamento Semântico](https://semver.org/lang/pt-BR/). A versão do port e a versão da **API de mods**
-(`docs/api-mods.md`) são numeradas separadamente.
+# Changelog
 
-> **Rascunho** para revisão (ver `docs/lancamento.md`). A data e o número só ficam valendo quando a tag
-> `v1.0.0` for criada; até lá os `Cargo.toml` continuam em `0.1.0`.
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
+[Semantic Versioning](https://semver.org/). The port version and the **mod API** version
+(`docs/api-mods.md`) are numbered separately.
 
-## [1.0.0] — não lançado
+> **Draft** for review (see `docs/lancamento.md`). The date and the number only become final when the
+> `v1.0.0` tag is created; until then the `Cargo.toml` files stay at `0.1.0`.
 
-Primeira versão para quem joga. Reimplementação do **SimAnt: The Electronic Ant Colony** (Maxis, 1991,
-versão Windows 3.x) em Rust + SDL2, que lê os arquivos do jogo original do próprio usuário. Nenhum
-arquivo do jogo é distribuído; os textos do jogo também são lidos da instalação do usuário.
+## [1.0.0] — unreleased
 
-### O jogo
+First version for players. A reimplementation of **SimAnt: The Electronic Ant Colony** (Maxis, 1991,
+Windows 3.x version) in Rust + SDL2 that reads the original game files from the user's own copy. No
+game file is distributed; the game's texts are also read from the user's installation.
 
-- **Os quatro modos do original:** Tutorial (lições 1 a 57), Quick Game, Full Game (o quintal e a casa,
-  com troca de patch) e Experimental (ferramentas de cavar, encher, comida, pedras, formigas, cheiro,
-  inseticida e o menu de ferramentas de segurar).
-- **Simulação igual à do original, tick a tick:** 221 vetores gravados do SimAnt rodando, 2 sequências
-  longas (200 e 600 ticks), 21 ações da interface, o Load do tutorial e 20 casos de regra conferidos
-  bit a bit (307/307 blocos do estado); a geração do Quick Game, dos 12 patches da casa e do jogo novo de
-  Full, Experimental e Tutorial também bate antes do primeiro tick.
-- **Formiga amarela:** andar, comer, cavar, recrutar e liberar operárias, alarme, trofalaxia, troca de
-  corpo, lutas e as dez mortes do original; inimigos (formiga-leão, aranha, inclusive a aranha do
-  jogador com AutoTrack, lagarta, bicho-de-conta), quintal (menino, cortador de grama, inseticida,
-  gato, cachorro, pássaro, chuva, revoadas) e fim de jogo.
-- **Telas e janelas do original:** abertura e "Select a Game", janela de edição, mapa, mini mapa,
-  quintal (modos quintal, casa, estratégico e gráfico), Caste Control, Behavior Control, History, Info
-  (51 cartões), Examine, balões de fala ("Silly" e os 23 do menino), quadros da janela 26, barra de
-  menus do Windows 3.1 com About, Status, Quit e Load Game, menu de sistema das janelas, faixa com
-  botões configuráveis, marcadores e barras de saúde. Comparadas pixel a pixel com capturas do original
-  (93–100%).
-- **Salvar e carregar** no formato `.ANT` do original (o arquivo gravado pelo port abre no SimAnt).
-- **Ajuda:** visor do `SIMANT.HLP` (WinHelp 3.0) e ajuda contextual (Shift+F1, botões *?*).
-- **Códigos de trapaça** do original (`heal`, `just`, `qeen`, `eggs`...).
-- **Som e música:** os efeitos e as 28 músicas do original. Sintetizador FM próprio no estilo do OPL
-  da Sound Blaster (padrão), com o banco de timbres ajustado contra gravações do original; opção de
-  SoundFont General MIDI (`--soundfont`) e de um sintetizador simples. Os efeitos soam como na Sound
-  Blaster 16 do original (5000 Hz, nos blocos do driver), medidos numa partida gravada.
-- **Ritmo do original:** relógio de 55 ms do Windows 3.1, velocidades lenta/normal medidas no original
-  (3 e 6 ticks/s), rápida e ultra.
+### The game
 
-### Para os sistemas de hoje
+- **The original's four modes:** Tutorial (lessons 1 to 57), Quick Game, Full Game (the yard and the
+  house, with patch switching) and Experimental (tools to dig, fill, food, rocks, ants, scent,
+  insecticide and the hold-down tools menu).
+- **Simulation identical to the original, tick by tick:** 221 tick vectors recorded from SimAnt running,
+  2 long sequences (200 and 600 ticks), 21 interface actions, the tutorial Load and 20 rule cases
+  checked bit for bit (307/307 state blocks); the generation of the Quick Game, of the 12 house patches
+  and of a new Full, Experimental and Tutorial game also matches before the first tick.
+- **Yellow ant:** walking, eating, digging, recruiting and releasing workers, alarm, trophallaxis, body
+  switching, fights and the original's ten deaths; enemies (antlion, spider, including the player's
+  spider with AutoTrack, caterpillar, pill bug), yard (boy, lawnmower, insecticide, cat, dog, bird,
+  rain, mating flights) and end of game.
+- **The original's screens and windows:** title and "Select a Game", edit window, map, mini map, yard
+  (yard, house, strategic and graph modes), Caste Control, Behavior Control, History, Info (51 cards),
+  Examine, speech balloons ("Silly" and the boy's 23), window 26 frames, Windows 3.1 menu bar with
+  About, Status, Quit and Load Game, the windows' system menu, ribbon with configurable buttons,
+  bookmarks and health bars. Compared pixel by pixel with captures of the original (93–100%).
+- **Save and load** in the original's `.ANT` format (the file written by the port opens in SimAnt).
+- **Help:** a viewer for `SIMANT.HLP` (WinHelp 3.0) and context help (Shift+F1, *?* buttons).
+- The original's **cheat codes** (`heal`, `just`, `qeen`, `eggs`...).
+- **Sound and music:** the original's effects and 28 songs. Our own FM synthesizer in the style of the
+  Sound Blaster's OPL (default), with the instrument bank tuned against recordings of the original; a
+  General MIDI SoundFont option (`--soundfont`) and a simple synthesizer. Effects sound as on the
+  original's Sound Blaster 16 (5000 Hz, in the driver's blocks), measured in a recorded session.
+- **The original's pace:** Windows 3.1's 55 ms clock, slow/normal speeds measured on the original
+  (3 and 6 ticks/s), fast and ultra.
 
-- Janela nítida: ciente de DPI, ampliação por múltiplos inteiros, redimensionável.
-- Tela virtual de 640×480 (padrão), 800×600 ou 1024×768, com o layout que o original usa em cada uma.
-- Barra de título do Windows 3.1, ligada por padrão (`--sem-moldura` desliga), que substitui a moldura
-  do sistema: janela sem borda, arrastada pelo título, maximizar/restaurar/minimizar e menu de sistema
-  na janela de verdade (também com um diálogo aberto e no "Select a Game"), moldura grossa de 4 pixels
-  rente às bordas com a janela restaurada, Alt+F4 sempre com a pergunta do Quit
-  (`--moldura-do-sistema` mantém a borda do sistema). Os testes e exportações ficam sem ela. Escolha
-  do usuário. Na ajuda, fechar é Ctrl+F4 (o Alt+F4 fica só com o jogo).
-- Velocidades rápida e ultra a 2,5× e 5× a normal (escolha do usuário; `--velocidades original` volta ao
-  ritmo do 486 da bancada) e simulação na lenta enquanto a janela está sem foco (`--sem-foco original`
-  mantém o ritmo); o tick, o save e o menu Speed não mudam. Caixas no launcher.
-- Sintetizador simples como padrão das músicas (escolha do usuário; o FM continua em `--sintetizador fm`).
-- Preferências guardadas entre partidas na pasta do usuário (no lugar do `[SimAnt]` do `WIN.INI`).
-- Teclas e opções em arquivos de dados (`data/*.json`).
-- Linha de comando para rodar sem janela (`--ticks`, `--salvar`, exportação de telas e sons).
-- **Launcher:** o `simant` aberto sem opções mostra uma tela de opções de inicialização: pasta da
-  instalação do SimAnt (seletor do sistema, conferida e lembrada), início (abertura, jogo novo de cada
-  tipo ou save), vídeo, perfil de driver, som e sintetizador, mods (pasta e cada mod ligado ou não),
-  preferências e a linha de comando equivalente, editável. As escolhas ficam em `launcher.json` e valem
-  também para o `simant` rodado com opções (que vencem).
-- No Windows, o `simant.exe` não abre console: mensagens em `simant.log` na pasta do usuário, erros
-  fatais numa caixa de mensagem, `simant-console.bat`/`--console` para ver tudo na hora.
-- O pacote funciona de qualquer pasta: `data/` e `mods/` são procurados ao lado do executável.
-- Opções novas: `--launcher`, `--config`, `--sem-config`, `--console`, `--perfil-driver`,
+### For today's systems
+
+- Sharp window: DPI-aware, integer scaling, resizable.
+- 640×480 (default), 800×600 or 1024×768 virtual screen, with the layout the original uses in each.
+- Windows 3.1 title bar, on by default (`--sem-moldura` turns it off), replacing the system frame:
+  borderless window, dragged by the title, maximize/restore/minimize and system menu acting on the real
+  window (also with a dialog open and in "Select a Game"), 4-pixel thick frame flush with the edges when
+  the window is restored, Alt+F4 always asks the Quit question (`--moldura-do-sistema` keeps the system
+  border). Tests and exports run without it. User's choice. In the help viewer, closing is Ctrl+F4
+  (Alt+F4 belongs to the game only).
+- Fast and ultra speeds at 2.5× and 5× normal (user's choice; `--velocidades original` returns to the
+  pace of the test bench's 486) and simulation at slow speed while the window is out of focus
+  (`--sem-foco original` keeps the pace); the tick, the save and the Speed menu don't change. Checkboxes
+  in the launcher.
+- Simple synthesizer as the default for music (user's choice; FM is still available with
+  `--sintetizador fm`).
+- Preferences kept between games in the user folder (in place of `WIN.INI`'s `[SimAnt]` section).
+- Keys and options in data files (`data/*.json`).
+- Command line for running without a window (`--ticks`, `--salvar`, screen and sound export).
+- **Launcher:** `simant` opened without options shows a startup options screen: SimAnt installation
+  folder (system picker, checked and remembered), start (title, new game of each type or save), video,
+  driver profile, sound and synthesizer, mods (folder and each mod on or off), preferences and the
+  equivalent command line, editable. The choices are kept in `launcher.json` and also apply to `simant`
+  run with options (which win).
+- On Windows, `simant.exe` doesn't open a console: messages go to `simant.log` in the user folder, fatal
+  errors to a message box, `simant-console.bat`/`--console` to see everything live.
+- The package works from any folder: `data/` and `mods/` are looked up next to the executable.
+- New options: `--launcher`, `--config`, `--sem-config`, `--console`, `--perfil-driver`,
   `--desligar-mods`, `--com-som`, `--capturar-launcher`.
+- Documentation on GitHub in English, with every document also available in Portuguese
+  (`README.pt-BR.md`, `docs/pt-BR/`).
 
 ### Mods
 
-- **API de mods 1.0** (era 0.35 durante o desenvolvimento; ver `docs/api-mods.md`): substituição de
-  objetos do banco original, dos arquivos soltos do jogo e de 42 arquivos `data/*.json` do port,
-  mesclados por chave; scripts **Lua 5.4** em sandbox, com ganchos fora e dentro do tick, leitura e
-  escritas validadas do estado (comida, cheiros, castas, formigas nos ninhos), menu e painel próprios e
-  estado guardado ao lado do save (`JOGO.ANT.mods.json`).
-- Mods de exemplo em `exemplos/mods/`: `exemplo-lua` (chuva de comida) e `trapacas` (menu F12 com
-  chuva, revoada, menino, gato, fim de jogo e painel de depuração).
+- **Mod API 1.0** (it was 0.35 during development; see `docs/api-mods.md`): replacement of objects in
+  the original database, of the game's loose files and of 42 `data/*.json` files of the port, merged by
+  key; sandboxed **Lua 5.4** scripts, with hooks outside and inside the tick, reading and validated
+  writes of the state (food, scents, castes, ants in the nests), their own menu and panel and state
+  saved next to the save (`JOGO.ANT.mods.json`).
+- Example mods in `exemplos/mods/`: `exemplo-lua` (food rain) and `trapacas` (F12 menu with rain,
+  mating flight, boy, cat, end of game and debug panel).
 
-### Limitações conhecidas
+### Known limitations
 
-- É preciso ter o SimAnt para Windows 3.x original (os arquivos `.DAT`/`.NDX` da pasta `ANTWIN`).
-- Diálogos internos do visor de ajuda (Open, Print, Annotate...) não existem.
-- Alguns detalhes de 1 pixel em poucos desenhos (gato, base dos textos do fim de jogo, gráficos do
-  History) e o realce do menu em 256 cores ainda diferem do original.
-- Ritmo das velocidades rápida e ultra não foi medido numa máquina real.
-- Rede (NetBIOS/DDE) do original fora do escopo.
-- A lista completa está em `docs/estado-do-projeto.md` §3–§5 e `docs/divergencias.md`.
+- You need the original SimAnt for Windows 3.x (the `.DAT`/`.NDX` files of the `ANTWIN` folder).
+- The help viewer's internal dialogs (Open, Print, Annotate...) don't exist.
+- Some 1-pixel details in a few drawings (cat, baseline of the end-of-game texts, History graphs) and
+  the menu highlight in 256 colors still differ from the original.
+- The pace of the fast and ultra speeds was not measured on a real machine.
+- The original's networking (NetBIOS/DDE) is out of scope.
+- The full list is in `docs/estado-do-projeto.md` §3–§5 and `docs/divergencias.md`.
 
-## Desenvolvimento (0.x, sem lançamento)
+## Development (0.x, unreleased)
 
-Resumo do histórico do repositório (338 commits, 16 a 19 de outubro de 2026); os detalhes estão em
-`git log`, `docs/decisoes.md` e no histórico de compatibilidade de `docs/api-mods.md`.
+Summary of the repository history (338 commits, October 16 to 19, 2026); the details are in
+`git log`, `docs/decisoes.md` and the compatibility history in `docs/api-mods.md`.
 
-- **2026-10-16 — Marco 1:** especificação inicial, parsers do banco `.NDX/.DAT` com LZSS, bitmaps,
-  fontes e save `.ANT`; abertura em Rust + SDL2; escolha de Rust + SDL2 e Lua; bancada automática QEMU
-  + SvarDOS que lê e escreve as variáveis do jogo original e grava vetores tick a tick.
-- **2026-10-17:** regras do tick (feromônios, superfície, ninhos, inimigos, quintal, água, conselhos,
-  tutorial) conferidas contra os vetores; som e música; modos de jogo, quintal, troca de patch, casa e
-  Experimental; janelas Caste/Behavior/History, Info, Examine, mapa, Load/Save As; scripts Lua de mods
-  (API 0.12); CI no GitHub Actions.
-- **2026-10-18:** fim de jogo dentro do tick, Load do tutorial, tutorial completo no original, janela
-  nítida e opções de vídeo, preferências do jogador, barra de menus do Windows, ajuda (`SIMANT.HLP`),
-  balões "Silly", menu de ferramentas, quadros da janela 26, desenho da aranha; API 0.17–0.25 com o
-  mod de trapaças.
-- **2026-10-19:** API 0.26 (mesclagem por chave, ganchos dentro do tick, estado no save); tela virtual
-  640/800/1024 e perfil de driver; `WIN.INI` como origem das preferências; sintetizador FM como padrão
-  e banco ajustado às 28 músicas do original; barra de título do Windows 3.1 opcional; sétima e oitava
-  rodadas de vetores (ramos raros, estratégia vermelha, recrutamento, revoada) e geração conferida;
-  API 0.34. Textos do SimAnt fora do repositório: os `data/*.json` guardam só a referência (banco,
-  executável, layout de janela, `.HLP`) e o port lê o texto da instalação do usuário; API 0.35.
+- **2026-10-16 — Milestone 1:** initial specification, parsers for the `.NDX/.DAT` database with LZSS,
+  bitmaps, fonts and `.ANT` save; title screen in Rust + SDL2; choice of Rust + SDL2 and Lua; automated
+  QEMU + SvarDOS test bench that reads and writes the original game's variables and records tick vectors
+  tick by tick.
+- **2026-10-17:** tick rules (pheromones, surface, nests, enemies, yard, water, advice, tutorial)
+  checked against the tick vectors; sound and music; game modes, yard, patch switching, house and
+  Experimental; Caste/Behavior/History, Info, Examine, map, Load/Save As windows; Lua mod scripts
+  (API 0.12); CI on GitHub Actions.
+- **2026-10-18:** end of game inside the tick, tutorial Load, complete tutorial on the original, sharp
+  window and video options, player preferences, Windows menu bar, help (`SIMANT.HLP`), "Silly"
+  balloons, tools menu, window 26 frames, spider drawing; API 0.17–0.25 with the cheats mod.
+- **2026-10-19:** API 0.26 (merge by key, hooks inside the tick, state in the save); 640/800/1024
+  virtual screen and driver profile; `WIN.INI` as the source of preferences; FM synthesizer as default
+  and bank tuned to the original's 28 songs; optional Windows 3.1 title bar; seventh and eighth rounds
+  of tick vectors (rare branches, red strategy, recruiting, mating flight) and generation checked;
+  API 0.34. SimAnt's texts out of the repository: the `data/*.json` files only keep the reference
+  (database, executable, window layout, `.HLP`) and the port reads the text from the user's
+  installation; API 0.35.
