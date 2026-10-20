@@ -230,6 +230,71 @@ fn mod_de_exemplo_chove_comida_a_cada_500_ticks() {
     assert_eq!(msgs[0].texto, format!("Choveu comida! ({comida} pedaços)"));
 }
 
+/// Superfície de um patch de carpete da casa (`_CarpetFloorR`: chão 0x03, `_TERRAINset` = 1) num
+/// Jogo Completo.
+fn estado_na_casa() -> Estado {
+    let mut e = Estado::vazio();
+    e.partida.tipo_jogo = 2;
+    e.ambiente.terreno = 1;
+    e.ambiente.barreira = 0x90;
+    e.superficie.mapa.dados.fill(0x03);
+    e
+}
+
+/// Regressão (2026-10-19): na casa, a comida dos mods (`colocar_comida`, a "chuva de comida" do
+/// exemplo e a trapaça "Comida em volta da amarela") era gravada com o valor do quintal (0x48), que no
+/// conjunto de tiles da casa é uma peça do botão do fogão: "pedrinhas cortadas" no carpete. Na casa a
+/// comida segue `_AddFood` da casa; a pedra é recusada (a casa não tem pedrinha).
+#[test]
+fn comida_e_pedra_dos_mods_na_casa_usam_os_tiles_da_casa() {
+    let mut e = estado_na_casa();
+    e.superficie.mapa.definir(5, 5, 0x48); // peça do botão (patch 0 da cozinha): não é comida na casa
+    e.superficie.mapa.definir(6, 6, 0x1B); // comida cheia (4 unidades no chão 0)
+    let mut s = scripts(
+        r#"
+        function ao_iniciar(e)
+          registrar(e:colocar_comida("superficie", 1, 1), e:colocar_comida("superficie", 1, 1),
+            e:colocar_comida("superficie", 5, 5), e:colocar_comida("superficie", 6, 6),
+            e:colocar_pedra(3, 3), e:tirar_comida("superficie", 1, 1), e:tirar_comida("superficie", 5, 5))
+        end
+        "#,
+    );
+    s.ao_iniciar(&mut e);
+    assert_eq!(s.retirar_registro(), vec!["[teste] true\ttrue\tfalse\tfalse\tfalse\ttrue\tfalse".to_string()]);
+    assert_eq!(e.superficie.mapa.em(1, 1), Some(0x03), "tirada a comida, volta o carpete");
+    assert_eq!(e.superficie.mapa.em(5, 5), Some(0x48), "o botão não é tocado");
+    assert_eq!(e.superficie.mapa.em(6, 6), Some(0x1B));
+    assert_eq!(e.superficie.mapa.em(3, 3), Some(0x03), "sem pedra na casa");
+    assert_eq!(e.ambiente.comida_superficie, 1, "duas unidades postas, uma tirada");
+
+    // Uma unidade: chão 0–3 → (v + 6) × 4; as seguintes somam até 4.
+    let mut e = estado_na_casa();
+    e.superficie.mapa.definir(2, 2, 2);
+    let mut s = scripts(r#"function ao_iniciar(e) for _ = 1, 5 do e:colocar_comida("superficie", 2, 2) end end"#);
+    s.ao_iniciar(&mut e);
+    assert_eq!(e.superficie.mapa.em(2, 2), Some(0x23));
+    assert_eq!(e.ambiente.comida_superficie, 4);
+}
+
+/// A "chuva de comida" do mod de exemplo dentro de casa: nenhum tile do quintal no carpete, e cada
+/// pedaço contado em `_FoodA` é comida da casa (0x18–0x27).
+#[test]
+fn chuva_de_comida_do_exemplo_dentro_de_casa() {
+    let r = recursos_com_mods(&raiz().join("exemplos/mods"));
+    let mut s = Scripts::carregar(&r, Limites::default()).unwrap().unwrap();
+    let mut e = estado_na_casa();
+    e.partida.tempo = 499;
+    s.ao_iniciar(&mut e);
+    e.partida.tempo = 500;
+    s.depois_do_tick(&mut e);
+    let comida = e.ambiente.comida_superficie;
+    assert!(comida > 0 && comida <= 30, "comida = {comida}");
+    let mapa = &e.superficie.mapa.dados;
+    assert!(mapa.iter().all(|&v| v == 0x03 || (0x18..=0x27).contains(&v)), "só carpete e comida da casa");
+    let pedacos: i32 = mapa.iter().filter(|&&v| (0x18..=0x27).contains(&v)).map(|&v| i32::from(v & 3) + 1).sum();
+    assert_eq!(pedacos, i32::from(comida));
+}
+
 #[test]
 fn sem_scripts_nada_e_carregado_e_o_tick_fica_igual() {
     let vazio = std::env::temp_dir().join(format!("simant_mods_lua_vazio_{}", std::process::id()));

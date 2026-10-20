@@ -293,3 +293,35 @@ fn patches_da_casa_no_jogo_completo() {
     usar(&mut q, "Ir para o patch da cozinha");
     assert!(recusas(&mut q).iter().any(|l| l.contains("10000")));
 }
+
+/// Regressão (2026-10-19): dentro de casa, "Comida em volta da amarela" gravava a comida do quintal
+/// (0x48), desenhada com o conjunto de tiles da casa como uma peça do botão do fogão ("pedrinhas
+/// cortadas" no carpete); e "Formiga-leão perto da amarela" punha os tiles da formiga-leão do quintal.
+#[test]
+fn comida_e_formiga_leao_dentro_de_casa() {
+    let mut p = partida_completa();
+    p.estado.preta.populacao = 50;
+    usar(&mut p, "Ir para o patch da cozinha");
+    assert_eq!(p.estado.ambiente.terreno, 1);
+    let quintal = |p: &Partida| p.estado.superficie.mapa.dados.iter().filter(|&&v| (0x48..=0x4B).contains(&v)).count();
+    let antes = quintal(&p);
+    // A amarela na superfície, no carpete livre.
+    let (x, y) = (60, 30);
+    p.estado.amarela.plano = 1;
+    p.estado.amarela.x = x;
+    p.estado.amarela.y = y;
+    let comida = p.estado.ambiente.comida_superficie;
+    usar(&mut p, "Comida em volta da amarela");
+    assert!(p.estado.ambiente.comida_superficie > comida, "comida posta");
+    assert_eq!(quintal(&p), antes, "nenhum valor de comida do quintal no mapa da casa");
+    let em_volta: Vec<u8> = (-1..=1)
+        .flat_map(|dx| (-1..=1).map(move |dy| (dx, dy)))
+        .filter(|&d| d != (0, 0))
+        .filter_map(|(dx, dy)| p.estado.superficie.mapa.em(i32::from(x) + dx, i32::from(y) + dy))
+        .collect();
+    assert!(em_volta.iter().any(|v| (0x18..=0x27).contains(v)), "comida da casa: {em_volta:x?}");
+    let leoes = p.estado.formigas_leao.quantidade;
+    usar(&mut p, "Formiga-leão perto");
+    assert_eq!(p.estado.formigas_leao.quantidade, leoes);
+    assert!(recusas(&mut p).iter().any(|l| l.contains("não há formiga-leão dentro de casa")));
+}

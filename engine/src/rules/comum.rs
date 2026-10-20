@@ -142,6 +142,25 @@ pub fn e_comida_superficie(casa: bool, v: u8) -> bool {
     }
 }
 
+/// Uma unidade de comida a mais numa célula da superfície da **casa**, com a codificação de `_AddFood`
+/// e `_DropFoodA` na casa (superficie.md 8): o chão de carpete/ladrilho 0–3 vira `(v + 6) × 4` (uma
+/// unidade, o chão guardado nos bits altos) e a comida 0x18–0x27 com menos de quatro unidades ganha
+/// uma. `None` se a célula não recebe comida. (Os valores do quintal, 0x48–0x4B, são peças do botão do
+/// fogão no conjunto de tiles da casa.)
+pub fn comida_na_casa_mais_uma(v: u8) -> Option<u8> {
+    match v {
+        0..=3 => Some((v + 6) * 4),
+        0x18..=0x27 if v & 3 < 3 => Some(v + 1),
+        _ => None,
+    }
+}
+
+/// O chão que fica sob a comida 0x18–0x27 da superfície da casa (a última unidade de `_PickupFoodA`
+/// volta a ele); `None` se a célula não tem comida.
+pub fn chao_sob_comida_na_casa(v: u8) -> Option<u8> {
+    (0x18..=0x27).contains(&v).then(|| ((v & 0xFC) - 0x18) >> 2)
+}
+
 /// `_IsItHole(x, y)` (superficie.md 2.1): dentro da superfície e buraco do conjunto de tiles atual
 /// (quintal 0x50; casa 0x80–0x8F).
 pub fn e_buraco_superficie(e: &Estado, x: i32, y: i32) -> bool {
