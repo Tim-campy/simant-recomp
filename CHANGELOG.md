@@ -36,9 +36,10 @@ game file is distributed; the game's texts are also read from the user's install
 - **Save and load** in the original's `.ANT` format (the file written by the port opens in SimAnt).
 - **Help:** a viewer for `SIMANT.HLP` (WinHelp 3.0) and context help (Shift+F1, *?* buttons).
 - The original's **cheat codes** (`heal`, `just`, `qeen`, `eggs`...).
-- **Sound and music:** the original's effects and 28 songs. Our own FM synthesizer in the style of the
-  Sound Blaster's OPL (default), with the instrument bank tuned against recordings of the original; a
-  General MIDI SoundFont option (`--soundfont`) and a simple synthesizer. Effects sound as on the
+- **Sound and music:** the original's effects and 28 songs. Music plays through a simple synthesizer by
+  default; optional: our own FM synthesizer in the style of the Sound Blaster's OPL
+  (`--sintetizador fm`), with the instrument bank tuned against recordings of the original, and a
+  General MIDI SoundFont (`--soundfont`). Effects sound as on the
   original's Sound Blaster 16 (5000 Hz, in the driver's blocks), measured in a recorded session.
 - **The original's pace:** Windows 3.1's 55 ms clock, slow/normal speeds measured on the original
   (3 and 6 ticks/s), fast and ultra.
@@ -77,7 +78,7 @@ game file is distributed; the game's texts are also read from the user's install
 
 ### Mods
 
-- **Mod API 1.0** (it was 0.35 during development; see `docs/api-mods.md`): replacement of objects in
+- **Mod API**, frozen at 1.0 at release (0.x versions during development; see `docs/api-mods.md`): replacement of objects in
   the original database, of the game's loose files and of 42 `data/*.json` files of the port, merged by
   key; sandboxed **Lua 5.4** scripts, with hooks outside and inside the tick, reading and validated
   writes of the state (food, scents, castes, ants in the nests), their own menu and panel and state
@@ -112,8 +113,8 @@ Summary of the repository history (338 commits, October 16 to 19, 2026); the det
   window and video options, player preferences, Windows menu bar, help (`SIMANT.HLP`), "Silly"
   balloons, tools menu, window 26 frames, spider drawing; API 0.17–0.25 with the cheats mod.
 - **2026-10-19:** API 0.26 (merge by key, hooks inside the tick, state in the save); 640/800/1024
-  virtual screen and driver profile; `WIN.INI` as the source of preferences; FM synthesizer as default
-  and bank tuned to the original's 28 songs; optional Windows 3.1 title bar; seventh and eighth rounds
+  virtual screen and driver profile; `WIN.INI` as the source of preferences; FM synthesizer (default
+  for a while; the simple one is the default at release) and bank tuned to the original's 28 songs; optional Windows 3.1 title bar; seventh and eighth rounds
   of tick vectors (rare branches, red strategy, recruiting, mating flight) and generation checked;
   API 0.34. SimAnt's texts out of the repository: the `data/*.json` files only keep the reference
   (database, executable, window layout, `.HLP`) and the port reads the text from the user's
