@@ -1,4 +1,6 @@
-# Mod de trapaças (exemplo, API de mods 0.17 e 0.26)
+*Read in English: [README.md](README.md)*
+
+# Mod de trapaças (exemplo, API de mods 0.17, 0.26 e 0.43)
 
 Menu para provocar na hora os eventos do jogo e testar o port: chuva, menino cortando a grama ou com inseticida, revoada, gato, cachorro, aranha, formiga-leão, luta, comida, saúde da amarela, troca de patch (inclusive os 38 da casa), castas e comportamento, alarme, soldados no ninho, rainhas guardadas para o botão PLACE, lições do tutorial, fim de jogo, Mystery, avanço rápido de ticks e um painel de depuração.
 
@@ -13,11 +15,13 @@ Menu para provocar na hora os eventos do jogo e testar o port: chuva, menino cor
 
 - **F12** abre o menu (para trocar, mude `TECLA` em `trapacas.lua`: uma tecla de função ou uma combinação com Ctrl/Alt).
 - Setas + Enter ou clique escolhem; Esc ou clique fora fecham. A simulação para enquanto o menu está aberto.
-- Toda trapaça usada aparece na faixa ("Trapaça: ...") e conta no painel. Recusas aparecem na faixa e no console.
+- Toda trapaça usada aparece na faixa ("Cheat: ...") e conta no painel. Recusas aparecem na faixa e no console.
 - Desde a API 0.26, a contagem de trapaças e o painel vão para `NOME.ANT.mods.json`, ao lado do save (`ao_salvar`/`ao_carregar`); o `.ANT` continua o do original, que o lê normalmente (e não sabe que houve trapaça). No Load, a faixa avisa quantas trapaças o jogo já teve.
 
-A lista de itens e um roteiro para testar cada evento estão no `README.md` da raiz ("Testando com o mod de trapaças").
+## Textos (API 0.43)
+
+Os textos do mod (título e itens do menu, avisos na faixa, painel) não ficam no script: vêm de `data/idiomas/<idioma>.json` dentro do mod (chaves `mod.trapacas.*`), lidos com `traduzir()` no idioma do jogo (frame de idiomas, `docs/pt-BR/i18n.md`). O mod traz o inglês (`en.json`, o idioma de reserva e o único do jogo por enquanto) e uma tradução em português (`pt-BR.json`) como segundo exemplo; ela passa a valer quando o jogo tiver o pt-BR no contexto `jogo`. Para traduzir o mod para outro idioma, basta um `data/idiomas/<código>.json` com as mesmas chaves.
 
 ## Diferença para os códigos do original
 
-O SimAnt original tem os seus próprios códigos de trapaça (`heal`, `just`, `qeen`...), digitados na partida; eles são parte do jogo base e funcionam com ou sem este mod (`docs/spec/regras/trapacas.md`).
+O SimAnt original tem os seus próprios códigos de trapaça (`heal`, `just`, `qeen`...), digitados na partida; eles são parte do jogo base e funcionam com ou sem este mod (`docs/pt-BR/spec/regras/trapacas.md`).
