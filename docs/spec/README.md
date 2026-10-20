@@ -1,63 +1,65 @@
-# Especificação do SimAnt (Windows 3.x)
+*Leia em português: [README.md](../pt-BR/spec/README.md)*
 
-Jogo: **SimAnt: The Electronic Ant Colony** (Maxis, 1991), versão Windows por "Lightning" Rod Lai. Gênero: simulação/estratégia (colônia de formigas). O jogador controla uma formiga amarela da colônia preta, que disputa o quintal e a casa com a colônia vermelha. Os créditos e a descrição saem de bitmaps do `WINGANT` com ids entre 1000 e 4999 (folha de contato em `re_trabalho/png/sheet_wingant_a.png`): a tela de créditos e o menu "Select a Game", que oferece Tutorial, Quick Game, Full Game, Experimental e Load Game.
+# SimAnt Specification (Windows 3.x)
 
-## Convenção de evidência
+Game: **SimAnt: The Electronic Ant Colony** (Maxis, 1991), Windows version by "Lightning" Rod Lai. Genre: simulation/strategy (ant colony). The player controls a yellow ant of the black colony, which competes with the red colony for the yard and the house. The credits and the description come from `WINGANT` bitmaps with ids between 1000 and 4999 (contact sheet at `re_trabalho/png/sheet_wingant_a.png`): the credits screen and the "Select a Game" menu, which offers Tutorial, Quick Game, Full Game, Experimental and Load Game.
 
-- **Fato verificado:** testado no jogo original ou validado sobre os arquivos reais com ferramenta reproduzível (o texto diz qual).
-- **Fato visto no código:** lido no pseudocódigo do Ghidra, com o endereço `seletor:offset` e o nome do `.SYM`.
-- **[hipótese]:** inferência ainda não confirmada.
-- **[em aberto]:** pergunta conhecida, sem resposta ainda.
+## Evidence convention
 
-Ambiente de referência: DOSBox-X (`referencia/`). Comparações com o original estão em `tests/referencias/README.md`.
+- **Verified fact:** tested in the original game or validated against the real files with a reproducible tool (the text says which).
+- **Fact seen in the code:** read in the Ghidra pseudocode, with the `selector:offset` address and the name from the `.SYM`.
+- **[hypothesis]:** inference not yet confirmed.
+- **[open]:** known question, not yet answered.
 
-## Índice
+Reference environment: DOSBox-X (`referencia/`). Comparisons with the original are in `tests/referencias/README.md`.
 
-- [executavel.md](executavel.md): mapa do `SIMANTW.EXE`, módulos e fluxo principal.
-- [arquivos-do-jogo.md](arquivos-do-jogo.md): inventário dos arquivos da instalação.
-- Telas:
-  - [telas/abertura.md](telas/abertura.md): abertura (`_ShowIntro`), implementada no marco 1.
-  - [telas/resolucao.md](telas/resolucao.md): layout por resolução (640×480, 800×600, 1024×768): janela principal maximizada, tabela de posições pela altura da tela e a tela virtual do port.
-  - [telas/jogo.md](telas/jogo.md): tela de jogo (faixa + janela de edição com chão e vida), planos, rolagem e reconstrução de `_LifeA/B/R`.
-  - [telas/mensagens.md](telas/mensagens.md): avisos ao jogador (mensagem da faixa, quadros de mensagem, fim de jogo e pontuação), botões configuráveis da faixa e salvar.
-  - [telas/menus-mods.md](telas/menus-mods.md): menu e painel dos scripts de mods (API 0.17; extensão do port, não existe no original).
-  - [telas/janelas.md](telas/janelas.md): Caste e Behavior Control (triângulo), History, menus de segurar o botão (`_AntMenu`, ícones), estado dos botões da faixa e gerenciador de janelas.
-  - [telas/mapa.md](telas/mapa.md): janela do mapa (`mapWin`): planos, mapas de feromônio, trilhas, aranha, pegada e retângulo da vista.
-  - [telas/quintal.md](telas/quintal.md): janela do quintal (Yard View) e faixa 35, troca de patch (`_XferPatch`), PLACE e Jogo Completo.
-  - [telas/experimental.md](telas/experimental.md): modo Experimental (menu e ferramentas de edição, Quick Game → Experimental, "Start Game") e tabela de aceleradores.
-  - [telas/info.md](telas/info.md): janela Info (cartões da enciclopédia).
-  - [telas/arquivos.md](telas/arquivos.md): diálogos Load, Save e Save As.
-  - [telas/ajuda.md](telas/ajuda.md) e [telas/ajuda-contexto.md](telas/ajuda-contexto.md): visor do `SIMANT.HLP` e como se chega à ajuda (F1, modo de ajuda, botões "?", cursores).
-- Formatos:
-  - [formatos/banco-dat-ndx.md](formatos/banco-dat-ndx.md): banco de recursos e compressão LZSS.
-  - [formatos/bitmap.md](formatos/bitmap.md): bitmaps e paleta.
-  - [formatos/fonte.md](formatos/fonte.md): fontes (FONT do Mac e Gaia do `FONTRES.FON`) e posicionamento de texto.
-  - [formatos/janela.md](formatos/janela.md): sistema de janelas (layouts, cores, posições, cálculo e posicionamento na tela).
+## Index
+
+- [executavel.md](executavel.md): map of `SIMANTW.EXE`, modules and main flow.
+- [arquivos-do-jogo.md](arquivos-do-jogo.md): inventory of the installation files.
+- Screens:
+  - [telas/abertura.md](telas/abertura.md): intro (`_ShowIntro`), implemented in milestone 1.
+  - [telas/resolucao.md](telas/resolucao.md): layout per resolution (640×480, 800×600, 1024×768): maximized main window, position table by screen height, and the port's virtual screen.
+  - [telas/jogo.md](telas/jogo.md): game screen (ribbon + edit window with ground and life), planes, scrolling and reconstruction of `_LifeA/B/R`.
+  - [telas/mensagens.md](telas/mensagens.md): notices to the player (ribbon message, message boxes, game over and score), configurable ribbon buttons and saving.
+  - [telas/menus-mods.md](telas/menus-mods.md): menu and panel for mod scripts (API 0.17; a port extension, does not exist in the original).
+  - [telas/janelas.md](telas/janelas.md): Caste and Behavior Control (triangle), History, hold-the-button menus (`_AntMenu`, icons), ribbon button state and window manager.
+  - [telas/mapa.md](telas/mapa.md): map window (`mapWin`): planes, pheromone maps, trails, spider, footprint and view rectangle.
+  - [telas/quintal.md](telas/quintal.md): yard window (Yard View) and ribbon 35, patch switching (`_XferPatch`), PLACE and Full Game.
+  - [telas/experimental.md](telas/experimental.md): Experimental mode (menu and editing tools, Quick Game → Experimental, "Start Game") and accelerator table.
+  - [telas/info.md](telas/info.md): Info window (encyclopedia cards).
+  - [telas/arquivos.md](telas/arquivos.md): Load, Save and Save As dialogs.
+  - [telas/ajuda.md](telas/ajuda.md) and [telas/ajuda-contexto.md](telas/ajuda-contexto.md): `SIMANT.HLP` viewer and how help is reached (F1, help mode, "?" buttons, cursors).
+- Formats:
+  - [formatos/banco-dat-ndx.md](formatos/banco-dat-ndx.md): resource bank and LZSS compression.
+  - [formatos/bitmap.md](formatos/bitmap.md): bitmaps and palette.
+  - [formatos/fonte.md](formatos/fonte.md): fonts (Mac FONT and Gaia from `FONTRES.FON`) and text positioning.
+  - [formatos/janela.md](formatos/janela.md): window system (layouts, colors, positions, on-screen computation and placement).
   - [formatos/simant-cfg.md](formatos/simant-cfg.md): `SIMANT.CFG`.
-  - [formatos/save-ant.md](formatos/save-ant.md): jogo salvo e modelo de estado da simulação.
-  - [formatos/som.md](formatos/som.md): efeitos (tipo 5, tipo 51), cabeçalhos de música (tipo 18), MIDI (`SOUND\*.MID`, tipos 20 e 50) e as saídas de áudio do original.
-  - [formatos/tiles.md](formatos/tiles.md): tiles (objetos tipo 9) e montagem da imagem dos mapas.
+  - [formatos/save-ant.md](formatos/save-ant.md): saved game and simulation state model.
+  - [formatos/som.md](formatos/som.md): sound effects (type 5, type 51), music headers (type 18), MIDI (`SOUND\*.MID`, types 20 and 50) and the original's audio outputs.
+  - [formatos/tiles.md](formatos/tiles.md): tiles (type 9 objects) and assembly of the map image.
   - [formatos/hlp.md](formatos/hlp.md): `SIMANT.HLP` (WinHelp 3.0).
-  - [formatos/ne-recursos.md](formatos/ne-recursos.md): recursos do executável NE (cursores).
-- Regras:
-  - [regras/rng.md](regras/rng.md): geradores aleatórios (LFSR `_SRand*` e `rand` do C em `_RRand`), sementes e quem usa cada um.
-  - [regras/geracao-mundo.md](regras/geracao-mundo.md): novo jogo (`_NewGame`, `_RandYard`, `_RandWorld`), patches do quintal e da casa, rainhas, comida e tutorial; verificada contra o `QUICK2.ANT`.
-  - [regras/tiles-valores.md](regras/tiles-valores.md): significado dos valores de `_MapA`, `_MapB` e `_MapR` e das funções de teste de tile.
-  - [regras/simulacao-visao-geral.md](regras/simulacao-visao-geral.md): tick (`MYTIMERFUNC`/`_DoAntSim`), ordem e frequência das sub-rotinas, velocidade, pausa, fim de jogo e pontuação.
-  - [regras/formigas.md](regras/formigas.md): listas A/B/R, campos X/Y/M/T/S, castas, modos, triângulos de controle e máquina de estados.
-  - [regras/feromonios.md](regras/feromonios.md): mapas de cheiro (`_PherMap*`), depósito, decaimento e leitura.
-  - [regras/superficie.md](regras/superficie.md): formigas da superfície (`_DoAntSimA` e cada modo), funções de direção, luta, cadáveres, entrada no ninho, comida, estratégia preta/vermelha, recrutamento e formiga vermelha líder.
-  - [regras/inimigos.md](regras/inimigos.md): formiga-leão, aranha (inclusive controlada pelo jogador), lagarta e bicho-de-conta.
-  - [regras/formiga-amarela.md](regras/formiga-amarela.md): formiga amarela (estado `_Me*`, movimento e caminho, ninho, pegar/largar, comer, luta, troca de corpo, recrutamento, morte e reencarnação) e controles do jogador (mouse, teclas, menus, aceleradores, modo Experimental).
-  - [regras/ninho.md](regras/ninho.md): formigas dentro dos ninhos preto e vermelho (`_DoAntSimB/R`, `_DoNestAntB/R`): despacho por modo, movimento, luta, comida guardada, escavação, mapa de saída, invasoras, água e inundação; diferenças R × B e casos de teste.
-  - [regras/ciclo-de-vida.md](regras/ciclo-de-vida.md): postura, desenvolvimento e eclosão dos ovos (`_SimEggB/R`), rainha (cabeça e cauda, andar, fome), escolha de casta (`_SetCasteProd`, `_CasteTabC`) e casos de teste.
-  - [regras/testes-tick.md](regras/testes-tick.md): determinismo do original na bancada QEMU, vetores "estado antes → depois" de um tick e o que capturar além do save.
-  - [regras/quintal.md](regras/quintal.md): quintal (`_DoSimYard`): menino dentro e fora de casa, cortador, pé e inseticida, gato, cachorro, pássaro, chuva e água, colônias do quintal 12 × 16 (`_SimColonies`, revoada, migração) e fim do Jogo Completo; casos Q-01 e Q-02 confirmados no original.
-  - [regras/som.md](regras/som.md): funções de som, opções Music/Sound Effects, preempção e catálogo de quem toca cada música e efeito.
-  - [regras/trapacas.md](regras/trapacas.md): códigos de trapaça de 4 letras do original (`_Cheats`, `_CheatKeys`), conferidos na bancada.
-  - [regras/conselhos.md](regras/conselhos.md): `_Feedback`: mensagens de conselho (lista 4/1020) e tutorial (`_GiveLesson`/`_LessonDone`, lições 4/11000…11112).
-  - [regras/misterio.md](regras/misterio.md): botão Mystery (`_MysteryButton`).
+  - [formatos/ne-recursos.md](formatos/ne-recursos.md): NE executable resources (cursors).
+- Rules:
+  - [regras/rng.md](regras/rng.md): random generators (LFSR `_SRand*` and C `rand` in `_RRand`), seeds and who uses each one.
+  - [regras/geracao-mundo.md](regras/geracao-mundo.md): new game (`_NewGame`, `_RandYard`, `_RandWorld`), yard and house patches, queens, food and tutorial; verified against `QUICK2.ANT`.
+  - [regras/tiles-valores.md](regras/tiles-valores.md): meaning of the values of `_MapA`, `_MapB` and `_MapR` and of the tile test functions.
+  - [regras/simulacao-visao-geral.md](regras/simulacao-visao-geral.md): tick (`MYTIMERFUNC`/`_DoAntSim`), order and frequency of the subroutines, speed, pause, game over and score.
+  - [regras/formigas.md](regras/formigas.md): A/B/R lists, X/Y/M/T/S fields, castes, modes, control triangles and state machine.
+  - [regras/feromonios.md](regras/feromonios.md): scent maps (`_PherMap*`), deposit, decay and reading.
+  - [regras/superficie.md](regras/superficie.md): surface ants (`_DoAntSimA` and each mode), direction functions, fighting, corpses, nest entry, food, black/red strategy, recruitment and the red leader ant.
+  - [regras/inimigos.md](regras/inimigos.md): antlion, spider (including player-controlled), caterpillar and pill bug.
+  - [regras/formiga-amarela.md](regras/formiga-amarela.md): yellow ant (`_Me*` state, movement and path, nest, pick up/drop, eating, fighting, body swap, recruitment, death and reincarnation) and player controls (mouse, keys, menus, accelerators, Experimental mode).
+  - [regras/ninho.md](regras/ninho.md): ants inside the black and red nests (`_DoAntSimB/R`, `_DoNestAntB/R`): dispatch by mode, movement, fighting, stored food, digging, exit map, invaders, water and flooding; R × B differences and test cases.
+  - [regras/ciclo-de-vida.md](regras/ciclo-de-vida.md): laying, development and hatching of eggs (`_SimEggB/R`), queen (head and tail, walking, hunger), caste choice (`_SetCasteProd`, `_CasteTabC`) and test cases.
+  - [regras/testes-tick.md](regras/testes-tick.md): determinism of the original on the QEMU test bench, "state before → after" tick vectors and what to capture besides the save.
+  - [regras/quintal.md](regras/quintal.md): yard (`_DoSimYard`): boy inside and outside the house, lawnmower, foot and insecticide, cat, dog, bird, rain and water, 12 × 16 yard colonies (`_SimColonies`, mating flight, migration) and the end of the Full Game; cases Q-01 and Q-02 confirmed in the original.
+  - [regras/som.md](regras/som.md): sound functions, Music/Sound Effects options, preemption and a catalog of who plays each music track and sound effect.
+  - [regras/trapacas.md](regras/trapacas.md): the original's 4-letter cheat codes (`_Cheats`, `_CheatKeys`), checked on the test bench.
+  - [regras/conselhos.md](regras/conselhos.md): `_Feedback`: advice messages (list 4/1020) and tutorial (`_GiveLesson`/`_LessonDone`, lessons 4/11000…11112).
+  - [regras/misterio.md](regras/misterio.md): Mystery button (`_MysteryButton`).
 
-## O que falta especificar
+## What remains to be specified
 
-Os tiles e mapas, as regras da simulação e o som, que estavam nesta lista, já estão especificados (índice acima). O que ainda falta especificar ou implementar está em [../estado-do-projeto.md](../estado-do-projeto.md) §4 (revisto em 2026-10-19). A barra de menus, os balões e os quadros da janela 26, que estavam aqui, foram feitos em 2026-10-18 ([telas/menus.md](telas/menus.md), [telas/baloes.md](telas/baloes.md), [telas/mensagens.md](telas/mensagens.md)); os gráficos de saúde (`_DrawEditGraphs`) não desenham nos modos do Windows ([telas/baloes.md](telas/baloes.md) §3).
+The tiles and maps, the simulation rules and the sound, which were on this list, are now specified (index above). What still remains to be specified or implemented is in [../estado-do-projeto.md](../estado-do-projeto.md) §4 (revised on 2026-10-19). The menu bar, the balloons and the window 26 boxes, which were listed here, were done on 2026-10-18 ([telas/menus.md](telas/menus.md), [telas/baloes.md](telas/baloes.md), [telas/mensagens.md](telas/mensagens.md)); the health graphs (`_DrawEditGraphs`) do not draw in the Windows modes ([telas/baloes.md](telas/baloes.md) §3).

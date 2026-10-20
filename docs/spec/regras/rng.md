@@ -1,161 +1,163 @@
-# Geradores de números aleatórios
+*Leia em português: [rng.md](../../pt-BR/spec/regras/rng.md)*
 
-O SimAnt usa **dois geradores independentes**:
+# Random number generators
 
-| Nome usado aqui | Rotinas | Estado | Algoritmo |
+SimAnt uses **two independent generators**:
+
+| Name used here | Routines | State | Algorithm |
 |---|---|---|---|
-| **S** ("semente do mundo") | `_SRand1`, `_SRand2` … `_SRand256`, `_SGRand`, `_SGIRand`, `_SGSRand`, `_SetSRandSeed`, `_GetSRandSeed`, `_SeedSRand` | 1 palavra de 16 bits em `DGROUP:0xcbf2` (sem nome no `.SYM`) | LFSR de Galois de 16 bits |
-| **R** ("rand do C") | `_RRand`, `_SeedRRand` (e as funções do runtime `_srand`/`_rand`) | 32 bits em `DGROUP:0xae34` (palavra baixa) e `0xae36` (palavra alta), sem nome no `.SYM` | congruencial linear do runtime do Microsoft C |
+| **S** ("world seed") | `_SRand1`, `_SRand2` … `_SRand256`, `_SGRand`, `_SGIRand`, `_SGSRand`, `_SetSRandSeed`, `_GetSRandSeed`, `_SeedSRand` | 1 16-bit word at `DGROUP:0xcbf2` (no name in the `.SYM`) | 16-bit Galois LFSR |
+| **R** ("C rand") | `_RRand`, `_SeedRRand` (and the runtime functions `_srand`/`_rand`) | 32 bits at `DGROUP:0xae34` (low word) and `0xae36` (high word), no name in the `.SYM` | Microsoft C runtime linear congruential |
 
-Fontes: pseudocódigo do Ghidra (`re_trabalho/decomp/Code5.c`, `Code4.c`, `Code2.c`) e desmontagem direta dos bytes do `SIMANTW.EXE` (capstone, modo 16 bits) para conferir instruções que o pseudocódigo deixa ambíguas (divisão com ou sem sinal, ordem de avaliação).
+Sources: Ghidra pseudocode (`re_trabalho/decomp/Code5.c`, `Code4.c`, `Code2.c`) and direct disassembly of the `SIMANTW.EXE` bytes (capstone, 16-bit mode) to check instructions that the pseudocode leaves ambiguous (signed or unsigned division, evaluation order).
 
-## Gerador S (LFSR)
+## S generator (LFSR)
 
-### Passo
+### Step
 
-Fato visto no código (`_SRand1` @ `1020:158a`, e as variantes abaixo, conferido na desmontagem):
+Fact seen in the code (`_SRand1` @ `1020:158a`, and the variants below, checked in the disassembly):
 
 ```
-passo(s):            // s = palavra de 16 bits sem sinal
-    vai_um = bit 15 de s
+step(s):             // s = unsigned 16-bit word
+    carry = bit 15 of s
     s = (s << 1) & 0xFFFF
-    se vai_um: s = s XOR 0x1BF5
-    devolve s        // o novo estado é também o valor sorteado
+    if carry: s = s XOR 0x1BF5
+    return s         // the new state is also the drawn value
 ```
 
-Propriedades (fato verificado por enumeração dos 65.536 estados com um script Python):
+Properties (fact verified by enumerating the 65,536 states with a Python script):
 
-- O passo é uma bijeção. Os ciclos são: o estado 0 (fixo: com semente 0 o gerador devolve 0 para sempre), um ciclo de 57.337 estados, um de 8.191 e um de 7 (`0x3859 → 0x70b2 → 0xe164 → 0xd93d → 0xa98f → 0x48eb → 0x91d6 → 0x3859`). Não é um LFSR de período máximo.
-- O bit 0 do novo estado é igual ao bit 15 do estado anterior (porque 0x1BF5 é ímpar).
-- Vetores de teste: semente 1 → 2, 4, 8, 0x10, …; semente 0x1234 → 0x2468, 0x48d0, 0x91a0, 0x38b5, 0x716a, 0xe2d4, 0xde5d, 0xa74f, 0x556b, 0xaad6.
+- The step is a bijection. The cycles are: state 0 (fixed: with seed 0 the generator returns 0 forever), a cycle of 57,337 states, one of 8,191 and one of 7 (`0x3859 → 0x70b2 → 0xe164 → 0xd93d → 0xa98f → 0x48eb → 0x91d6 → 0x3859`). It is not a maximum-period LFSR.
+- Bit 0 of the new state equals bit 15 of the previous state (because 0x1BF5 is odd).
+- Test vectors: seed 1 → 2, 4, 8, 0x10, …; seed 0x1234 → 0x2468, 0x48d0, 0x91a0, 0x38b5, 0x716a, 0xe2d4, 0xde5d, 0xa74f, 0x556b, 0xaad6.
 
-### Funções de saída
+### Output functions
 
-Todas dão exatamente **um** passo, exceto as três "G", que dão dois ou três.
+All of them take exactly **one** step, except the three "G" ones, which take two or three.
 
-| Função | Endereço | Resultado | Observação |
+| Function | Address | Result | Note |
 |---|---|---|---|
-| `_SRand1(n)` | `1020:158a` | `passo() mod n` | divisão **sem sinal** de 16 bits (`div`), resultado 0…n−1 |
-| `_SRand2()` | `1020:15ae` | `passo() & 1` | |
-| `_SRand4()` | `1020:15ce` | `passo() & 3` | |
-| `_SRand8()` | `1020:15ee` | `passo() & 7` | |
-| `_SRand16()` | `1020:160e` | `passo() & 0xF` | |
-| `_SRand32()` | `1020:162e` | `passo() & 0x1F` | |
-| `_SRand64()` | `1020:164e` | `passo() & 0x3F` | |
-| `_SRand128()` | `1020:166e` | `passo() & 0x7F` | |
-| `_SRand256()` | `1020:168e` | `passo() & 0xFF` | |
-| `_SGRand(n)` | `1020:14a4` | `min(a, b)` com `a = SRand1(n)` e depois `b = SRand1(n)` | distribuição puxada para 0 |
-| `_SGIRand(n)` | `1020:147c` | `max(a, b)`, mesma ordem | nenhum chamador no pseudocódigo |
-| `_SGSRand(n)` | `1020:14cc` | `m = min(SRand1(n), SRand1(n))`; depois `SRand2()`; se der 1, devolve `−m` | valor com sinal, concentrado perto de 0 |
+| `_SRand1(n)` | `1020:158a` | `step() mod n` | **unsigned** 16-bit division (`div`), result 0…n−1 |
+| `_SRand2()` | `1020:15ae` | `step() & 1` | |
+| `_SRand4()` | `1020:15ce` | `step() & 3` | |
+| `_SRand8()` | `1020:15ee` | `step() & 7` | |
+| `_SRand16()` | `1020:160e` | `step() & 0xF` | |
+| `_SRand32()` | `1020:162e` | `step() & 0x1F` | |
+| `_SRand64()` | `1020:164e` | `step() & 0x3F` | |
+| `_SRand128()` | `1020:166e` | `step() & 0x7F` | |
+| `_SRand256()` | `1020:168e` | `step() & 0xFF` | |
+| `_SGRand(n)` | `1020:14a4` | `min(a, b)` with `a = SRand1(n)` and then `b = SRand1(n)` | distribution skewed towards 0 |
+| `_SGIRand(n)` | `1020:147c` | `max(a, b)`, same order | no caller in the pseudocode |
+| `_SGSRand(n)` | `1020:14cc` | `m = min(SRand1(n), SRand1(n))`; then `SRand2()`; if it gives 1, returns `−m` | signed value, concentrated near 0 |
 
-Atenção: `_SRandK()` (máscara) e `_SRand1(K)` (resto) dão o mesmo número para K potência de 2, mas o código usa as duas formas; para reproduzir o original basta que cada chamada dê um passo.
+Caution: `_SRandK()` (mask) and `_SRand1(K)` (remainder) give the same number for K a power of 2, but the code uses both forms; to reproduce the original it is enough that each call takes one step.
 
-### Semente
+### Seed
 
-- Valor inicial no executável: `DGROUP:0xcbf2 = 0` (fato verificado: bytes do segmento 10 no arquivo, offset de arquivo `0x20000 + 0xcbf2`).
-- `_SetSRandSeed(v)` (`1020:1506`) grava v; `_GetSRandSeed()` (`1020:1512`) lê (devolve DX = 0). Fato visto no código.
-- `_SeedSRand()` (`1020:152a`): `s = (_TickCount() & 0xFFFF) XOR 0x3751`. Fato visto no código.
-- `_TickCount()` (`1008:18ac`) = `GetTickCount() / 55` (divisão longa sem sinal por 0x37), isto é, o relógio do Windows em "ticks" de ~55 ms, como no Mac. Os chamadores usam só a palavra baixa. Fato visto no código.
+- Initial value in the executable: `DGROUP:0xcbf2 = 0` (fact verified: bytes of segment 10 in the file, file offset `0x20000 + 0xcbf2`).
+- `_SetSRandSeed(v)` (`1020:1506`) writes v; `_GetSRandSeed()` (`1020:1512`) reads it (returns DX = 0). Fact seen in the code.
+- `_SeedSRand()` (`1020:152a`): `s = (_TickCount() & 0xFFFF) XOR 0x3751`. Fact seen in the code.
+- `_TickCount()` (`1008:18ac`) = `GetTickCount() / 55` (unsigned long division by 0x37), that is, the Windows clock in "ticks" of ~55 ms, as on the Mac. Callers use only the low word. Fact seen in the code.
 
-### Quem semeia S
+### Who seeds S
 
-| Momento | Chamada | Fonte |
+| Moment | Call | Source |
 |---|---|---|
-| Inicialização do programa | `_initStuff` (`1020:0000`) chama `_BootUpGame` (`1000:96b2`, que sempre devolve 0) e então `_InitSimVars`, `_SeedSRand`, `_SeedRRand` | fato visto no código |
-| Geração de cada patch do quintal | `_RandWorld` (`1030:5ab0`) começa com `_SetSRandSeed(semente do patch)` | fato visto no código |
-| Tutorial carregado de `Tutorial.Ant` | `_SpecialTutorialInit` (`1010:9cea`) e `_LoadGame` (`1010:9fa0`) chamam `_GenerateTutorial` e depois `_SeedSRand` | fato visto no código |
+| Program startup | `_initStuff` (`1020:0000`) calls `_BootUpGame` (`1000:96b2`, which always returns 0) and then `_InitSimVars`, `_SeedSRand`, `_SeedRRand` | fact seen in the code |
+| Generation of each yard patch | `_RandWorld` (`1030:5ab0`) starts with `_SetSRandSeed(patch seed)` | fact seen in the code |
+| Tutorial loaded from `Tutorial.Ant` | `_SpecialTutorialInit` (`1010:9cea`) and `_LoadGame` (`1010:9fa0`) call `_GenerateTutorial` and then `_SeedSRand` | fact seen in the code |
 
-Consequência: o mapa de um patch é **função só da semente do patch** (mais o estado do quintal, ver [geracao-mundo.md](geracao-mundo.md)); depois de gerado, S continua de onde a geração parou e passa a servir à simulação.
+Consequence: a patch's map is **a function of the patch seed only** (plus the yard state, see [geracao-mundo.md](geracao-mundo.md)); after generation, S continues from where the generation stopped and goes on to serve the simulation.
 
-## Gerador R (`rand` do Microsoft C)
+## R generator (Microsoft C `rand`)
 
-Fato visto no código (`_srand` @ `1018:06f6`, `_rand` @ `1018:070a`, conferido na desmontagem):
+Fact seen in the code (`_srand` @ `1018:06f6`, `_rand` @ `1018:070a`, checked in the disassembly):
 
 ```
-estado de 32 bits, inicial = 1 (bytes 01 00 00 00 em DGROUP:0xae34)
-srand(v):  estado = v (palavra alta zerada)
-rand():    estado = (estado * 0x343FD + 0x269EC3) mod 2^32
-           devolve (estado >> 16) & 0x7FFF
+32-bit state, initial = 1 (bytes 01 00 00 00 at DGROUP:0xae34)
+srand(v):  state = v (high word zeroed)
+rand():    state = (state * 0x343FD + 0x269EC3) mod 2^32
+           return (state >> 16) & 0x7FFF
 ```
 
-É o gerador clássico do runtime C da Microsoft (multiplicador 214013, incremento 2531011).
+It is the classic Microsoft C runtime generator (multiplier 214013, increment 2531011).
 
-- `_RRand(n)` (`1020:156e`): `v = rand()`; se `v < 0`, `v = −v` (nunca acontece, `rand` é 0…0x7FFF); devolve `v mod n` com divisão **com sinal** (`idiv`). Fato visto no código.
-- `_SeedRRand()` (`1020:1536`): faz `s = TickCount XOR 0x3751` (igual a `_SeedSRand`), sorteia `k = SRand128()` (avança S), chama `srand(TickCount)` (nova leitura do relógio) e descarta `k` valores de `rand()`. Fato visto no código.
-- `_SetRRandSeed` (`1020:1518`) é vazia. `_GetRRandSeed` (`1020:151a`) lê uma palavra dupla em `0x046C:0000` (o endereço linear do contador de ticks do BIOS, 0040:006C, usado como se fosse seletor); não tem chamadores no pseudocódigo. Ambas parecem resíduo do port do DOS [hipótese].
+- `_RRand(n)` (`1020:156e`): `v = rand()`; if `v < 0`, `v = −v` (never happens, `rand` is 0…0x7FFF); returns `v mod n` with **signed** division (`idiv`). Fact seen in the code.
+- `_SeedRRand()` (`1020:1536`): does `s = TickCount XOR 0x3751` (same as `_SeedSRand`), draws `k = SRand128()` (advances S), calls `srand(TickCount)` (a new clock reading) and discards `k` values of `rand()`. Fact seen in the code.
+- `_SetRRandSeed` (`1020:1518`) is empty. `_GetRRandSeed` (`1020:151a`) reads a double word at `0x046C:0000` (the linear address of the BIOS tick counter, 0040:006C, used as if it were a selector); it has no callers in the pseudocode. Both look like leftovers from the DOS port [hypothesis].
 
-## Quem usa cada gerador
+## Who uses each generator
 
-Contagem de chamadas no pseudocódigo (fato visto no código; lista completa obtida com `grep` em `re_trabalho/decomp/*.c`):
+Count of calls in the pseudocode (fact seen in the code; full list obtained with `grep` over `re_trabalho/decomp/*.c`):
 
-- **R (`_RRand`)**: só 9 rotinas. `_RandYard` (sementes dos 192 patches), `_PlaceDrop` (posição das gotas de chuva), `_SimRain`/`_DoSimYard` (sorteio do início da chuva), `_GetWinner` (lutas), `_MysteryButton`, `_CheatKeys`, `_AnimYellowInsane`.
-- **S**: todo o resto. Geração do mapa (`_MakeYardPatch`, `_AddRocks`, `_InitAntLions`, `_InitPillar`, `_RandWorld`, `_PlaceBlackQueen`, `_AddFood`, `_DigTileB/R` e `_SmoothEdgesB/R` via `_SRand8`), a simulação das formigas (`SIMANT1_MODULE`), quintal (menino, gato, cachorro, pássaro, aranha, formiga-leão), e **também rotinas de desenho**: `_DrawCurBalloons`, `_DrawSpider`, `_DrawSwarm`, `_Draw_SimYard`, `_DrawRain` chamam `_SRand*`.
+- **R (`_RRand`)**: only 9 routines. `_RandYard` (seeds of the 192 patches), `_PlaceDrop` (position of the raindrops), `_SimRain`/`_DoSimYard` (random draw for the start of rain), `_GetWinner` (fights), `_MysteryButton`, `_CheatKeys`, `_AnimYellowInsane`.
+- **S**: everything else. Map generation (`_MakeYardPatch`, `_AddRocks`, `_InitAntLions`, `_InitPillar`, `_RandWorld`, `_PlaceBlackQueen`, `_AddFood`, `_DigTileB/R` and `_SmoothEdgesB/R` via `_SRand8`), the ant simulation (`SIMANT1_MODULE`), yard (boy, cat, dog, bird, spider, antlion), and **also drawing routines**: `_DrawCurBalloons`, `_DrawSpider`, `_DrawSwarm`, `_Draw_SimYard`, `_DrawRain` call `_SRand*`.
 
-Consequência importante para o port: como o desenho consome S, a sequência da simulação no original depende do que foi desenhado (janelas abertas, balões). Uma reprodução bit a bit da simulação exige ou reproduzir essas chamadas de desenho, ou aceitar divergência depois da geração do mundo [hipótese: não medido quanto isso afeta na prática]. A geração do mundo em si não chama desenho entre o `_SetSRandSeed` e o fim do `_RandWorld` (fato visto no código, e confirmado pela reprodução exata descrita abaixo).
+Important consequence for the port: since drawing consumes S, the simulation sequence in the original depends on what was drawn (open windows, balloons). A bit-exact reproduction of the simulation requires either reproducing these drawing calls or accepting divergence after world generation [hypothesis: not measured how much this matters in practice]. World generation itself does not call drawing between `_SetSRandSeed` and the end of `_RandWorld` (fact seen in the code, and confirmed by the exact reproduction described below).
 
-## Sorteios do desenho
+## Drawing random draws
 
-Fora do tick, o original consome S (nunca R) ao **redesenhar**. Fontes: pseudocódigo (análise de 2026-10-17, endereços abaixo) e bancada QEMU (gravações em `re_trabalho/cen/desenho_*`, `tools/cenarios_tick.py teclas` + `entre`, que conta os passos de S e R entre o fim de um tick e o começo do seguinte). Implementação: `engine/src/rules/desenho.rs`; conferência: vetores `tests/referencias/acoes/desenho_*` (o intervalo entre dois ticks: estado depois de um, estado antes do seguinte), `engine/tests/acoes_originais.rs`.
+Outside the tick, the original consumes S (never R) when **redrawing**. Sources: pseudocode (analysis from 2026-10-17, addresses below) and QEMU bench (recordings in `re_trabalho/cen/desenho_*`, `tools/cenarios_tick.py teclas` + `entre`, which counts the S and R steps between the end of one tick and the start of the next). Implementation: `engine/src/rules/desenho.rs`; checking: vectors `tests/referencias/acoes/desenho_*` (the interval between two ticks: state after one, state before the next), `engine/tests/acoes_originais.rs`.
 
-**Quando há redesenho** (`MYTIMERFUNC` `1000:2440` → `_DoAntSim` → `_UpdateWindows` `1000:2224`) [código]: depois de **cada tick**, se a janela principal não está minimizada; com a aplicação inativa, só 1 tick em 8 (`DGROUP:0x2f0`). Sem tick (jogo pausado) não há `_UpdateWindows`. Velocidade: `_GameSpeed` 2 desenha só com `_UDcntr` (`9:9b00`, +1 por chamada, módulo 64) par; 3, só com `_UDcntr % 4 == 0`. Ordem: mapa (0x100, não sorteia), **quintal** (0x1900: na frente, toda chamada; atrás, uma sim e outra não), **janela de edição** (na frente, toda chamada; atrás, uma sim e outra não). O WM_PAINT das janelas só copia o buffer e não sorteia.
+**When there is a redraw** (`MYTIMERFUNC` `1000:2440` → `_DoAntSim` → `_UpdateWindows` `1000:2224`) [code]: after **each tick**, if the main window is not minimized; with the application inactive, only 1 tick in 8 (`DGROUP:0x2f0`). Without a tick (game paused) there is no `_UpdateWindows`. Speed: `_GameSpeed` 2 only draws with `_UDcntr` (`9:9b00`, +1 per call, modulo 64) even; 3, only with `_UDcntr % 4 == 0`. Order: map (0x100, no random draw), **yard** (0x1900: in front, every call; behind, every other call), **edit window** (in front, every call; behind, every other call). The windows' WM_PAINT only copies the buffer and does not draw random numbers.
 
-| Rotina | Condição | Sorteios por redesenho | Grava no save |
+| Routine | Condition | Random draws per redraw | Written to the save |
 |---|---|---|---|
-| `_Draw_SimYard(_YardMode)` (`1010:b462`), via `_UpdateYard` | quintal aberto, `_YardMode` 0 (Yard) ou 1 (House) | chuva (`_RainOn` ≠ 0): **14 × (`SRand1(400)`, `SRand1(150)`) = 28** | — |
-| `_DrawSwarm` (`1010:bb0e`), no fim de `_Draw_SimYard` (modos 0 e 1) | `_MapMode` = 0 | pretas: `nB = min(_SwarmCntB, 16, _QueenStorageB)`; cada uma fora de ±15 volta a (`S16 − 10`, `S16 − 10`); todas andam `S1(3) − 1` em x e y → **2·nB + 2·(fora)**; vermelhas: fora de ±15 vão a (0, 0) sem sorteio, todas andam `S1(3) − 1` → **2·nR** | `_SwarmCentX = 28·px − 10·py + 178`, `_SwarmCentY = 10·py + 46` (patch atual), `_SwarmXB/YB/XR/YR` |
-| `_DrawPalps` (`1010:2594`) em `_DrawSpider`, via `_UpdateEdit` → `1010:16d4` | janela de edição aberta, aranha visível (`_PreDrawSpider`: `_SpidOn`, plano 0 ou 1, dentro da vista), `_SMode` ≠ 5 | **1 × `SRand1(4)`**, exceto com `_SMode` < 2 e `_MeSMode` < 6 | — |
-| `_DrawCurBalloons` (`1010:4cac`), via `1010:16d4`, **antes** das células e dos palpos | "Silly", `_ELayerMode = −1`, jogo não pausado, um balão anotado no tick | por fala com o prazo de tempo real vencido (ou balão novo: prazo 0): luta preta e vermelha `S32`+`S2` cada, ovo e rainha `S32`+`S4`, descanso `S64`+`S2` (ver [../telas/baloes.md](../telas/baloes.md)) | — |
-| balão da aranha (fim de `_DrawSpider`), **depois** dos palpos | "Silly", aranha visível | `S64` + `S2` quando vence o prazo (sem pausa); depois, se `_SMode` mudou ou > 4, `S32` (mesmo pausado; a cada redesenho com `_SMode` = 5) | — |
-| `MYTIMERFUNC` | janela minimizada, jogo não pausado nem acabado | `SRand1(7)` por chamada do temporizador (ícone "Ant0"–"Ant6") | — |
-| `_EndGameDialog`, `_SpiderDialog` (dentro do tick) | fim de jogo; morte pela aranha com "Events" | um `S2`; um `S1(2)` (`1:685a`, depois da animação: escolhe o texto 0x273F ou 0x2740) | — |
-| `_DoEditUpdateDraw`/`_GotoMyAnt` dentro do tick (`_DoAntMoveY`, `_YellowFight`, `_YellowDeath`...) | janela de edição **aberta** (na frente ou não) | os mesmos da janela de edição (palpos, balões), no meio do tick: ver "Desenho dentro do tick" abaixo | — |
+| `_Draw_SimYard(_YardMode)` (`1010:b462`), via `_UpdateYard` | yard open, `_YardMode` 0 (Yard) or 1 (House) | rain (`_RainOn` ≠ 0): **14 × (`SRand1(400)`, `SRand1(150)`) = 28** | — |
+| `_DrawSwarm` (`1010:bb0e`), at the end of `_Draw_SimYard` (modes 0 and 1) | `_MapMode` = 0 | black: `nB = min(_SwarmCntB, 16, _QueenStorageB)`; each one outside ±15 goes back to (`S16 − 10`, `S16 − 10`); all move `S1(3) − 1` in x and y → **2·nB + 2·(outside)**; red: outside ±15 go to (0, 0) without random draw, all move `S1(3) − 1` → **2·nR** | `_SwarmCentX = 28·px − 10·py + 178`, `_SwarmCentY = 10·py + 46` (current patch), `_SwarmXB/YB/XR/YR` |
+| `_DrawPalps` (`1010:2594`) in `_DrawSpider`, via `_UpdateEdit` → `1010:16d4` | edit window open, spider visible (`_PreDrawSpider`: `_SpidOn`, plane 0 or 1, inside the view), `_SMode` ≠ 5 | **1 × `SRand1(4)`**, except with `_SMode` < 2 and `_MeSMode` < 6 | — |
+| `_DrawCurBalloons` (`1010:4cac`), via `1010:16d4`, **before** the cells and the palps | "Silly", `_ELayerMode = −1`, game not paused, a balloon noted in the tick | per speech whose real-time deadline has expired (or new balloon: deadline 0): black and red fight `S32`+`S2` each, egg and queen `S32`+`S4`, rest `S64`+`S2` (see [../telas/baloes.md](../telas/baloes.md)) | — |
+| spider balloon (end of `_DrawSpider`), **after** the palps | "Silly", spider visible | `S64` + `S2` when the deadline expires (not paused); then, if `_SMode` changed or > 4, `S32` (even when paused; on every redraw with `_SMode` = 5) | — |
+| `MYTIMERFUNC` | window minimized, game neither paused nor over | `SRand1(7)` per timer call (icon "Ant0"–"Ant6") | — |
+| `_EndGameDialog`, `_SpiderDialog` (inside the tick) | game over; death by the spider with "Events" | one `S2`; one `S1(2)` (`1:685a`, after the animation: picks text 0x273F or 0x2740) | — |
+| `_DoEditUpdateDraw`/`_GotoMyAnt` inside the tick (`_DoAntMoveY`, `_YellowFight`, `_YellowDeath`...) | edit window **open** (in front or not) | the same as the edit window (palps, balloons), in the middle of the tick: see "Drawing inside the tick" below | — |
 
-### Desenho dentro do tick
+### Drawing inside the tick
 
-Fontes: pseudocódigo (`_UpdateEdit` `1010:11e0`, `_GotoMyAnt` `1000:a764`, `_SetMapPlaneLocation` `1000:a386`, `_CenterEdit` `1010:1620`, `_YellowDeath` `1000:7746`, `_YellowBirth` `1000:739e`, `_AnimYellowFight` `1028:7e56`, `_AnimYellowInsane` `1028:8078`, `_DoAntMoveY` `1028:75f4`, `_DoTroph` `1000:846e`, `_TryMyDropOrLift` `1020:98de`) e bancada (contagem abaixo).
+Sources: pseudocode (`_UpdateEdit` `1010:11e0`, `_GotoMyAnt` `1000:a764`, `_SetMapPlaneLocation` `1000:a386`, `_CenterEdit` `1010:1620`, `_YellowDeath` `1000:7746`, `_YellowBirth` `1000:739e`, `_AnimYellowFight` `1028:7e56`, `_AnimYellowInsane` `1028:8078`, `_DoAntMoveY` `1028:75f4`, `_DoTroph` `1000:846e`, `_TryMyDropOrLift` `1020:98de`) and test bench (count below).
 
-Algumas rotinas do tick redesenham a janela de edição na hora, por `_UpdateEdit` → `FUN_1010_16d4` (o mesmo redesenho do timer: `_PreDrawSpider`, `_DrawCurBalloons`, células, `_DrawSpider` com os palpos e o balão da aranha, `_DrawBalloons`). `_UpdateEdit` só exige `_win_IsWinOpen(0)`: a janela de edição **aberta**, na frente ou atrás [código]. Os sorteios são os do redesenho do timer, com a vista daquele instante (`_MapPlane`, `_MapPnt`, `_editWidth × _editHeight`). Quando acontece [código]:
+Some tick routines redraw the edit window on the spot, via `_UpdateEdit` → `FUN_1010_16d4` (the same redraw as the timer's: `_PreDrawSpider`, `_DrawCurBalloons`, cells, `_DrawSpider` with the palps and the spider balloon, `_DrawBalloons`). `_UpdateEdit` only requires `_win_IsWinOpen(0)`: the edit window **open**, in front or behind [code]. The random draws are those of the timer redraw, with the view at that instant (`_MapPlane`, `_MapPnt`, `_editWidth × _editHeight`). When it happens [code]:
 
-| Ponto do tick | Desenho |
+| Point in the tick | Drawing |
 |---|---|
-| `_GotoMyAnt` (fora do Experimental, `_GameType` ≠ 3) | um redesenho **se `_CenterEdit` moveu a vista** (no plano mostrado, ou depois de `_SetMapPlaneLocation` trocar o plano); sem movimento, nenhum. Chamado na morte e no renascimento, no AutoTrack de `_DoAntMoveY`, na luta perdida (`_YellowFight`), na passagem entre ninhos, ao cavar um buraco novo (`_TryMyDropOrLift`) e pela aranha do jogador com AutoTrack (`_MoveSpider`) |
-| `_YellowDeath(c)` | `_GotoMyAnt` e logo um `_DoEditAndMapUpdateDraw`; na reencarnação num adulto, `_GotoMyAnt` + outro redesenho |
-| `_AnimYellowFight` (luta, mortes 1, 2, choque) | um antes do laço e um por quadro (depois do `S8` do quadro); com música e morte 1–9 o laço sai no 1º quadro **antes** do desenho |
-| `_AnimYellowInsane` (mortes 7–9) | um antes do laço e um por quadro |
-| `_YellowBirth` (renascer de ovo; fundar colônia) | ovo: `_GotoMyAnt`, um redesenho, um por estágio 2–7 e um no fim (8); colônia: um depois de virar rainha, um com o ovo, um por estágio e um no fim |
-| `_DoAntMoveY` | um antes de entrar num buraco da superfície e antes de sair do ninho; um ao chegar ao lado da formiga-alvo (ordens 3 e 4); um quando a ordem 4 vira a formiga para a amarela |
-| `_DoTroph`, `_TryMyDropOrLift` (pegar) | um, depois de virar a amarela |
+| `_GotoMyAnt` (outside Experimental, `_GameType` ≠ 3) | one redraw **if `_CenterEdit` moved the view** (in the shown plane, or after `_SetMapPlaneLocation` switches the plane); without movement, none. Called on death and on rebirth, in the AutoTrack of `_DoAntMoveY`, in the lost fight (`_YellowFight`), when passing between nests, when digging a new hole (`_TryMyDropOrLift`) and by the player's spider with AutoTrack (`_MoveSpider`) |
+| `_YellowDeath(c)` | `_GotoMyAnt` and right after a `_DoEditAndMapUpdateDraw`; on reincarnation into an adult, `_GotoMyAnt` + another redraw |
+| `_AnimYellowFight` (fight, deaths 1, 2, shock) | one before the loop and one per frame (after the frame's `S8`); with music and death 1–9 the loop exits on the 1st frame **before** the drawing |
+| `_AnimYellowInsane` (deaths 7–9) | one before the loop and one per frame |
+| `_YellowBirth` (reborn from an egg; founding a colony) | egg: `_GotoMyAnt`, one redraw, one per stage 2–7 and one at the end (8); colony: one after becoming queen, one with the egg, one per stage and one at the end |
+| `_DoAntMoveY` | one before entering a surface hole and before leaving the nest; one on arriving next to the target ant (orders 3 and 4); one when order 4 turns the ant towards the yellow ant |
+| `_DoTroph`, `_TryMyDropOrLift` (pick up) | one, after turning the yellow ant |
 
-Na prática só sorteiam (1) os **palpos** (`S1(4)`): aranha à vista na vista do momento e `_SMode` ≥ 2 (ou `_MeSMode` ≥ 6), `_SMode` ≠ 5; e (2) os **balões** "Silly". Fora isso o desenho de dentro do tick não muda S.
+In practice only (1) the **palps** (`S1(4)`) draw random numbers: spider in sight in the current view and `_SMode` ≥ 2 (or `_MeSMode` ≥ 6), `_SMode` ≠ 5; and (2) the "Silly" **balloons**. Other than that, drawing inside the tick does not change S.
 
-**Medido** (2026-10-18, `cenarios_regras.py contar_aranha`: breakpoints em `_SRand1`, `_DrawPalps`, `_DoEditUpdateDraw`, `_GotoMyAnt`, `_SpiderDialog`; `re_trabalho/cen_ag88/contar_aranha/contagem.json`): na morte da amarela pela aranha, na ordem, `S1(4)` de `_DrawPalps` (chamado de `3:25bd`) no desenho de `_GotoMyAnt`, outro no `_DoEditAndMapUpdateDraw` de `_YellowDeath`, o `S1(2)` de `_SpiderDialog` (de `1:685a`), o `S1(5)` da música (`1:78ce`) e o terceiro `S1(4)` no desenho de antes do laço de `_AnimYellowFight`; o 1º quadro sai por `_mySongIsDone` antes do desenho. Os 8 `_DoEditUpdateDraw` de `_YellowBirth` depois do 2º `_GotoMyAnt` (a vista já no ninho preto) não sorteiam. Controle: a morte pela formiga-leão (`contar_leao`, aranha fora da vista) não tem `_DrawPalps`. `_LionDialog` não sorteia.
+**Measured** (2026-10-18, `cenarios_regras.py contar_aranha`: breakpoints on `_SRand1`, `_DrawPalps`, `_DoEditUpdateDraw`, `_GotoMyAnt`, `_SpiderDialog`; `re_trabalho/cen_ag88/contar_aranha/contagem.json`): on the yellow ant's death by the spider, in order, the `S1(4)` of `_DrawPalps` (called from `3:25bd`) in the `_GotoMyAnt` drawing, another in the `_DoEditAndMapUpdateDraw` of `_YellowDeath`, the `S1(2)` of `_SpiderDialog` (from `1:685a`), the music's `S1(5)` (`1:78ce`) and the third `S1(4)` in the drawing before the `_AnimYellowFight` loop; the 1st frame exits via `_mySongIsDone` before the drawing. The 8 `_DoEditUpdateDraw` of `_YellowBirth` after the 2nd `_GotoMyAnt` (the view already in the black nest) do not draw random numbers. Control: death by the antlion (`contar_leao`, spider out of view) has no `_DrawPalps`. `_LionDialog` does not draw random numbers.
 
-**No port** (2026-10-18): `Estado::edicao_no_tick` (`rules::desenho::EdicaoNoTick`, fora do save) diz se a janela de edição está aberta e o tamanho da vista; quem roda o tick o preenche (`core::partida::Partida::preparar_edicao_no_tick`, pela janela aberta de `janelas_desenho`; o comparador de vetores, `vetor_tick::montar_entrada`, com a janela da bancada, aberta salvo `"EdicaoAberta": false` nos extras). No começo do tick (`desenho::comecar_tick`) a vista do tick parte de `_MapPlane`/`_MapPnt`; cada `_GotoMyAnt` das regras (`amarela::centralizar`) move essa vista com o mesmo `_CenterEdit` (`desenho::centralizar_vista`) e redesenha se ela andou (`desenho::centralizar_no_tick`); os `_DoEditUpdateDraw` da tabela chamam `desenho::desenhar_no_tick`. A vista de verdade continua sendo movida depois do tick pelos pedidos `Evento::CentralizarNaAmarela`, com o mesmo cálculo, então as duas coincidem; desde 2026-10-19 esses pedidos são apresentados em ordem com os quadros e as animações, e cada `desenhar_no_tick` deixa também um `Evento::Instantaneo` com a janela desenhada (formiga-amarela.md §9.4; não sorteia nada). O `S1(2)` de `_SpiderDialog` é sorteado em `amarela::matar_amarela` (só com Events), entre o redesenho da morte e a música, e vira `Evento::DialogoAranha { texto }` (`amarela.json` → `mensagens.aranha_comeu`). Conferência: vetor `ticks/amarela_morte_aranha/1793` 307/307 com S, R e vida (era pendente, 294/307); os outros 144 vetores, as 2 sequências longas e as ações continuam iguais. [hipótese: com o programa minimizado o port também desenha, como `_UpdateEdit`.]
+**In the port** (2026-10-18): `Estado::edicao_no_tick` (`rules::desenho::EdicaoNoTick`, outside the save) says whether the edit window is open and the view size; whoever runs the tick fills it in (`core::partida::Partida::preparar_edicao_no_tick`, from the open window of `janelas_desenho`; the vector comparator, `vetor_tick::montar_entrada`, with the bench window, open unless `"EdicaoAberta": false` in the extras). At the start of the tick (`desenho::comecar_tick`) the tick view starts from `_MapPlane`/`_MapPnt`; each `_GotoMyAnt` of the rules (`amarela::centralizar`) moves that view with the same `_CenterEdit` (`desenho::centralizar_vista`) and redraws if it moved (`desenho::centralizar_no_tick`); the table's `_DoEditUpdateDraw` calls `desenho::desenhar_no_tick`. The real view is still moved after the tick by the `Evento::CentralizarNaAmarela` requests, with the same calculation, so the two coincide; since 2026-10-19 these requests are presented in order with the frames and animations, and each `desenhar_no_tick` also leaves an `Evento::Instantaneo` with the drawn window (formiga-amarela.md §9.4; it draws no random numbers). The `S1(2)` of `_SpiderDialog` is drawn in `amarela::matar_amarela` (only with Events), between the death redraw and the music, and becomes `Evento::DialogoAranha { texto }` (`amarela.json` → `mensagens.aranha_comeu`). Checking: vector `ticks/amarela_morte_aranha/1793` 307/307 with S, R and life (was pending, 294/307); the other 144 vectors, the 2 long sequences and the actions remain equal. [hypothesis: with the program minimized the port also draws, like `_UpdateEdit`.]
 
-**Relógio dos balões dentro do tick (verificado em 2026-10-19).** Cada redesenho lê `_TickCount` na hora (`_DrawSpider` e `_DrawCurBalloons` chamam `_TickCount` antes de comparar e de gravar cada prazo). A bancada gravou o valor de cada leitura com breakpoints logo depois dos `CALL _TickCount` do segmento 3 (`cenarios_regras.py`, `capturar_tick_relogio`): fora das animações, todas as leituras do tick dão o mesmo valor (`desenho_aranha_movey`: 6159 nas três leituras do redesenho de antes de entrar no buraco; 6245 nas duas do `_GotoMyAnt` da saída do ninho); nas animações da amarela o relógio anda: na morte pela aranha com "Silly", sem música e sem Events (`amarela_morte_aranha_silly/1793`), o redesenho do `_GotoMyAnt` leu 6023, o de `_YellowDeath` 6028, o de antes do laço de `_AnimYellowFight` 6029 e os 32 quadros 6030, 6033, …, 6123 — **+1 no primeiro quadro e +3 em cada um dos seguintes**, a espera de "início + 6" no relógio do Mac (que anda 3 por degrau). Os 5 degraus entre o 1º e o 2º redesenho são do tempo da própria rotina na bancada TCG (o `_DrawMap` e o desenho da janela), não de uma espera do código. Com Events, a caixa de `_SpiderDialog` para o relógio no meio do tick pelo tempo que o jogador leva para fechá-la (1ª gravação: 6030 antes e 6039 depois da caixa).
+**Balloon clock inside the tick (verified on 2026-10-19).** Each redraw reads `_TickCount` on the spot (`_DrawSpider` and `_DrawCurBalloons` call `_TickCount` before comparing and writing each deadline). The test bench recorded the value of each reading with breakpoints right after the `CALL _TickCount` of segment 3 (`cenarios_regras.py`, `capturar_tick_relogio`): outside the animations, all readings in the tick give the same value (`desenho_aranha_movey`: 6159 in the three readings of the redraw before entering the hole; 6245 in the two of the `_GotoMyAnt` when leaving the nest); in the yellow ant's animations the clock moves: on death by the spider with "Silly", no music and no Events (`amarela_morte_aranha_silly/1793`), the `_GotoMyAnt` redraw read 6023, the `_YellowDeath` one 6028, the one before the `_AnimYellowFight` loop 6029 and the 32 frames 6030, 6033, …, 6123 — **+1 on the first frame and +3 on each of the following ones**, the wait of "start + 6" on the Mac clock (which moves 3 per step). The 5 steps between the 1st and the 2nd redraw come from the routine's own time on the TCG bench (`_DrawMap` and the window drawing), not from a wait in the code. With Events, the `_SpiderDialog` box stops the clock in the middle of the tick for as long as the player takes to close it (1st recording: 6030 before and 6039 after the box).
 
-**No port:** o tick parte de `_TickCount` = `ms_total / 55` da partida (`EdicaoNoTick::tick_count`); `_AnimYellowFight` e `_AnimYellowInsane` o avançam antes de cada quadro (`desenho::avancar_relogio_no_tick`: 1 degrau no primeiro, `espera_quadro_ms / 55` = 3 nos seguintes da luta e `espera_loucura_ms / 55` = 2 na loucura). O tempo que o original gasta desenhando e a caixa da aranha não entram (o port mostra a caixa depois do tick): numa partida ao vivo com "Silly", um prazo que vence nesses intervalos pode sortear num redesenho diferente do original [limitação]. A visibilidade dos balões (`_BalloonIsVisible`) usa a vista do momento: dentro do tick, a que os `_GotoMyAnt` já moveram (`baloes::na_vista`). Vetores: os balões não vão no save, então os vetores novos gravam as variáveis dos balões na entrada e na saída (`Baloes` do `extras.json`) e as leituras de `_TickCount` (`TickCount_lidos`); o comparador põe os balões no estado de entrada, usa a primeira leitura do desenho como relógio do tick e compara prazos, falas, índices e `_LastSMode` depois (`vetor_tick::aplicar_baloes`, `comparar_baloes`).
+**In the port:** the tick starts from `_TickCount` = `ms_total / 55` of the game (`EdicaoNoTick::tick_count`); `_AnimYellowFight` and `_AnimYellowInsane` advance it before each frame (`desenho::avancar_relogio_no_tick`: 1 step on the first, `espera_quadro_ms / 55` = 3 on the following ones of the fight and `espera_loucura_ms / 55` = 2 in the insanity). The time the original spends drawing and the spider box are not included (the port shows the box after the tick): in a live game with "Silly", a deadline that expires in these intervals may draw in a different redraw than in the original [limitation]. Balloon visibility (`_BalloonIsVisible`) uses the current view: inside the tick, the one the `_GotoMyAnt` calls have already moved (`baloes::na_vista`). Vectors: balloons are not in the save, so the new vectors record the balloon variables at input and output (`Baloes` in `extras.json`) and the `_TickCount` readings (`TickCount_lidos`); the comparator puts the balloons into the input state, uses the first drawing reading as the tick clock and compares deadlines, speeches, indices and `_LastSMode` afterwards (`vetor_tick::aplicar_baloes`, `comparar_baloes`).
 
-**Aranha à vista durante `_DoAntMoveY` (verificado em 2026-10-19):** `desenho_aranha_movey` (a aranha comendo parada a 3 células de um buraco, "Silly" e `_LastSMode` ≠ 3): no tick em que a amarela entra no buraco, o redesenho de antes da entrada sorteia o balão da aranha (`S32`, prazo com o relógio do momento) e os palpos (`S1(4)`); na saída do ninho, o `_GotoMyAnt` de depois (de volta à superfície) faz o mesmo. Os dois ticks batem 307/307 com S, R, vida e os 19 valores dos balões.
+**Spider in view during `_DoAntMoveY` (verified on 2026-10-19):** `desenho_aranha_movey` (the spider eating, stopped 3 cells from a hole, "Silly" and `_LastSMode` ≠ 3): on the tick in which the yellow ant enters the hole, the redraw before the entry draws the spider balloon (`S32`, deadline with the clock of the moment) and the palps (`S1(4)`); when leaving the nest, the subsequent `_GotoMyAnt` (back at the surface) does the same. Both ticks match 307/307 with S, R, life and the 19 balloon values.
 
-`_DrawRain` (`1010:ba9e`, o mesmo bloco da chuva) e `_SubtractFood` não têm chamador no pseudocódigo [em aberto: ponteiro]. `_MysteryButton` e `_CheatKeys` sorteiam R e S, mas são entrada do jogador, não desenho.
+`_DrawRain` (`1010:ba9e`, the same rain block) and `_SubtractFood` have no caller in the pseudocode [open: pointer]. `_MysteryButton` and `_CheatKeys` draw R and S, but they are player input, not drawing.
 
-**Verificado na bancada (2026-10-17, snapshot rico, chovendo):** Yard View (Ctrl+Y) e House View (Ctrl+5) na frente: **28 passos de S entre ticks**, todos os 7 intervalos; com a chuva acabada (tick 1749), 0. Yard View com `_SwarmCntB = 5`, `_QueenStorageB = 3`, `_SwarmCntR = 2`, `_QueenStorageR = 4`: **38** (28 + 2·3 + 2·2) e, quando `_SwarmCntB` caiu a 2, **36**; `_SwarmXB/YB/XR/YR` mudam entre os ticks exatamente como `desenho::desenhar_enxame` (vetores `desenho_chuva_enxame`, `_enxame2`, `desenho_chuva_casa`: 307/307 e S igual). Strategic View (Ctrl+6, modo 2): 0. Janela de edição na superfície, sem "Silly" e sem a aranha à vista, e no ninho: 0 em todas as gravações de vetores (centenas de intervalos). `_SpecialXfer` abre a janela do quintal dentro do tick: `_DrawSwarm` grava `_SwarmCentX/Y` com o patch antigo (11, 8) e o desenho das colônias zera `_ColonyUpdateFlag` (`acoes/special_xfer`, 307/307 com isso).
+**Verified on the test bench (2026-10-17, rich snapshot, raining):** Yard View (Ctrl+Y) and House View (Ctrl+5) in front: **28 S steps between ticks**, in all 7 intervals; with the rain over (tick 1749), 0. Yard View with `_SwarmCntB = 5`, `_QueenStorageB = 3`, `_SwarmCntR = 2`, `_QueenStorageR = 4`: **38** (28 + 2·3 + 2·2) and, when `_SwarmCntB` dropped to 2, **36**; `_SwarmXB/YB/XR/YR` change between ticks exactly as `desenho::desenhar_enxame` (vectors `desenho_chuva_enxame`, `_enxame2`, `desenho_chuva_casa`: 307/307 and equal S). Strategic View (Ctrl+6, mode 2): 0. Edit window on the surface, without "Silly" and without the spider in view, and in the nest: 0 in all vector recordings (hundreds of intervals). `_SpecialXfer` opens the yard window inside the tick: `_DrawSwarm` writes `_SwarmCentX/Y` with the old patch (11, 8) and the colony drawing zeroes `_ColonyUpdateFlag` (`acoes/special_xfer`, 307/307 with that).
 
-**No port:** `desenho::redesenho_do_timer(e, janelas, contadores)` faz, depois de cada tick, os sorteios do quintal e dos palpos com as mesmas regras de quando redesenhar (a interface informa as janelas abertas/na frente, aplicação ativa/minimizada e se a aranha está visível, e guarda os contadores que não vão no save); `desenhar_quintal`, `desenhar_enxame`, `desenhar_palpos`, `desenhar_colonias` separadas. Ligado (2026-10-18): `core::partida::Partida::rodar_tick` chama `redesenho_do_timer` depois de cada tick, com `Partida::janelas_desenho` (a interface diz a cada quadro se o quintal e a janela de edição estão abertos e na frente e se a janela está minimizada — `simant/src/sessao.rs::atualizar_janelas_desenho`; o foco vem de `definir_foco`; a aranha visível é calculada no tick com a vista, `desenho::aranha_visivel`, como `_PreDrawSpider`) e os contadores em `Partida::contadores_redesenho` (fora do save); minimizada e sem pausa nem fim de jogo, `mensagem_de_timer` sorteia o `SRand1(7)` do ícone. Testes: `core/partida.rs` (chuva com o quintal na frente = 28 sorteios depois do tick, inativa 1 em 8, ícone minimizado). Balões "Silly" e da aranha (2026-10-18): `desenho::desenhar_edicao` chama `rules::baloes` na ordem do redesenho da janela de edição (balões, palpos, balão da aranha, escolha), com `_TickCount` = `ms_total / 55` da partida e o estado em `Estado::baloes` (fora do save; telas/baloes.md). Os desenhos de dentro do tick: ver "Desenho dentro do tick" (2026-10-18). **Fora**: o redesenho da rolagem e os redesenhos que a interface faz por ações do jogador fora do tick (Home, troca de corpo, clique na própria amarela) [lacunas]; a ordem entre o quintal e as janelas de controle não é modelada (a de edição conta como "na frente" se nenhuma janela de controle está acima dela e o quintal não está na frente) [hipótese].
+**In the port:** `desenho::redesenho_do_timer(e, janelas, contadores)` performs, after each tick, the yard and palp random draws with the same rules for when to redraw (the interface reports the open/in-front windows, active/minimized application and whether the spider is visible, and keeps the counters that are not in the save); `desenhar_quintal`, `desenhar_enxame`, `desenhar_palpos`, `desenhar_colonias` separate. Wired up (2026-10-18): `core::partida::Partida::rodar_tick` calls `redesenho_do_timer` after each tick, with `Partida::janelas_desenho` (the interface says on each frame whether the yard and the edit window are open and in front and whether the window is minimized — `simant/src/sessao.rs::atualizar_janelas_desenho`; focus comes from `definir_foco`; the visible spider is calculated in the tick with the view, `desenho::aranha_visivel`, like `_PreDrawSpider`) and the counters in `Partida::contadores_redesenho` (outside the save); minimized and with no pause or game over, `mensagem_de_timer` draws the icon's `SRand1(7)`. Tests: `core/partida.rs` (rain with the yard in front = 28 random draws after the tick, inactive 1 in 8, minimized icon). "Silly" and spider balloons (2026-10-18): `desenho::desenhar_edicao` calls `rules::baloes` in the order of the edit window redraw (balloons, palps, spider balloon, choice), with `_TickCount` = `ms_total / 55` of the game and the state in `Estado::baloes` (outside the save; telas/baloes.md). The drawings inside the tick: see "Drawing inside the tick" (2026-10-18). **Not covered**: the scroll redraw and the redraws the interface does for player actions outside the tick (Home, body switch, click on the yellow ant itself) [gaps]; the order between the yard and the control windows is not modeled (the edit window counts as "in front" if no control window is above it and the yard is not in front) [hypothesis].
 
-## A semente está no save?
+## Is the seed in the save?
 
-- O estado de S (`DGROUP:0xcbf2`) e o de R (`0xae34`) **não** estão na tabela de blocos do `.ANT` (fato visto no código: a tabela `1038:9570` lida por `_SaveGame`/`_LoadGame`, listada em [../formatos/save-ant.md](../formatos/save-ant.md), não tem nenhum bloco nesses endereços).
-- O que está no save é **`_YMapSeeds`** (`1038:0224`, 192 palavras, bloco 29, offset 45328 do arquivo): a semente de cada patch do quintal, índice `y * 12 + x`. Com ela o patch atual pode ser regenerado. Fato visto no código e verificado no `QUICK2.ANT`.
-- Ao carregar, `_LoadGame` chama `_RandYard` antes de ler os blocos (fato visto no código), o que reinicia S pela semente de um patch novo; o estado exato de S no momento do save se perde. Logo, depois de um load, a simulação do original não segue a mesma sequência aleatória que teria sem salvar [hipótese, a medir].
+- The state of S (`DGROUP:0xcbf2`) and of R (`0xae34`) are **not** in the `.ANT` block table (fact seen in the code: the table `1038:9570` read by `_SaveGame`/`_LoadGame`, listed in [../formatos/save-ant.md](../formatos/save-ant.md), has no block at those addresses).
+- What is in the save is **`_YMapSeeds`** (`1038:0224`, 192 words, block 29, file offset 45328): the seed of each yard patch, index `y * 12 + x`. With it the current patch can be regenerated. Fact seen in the code and verified in `QUICK2.ANT`.
+- On load, `_LoadGame` calls `_RandYard` before reading the blocks (fact seen in the code), which reseeds S with the seed of a new patch; the exact state of S at the moment of saving is lost. Therefore, after a load, the original's simulation does not follow the same random sequence it would have followed without saving [hypothesis, to be measured].
 
-## Verificação feita
+## Verification done
 
-Fato verificado (2026-10-16): com a semente do patch atual lida do `QUICK2.ANT` (`_YMapSeeds[8 * 12 + 11] = 13106 = 0x3332`) e o passo acima, os 8.192 sorteios `_SRand16` da superfície reproduzem **todas** as 7.415 células de chão do `_MapA` salvo, e o restante da geração (ver [geracao-mundo.md](geracao-mundo.md)) reproduz `_MapB` e `_MapR` inteiros e o `_MapA` exceto os bichos que se moveram. Script: `re_trabalho/verifica_geracao_quick2.py` (material de trabalho, fora do git).
+Fact verified (2026-10-16): with the current patch seed read from `QUICK2.ANT` (`_YMapSeeds[8 * 12 + 11] = 13106 = 0x3332`) and the step above, the 8,192 `_SRand16` surface random draws reproduce **all** 7,415 ground cells of the saved `_MapA`, and the rest of the generation (see [geracao-mundo.md](geracao-mundo.md)) reproduces `_MapB` and `_MapR` entirely and `_MapA` except for the creatures that moved. Script: `re_trabalho/verifica_geracao_quick2.py` (working material, outside git).
 
-## Como testar contra o original
+## How to test against the original
 
-1. **Sem emulador (já feito):** rodar `python re_trabalho/verifica_geracao_quick2.py`; ele lê `tests/referencias/saves/QUICK2.ANT`, regera o patch e imprime as diferenças. No port, o mesmo caso é o teste `engine/tests/geracao_quick2.rs`, e os vetores desta página estão nos testes unitários de `engine/src/rules/rng.rs` (implementação: `GeradorS` e `GeradorR`).
-2. **Semente forçada na bancada QEMU** ([../../bancada-qemu.md](../../bancada-qemu.md)): o comando `memoria` dá dumps da RAM física. Para forçar S, é preciso achar o endereço físico do DGROUP (procurar no dump um padrão conhecido do DGROUP, como a tabela `DGROUP:0x230c = 19 1a 1c 1f 1e 1d 1b 18`) e escrever na palavra `0xcbf2` com o monitor do QEMU (comando HMP `pmemsave`/`xp` para ler; escrita exige `gdbstub` ou um comando novo na bancada). **Feito:** a bancada tem `escrever_variavel SementeS ...` (gdbstub) e o modo tick; com as sementes forçadas, duas execuções dão a mesma sequência de S e R tick a tick (verificado, ver [testes-tick.md](testes-tick.md)). Atenção: `_SimBird` só sorteia `SRand2` quando `_gameCycles` (contador do laço do `MYTIMERFUNC`, não de ticks) passou de `_BirdDelay`; em velocidade normal isso vale em todo tick.
-3. **R:** para testar `_RRand`, gerar dois Quick Games seguidos na mesma sessão e comparar `_YMapSeeds` dos dois saves: a segunda tabela deve ser a continuação da sequência `rand()` da primeira (192 chamadas depois), desde que nada mais tenha chamado `_RRand` entre os dois (chuva, lutas) [hipótese a confirmar].
+1. **Without emulator (already done):** run `python re_trabalho/verifica_geracao_quick2.py`; it reads `tests/referencias/saves/QUICK2.ANT`, regenerates the patch and prints the differences. In the port, the same case is the test `engine/tests/geracao_quick2.rs`, and the vectors on this page are in the unit tests of `engine/src/rules/rng.rs` (implementation: `GeradorS` and `GeradorR`).
+2. **Forced seed on the QEMU bench** ([../../bancada-qemu.md](../../bancada-qemu.md)): the `memoria` command gives physical RAM dumps. To force S, one needs to find the physical address of DGROUP (search the dump for a known DGROUP pattern, such as the table `DGROUP:0x230c = 19 1a 1c 1f 1e 1d 1b 18`) and write to the word `0xcbf2` with the QEMU monitor (HMP command `pmemsave`/`xp` to read; writing requires `gdbstub` or a new command in the bench). **Done:** the bench has `escrever_variavel SementeS ...` (gdbstub) and the tick mode; with the seeds forced, two runs give the same S and R sequence tick by tick (verified, see [testes-tick.md](testes-tick.md)). Caution: `_SimBird` only draws `SRand2` when `_gameCycles` (counter of the `MYTIMERFUNC` loop, not of ticks) has passed `_BirdDelay`; at normal speed this holds on every tick.
+3. **R:** to test `_RRand`, generate two Quick Games in a row in the same session and compare `_YMapSeeds` of the two saves: the second table should be the continuation of the `rand()` sequence of the first (192 calls later), as long as nothing else called `_RRand` between the two (rain, fights) [hypothesis to be confirmed].

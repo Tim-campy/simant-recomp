@@ -1,45 +1,47 @@
-# Tela de abertura
+*Leia em português: [abertura.md](../../pt-BR/spec/telas/abertura.md)*
 
-## Comportamento
+# Opening screen
 
-**Fonte:** fato visto no código, `_ShowIntro` (`1000:d3e2`).
+## Behavior
 
-1. Abre a janela interna `0x300` (768) do sistema de janelas próprio (`_win_Open`) e captura o mouse.
-2. Toca a música de id 10001 (`_myBeginSong(0x2711, 0x7e)`; o segundo parâmetro tem significado [em aberto]). No banco `SOUND`, o id 10001 existe como cabeçalho (tipo 18) e como MIDI (tipos 20 e 50).
-3. Monta um número de 8 dígitos a partir de uma tabela do DGROUP [hipótese: número de série exibido na tela; não é usado neste marco].
-4. Espera até **40 × 18 = 720 ticks** (`_DialogWaitInit(0x28)`). O tick de `_TickCount` (`1008:18ac`) é `GetTickCount() / 55`, ou seja, cerca de 18,2 por segundo, o que dá cerca de **39,6 s**. **Verificado (2026-10-18, `tools/medir_abertura.py`):** a pilha de esperas (`DGROUP:150a`, início em `cad4`, duração em `caf4`) mostra o título armado em `_TickCount` 1013 com 720 e o registro em 1733 = 1013 + 720 com 270; na VM, 719 e 270 ticks do BIOS. O logotipo é desenhado antes de a espera começar. Espaço fecha o título e o registro em ~0,25 s; apertado antes de a espera começar, se perde. O tempo no relógio do host não serve (o QEMU sem `icount` perde ticks do Windows com a máquina carregada).
-5. Fecha antes do tempo se `_win_Events()` devolver um evento (clique ou tecla tratada pela janela) ou se a **barra de espaço** estiver pressionada (`GetAsyncKeyState(VK_SPACE)` em `_DialogAbortOrCont`, `1000:9c98`).
-6. Fecha a janela `0x300` e descarta os eventos pendentes.
+**Source:** fact seen in the code, `_ShowIntro` (`1000:d3e2`).
 
-## Conteúdo visual
+1. Opens the internal window `0x300` (768) of the game's own window system (`_win_Open`) and captures the mouse.
+2. Plays the music with id 10001 (`_myBeginSong(0x2711, 0x7e)`; the meaning of the second parameter is [open]). In the `SOUND` database, id 10001 exists as a header (type 18) and as MIDI (types 20 and 50).
+3. Builds an 8-digit number from a DGROUP table [hypothesis: serial number shown on screen; not used in this milestone].
+4. Waits up to **40 × 18 = 720 ticks** (`_DialogWaitInit(0x28)`). The tick of `_TickCount` (`1008:18ac`) is `GetTickCount() / 55`, i.e. about 18.2 per second, which gives about **39.6 s**. **Verified (2026-10-18, `tools/medir_abertura.py`):** the wait stack (`DGROUP:150a`, start at `cad4`, duration at `caf4`) shows the title armed at `_TickCount` 1013 with 720 and the registration at 1733 = 1013 + 720 with 270; in the VM, 719 and 270 BIOS ticks. The logo is drawn before the wait starts. Space closes the title and the registration in ~0.25 s; if pressed before the wait starts, it is lost. Host wall-clock time is no good (QEMU without `icount` loses Windows ticks when the machine is loaded).
+5. Closes early if `_win_Events()` returns an event (click or key handled by the window) or if the **space bar** is pressed (`GetAsyncKeyState(VK_SPACE)` in `_DialogAbortOrCont`, `1000:9c98`).
+6. Closes window `0x300` and discards pending events.
 
-- A janela `0x300` é a janela 3 (`titleWin`), com os objetos `titlePic1` (bitmap 2000) e `titlePic2` (bitmap 2001). Fato visto nos dados; ver [../formatos/janela.md](../formatos/janela.md).
-- **Observado no original (DOSBox-X, 2026-10-16):** ao iniciar `SIMANTW.EXE`, a área cliente mostra a faixa de ferramentas (janela 34) e a janela de título com borda, sem nenhuma tela "Maxis Presents" antes. O port reproduz isso com 99,98% dos pixels iguais (a diferença é o cursor). Captura: `tests/referencias/capturas/titulo_800x600.png`. Em cima da área cliente o original já mostra a barra de título e a barra de menus da janela principal (maximizada), paradas durante a abertura; o port desenha a barra de menus e, com `moldura_windows31`, o título (menus.md §8, 2026-10-19).
-- **Em aberto:** onde entram os bitmaps "Maxis Presents" (2/28000, 2/28003).
+## Visual content
 
-## Sequência de inicialização
+- Window `0x300` is window 3 (`titleWin`), with the objects `titlePic1` (bitmap 2000) and `titlePic2` (bitmap 2001). Fact seen in the data; see [../formatos/janela.md](../formatos/janela.md).
+- **Observed in the original (DOSBox-X, 2026-10-16):** on starting `SIMANTW.EXE`, the client area shows the tool ribbon (window 34) and the bordered title window, with no "Maxis Presents" screen before. The port reproduces this with 99.98% of pixels equal (the difference is the cursor). Capture: `tests/referencias/capturas/titulo_800x600.png`. Above the client area the original already shows the title bar and the menu bar of the main (maximized) window, frozen during the opening; the port draws the menu bar and, with `moldura_windows31`, the title (menus.md §8, 2026-10-19).
+- **Open:** where the "Maxis Presents" bitmaps (2/28000, 2/28003) come in.
 
-**Fonte:** `WINMAIN` (`1000:3fda`) chama `_ShowIntro` → `_CustomerIDDialog` → `_NewGame(1)`. Observado no DOSBox-X (2026-10-16), deixando os tempos esgotarem sem tocar em nada (`tools/capturar_original.ps1 -Espera 80`):
+## Startup sequence
 
-1. **Título** (janela 3): até 720 ticks (≈ 39,6 s), ou espaço, ou clique.
-2. **Registro** (janela 30, `picStrWin`, via `_PictureDialog`): o texto de registro, o nome registrado, o número de cliente e "Click here to continue" (nome e número desta cópia omitidos). Fecha depois de 15 × 18 = 270 ticks (≈ 14,9 s), com espaço ou com clique. Os textos fixos vêm de 10/131 ("This copy of SimAnt is registered to:") e 10/132 ("Customer ID:"); o nome vem de uma string decodificada por `_DecodeString` (DGROUP `0x8b3e`); o número de 8 dígitos é o que `_ShowIntro` monta. Fontes: `font3` (azul) e `font2` ("Click here to continue"), validadas pixel a pixel (ver [../formatos/fonte.md](../formatos/fonte.md)). Captura: `apos_titulo.png`. **Fora do port por enquanto:** o tamanho da janela e a posição dos textos vêm de `_PictureDialog`/`_win_DrawPictureWindow`, ainda não especificados.
-3. **Select a Game** (janela 2, `scenarioWin`, via `_DoScenario`): fica aberta até haver escolha. Captura: `novo_jogo.png`. O port reproduz com 99,87% de pixels iguais.
+**Source:** `WINMAIN` (`1000:3fda`) calls `_ShowIntro` → `_CustomerIDDialog` → `_NewGame(1)`. Observed in DOSBox-X (2026-10-16), letting the timers run out without touching anything (`tools/capturar_original.ps1 -Espera 80`):
 
-Os tempos são aproximados porque o tick é de 55 ms. Nos testes, a soma bate: o "Select a Game" já estava aberto 80 s depois de iniciar o DOSBox-X.
+1. **Title** (window 3): up to 720 ticks (≈ 39.6 s), or space, or click.
+2. **Registration** (window 30, `picStrWin`, via `_PictureDialog`): the registration text, the registered name, the customer number and "Click here to continue" (name and number of this copy omitted). Closes after 15 × 18 = 270 ticks (≈ 14.9 s), with space or with a click. The fixed texts come from 10/131 ("This copy of SimAnt is registered to:") and 10/132 ("Customer ID:"); the name comes from a string decoded by `_DecodeString` (DGROUP `0x8b3e`); the 8-digit number is the one `_ShowIntro` builds. Fonts: `font3` (blue) and `font2` ("Click here to continue"), validated pixel by pixel (see [../formatos/fonte.md](../formatos/fonte.md)). Capture: `apos_titulo.png`. **Out of the port for now:** the window size and the text positions come from `_PictureDialog`/`_win_DrawPictureWindow`, not yet specified.
+3. **Select a Game** (window 2, `scenarioWin`, via `_DoScenario`): stays open until a choice is made. Capture: `novo_jogo.png`. The port reproduces it with 99.87% of pixels equal.
 
-## Escolha do jogo (`_DoScenario` `1000:5998`, `_NewGame` `1000:d6dc`)
+The times are approximate because the tick is 55 ms. In the tests, the sum matches: "Select a Game" was already open 80 s after starting DOSBox-X.
 
-**Fonte:** pseudocódigo [código], nomes do objeto 1/2 do `SHARED` [dados] e cliques na bancada QEMU [verificado].
+## Game choice (`_DoScenario` `1000:5998`, `_NewGame` `1000:d6dc`)
 
-- `_DoScenario` abre a janela 2, espera um evento de objeto e devolve o id do objeto; `GetAsyncKeyState(VK_RETURN)` devolve 0x203 (Full Game); `_DialogAbort` devolve 0x205 [código].
-- `_NewGame` converte: `scenTutorial` 0x206 → `_CurGameType` 0, `scenQuickGame` 0x202 → 1, `scenFullGame` 0x203 → 2, `scenExperimental` 0x204 → 3; `scenLoad` 0x207 → `_LoadGame` (se falhar, mostra a caixa de novo); `scenCancel` 0x205 → devolve −1 sem mudar nada [código]. Depois, `_RandYard` e as janelas do jogo ([../regras/geracao-mundo.md](../regras/geracao-mundo.md) §1–2).
-- O mesmo diálogo volta durante a partida por File → New Game (**Ctrl+N**, `_ProcMenu` caso 3) e ao fechar o diálogo de fim de jogo (`_EndGameDialog` → `_NewGame(0)`), com a simulação pausada (`_SetPause(1)`) [código].
-- Na bancada (640×480): Quick Game em (345, 228), Tutorial em (185, 228), Full Game em (280, 290) na tela; o Full Game começa na superfície com a rainha alada e a faixa diz "You need to dig a nest" (`re_trabalho/modos/full_inicio.png`) [verificado].
+**Source:** pseudocode [code], names of object 1/2 of `SHARED` [data] and clicks on the QEMU bench [verified].
 
-**No port:** `engine/src/core/selecao.rs` (`SelecaoDeJogo`: objeto sob o clique → `Escolha`), dados em `data/modos.json` (objeto → escolha, Enter → Full Game, tecla do New Game). Na abertura, a tela `selecao` de `telas.json` não fecha mais com qualquer clique: só um botão (ou Enter) escolhe, e o jogo do tipo escolhido começa (`simant/src/modos.rs`). Na partida, Ctrl+N desenha a janela 2 por cima da tela de jogo (posição da tabela 9/0) e pausa a simulação até a escolha. `--tipo tutorial|rapido|completo|experimental` começa direto um jogo do tipo. Load Game abre o File → Load na partida e o "Load Ant Hill" por cima do "Select a Game" na abertura (Cancel volta à escolha; menus.md §7); Cancel do "Select a Game" na abertura fecha o port, como o original (conferido na bancada em 2026-10-19: o SimAnt encerra e fica o Program Manager; `roteiros/qemu_selecao_cancelar.txt`).
+- `_DoScenario` opens window 2, waits for an object event and returns the object id; `GetAsyncKeyState(VK_RETURN)` returns 0x203 (Full Game); `_DialogAbort` returns 0x205 [code].
+- `_NewGame` converts: `scenTutorial` 0x206 → `_CurGameType` 0, `scenQuickGame` 0x202 → 1, `scenFullGame` 0x203 → 2, `scenExperimental` 0x204 → 3; `scenLoad` 0x207 → `_LoadGame` (if it fails, shows the box again); `scenCancel` 0x205 → returns −1 without changing anything [code]. Then, `_RandYard` and the game windows ([../regras/geracao-mundo.md](../regras/geracao-mundo.md) §1–2).
+- The same dialog comes back during the game via File → New Game (**Ctrl+N**, `_ProcMenu` case 3) and when closing the game-over dialog (`_EndGameDialog` → `_NewGame(0)`), with the simulation paused (`_SetPause(1)`) [code].
+- On the test bench (640×480): Quick Game at (345, 228), Tutorial at (185, 228), Full Game at (280, 290) on screen; Full Game starts on the surface with the winged queen and the ribbon says "You need to dig a nest" (`re_trabalho/modos/full_inicio.png`) [verified].
 
-**Verificado:** o teste `engine/tests/modos_reais.rs` confere que, na tabela de posições 0, os pontos clicados na bancada caem nos botões certos (Quick, Tutorial, Full, Experimental, Load) e que o centro de cada botão devolve a própria escolha.
+**In the port:** `engine/src/core/selecao.rs` (`SelecaoDeJogo`: object under the click → `Escolha`), data in `data/modos.json` (object → choice, Enter → Full Game, New Game key). At the opening, the `selecao` screen of `telas.json` no longer closes on any click: only a button (or Enter) chooses, and the game of the chosen type starts (`simant/src/modos.rs`). During a game, Ctrl+N draws window 2 over the game screen (position from table 9/0) and pauses the simulation until the choice. `--tipo tutorial|rapido|completo|experimental` starts a game of that type directly. Load Game opens File → Load during a game and "Load Ant Hill" over "Select a Game" at the opening (Cancel returns to the choice; menus.md §7); Cancel in "Select a Game" at the opening closes the port, like the original (checked on the test bench on 2026-10-19: SimAnt exits and the Program Manager remains; `roteiros/qemu_selecao_cancelar.txt`).
 
-## No port (marco 1)
+**Verified:** the test `engine/tests/modos_reais.rs` checks that, in position table 0, the points clicked on the test bench fall on the right buttons (Quick, Tutorial, Full, Experimental, Load) and that the center of each button returns its own choice.
 
-A sequência fica em `data/telas.json` (dados, não código): para cada tela, as janelas do jogo (e, opcionalmente, bitmaps soltos), a duração em ticks e os gatilhos que a encerram. Hoje só contém a abertura validada. Um mod pode trocar bitmaps ou layouts por (tipo, id), ou mudar a sequência.
+## In the port (milestone 1)
+
+The sequence is in `data/telas.json` (data, not code): for each screen, the game windows (and, optionally, loose bitmaps), the duration in ticks and the triggers that end it. Today it only contains the validated opening. A mod can replace bitmaps or layouts by (type, id), or change the sequence.

@@ -1,96 +1,98 @@
-# Som e música: arquivos e formatos
+*Leia em português: [som.md](../../pt-BR/spec/formatos/som.md)*
 
-Onde estão os sons e as músicas do SimAnt para Windows, em que formato, e por qual caminho o executável os toca. Quando cada um toca está em [regras/som.md](../regras/som.md).
+# Sound and music: files and formats
 
-## Resumo
+Where SimAnt for Windows keeps its sounds and music, in what format, and along which path the executable plays them. When each one plays is in [regras/som.md](../regras/som.md).
 
-| Conteúdo | Onde | Formato | Quem usa |
+## Summary
+
+| Content | Where | Format | Used by |
 |---|---|---|---|
-| Efeitos sonoros | banco `SOUND`, tipo **5**, ids 0–56 | amostras de 8 bits comprimidas em deltas de 4 bits ("instrumento DAC") | `_myBeginSound` com MMSYSTEM (`waveOutWrite`) ou Sound Blaster (`vocPlayMemUnFormat`) |
-| Efeitos sonoros (versão Mac) | banco `SOUND`, tipo **51**, 34 ids entre 1 e 49 | recurso `snd ` do Macintosh (formato 1 ou 2) | `_myBeginSound` só com `DSOUND.DLL` (Disney Sound Source) |
-| Músicas (Windows padrão) | arquivos `SOUND\*.MID` da pasta do jogo (29 arquivos) | MIDI padrão (SMF formato 1), arranjo duplo do Windows 3.1 | `_myBeginSong` via MCI (`mciSendCommand`) |
-| Cabeçalhos de música | banco `SOUND`, tipo **18**, 33 ids (10001–20011) | 18 bytes, 9 palavras big-endian | `_myBeginSong` (todos os caminhos) |
-| Músicas (Sound Blaster) | banco `SOUND`, tipo **20**, 30 ids | MIDI padrão, um só arranjo (canais 2–4 e 10) | `_myBeginSong` via `SNDBLST.DLL` (`musPlayMemMidi`) |
-| Músicas (alto-falante do PC) | banco `SOUND`, tipo **50**, 28 ids | MIDI padrão reduzido a uma voz | `_myBeginSong` via `SOUND.DRV` (`SetVoiceNote`) |
+| Sound effects | `SOUND` database, type **5**, ids 0–56 | 8-bit samples compressed as 4-bit deltas ("DAC instrument") | `_myBeginSound` with MMSYSTEM (`waveOutWrite`) or Sound Blaster (`vocPlayMemUnFormat`) |
+| Sound effects (Mac version) | `SOUND` database, type **51**, 34 ids between 1 and 49 | Macintosh `snd ` resource (format 1 or 2) | `_myBeginSound` only with `DSOUND.DLL` (Disney Sound Source) |
+| Music (standard Windows) | `SOUND\*.MID` files in the game folder (29 files) | standard MIDI (SMF format 1), Windows 3.1 dual arrangement | `_myBeginSong` via MCI (`mciSendCommand`) |
+| Music headers | `SOUND` database, type **18**, 33 ids (10001–20011) | 18 bytes, 9 big-endian words | `_myBeginSong` (all paths) |
+| Music (Sound Blaster) | `SOUND` database, type **20**, 30 ids | standard MIDI, a single arrangement (channels 2–4 and 10) | `_myBeginSong` via `SNDBLST.DLL` (`musPlayMemMidi`) |
+| Music (PC speaker) | `SOUND` database, type **50**, 28 ids | standard MIDI reduced to one voice | `_myBeginSong` via `SOUND.DRV` (`SetVoiceNote`) |
 
-**Fonte:** fato verificado com `tools/db_list.py` e dumps dos objetos (contagens, tamanhos, assinaturas `MThd`); caminhos de reprodução vistos no código (`GR_MODULE`, segmento `1008`), endereços abaixo.
+**Source:** verified fact with `tools/db_list.py` and object dumps (counts, sizes, `MThd` signatures); playback paths seen in the code (`GR_MODULE`, segment `1008`), addresses below.
 
-## Saída de áudio escolhida pelo original
+## Audio output chosen by the original
 
-`_snd_Install` (`1008:793a`), chamada uma vez na inicialização logo depois de `_db_SetDataBase("sound")`, testa as bibliotecas nesta ordem (fato visto no código; nomes das DLLs e funções são strings do DGROUP, offsets `0xafa`–`0xbcf`):
+`_snd_Install` (`1008:793a`), called once at startup right after `_db_SetDataBase("sound")`, tests the libraries in this order (fact seen in the code; DLL and function names are DGROUP strings, offsets `0xafa`–`0xbcf`):
 
-1. `MMSYSTEM.DLL` (procurada na pasta do Windows, em `SYSTEM\` e na pasta do jogo por `_IsDLLAvail` `1008:780e`). Se `midiOutGetNumDevs()` > 0: **modo multimídia** (`[0x8d0a]` = 1). Músicas por MCI, efeitos por `waveOut*`.
-2. Senão, `SNDBLST.DLL` com `sbcGetDLLVersion` e `sbcGetCardName`: **modo Sound Blaster** (`[0x8d0a]` = 0). Músicas por `musOpenDevice`/`musPlayMemMidi`, efeitos por `vocOpenDevice`/`vocPlayMemUnFormat`.
-3. Senão, de novo `MMSYSTEM.DLL`, agora só com `waveOutGetNumDevs()` > 0: efeitos por `waveOut*`, música pelo alto-falante (`[0x8d0c]` = 1).
-4. Sem nada: música pelo `SOUND.DRV` do Windows 3.0 (importado por ordinal: 1 `OpenSound`, 2 `CloseSound`, 3 `SetVoiceQueueSize`, 4 `SetVoiceNote`, 9 `StartSound`) e efeitos desligados.
+1. `MMSYSTEM.DLL` (searched for in the Windows folder, in `SYSTEM\` and in the game folder by `_IsDLLAvail` `1008:780e`). If `midiOutGetNumDevs()` > 0: **multimedia mode** (`[0x8d0a]` = 1). Music through MCI, effects through `waveOut*`.
+2. Otherwise, `SNDBLST.DLL` with `sbcGetDLLVersion` and `sbcGetCardName`: **Sound Blaster mode** (`[0x8d0a]` = 0). Music through `musOpenDevice`/`musPlayMemMidi`, effects through `vocOpenDevice`/`vocPlayMemUnFormat`.
+3. Otherwise, `MMSYSTEM.DLL` again, now only with `waveOutGetNumDevs()` > 0: effects through `waveOut*`, music through the PC speaker (`[0x8d0c]` = 1).
+4. With nothing: music through the Windows 3.0 `SOUND.DRV` (imported by ordinal: 1 `OpenSound`, 2 `CloseSound`, 3 `SetVoiceQueueSize`, 4 `SetVoiceNote`, 9 `StartSound`) and effects turned off.
 
-Além disso, com MMSYSTEM e sem `waveOut` [hipótese: a condição exata não foi seguida], tenta `DSOUND.DLL` (`GetDSoundVersion` ≥ 2) e, se houver, os efeitos usam os objetos tipo 51 por `PlaySound`.
+In addition, with MMSYSTEM and without `waveOut` [hypothesis: the exact condition was not followed], it tries `DSOUND.DLL` (`GetDSoundVersion` ≥ 2) and, if present, the effects use the type 51 objects through `PlaySound`.
 
-Numa instalação comum do Windows 3.1 com placa de som (inclusive a de referência, com Sound Blaster 16 no DOSBox-X), o caminho é o **1**: MIDI por MCI a partir de `SOUND\*.MID` e efeitos do tipo 5 por `waveOut`. **O port reproduz esse caminho.** Os tipos 20 e 51 ficam como alternativa de dados; o tipo 50 não é usado.
+On an ordinary Windows 3.1 installation with a sound card (including the reference one, with a Sound Blaster 16 in DOSBox-X), the path is **1**: MIDI through MCI from `SOUND\*.MID` and type 5 effects through `waveOut`. **The port reproduces this path.** Types 20 and 51 remain as alternative data; type 50 is not used.
 
-### `SIMANT.CFG` não escolhe a saída
+### `SIMANT.CFG` does not choose the output
 
-`_ReadConfig` (`1008:08f4`) grava o dígito de "Sound Mode" em `_musicDevice`, mas nenhuma função lê `_musicDevice` no pseudocódigo: as três referências são escritas (`_IBMInitStuff` `1008:0220` põe −1 ou um dígito; `_ReadConfig` põe o dígito do arquivo). `_snd_Install` não consulta a variável, e `_MusicInit` (`1008:827c`) só registra "MUSIC INIT!" no log de depuração. Conclusão: no Windows o "Sound Mode" não tem efeito (visto no código; uma leitura indireta que o Ghidra não resolveu não está descartada). Ver [simant-cfg.md](simant-cfg.md).
+`_ReadConfig` (`1008:08f4`) stores the "Sound Mode" digit in `_musicDevice`, but no function reads `_musicDevice` in the pseudocode: all three references are writes (`_IBMInitStuff` `1008:0220` sets −1 or a digit; `_ReadConfig` sets the digit from the file). `_snd_Install` does not consult the variable, and `_MusicInit` (`1008:827c`) only writes "MUSIC INIT!" to the debug log. Conclusion: on Windows, "Sound Mode" has no effect (seen in the code; an indirect read that Ghidra did not resolve is not ruled out). See [simant-cfg.md](simant-cfg.md).
 
-## Tipo 5: efeito sonoro ("instrumento DAC")
+## Type 5: sound effect ("DAC instrument")
 
-57 objetos, ids 0–56, todos com flags 8 (sem compressão LZSS). Tamanho de 67 a 6464 bytes.
+57 objects, ids 0–56, all with flags 8 (no LZSS compression). Size from 67 to 6464 bytes.
 
-| Offset | Tamanho | Campo |
+| Offset | Size | Field |
 |---|---|---|
-| 0 | 16 bytes | tabela de deltas: 16 valores **com sinal** (8 bits), indexados por um nibble |
-| 16 | N − 16 bytes | dados: cada byte guarda dois nibbles, primeiro o **alto**, depois o baixo |
+| 0 | 16 bytes | delta table: 16 **signed** values (8 bits), indexed by a nibble |
+| 16 | N − 16 bytes | data: each byte holds two nibbles, first the **high** one, then the low one |
 
-Decodificação (fato visto no código, três cópias idênticas: `_UncompressDACInstrument` `1008:768c`, `_MciOutWave` `1008:959c` e o caminho `sndPlaySound` de `_myBeginSound`):
+Decoding (fact seen in the code, three identical copies: `_UncompressDACInstrument` `1008:768c`, `_MciOutWave` `1008:959c` and the `sndPlaySound` path of `_myBeginSound`):
 
 ```
-amostra = 0x80
-para cada byte b dos dados:
-    amostra = (amostra + tabela[b >> 4])  mod 256 ; emite amostra
-    amostra = (amostra + tabela[b & 0xF]) mod 256 ; emite amostra
+sample = 0x80
+for each data byte b:
+    sample = (sample + table[b >> 4])  mod 256 ; emit sample
+    sample = (sample + table[b & 0xF]) mod 256 ; emit sample
 ```
 
-- Resultado: PCM **8 bits sem sinal** (0x80 = silêncio), mono, **2 × (N − 16)** amostras.
-- A soma é em 8 bits com estouro (aritmética de `char`), sem saturação.
-- **Taxa:** o `WAVEFORMAT` montado para `waveOutOpen` tem `nSamplesPerSec` = `nAvgBytesPerSec` = **0x1000 = 4096 Hz**, `nChannels` = 1, `nBlockAlign` = 1, `wBitsPerSample` = 8 (fato visto na desmontagem: `mov word [bx+4], 0x1000` em `1008:9d7e`). O caminho Sound Blaster também passa 0x1000 a `vocPlayMemUnFormat` (`1008:9b01`) e o caminho `sndPlaySound` monta um cabeçalho RIFF com os mesmos valores.
-- **Taxa real na Sound Blaster 16 (medida em 2026-10-19):** o `sb16snd.drv` toca esses bytes a **5000 Hz** (o mínimo da placa), sem reamostrar, e só em **blocos inteiros de 504 amostras**: o resto do último bloco se perde e um efeito com menos de 504 amostras (15, 17, 18, 19, 28, 29, 40, 47 e outros) não soa. Medido numa sessão jogada no DOSBox-X e num teste controlado com um WAV de 4096 Hz pelo mesmo driver (a 5000 Hz o mesmo efeito sai inteiro); ver [regras/som.md](../regras/som.md), "Efeitos dentro do jogo, gravados numa sessão jogada pelo usuário". O port segue a SB16: `taxa_efeitos` = 5000 e `bloco_efeitos` = 504 em `data/som.json` (4096 e 0 dão o que o código pede).
-- Observação: comparando com as versões Mac (tipo 51), o número de amostras de vários sons bate com uma taxa de ~5563 Hz (ex.: id 41 tem 12 896 amostras aqui e 13 184 no `snd ` a 5563,6 Hz; id 15 tem 102 amostras contra 205 a 11 127 Hz). Ou seja, o código do Windows pede os efeitos cerca de 26 % mais lentos e graves que o Mac; na SB16 (5000 Hz) ficam ~10 % mais lentos. O port segue a SB16 medida (5000 Hz) por padrão; a taxa fica em `data/som.json`.
+- Result: **unsigned 8-bit** PCM (0x80 = silence), mono, **2 × (N − 16)** samples.
+- The addition is 8-bit with overflow (`char` arithmetic), without saturation.
+- **Rate:** the `WAVEFORMAT` built for `waveOutOpen` has `nSamplesPerSec` = `nAvgBytesPerSec` = **0x1000 = 4096 Hz**, `nChannels` = 1, `nBlockAlign` = 1, `wBitsPerSample` = 8 (fact seen in the disassembly: `mov word [bx+4], 0x1000` at `1008:9d7e`). The Sound Blaster path also passes 0x1000 to `vocPlayMemUnFormat` (`1008:9b01`) and the `sndPlaySound` path builds a RIFF header with the same values.
+- **Actual rate on the Sound Blaster 16 (measured on 2026-10-19):** `sb16snd.drv` plays these bytes at **5000 Hz** (the card's minimum), without resampling, and only in **whole blocks of 504 samples**: the rest of the last block is lost and an effect with fewer than 504 samples (15, 17, 18, 19, 28, 29, 40, 47 and others) makes no sound. Measured in a session played in DOSBox-X and in a controlled test with a 4096 Hz WAV through the same driver (at 5000 Hz the same effect comes out whole); see [regras/som.md](../regras/som.md), "In-game effects, recorded in a session played by the user". The port follows the SB16: `taxa_efeitos` = 5000 and `bloco_efeitos` = 504 in `data/som.json` (4096 and 0 give what the code asks for).
+- Note: comparing with the Mac versions (type 51), the sample count of several sounds matches a rate of ~5563 Hz (e.g. id 41 has 12 896 samples here and 13 184 in the `snd ` at 5563.6 Hz; id 15 has 102 samples versus 205 at 11 127 Hz). In other words, the Windows code asks for the effects about 26 % slower and lower-pitched than the Mac; on the SB16 (5000 Hz) they are ~10 % slower. The port follows the measured SB16 (5000 Hz) by default; the rate is in `data/som.json`.
 
-## Tipo 51: efeito sonoro em formato Mac
+## Type 51: sound effect in Mac format
 
-34 objetos (ids 1–49 com lacunas), com e sem LZSS. São recursos `snd ` do Macintosh (fato verificado pelo dump; formato da Apple, *Inside Macintosh: Sound*):
+34 objects (ids 1–49 with gaps), with and without LZSS. They are Macintosh `snd ` resources (verified fact from the dump; Apple's format, *Inside Macintosh: Sound*):
 
-- formato 1: `0001` (formato), `0001` (um sintetizador), `0005` (sampled synth) + 4 bytes de inicialização, `0001` comando, `8051` (`bufferCmd` com o bit de offset), parâmetros `0000` e `00000014` → cabeçalho de som no offset 20;
-- formato 2 (só o id 23): `0002`, `0000` (referências), `0001` comando, `8050`... → cabeçalho no offset 14;
-- cabeçalho de som (big-endian): ponteiro (0), número de amostras (u32), taxa em ponto fixo 16.16 (ex.: `15bba2e8` = 5563,6 Hz, `2b7745d2` = 11 127 Hz, `56ee8ba3` = 22 254,5 Hz), início e fim do laço, codificação (0), nota base (`3c`), seguidos das amostras de 8 bits sem sinal.
+- format 1: `0001` (format), `0001` (one synthesizer), `0005` (sampled synth) + 4 initialization bytes, `0001` command, `8051` (`bufferCmd` with the offset bit), parameters `0000` and `00000014` → sound header at offset 20;
+- format 2 (only id 23): `0002`, `0000` (references), `0001` command, `8050`... → header at offset 14;
+- sound header (big-endian): pointer (0), number of samples (u32), rate in 16.16 fixed point (e.g. `15bba2e8` = 5563.6 Hz, `2b7745d2` = 11 127 Hz, `56ee8ba3` = 22 254.5 Hz), loop start and end, encoding (0), base note (`3c`), followed by the unsigned 8-bit samples.
 
-Só a variante com `DSOUND.DLL` usa esses objetos. O port não os toca [em aberto: oferecer como opção "sons do Mac"].
+Only the `DSOUND.DLL` variant uses these objects. The port does not play them [open: offer as a "Mac sounds" option].
 
-## Tipo 18: cabeçalho de música
+## Type 18: music header
 
-33 objetos de 18 bytes = 9 palavras **big-endian** (dados vindos do Mac; `_FlipWord` em `_myBeginSong`).
+33 objects of 18 bytes = 9 **big-endian** words (data from the Mac; `_FlipWord` in `_myBeginSong`).
 
-| Palavra | Campo | Evidência |
+| Word | Field | Evidence |
 |---|---|---|
-| 0 | id do objeto MIDI (tipos 20/50) | fato visto no código: lido em `_myBeginSong` e passado a `_db_LoadObject(x, 0x14)` / `(x, 0x32)`; os valores existentes casam com os ids dos tipos 20 e 50 |
-| 1 | 4 nos temas longos (10001–10010), 1 nos demais | [significado desconhecido] |
-| 2 | sempre 0 | — |
-| 3 | **transposição em semitons** (0, 6 ou 12) | fato visto no código: passada a `musTransposeNote` no modo Sound Blaster; o log usa o texto `"myBeginSong(shift=%d)..."` |
-| 4, 5 | pares (8,3), (5,5), (6,4), (4,2) | [significado desconhecido] |
-| 6 | 0x4410, 0x410C, 0x400C, 0x4010, 0x4008 | [significado desconhecido] |
+| 0 | MIDI object id (types 20/50) | fact seen in the code: read in `_myBeginSong` and passed to `_db_LoadObject(x, 0x14)` / `(x, 0x32)`; the existing values match the ids of types 20 and 50 |
+| 1 | 4 in the long themes (10001–10010), 1 in the others | [meaning unknown] |
+| 2 | always 0 | — |
+| 3 | **transposition in semitones** (0, 6 or 12) | fact seen in the code: passed to `musTransposeNote` in Sound Blaster mode; the log uses the text `"myBeginSong(shift=%d)..."` |
+| 4, 5 | pairs (8,3), (5,5), (6,4), (4,2) | [meaning unknown] |
+| 6 | 0x4410, 0x410C, 0x400C, 0x4010, 0x4008 | [meaning unknown] |
 | 7, 8 | 0 | — |
 
-Uma música é pedida pelo **id do cabeçalho**. Vários cabeçalhos apontam para o mesmo MIDI com transposições diferentes: 11014 = 11013 + 6 semitons, 11015 = 11013 + 12, 11017 = 11016 + 12. Não há cabeçalho para 20006 (`jolly5`), 11008–11012 nem 11019.
+A song is requested by the **header id**. Several headers point to the same MIDI with different transpositions: 11014 = 11013 + 6 semitones, 11015 = 11013 + 12, 11017 = 11016 + 12. There is no header for 20006 (`jolly5`), 11008–11012 or 11019.
 
-Se o cabeçalho não existe, `_myBeginSong` retorna sem tocar nada, em qualquer modo (fato visto no código: `_db_LoadObject(id, 0x12, 1)` nulo → retorno).
+If the header does not exist, `_myBeginSong` returns without playing anything, in any mode (fact seen in the code: null `_db_LoadObject(id, 0x12, 1)` → return).
 
-## Músicas por MCI: `SOUND\*.MID` e a tabela de nomes
+## Music through MCI: `SOUND\*.MID` and the name table
 
-No modo multimídia, `_myBeginSong(id)` procura `id` numa tabela de 31 pares (nome, id) terminada por −1 e toca o arquivo `<pasta do executável>sound\<nome>.mid` (formato `"%ssound\%s.mid"`, DGROUP `0xe3c`) com `mciSendCommand` (abrir com o *MIDI Mapper*, `MCI_SEEK` ao início, `MCI_PLAY` com notificação). O id **não** é usado para escolher o objeto tipo 20 nem a transposição do cabeçalho: no modo MCI a palavra 3 é ignorada.
+In multimedia mode, `_myBeginSong(id)` looks up `id` in a table of 31 (name, id) pairs terminated by −1 and plays the file `<executable folder>sound\<name>.mid` (format `"%ssound\%s.mid"`, DGROUP `0xe3c`) with `mciSendCommand` (open with the *MIDI Mapper*, `MCI_SEEK` to the start, `MCI_PLAY` with notification). The id is **not** used to choose the type 20 object nor the header's transposition: in MCI mode word 3 is ignored.
 
-A tabela fica no DGROUP: ponteiros far para os nomes em `[0x8d2a]` (31 × 4 bytes) e os ids em `[0x8da6]` (31 palavras + −1). No arquivo do executável essa área está zerada; os valores abaixo foram lidos da memória do jogo em execução (fato verificado no dump de RAM `re_trabalho/qemu_ram_quick2.bin`, bancada QEMU; os nomes são as strings do DGROUP `0xd05`–`0xdee`):
+The table lives in DGROUP: far pointers to the names at `[0x8d2a]` (31 × 4 bytes) and the ids at `[0x8da6]` (31 words + −1). In the executable file this area is zeroed; the values below were read from the memory of the running game (verified fact in the RAM dump `re_trabalho/qemu_ram_quick2.bin`, QEMU bench; the names are the DGROUP strings `0xd05`–`0xdee`):
 
-| Id | Arquivo | | Id | Arquivo |
+| Id | File | | Id | File |
 |---|---|---|---|---|
 | 10001 | gamethme | | 11004 | newcoln2 |
 | 10003 | antthme1 | | 11005 | newbody |
@@ -105,42 +107,42 @@ A tabela fica no DGROUP: ponteiros far para os nomes em `[0x8d2a]` (31 × 4 byte
 | 20002–20006 | jolly1–jolly5 | | 11021 | redq |
 | 20007 | omnious1 | | 20008–20011 | sad1–sad4 |
 
-Consequências (fato visto no código, a confirmar ouvindo o original):
+Consequences (fact seen in the code, to be confirmed by listening to the original):
 
-- 11015 tem cabeçalho mas não está na tabela: **não toca** no modo MCI (`_myBeginSong` retorna quando a busca chega ao −1). Idem 11002 e 11003.
-- 20006 (`jolly5`) está na tabela mas não tem cabeçalho: também **não toca**. O arquivo `JOLLY5.MID` existe sem uso.
-- 11014 e 11017 tocam o mesmo arquivo que 11013 e 11016, **sem** a transposição.
+- 11015 has a header but is not in the table: it **does not play** in MCI mode (`_myBeginSong` returns when the lookup reaches the −1). Likewise 11002 and 11003.
+- 20006 (`jolly5`) is in the table but has no header: it also **does not play**. The file `JOLLY5.MID` exists unused.
+- 11014 and 11017 play the same file as 11013 and 11016, **without** the transposition.
 
-### Formato dos arquivos `.MID`
+### Format of the `.MID` files
 
-MIDI padrão (SMF), formato 1, divisão 240 ticks por semínima, com metaeventos de andamento (`FF 51`), SMPTE (`FF 54`) e compasso (`FF 58`). Fato verificado com um analisador simples (contagem de notas por canal):
+Standard MIDI (SMF), format 1, division 240 ticks per quarter note, with tempo (`FF 51`), SMPTE (`FF 54`) and time signature (`FF 58`) meta-events. Verified fact with a simple analyzer (note count per channel):
 
-- Todos seguem as **diretrizes de autoria MIDI do Windows 3.1** (arranjo duplo): a mesma música aparece duas vezes, no arranjo "estendido" (canais 1–10, percussão no 10) e no "básico" (canais 13–16, percussão no 16), com as mesmas notas e os mesmos programas. Exemplo: `GAMETHME.MID` tem 346 notas no canal 3 e 346 no 13, 456 no 10 e 456 no 16.
-- O *MIDI Mapper* do Windows 3.1 toca só um dos arranjos, conforme a configuração do sintetizador. Tocar todos os canais dobra cada nota. **O port toca só os canais 1–10** (lista em `data/som.json`, `canais_midi`).
-- Os programas são General MIDI (ex.: 34 baixo, 3 piano elétrico, 95 pad), e o canal 10 recebe programa 126 [hipótese: sobra da conversão; em GM, programa no canal de percussão escolhe o kit].
+- All of them follow the **Windows 3.1 MIDI authoring guidelines** (dual arrangement): the same music appears twice, in the "extended" arrangement (channels 1–10, percussion on 10) and in the "base" arrangement (channels 13–16, percussion on 16), with the same notes and the same programs. Example: `GAMETHME.MID` has 346 notes on channel 3 and 346 on 13, 456 on 10 and 456 on 16.
+- The Windows 3.1 *MIDI Mapper* plays only one of the arrangements, depending on the synthesizer configuration. Playing all channels doubles every note. **The port plays only channels 1–10** (list in `data/som.json`, `canais_midi`).
+- The programs are General MIDI (e.g. 34 bass, 3 electric piano, 95 pad), and channel 10 receives program 126 [hypothesis: a leftover from the conversion; in GM, a program on the percussion channel selects the kit].
 
-### Tipo 20 (Sound Blaster) e tipo 50 (alto-falante)
+### Type 20 (Sound Blaster) and type 50 (PC speaker)
 
-MIDI padrão também (assinatura `MThd`), com LZSS em parte deles. Não são cópias dos `.MID` (nenhum hash coincide): o tipo 20 tem um só arranjo, em geral nos canais 2–4 e percussão no 10 (ex.: 10001 com 182/346/98 notas nos canais 2/3/4 e 597 no 10); o tipo 50 é uma redução a uma voz (10001: só o canal 3), para o `SetVoiceNote`. No modo Sound Blaster, `_myBeginSong` carrega o tipo 20 do id da palavra 0 do cabeçalho, aplica a transposição (`musTransposeNote`) e toca com `musPlayMemMidi`; no modo alto-falante interpreta o tipo 50 em `_myBeginSong` (`"Unknown command"`, `"Meta Event"`, `"Program Change"`...).
+Also standard MIDI (`MThd` signature), with LZSS in some of them. They are not copies of the `.MID` files (no hash matches): type 20 has a single arrangement, generally on channels 2–4 with percussion on 10 (e.g. 10001 with 182/346/98 notes on channels 2/3/4 and 597 on 10); type 50 is a reduction to one voice (10001: only channel 3), for `SetVoiceNote`. In Sound Blaster mode, `_myBeginSong` loads the type 20 object with the id from header word 0, applies the transposition (`musTransposeNote`) and plays it with `musPlayMemMidi`; in PC speaker mode it interprets type 50 inside `_myBeginSong` (`"Unknown command"`, `"Meta Event"`, `"Program Change"`...).
 
 ## Port
 
-- **Leitura:** `engine/src/formats/som.rs` (tipo 5 → PCM, tipo 18 → `CabecalhoMusica`, gravação de WAV) e `engine/src/formats/midi.rs` (SMF → lista de eventos com tempo em segundos, filtro de canais e transposição). Testes em `engine/tests/som_reais.rs`, contra os arquivos do usuário.
-- **Reprodução:** `simant/src/som/` (SDL2 + sintetizador), ver [regras/som.md](../regras/som.md) e `docs/decisoes.md`.
-- **Mods:** um efeito pode ser trocado com `objetos/5/<id>.bin` (mesmo formato DAC); uma música com `arquivos/sound/<nome>.mid`; a tabela id → arquivo, a taxa e os blocos do driver dos efeitos, os volumes, os canais e o sintetizador ficam em `data/som.json`; o banco FM em `data/opl_banco.json`.
+- **Reading:** `engine/src/formats/som.rs` (type 5 → PCM, type 18 → `CabecalhoMusica`, WAV writing) and `engine/src/formats/midi.rs` (SMF → event list with time in seconds, channel filter and transposition). Tests in `engine/tests/som_reais.rs`, against the user's files.
+- **Playback:** `simant/src/som/` (SDL2 + synthesizer), see [regras/som.md](../regras/som.md) and `docs/decisoes.md`.
+- **Mods:** an effect can be replaced with `objetos/5/<id>.bin` (same DAC format); a song with `arquivos/sound/<name>.mid`; the id → file table, the effects' rate and driver blocks, the volumes, the channels and the synthesizer are in `data/som.json`; the FM bank in `data/opl_banco.json`.
 
-### MIDI Mapper da instalação de referência
+### MIDI Mapper of the reference installation
 
-O `SYSTEM.INI` liga o MIDI ao `sb16fm.drv` (OPL3) pelo `midimap.drv`, e o `MIDIMAP.CFG` está na configuração "SB16 Ext Synth": canais 1–10 → "Creative Music Synthesizer", sem mapa de programas nem de teclas; 11–16 mudos. Detalhes e evidência em [regras/som.md](../regras/som.md), "Áudio do original no DOSBox-X". Isso confirma a escolha `canais_midi` = 1–10.
+`SYSTEM.INI` connects MIDI to `sb16fm.drv` (OPL3) through `midimap.drv`, and `MIDIMAP.CFG` is in the "SB16 Ext Synth" setup: channels 1–10 → "Creative Music Synthesizer", with no patch map or key map; 11–16 muted. Details and evidence in [regras/som.md](../regras/som.md), "The original's audio in DOSBox-X". This confirms the choice `canais_midi` = 1–10.
 
-### Sintetizador FM (port)
+### FM synthesizer (port)
 
-`simant/src/som/fm.rs` é um sintetizador FM próprio no estilo do OPL2/OPL3 (implementação própria a partir do comportamento documentado do chip, sem código de emuladores existentes):
+`simant/src/som/fm.rs` is the port's own FM synthesizer in the style of the OPL2/OPL3 (an original implementation based on the chip's documented behavior, with no code from existing emulators):
 
-- 18 vozes de 2 operadores (as do OPL3); sem modo de 4 operadores e sem modo de ritmo. Gera a 49 716 Hz (a taxa do chip) e reamostra linearmente para a saída.
-- Por operador, os campos dos registradores 0x20–0xE0: AM, VIB, EG-TYP (`sustenta`), KSR, MULT (½, 1–10, 10, 12, 12, 15, 15), KSL (0, 3, 1,5 e 6 dB/oitava, com a tabela de base por F-number do chip), TL (0,75 dB), AR/DR/SL/RR e as 8 formas de onda do OPL3. Envelopes com os tempos da ficha do YM3812 (ataque 0→100 % de 2826 ms na taxa 1, decaimento 0→96 dB de 39 281 ms, dividindo por 2 a cada 4 passos de taxa efetiva); ataque exponencial, decaimento linear em dB; sem EG-TYP, a soltura começa ao atingir SL. Realimentação do modulador pela média das duas últimas saídas; a portadora recebe ±4 ciclos de modulação com o modulador no máximo; conexão FM ou aditiva; LFO de tremolo (3,7 Hz, 4,8 ou 1 dB) e vibrato (6,1 Hz, 14 ou 7 cents). Um canal no máximo dá 1/8 da escala (4096/32768, como a saída do chip) vezes o `ganho`.
-- Driver MIDI próprio: nota → frequência (bloco e F-number para KSL/KSR), curvatura ±2 semitons, volume (CC 7), expressão (CC 11), pan (CC 10, contínuo; o original saiu mono), pedal (CC 64), CC 120/121/123; atenuação da nota = −`curva_volume_db` × log10(velocidade × volume × expressão), na portadora (e no modulador, se aditivo); voz roubada: a solta mais silenciosa, senão a mais antiga.
-- Canal de percussão: timbre por nota (`percussao`), tocado na `nota_fixa`; nota sem timbre = silêncio. As notas 59, 67, 70, 77 e 80 do mapa GM e as 85–95 de fora dele não soam no original (medido nas gravações, regras/som.md, "Percussão") e não têm timbre no banco do port.
-- A troca de programa vale a partir do evento seguinte: nos `.MID` em que a primeira nota vem antes do Program Change no mesmo instante (`sad2`, `omnious1`, `happy2`, `jolly*`, `redq`, `sad3`, `blackq`, `newcoln2`; o canal de `attack` nem tem troca), essa nota toca com o programa que o canal tinha; numa gravação depois do boot é o 0 (piano), o que o port também faz (o canal começa no 0 a cada música). [hipótese] no jogo, o driver do original guarda o programa da música anterior; o port não guarda.
+- 18 two-operator voices (those of the OPL3); no 4-operator mode and no rhythm mode. It generates at 49 716 Hz (the chip's rate) and resamples linearly to the output.
+- Per operator, the fields of registers 0x20–0xE0: AM, VIB, EG-TYP (`sustenta`), KSR, MULT (½, 1–10, 10, 12, 12, 15, 15), KSL (0, 3, 1.5 and 6 dB/octave, with the chip's base table by F-number), TL (0.75 dB), AR/DR/SL/RR and the 8 OPL3 waveforms. Envelopes with the timings from the YM3812 datasheet (attack 0→100 % of 2826 ms at rate 1, decay 0→96 dB of 39 281 ms, halving every 4 steps of effective rate); exponential attack, linear decay in dB; without EG-TYP, the release starts when SL is reached. Modulator feedback by the average of the last two outputs; the carrier receives ±4 cycles of modulation with the modulator at maximum; FM or additive connection; tremolo LFO (3.7 Hz, 4.8 or 1 dB) and vibrato (6.1 Hz, 14 or 7 cents). One channel at maximum gives 1/8 of full scale (4096/32768, like the chip's output) times the `ganho`.
+- The port's own MIDI driver: note → frequency (block and F-number for KSL/KSR), pitch bend ±2 semitones, volume (CC 7), expression (CC 11), pan (CC 10, continuous; the original output was mono), sustain pedal (CC 64), CC 120/121/123; note attenuation = −`curva_volume_db` × log10(velocity × volume × expression), on the carrier (and on the modulator, if additive); voice stealing: the quietest released voice, otherwise the oldest.
+- Percussion channel: timbre per note (`percussao`), played at `nota_fixa`; a note without a timbre = silence. Notes 59, 67, 70, 77 and 80 of the GM map and 85–95 outside it make no sound in the original (measured in the recordings, regras/som.md, "Percussion") and have no timbre in the port's bank.
+- A program change takes effect from the next event on: in the `.MID` files where the first note comes before the Program Change at the same instant (`sad2`, `omnious1`, `happy2`, `jolly*`, `redq`, `sad3`, `blackq`, `newcoln2`; the `attack` channel has no change at all), that note plays with the program the channel already had; in a recording made right after boot it is 0 (piano), which the port also does (the channel starts at 0 for each song). [hypothesis] in the game, the original's driver keeps the program from the previous song; the port does not.
 
-**Banco (`data/opl_banco.json`):** próprio do port, gerado por `tools/gerar_banco_opl.py` (um modelo por família GM com variações; os programas que as músicas usam — 0, 3, 19, 21, 25, 26, 31, 33, 34, 35, 49, 57, 59, 69, 95 — e a percussão ajustados contra as 28 gravações do original, com `tools/ajustar_timbre_fm.py` e `tools/som_dosbox.py perfil`/`percussao`, em 2026-10-19: perfis harmônicos, envelopes, nível por programa (`NIVEL_TL`) e curva de velocidade; regras/som.md, "Ajuste do banco FM contra as 28 músicas"). Chaves: `melodicos` (128 timbres, índice = programa GM), `percussao` (nota 35–81 → timbre), `curva_volume_db` (25: medida no original; era 40), `ganho` (1,65: calibrado pelo volume relativo medido; era 2,25 com o banco anterior), `tremolo_profundo`, `vibrato_profundo`. Timbre: `nome`, `modulador`, `portadora` (operadores: `mult`, `tl`, `ar`, `dr`, `sl`, `rr`, `sustenta`, `ksl`, `ksr`, `onda`, `am`, `vib`), `realimentacao`, `aditivo`, `transposicao`, `nota_fixa`. Alternativa: `fm.banco_op2` em `data/som.json` aponta para um banco `.op2` (formato DMX "#OPL_II#": 175 instrumentos de 36 bytes, 128 melódicos e as notas 35–81; só a primeira voz é usada) do próprio usuário, lido em tempo de execução; o port não traz nenhum.
+**Bank (`data/opl_banco.json`):** the port's own, generated by `tools/gerar_banco_opl.py` (one model per GM family with variations; the programs the songs use — 0, 3, 19, 21, 25, 26, 31, 33, 34, 35, 49, 57, 59, 69, 95 — and the percussion tuned against the 28 recordings of the original, with `tools/ajustar_timbre_fm.py` and `tools/som_dosbox.py perfil`/`percussao`, on 2026-10-19: harmonic profiles, envelopes, per-program level (`NIVEL_TL`) and velocity curve; regras/som.md, "FM bank adjustment against the 28 songs"). Keys: `melodicos` (128 timbres, index = GM program), `percussao` (note 35–81 → timbre), `curva_volume_db` (25: measured on the original; it was 40), `ganho` (1.65: calibrated by the measured relative volume; it was 2.25 with the previous bank), `tremolo_profundo`, `vibrato_profundo`. Timbre: `nome`, `modulador`, `portadora` (operators: `mult`, `tl`, `ar`, `dr`, `sl`, `rr`, `sustenta`, `ksl`, `ksr`, `onda`, `am`, `vib`), `realimentacao`, `aditivo`, `transposicao`, `nota_fixa`. Alternative: `fm.banco_op2` in `data/som.json` points to a `.op2` bank (DMX "#OPL_II#" format: 175 instruments of 36 bytes, 128 melodic plus notes 35–81; only the first voice is used) supplied by the user, read at run time; the port ships none.

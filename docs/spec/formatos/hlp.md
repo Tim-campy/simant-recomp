@@ -1,87 +1,89 @@
-# Arquivo de ajuda `SIMANT.HLP` (WinHelp 3.0)
+*Leia em português: [hlp.md](../../pt-BR/spec/formatos/hlp.md)*
 
-O original não desenha a própria ajuda: chama `WinHelp(hwnd, "SIMANT.HLP", comando, n)` (`_DoWinHelp` `1000:5aac`, `_DoEvent`, `_HelpKeyDown`; o nome do arquivo está em `_helpFile`, `9:76ac`) e o WinHelp do Windows mostra o tópico. O port lê o arquivo do usuário (`MAXIS/ANTWIN/SIMANT.HLP`, 197.256 bytes) e desenha a janela ele mesmo (visor: [../telas/ajuda.md](../telas/ajuda.md)).
+# Help file `SIMANT.HLP` (WinHelp 3.0)
 
-Implementação: `engine/src/formats/hlp.rs` (leitura), `tools/hlp_inspecionar.py` (inspeção em Python). Testes com o arquivo real: `engine/tests/ajuda_reais.rs`.
+The original does not draw its own help: it calls `WinHelp(hwnd, "SIMANT.HLP", command, n)` (`_DoWinHelp` `1000:5aac`, `_DoEvent`, `_HelpKeyDown`; the file name is in `_helpFile`, `9:76ac`) and Windows' WinHelp shows the topic. The port reads the user's file (`MAXIS/ANTWIN/SIMANT.HLP`, 197,256 bytes) and draws the window itself (viewer: [../telas/ajuda.md](../telas/ajuda.md)).
 
-Fontes do formato: a descrição pública "Windows Help File Format" (helpfile.txt, de M. Winterhoff, distribuída com o helpdeco) e a conferência byte a byte no `SIMANT.HLP`. Abaixo, "[arquivo]" = conferido no `SIMANT.HLP`; o resto vem da descrição pública e está marcado quando não foi usado.
+Implementation: `engine/src/formats/hlp.rs` (reading), `tools/hlp_inspecionar.py` (inspection in Python). Tests with the real file: `engine/tests/ajuda_reais.rs`.
 
-## 1. Cabeçalho e arquivos internos
+Sources for the format: the public description "Windows Help File Format" (helpfile.txt, by M. Winterhoff, distributed with helpdeco) and byte-by-byte checking against `SIMANT.HLP`. Below, "[file]" = checked in `SIMANT.HLP`; the rest comes from the public description and is marked when unused.
 
-| Desloc. | Tipo | Conteúdo | No SIMANT.HLP |
+## 1. Header and internal files
+
+| Offset | Type | Content | In SIMANT.HLP |
 |---|---|---|---|
-| 0 | u32 | magia 0x00035F3F | [arquivo] |
-| 4 | i32 | início do diretório | 0x8C1 |
-| 8 | i32 | primeiro bloco livre (−1) | −1 |
-| 12 | u32 | tamanho do arquivo | 197.256 |
+| 0 | u32 | magic 0x00035F3F | [file] |
+| 4 | i32 | directory start | 0x8C1 |
+| 8 | i32 | first free block (−1) | −1 |
+| 12 | u32 | file size | 197,256 |
 
-Cada arquivo interno começa com 9 bytes: `i32` reservado, `i32` usado (tamanho do conteúdo), `u8` flags; o conteúdo vem logo depois.
+Each internal file starts with 9 bytes: `i32` reserved, `i32` used (content size), `u8` flags; the content follows immediately.
 
-O diretório é um arquivo interno com uma árvore B+: depois dos 9 bytes, o cabeçalho da árvore (38 bytes): `u16` magia 0x293B, `u16` flags, `u16` tamanho da página (1024), 16 bytes de estrutura ("z4"), `i16` 0, `i16` divisões, `i16` página raiz, `i16` −1, `i16` total de páginas, `i16` níveis, `i32` entradas. As páginas vêm em seguida. Página folha: `u16` livre, `i16` número de entradas, `i16` página anterior, `i16` página seguinte, e as entradas (nome terminado em 0, `i32` posição do arquivo interno). Página de índice: `u16` livre, `i16` entradas, `i16` primeira página filha, … — para achar a primeira folha basta descer pela primeira filha e seguir as "seguintes". No SIMANT.HLP a árvore tem um nível e uma página [arquivo].
+The directory is an internal file with a B+ tree: after the 9 bytes, the tree header (38 bytes): `u16` magic 0x293B, `u16` flags, `u16` page size (1024), 16 bytes of structure ("z4"), `i16` 0, `i16` splits, `i16` root page, `i16` −1, `i16` total pages, `i16` levels, `i32` entries. The pages follow. Leaf page: `u16` free, `i16` number of entries, `i16` previous page, `i16` next page, and the entries (0-terminated name, `i32` position of the internal file). Index page: `u16` free, `i16` entries, `i16` first child page, … — to find the first leaf, just descend through the first child and follow the "next" links. In SIMANT.HLP the tree has one level and one page [file].
 
-Arquivos internos do SIMANT.HLP [arquivo]: `bm0`…`bm65` (figuras), `|Phrases`, `|SYSTEM`, `|TOPIC`, `|TOMAP`, `|FONT`, `|CTXOMAP`, `|KWDATA`, `|KWMAP`, `|KWBTREE` (palavras-chave da busca) e `|TTLBTREE` (títulos). O port lê o `|KWBTREE` e o `|KWDATA` (desde 2026-10-18, `ArquivoAjuda::palavras_chave`) e não lê o `|KWMAP` nem o `|TTLBTREE`.
+Internal files of SIMANT.HLP [file]: `bm0`…`bm65` (pictures), `|Phrases`, `|SYSTEM`, `|TOPIC`, `|TOMAP`, `|FONT`, `|CTXOMAP`, `|KWDATA`, `|KWMAP`, `|KWBTREE` (search keywords) and `|TTLBTREE` (titles). The port reads `|KWBTREE` and `|KWDATA` (since 2026-10-18, `ArquivoAjuda::palavras_chave`) and does not read `|KWMAP` nor `|TTLBTREE`.
 
-`|KWBTREE` [arquivo]: árvore B+ como o diretório (magia 0x293B, páginas de 2048 bytes, cabeçalho de 38 bytes; raiz em +26, níveis em +32, 128 entradas no SIMANT.HLP). Nas folhas (`u16` livre, `i16` entradas, `i16` anterior, `i16` seguinte), cada entrada é a palavra-chave (ASCIIZ), `u16` quantidade de tópicos e `i32` deslocamento no `|KWDATA`, que é um vetor de `u32` com as posições dos tópicos (como as do `|CTXOMAP`). A ordem das folhas é a alfabética da lista do Search ("About", "Alarm", "Altruism"…; bancada s01).
+`|KWBTREE` [file]: B+ tree like the directory (magic 0x293B, 2048-byte pages, 38-byte header; root at +26, levels at +32, 128 entries in SIMANT.HLP). In the leaves (`u16` free, `i16` entries, `i16` previous, `i16` next), each entry is the keyword (ASCIIZ), `u16` number of topics and `i32` offset into `|KWDATA`, which is a `u32` array with the topic positions (like those of `|CTXOMAP`). The order of the leaves is the alphabetical order of the Search list ("About", "Alarm", "Altruism"…; test bench s01).
 
 ## 2. `|SYSTEM`
 
-`u16` magia 0x036C, `u16` versão menor, `u16` maior (1), `i32` data, `u16` flags. Menor 15 = compilador HC30 (Windows 3.0); 21 = HC31 (3.1); acima de 16, o `|TOPIC` pode ser comprimido (flags 4 ou 8) e o título vem em registros. No HC30 o título é uma cadeia terminada em 0 logo depois do cabeçalho.
+`u16` magic 0x036C, `u16` minor version, `u16` major (1), `i32` date, `u16` flags. Minor 15 = HC30 compiler (Windows 3.0); 21 = HC31 (3.1); above 16, `|TOPIC` may be compressed (flags 4 or 8) and the title comes in records. In HC30 the title is a 0-terminated string right after the header.
 
-SIMANT.HLP: menor 15, flags 8, título "SimAnt" [arquivo]. O port só lê HC30 (o único que o SimAnt traz); um HC31 dá erro.
+SIMANT.HLP: minor 15, flags 8, title "SimAnt" [file]. The port only reads HC30 (the only one SimAnt ships); an HC31 gives an error.
 
 ## 3. `|Phrases` (HC30)
 
-`u16` número de frases N, `u16` 0x0100, N + 1 deslocamentos `u16` **relativos ao início da tabela** (o primeiro vale 2 × (N + 1)), e o texto das frases, sem terminador (uma frase acaba onde começa a seguinte). SIMANT.HLP: 1.147 frases [arquivo].
+`u16` number of phrases N, `u16` 0x0100, N + 1 `u16` offsets **relative to the start of the table** (the first is 2 × (N + 1)), and the phrase text, without terminator (a phrase ends where the next begins). SIMANT.HLP: 1,147 phrases [file].
 
-No texto do tópico, um byte 1–9 seguido de um byte `d` forma o índice `256 × (byte − 1) + d`; a frase é `índice / 2`, seguida de um espaço quando o índice é ímpar. O texto só é comprimido assim quando o tamanho descomprimido (`DataLen2`) é maior que o espaço que ele ocupa no registro.
+In the topic text, a byte 1–9 followed by a byte `d` forms the index `256 × (byte − 1) + d`; the phrase is `index / 2`, followed by a space when the index is odd. Text is only compressed this way when the uncompressed size (`DataLen2`) is larger than the space it takes in the record.
 
 ## 4. `|TOPIC` (HC30)
 
-Blocos de 2048 bytes, cada um com um cabeçalho de 12 bytes (`i32` último TOPICLINK, `i32` primeiro TOPICLINK, `i32` último cabeçalho de tópico); sem compressão LZ77 no HC30 [arquivo]. Os registros (TOPICLINK) atravessam blocos: ao ler um registro, pulam-se os 12 bytes de cada bloco no caminho.
+2048-byte blocks, each with a 12-byte header (`i32` last TOPICLINK, `i32` first TOPICLINK, `i32` last topic header); no LZ77 compression in HC30 [file]. Records (TOPICLINK) cross blocks: when reading a record, the 12 bytes of each block along the way are skipped.
 
-TOPICLINK: `i32` tamanho do registro, `i32` `DataLen2` (tamanho do texto descomprimido), `i32` anterior, `i32` **seguinte = distância em bytes até o próximo registro** (contando os cabeçalhos de bloco pulados; no HC31 é uma posição absoluta), `i32` `DataLen1` (cabeçalho + LinkData1), `u8` tipo; LinkData1 vai até `DataLen1`, o texto (LinkData2) até o fim do registro. O primeiro registro fica na posição 12. SIMANT.HLP: 344 tópicos, 350 registros de texto [arquivo].
+TOPICLINK: `i32` record size, `i32` `DataLen2` (uncompressed text size), `i32` previous, `i32` **next = distance in bytes to the next record** (counting the skipped block headers; in HC31 it is an absolute position), `i32` `DataLen1` (header + LinkData1), `u8` type; LinkData1 runs up to `DataLen1`, the text (LinkData2) up to the end of the record. The first record is at position 12. SIMANT.HLP: 344 topics, 350 text records [file].
 
-Tipos:
+Types:
 
-- **2 — cabeçalho do tópico.** LinkData1: `u32` tamanho, `i32` tópico anterior, `i32` tópico seguinte (números de tópico da sequência de navegação, −1 = nenhum; botões `<<` e `>>`). LinkData2: o título. No SIMANT.HLP todo título termina em "(id=0x…)" com o número de contexto (ex.: "Patch Ribbon Bar (id=0x2200)") [arquivo]; o port guarda o título bruto e um título sem esse sufixo.
-- **1 — texto (HC30).** LinkData1: `compressed signed long` (tamanho), `u8`, `u8`, `u16` id, `u16` bits do parágrafo, os valores opcionais dos bits e a lista de comandos de formatação até 0xFF. No SIMANT.HLP os quatro primeiros campos são sempre 0, 0x80, 0x08CA e um único registro tem bits ≠ 0 (0x0800, centralizado) [arquivo].
+- **2 — topic header.** LinkData1: `u32` size, `i32` previous topic, `i32` next topic (topic numbers of the browse sequence, −1 = none; `<<` and `>>` buttons). LinkData2: the title. In SIMANT.HLP every title ends in "(id=0x…)" with the context number (e.g. "Patch Ribbon Bar (id=0x2200)") [file]; the port stores the raw title and a title without that suffix.
+- **1 — text (HC30).** LinkData1: `compressed signed long` (size), `u8`, `u8`, `u16` id, `u16` paragraph bits, the optional values of the bits and the list of formatting commands up to 0xFF. In SIMANT.HLP the first four fields are always 0, 0x80, 0x08CA and a single record has bits ≠ 0 (0x0800, centered) [file].
 
-Bits do parágrafo (do bit 0 para cima): valor desconhecido (`compressed signed long`), espaço acima, abaixo, entre linhas, recuo esquerdo, direito, da primeira linha (`compressed signed short` cada), sem uso, borda (`u8` + `i16`), tabulações (`compressed signed short` n, e n × `compressed unsigned short`, com bit 0x4000 = mais um valor de tipo), alinhado à direita (0x0400), centralizado (0x0800). As unidades das medidas não foram conferidas (o SIMANT.HLP não usa nenhuma) [hipótese].
+Paragraph bits (from bit 0 upward): unknown value (`compressed signed long`), space above, below, between lines, left indent, right indent, first-line indent (`compressed signed short` each), unused, border (`u8` + `i16`), tabs (`compressed signed short` n, and n × `compressed unsigned short`, with bit 0x4000 = one more type value), right-aligned (0x0400), centered (0x0800). The units of the measurements were not checked (SIMANT.HLP uses none) [hypothesis].
 
-Valores comprimidos: *unsigned short* = 1 byte (par) ou 2 bytes (ímpar), metade do valor lido; *signed short* = o mesmo menos 64 (1 byte) ou 16384 (2 bytes); *unsigned long* = 2 ou 4 bytes, metade; *signed long* = o mesmo menos 16384 ou 0x4000000.
+Compressed values: *unsigned short* = 1 byte (even) or 2 bytes (odd), half of the value read; *signed short* = the same minus 64 (1 byte) or 16384 (2 bytes); *unsigned long* = 2 or 4 bytes, half; *signed long* = the same minus 16384 or 0x4000000.
 
-Texto: LinkData2 é uma sequência de cadeias separadas por 0. Antes de cada comando vem uma cadeia (pode ser vazia): cadeia 0, comando 0, cadeia 1, comando 1, …, até o 0xFF.
+Text: LinkData2 is a sequence of 0-separated strings. A string (possibly empty) comes before each command: string 0, command 0, string 1, command 1, …, up to 0xFF.
 
-| Comando | Argumentos | Significado |
+| Command | Arguments | Meaning |
 |---|---|---|
-| 0x80 | `u16` | troca a fonte (índice do `|FONT`); a fonte continua no registro seguinte |
-| 0x81 | — | quebra de linha |
-| 0x82 | — | fim do parágrafo |
-| 0x83 | — | tabulação |
-| 0x86, 0x87, 0x88 | `u8` tipo, `compressed signed long` tamanho, [tipo 0x22: `compressed unsigned short`], dados (`i16` embutida, `i16` número da figura `bmN` quando 0) | figura no texto, à esquerda ou à direita. SIMANT.HLP: 65 figuras nos tópicos, tipo 3, tamanho 4; 46 com 0x86 (no meio do texto, ícones dos botões) e 19 com 0x87 [arquivo] |
-| 0x89 | — | fim do hotspot |
-| 0x8B, 0x8C | — | espaço / hífen sem quebra |
+| 0x80 | `u16` | changes the font (index into `|FONT`); the font carries over into the next record |
+| 0x81 | — | line break |
+| 0x82 | — | end of paragraph |
+| 0x83 | — | tab |
+| 0x86, 0x87, 0x88 | `u8` type, `compressed signed long` size, [type 0x22: `compressed unsigned short`], data (`i16` embedded, `i16` picture number `bmN` when 0) | picture in the text, left or right. SIMANT.HLP: 65 pictures in topics, type 3, size 4; 46 with 0x86 (in the middle of the text, button icons) and 19 with 0x87 [file] |
+| 0x89 | — | end of hotspot |
+| 0x8B, 0x8C | — | non-breaking space / hyphen |
 | 0xC8, 0xCC | `u16` n, n bytes | macro |
-| 0xE0, 0xE1 | `u32` número do tópico | popup / salto (HC30); o número indexa o `|TOMAP` |
-| 0xE2–0xE7 | `u32` | popup/salto do HC31 (hash do contexto) [não usado] |
-| 0xEA–0xEF | `u16` n, n bytes | salto para outro arquivo/janela [não usado] |
-| 0xFF | — | fim |
+| 0xE0, 0xE1 | `u32` topic number | popup / jump (HC30); the number indexes `|TOMAP` |
+| 0xE2–0xE7 | `u32` | HC31 popup/jump (context hash) [not used] |
+| 0xEA–0xEF | `u16` n, n bytes | jump to another file/window [not used] |
+| 0xFF | — | end |
 
-Exemplo conferido (índice, contexto 0x100): fonte 0, "SimAnt", fonte 1, fim de parágrafo, "Welcome to SimAnt", fim, fim (linha vazia), e 14 vezes "salto 0xE1, texto, 0x89, fim de parágrafo" (Introduction, Ribbon Bars, …, Credits), como a captura a06 do WinHelp do original.
+Checked example (index, context 0x100): font 0, "SimAnt", font 1, end of paragraph, "Welcome to SimAnt", end, end (blank line), and 14 times "jump 0xE1, text, 0x89, end of paragraph" (Introduction, Ribbon Bars, …, Credits), like capture a06 of the original's WinHelp.
 
 ## 5. `|TOMAP`, `|CTXOMAP`
 
-- `|TOMAP` (HC30): vetor de `u32`, posição do cabeçalho de cada tópico pelo número do tópico (360 entradas no SIMANT.HLP). Os saltos 0xE0/0xE1 e a sequência de navegação usam esse número [arquivo: o salto 0x124 do índice leva a "Introduction"].
-- `|CTXOMAP`: `u16` n e n pares (`u32` número de contexto, `u32` posição do cabeçalho do tópico). É o que `WinHelp(…, HELP_CONTEXT, n)` usa. Conferidos com o WinHelp do original na bancada: 0x2200 → "Patch Ribbon Bar" (botão "?" da faixa, a04), 0x2209 → "Status Window Button" (a05), 4 → "Edit Window" (a02), e no arquivo 0x102 "Map Window", 0x1300 "Caste Control Window", 0x2308 "Help Button", 0xFD48 "Bookmarks", 0x100 "SimAnt" (o índice; F1 abre o índice, a06).
+- `|TOMAP` (HC30): `u32` array, position of each topic header by topic number (360 entries in SIMANT.HLP). The 0xE0/0xE1 jumps and the browse sequence use this number [file: the index's jump 0x124 leads to "Introduction"].
+- `|CTXOMAP`: `u16` n and n pairs (`u32` context number, `u32` topic header position). This is what `WinHelp(…, HELP_CONTEXT, n)` uses. Checked with the original's WinHelp on the test bench: 0x2200 → "Patch Ribbon Bar" (ribbon "?" button, a04), 0x2209 → "Status Window Button" (a05), 4 → "Edit Window" (a02), and in the file 0x102 "Map Window", 0x1300 "Caste Control Window", 0x2308 "Help Button", 0xFD48 "Bookmarks", 0x100 "SimAnt" (the index; F1 opens the index, a06).
 
 ## 6. `|FONT` (HC30)
 
-`u16` número de faces, `u16` número de descritores, `u16` início das faces, `u16` início dos descritores. As faces têm tamanho fixo ((início dos descritores − início das faces) / faces). Descritor (11 bytes): `u8` atributos (bit 0 negrito, 1 itálico, 2 sublinhado, …), `u8` meios pontos, `u8` família, `u16` índice da face, 3 bytes RGB da frente e 3 do fundo. SIMANT.HLP: 69 faces e 3 descritores: 0 = Helv 12 pt negrito, 1 = Helv 10 pt, 2 = Helv 10 pt negrito [arquivo].
+`u16` number of faces, `u16` number of descriptors, `u16` faces start, `u16` descriptors start. Faces have a fixed size ((descriptors start − faces start) / faces). Descriptor (11 bytes): `u8` attributes (bit 0 bold, 1 italic, 2 underline, …), `u8` half points, `u8` family, `u16` face index, 3 RGB bytes for foreground and 3 for background. SIMANT.HLP: 69 faces and 3 descriptors: 0 = Helv 12 pt bold, 1 = Helv 10 pt, 2 = Helv 10 pt bold [file].
 
-## 7. Figuras `bmN` (MRB/SHG)
+## 7. `bmN` pictures (MRB/SHG)
 
-`u16` magia 0x706C ("lp"), `u16` número de imagens, `u32` posição de cada imagem. Imagem: `u8` tipo (5 = DDB, 6 = DIB), `u8` empacotamento (0 nenhum, 1 RunLen, 2 LZ77, 3 LZ77 e depois RunLen), e, comprimidos: dpi x e y (`unsigned long`), planos e bits por pixel (`unsigned short`), largura, altura, cores usadas, cores importantes, tamanho dos dados, tamanho dos hotspots (`unsigned long`); depois `u32` posição dos dados e `u32` dos hotspots (relativas ao início da imagem) e a paleta RGBQUAD (DIB). Os pixels são de um DIB: linhas de baixo para cima, alinhadas a 4 bytes.
+`u16` magic 0x706C ("lp"), `u16` number of images, `u32` position of each image. Image: `u8` type (5 = DDB, 6 = DIB), `u8` packing (0 none, 1 RunLen, 2 LZ77, 3 LZ77 then RunLen), and, compressed: x and y dpi (`unsigned long`), planes and bits per pixel (`unsigned short`), width, height, colors used, important colors, data size, hotspot size (`unsigned long`); then `u32` data position and `u32` hotspot position (relative to the start of the image) and the RGBQUAD palette (DIB). The pixels are those of a DIB: rows bottom to top, aligned to 4 bytes.
 
-RunLen: byte n; com o bit 7, copiar os `n & 0x7F` bytes seguintes; senão, repetir o byte seguinte n vezes. LZ77: byte de flags (bit 0 primeiro); bit 1 = par `u16` com comprimento `(v >> 12) + 3` e distância `(v & 0xFFF) + 1`; bit 0 = byte literal.
+RunLen: byte n; with bit 7, copy the next `n & 0x7F` bytes; otherwise, repeat the next byte n times. LZ77: flags byte (bit 0 first); bit 1 = `u16` pair with length `(v >> 12) + 3` and distance `(v & 0xFFF) + 1`; bit 0 = literal byte.
 
-SIMANT.HLP: os 66 `bmN` são DIB de 4 bits e 16 cores com RunLen (ex.: `bm0`, 75 × 75) [arquivo: as 65 usadas decodificam; a imagem desenhada pelo port não foi comparada com o WinHelp do original].
+SIMANT.HLP: the 66 `bmN` are 4-bit, 16-color DIBs with RunLen (e.g. `bm0`, 75 × 75) [file: the 65 used ones decode; the image drawn by the port was not compared with the original's WinHelp].

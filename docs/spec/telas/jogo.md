@@ -1,346 +1,348 @@
-# Tela de jogo (faixa + janela de edição)
+*Leia em português: [jogo.md](../../pt-BR/spec/telas/jogo.md)*
 
-Este documento descreve a tela que aparece durante uma partida: a faixa de ferramentas (janela 34, `mapRibbon`) e a **janela de edição** (janela 0, `editWin`), que mostra o mapa da superfície ou de um ninho com as formigas por cima. As outras janelas abertas numa partida (mapa, controle de castas e de modos) ficam para depois.
+# Game screen (ribbon + edit window)
 
-Implementação: `engine/src/core/vida.rs` (camada de vida), `engine/src/core/edicao.rs` (vista da janela de edição), `engine/src/core/tela_jogo.rs` (`compor_tela_de_jogo`, moldura do Windows), `engine/src/core/navegacao.rs` (rolagem e troca de plano), dados em `data/tela_jogo.json` e `data/navegacao.json`. Executável: `simant --save <save .ANT>` (janela) ou `--exportar-tela-jogo <png>`. Exemplo de comparação: `cargo run -p engine --example tela_jogo -- <pasta do jogo> <save .ANT> <pasta de saída> [captura.png]`.
+This document describes the screen shown during a game: the tool ribbon (window 34, `mapRibbon`) and the **edit window** (window 0, `editWin`), which shows the map of the surface or of a nest with the ants on top. The other windows open during a game (map, caste control and mode control) are left for later.
 
-**Fontes:** pseudocódigo do Ghidra em `re_trabalho/decomp/` (só consulta; nomes do `SIMANTW.SYM`), o `QUICK2.ANT` e a captura `re_trabalho/qi_14_salvo.png`, tirada pela bancada QEMU ([bancada-qemu.md](../../bancada-qemu.md)) na mesma sessão em que o save foi gravado. Legenda: **[código]** = visto no pseudocódigo, com o endereço; **[save]** = visto nos dados; **[medido]** = medido pixel a pixel na captura; **[hipótese]** = não confirmado.
+Implementation: `engine/src/core/vida.rs` (life layer), `engine/src/core/edicao.rs` (edit window view), `engine/src/core/tela_jogo.rs` (`compor_tela_de_jogo`, Windows frame), `engine/src/core/navegacao.rs` (scrolling and plane switching), data in `data/tela_jogo.json` and `data/navegacao.json`. Executable: `simant --save <save .ANT>` (window) or `--exportar-tela-jogo <png>`. Comparison example: `cargo run -p engine --example tela_jogo -- <game folder> <save .ANT> <output folder> [captura.png]`.
 
-## Janelas abertas num Quick Game
+**Sources:** Ghidra pseudocode in `re_trabalho/decomp/` (reference only; names from `SIMANTW.SYM`), `QUICK2.ANT` and the capture `re_trabalho/qi_14_salvo.png`, taken by the QEMU bench ([bancada-qemu.md](../../bancada-qemu.md)) in the same session in which the save was written. Legend: **[code]** = seen in the pseudocode, with the address; **[save]** = seen in the data; **[measured]** = measured pixel by pixel in the capture; **[hypothesis]** = not confirmed.
 
-`_NewGame` (`1000:d6dc`), depois da escolha no "Select a Game" (o botão Quick Game, `scenQuickGame`, devolve 0x202, que vira o tipo de jogo 1; ver [abertura.md](abertura.md), "Escolha do jogo") [código]:
+## Windows open in a Quick Game
 
-1. abre a janela de edição (`_win_Open(0)`), quando o tipo é 0;
-2. `_OpenCasteWindow` e `_OpenModeWindow` (janelas de controle de casta e de modo);
-3. `_SetMapPlane(_MapPlane)`; com `_MapPlane = 0` abre a janela 25 (`_MapToYard`), senão a janela 1, `mapWin` (`_YardToMap`);
+`_NewGame` (`1000:d6dc`), after the choice in "Select a Game" (the Quick Game button, `scenQuickGame`, returns 0x202, which becomes game type 1; see [abertura.md](abertura.md), "Game choice") [code]:
+
+1. opens the edit window (`_win_Open(0)`), when the type is 0;
+2. `_OpenCasteWindow` and `_OpenModeWindow` (caste and mode control windows);
+3. `_SetMapPlane(_MapPlane)`; with `_MapPlane = 0` it opens window 25 (`_MapToYard`), otherwise window 1, `mapWin` (`_YardToMap`);
 4. `_SetMapTitle`, `_OpenEditWindow` (`_win_Open(0)`, `1010:0e2c`), `_SetMapPlane(_MePlane)`;
-5. no tipo 0, se a janela de edição não estiver maximizada, `_win_Zoom(0)`, que é `ShowWindow(SW_SHOWMAXIMIZED)` (`1030:c2ba`);
-6. `_CenterEdit(_MeLocX, _MeLocY)` e `_UpdateEdit` com `_editForce = 1`.
+5. on type 0, if the edit window is not maximized, `_win_Zoom(0)`, which is `ShowWindow(SW_SHOWMAXIMIZED)` (`1030:c2ba`);
+6. `_CenterEdit(_MeLocX, _MeLocY)` and `_UpdateEdit` with `_editForce = 1`.
 
-Ao carregar um jogo salvo, `_DoLoadInitializations` (`1010:9dbe`) chama `_SetDefaultWindows` (`1000:d66a`), que repete os passos 2 a 4 sem a maximização [código].
+When loading a saved game, `_DoLoadInitializations` (`1010:9dbe`) calls `_SetDefaultWindows` (`1000:d66a`), which repeats steps 2 to 4 without the maximization [code].
 
-Na captura `qi_14_salvo.png` (640×480) aparecem a faixa, a janela de edição em primeiro plano e, atrás dela, à direita, partes do `mapWin` e de uma janela de controle ("Soldiers 40%") [medido]. O port, por enquanto, desenha só a faixa e a janela de edição.
+The capture `qi_14_salvo.png` (640×480) shows the ribbon, the edit window in the foreground and, behind it on the right, parts of `mapWin` and of a control window ("Soldiers 40%") [measured]. For now the port draws only the ribbon and the edit window.
 
-## Planos e posição da vista
+## Planes and view position
 
-| `_MapPlane` | Vista | Mapa (`_DoCalcTile`) | Largura em tiles | Ponto lembrado |
+| `_MapPlane` | View | Map (`_DoCalcTile`) | Width in tiles | Remembered point |
 |---|---|---|---|---|
-| 0 | quintal (*yard*) | `_MapA` | 128 | `_YMapPnt` |
-| 1 | superfície | `_MapA` | 128 | `_AMapPnt` |
-| 2 | ninho preto | `_MapB` | 64 | `_BMapPnt` |
-| 3 | ninho vermelho | `_MapR` | 64 | `_RMapPnt` |
+| 0 | yard | `_MapA` | 128 | `_YMapPnt` |
+| 1 | surface | `_MapA` | 128 | `_AMapPnt` |
+| 2 | black nest | `_MapB` | 64 | `_BMapPnt` |
+| 3 | red nest | `_MapR` | 64 | `_RMapPnt` |
 
-**Fonte:** `_SetMapPlane` (`1000:a5ca`) lê o ponto lembrado do plano; `_BoundEditPosition` (`1010:15b4`) usa 0x80 nos planos 0 e 1 e 0x40 nos outros; `_SetMapPlaneLocation` (`1000:a386`) seleciona os botões da faixa (`Yard`, `Nest`, `Nest` vermelho, `Surface`) [código]. Todos os mapas têm 64 linhas.
+**Source:** `_SetMapPlane` (`1000:a5ca`) reads the plane's remembered point; `_BoundEditPosition` (`1010:15b4`) uses 0x80 on planes 0 and 1 and 0x40 on the others; `_SetMapPlaneLocation` (`1000:a386`) selects the ribbon buttons (`Yard`, `Nest`, red `Nest`, `Surface`) [code]. All maps have 64 rows.
 
-- `_MapPnt` (`DS:7d2e`, par x/y; o y fica em `DS:7d30`) é a célula do mapa no canto superior esquerdo da vista. Está no save [save].
-- Os pontos lembrados (`_YMapPnt`, `_AMapPnt`, `_BMapPnt`, `_RMapPnt`) são centros, não cantos: `_SetMapPlane` passa o ponto a `_CenterEdit` [código].
-- No `QUICK2.ANT`: `_MapPlane = 2`, `_MePlane = 2`, `_MapPnt = (22, 0)`, `_BMapPnt = (34, 9)` = `(_MeLocX, _MeLocY)` [save].
+- `_MapPnt` (`DS:7d2e`, x/y pair; y is at `DS:7d30`) is the map cell at the top-left corner of the view. It is in the save [save].
+- The remembered points (`_YMapPnt`, `_AMapPnt`, `_BMapPnt`, `_RMapPnt`) are centers, not corners: `_SetMapPlane` passes the point to `_CenterEdit` [code].
+- In `QUICK2.ANT`: `_MapPlane = 2`, `_MePlane = 2`, `_MapPnt = (22, 0)`, `_BMapPnt = (34, 9)` = `(_MeLocX, _MeLocY)` [save].
 
-### Limites (`_BoundEditPosition`)
+### Bounds (`_BoundEditPosition`)
 
-Com `L` = largura do mapa do plano: se `x < 0`, `x = 0`; senão, se `x + _editWidth > L`, `x = L − _editWidth`. O mesmo para `y` com 64 e `_editHeight` [código; idêntico em `_win_EditChanged` (`1010:0c62`), `FUN_1010_16d4` e `_CenterEdit`].
+With `L` = width of the plane's map: if `x < 0`, `x = 0`; otherwise, if `x + _editWidth > L`, `x = L − _editWidth`. The same for `y` with 64 and `_editHeight` [code; identical in `_win_EditChanged` (`1010:0c62`), `FUN_1010_16d4` and `_CenterEdit`].
 
-### Centralizar (`_CenterEdit`, `1010:1620`)
+### Centering (`_CenterEdit`, `1010:1620`)
 
-1. deslocamento `dx = x − _MapPnt.x − _editWidth / 2`, `dy = y − _MapPnt.y − _editHeight / 2` (divisão inteira);
-2. se os dois são 0, devolve 0 (nada a redesenhar);
-3. senão, `FUN_1010_616c` anda o ponto como uma reta de Bresenham em ponto fixo: no eixo maior, dá |d| passos de ±1; no menor, soma a cada passo a fração `(|d_menor| << 16) / |d_maior|` (divisão inteira sem sinal) num acumulador de 32 bits e anda ±1 sempre que o bit 16 do acumulador fica ligado, apagando esse bit. Por causa do truncamento da fração, o eixo menor pode andar um passo a menos que o pedido (ex.: `dx = 3`, `dy = 1` → fração 21845, soma 65535, nenhum passo em y) [código];
-4. aplica os limites e devolve 1.
+1. offset `dx = x − _MapPnt.x − _editWidth / 2`, `dy = y − _MapPnt.y − _editHeight / 2` (integer division);
+2. if both are 0, returns 0 (nothing to redraw);
+3. otherwise, `FUN_1010_616c` walks the point like a fixed-point Bresenham line: on the major axis it takes |d| steps of ±1; on the minor axis, at each step it adds the fraction `(|d_minor| << 16) / |d_major|` (unsigned integer division) to a 32-bit accumulator and steps ±1 whenever bit 16 of the accumulator becomes set, clearing that bit. Because the fraction is truncated, the minor axis may move one step less than requested (e.g.: `dx = 3`, `dy = 1` → fraction 21845, sum 65535, no step in y) [code];
+4. applies the bounds and returns 1.
 
-### Tamanho da vista (`_editWidth`, `_editHeight`)
+### View size (`_editWidth`, `_editHeight`)
 
-`_win_EditChanged` e `FUN_1010_16d4` pedem o retângulo do objeto 4 da janela 0 (`editTileArea`) a `_win_GetObjRect`, que soma 1 à direita e à base quando há faixa (`_ribbonBarHeight ≠ 0`, `1030:c2d2`). Depois: `_editWidth = ⌈largura / 16⌉`, `_editHeight = ⌈altura / 16⌉`, e o retângulo é esticado para múltiplos do tile [código].
+`_win_EditChanged` and `FUN_1010_16d4` ask `_win_GetObjRect` for the rectangle of object 4 of window 0 (`editTileArea`), which adds 1 to the right and bottom when there is a ribbon (`_ribbonBarHeight ≠ 0`, `1030:c2d2`). Then: `_editWidth = ⌈width / 16⌉`, `_editHeight = ⌈height / 16⌉`, and the rectangle is stretched to multiples of the tile [code].
 
-`editTileArea` vai de (16, 42) a (416, 345) no `WINGANT`. Com a faixa, 401 × 304 pixels, o que daria 26 × 19; mas o original centraliza como se fossem **25 × 19** (mensagens.md §6.1), e o port usa 25. A janela recorta a última coluna: só 25 colunas (400 pixels) aparecem antes da barra de rolagem [medido].
+`editTileArea` goes from (16, 42) to (416, 345) in `WINGANT`. With the ribbon, 401 × 304 pixels, which would give 26 × 19; but the original centers as if it were **25 × 19** (mensagens.md §6.1), and the port uses 25. The window clips the last column: only 25 columns (400 pixels) appear before the scroll bar [measured].
 
-### Posição ao carregar e na captura
+### Position on load and in the capture
 
-- Ao carregar, `_DoLoadInitializations` grava `(_MeLocX, _MeLocY)` no ponto lembrado do plano `_MePlane`, e `_SetDefaultWindows` → `_SetMapPlane(_MapPlane)` centraliza a vista nele; se `_MePlane = _MapPlane`, centraliza de novo em `(_MeLocX, _MeLocY)` [código]. Com 26 colunas, o `QUICK2.ANT` carregado começaria em x = 34 − 13 = 21 [hipótese: não capturado]. **Bancada (2026-10-17, mensagens.md §6):** um save com a amarela e o `_BMapPnt` em (34, 9) no ninho preto (plano 2), lido da memória logo depois do Load, ficou com `_MapPnt.x` = **22**, não 21. O mesmo 22 aparece no `QUICK2.ANT` salvo logo depois de o Quick Game ser criado (centralizado em 34): `_editWidth` é **25**, não 26. O port passou a usar 25 colunas (`ajuste_area_com_faixa` = 0) e a vista depois do Load bate 99,94% com a captura (mensagens.md §6.1). O retângulo real do `editTileArea` depois de `_win_Recalc` com a janela maximizada continua sem conta [em aberto].
-- A captura `qi_14_salvo.png` foi tirada no momento do save, sem carregar. Por isso a vista é a do `_MapPnt` salvo, (22, 0), que é o que o port usa ao reproduzir essa tela (`posicao: "salva"` em `data/tela_jogo.json`). O encaixe da captura confirma (22, 0) [medido].
+- On load, `_DoLoadInitializations` writes `(_MeLocX, _MeLocY)` to the remembered point of plane `_MePlane`, and `_SetDefaultWindows` → `_SetMapPlane(_MapPlane)` centers the view on it; if `_MePlane = _MapPlane`, it centers again on `(_MeLocX, _MeLocY)` [code]. With 26 columns, the loaded `QUICK2.ANT` would start at x = 34 − 13 = 21 [hypothesis: not captured]. **Bench (2026-10-17, mensagens.md §6):** a save with the yellow ant and `_BMapPnt` at (34, 9) in the black nest (plane 2), read from memory right after Load, ended up with `_MapPnt.x` = **22**, not 21. The same 22 appears in `QUICK2.ANT` saved right after the Quick Game was created (centered on 34): `_editWidth` is **25**, not 26. The port switched to 25 columns (`ajuste_area_com_faixa` = 0) and the view after Load matches the capture at 99.94% (mensagens.md §6.1). The real rectangle of `editTileArea` after `_win_Recalc` with the maximized window still has no calculation [open].
+- The capture `qi_14_salvo.png` was taken at the moment of the save, without loading. That is why the view is that of the saved `_MapPnt`, (22, 0), which is what the port uses when reproducing this screen (`posicao: "salva"` in `data/tela_jogo.json`). The fit of the capture confirms (22, 0) [measured].
 
-## Camada de vida
+## Life layer
 
-### Mapas `_LifeA/B/R`
+### Maps `_LifeA/B/R`
 
-Um byte por célula, no mesmo índice do mapa de chão (`x × 64 + y`): 0 = vazio; 0xFF = formiga amarela; 0xFE = segunda metade da formiga amarela quando ela é rainha; outro valor = campo T da formiga ([save-ant.md](../formatos/save-ant.md), "Listas de formigas"). Não são salvos [código].
+One byte per cell, at the same index as the ground map (`x × 64 + y`): 0 = empty; 0xFF = yellow ant; 0xFE = second half of the yellow ant when it is a queen; any other value = the ant's T field ([save-ant.md](../formatos/save-ant.md), "Ant lists"). They are not saved [code].
 
-### Reconstrução ao carregar (`_DoLoadInitializations`, `1010:9dbe`)
+### Reconstruction on load (`_DoLoadInitializations`, `1010:9dbe`)
 
-1. troca o tileset de chão conforme `_TERRAINset` (`_OverlayTileSet(0, 1000 ou 1001)`) [código];
-2. zera `_LifeA`, `_LifeB` e `_LifeR` [código];
-3. para cada lista (A → `_LifeA`, B → `_LifeB`, R → `_LifeR`), percorre os índices **de `_ListIndex?` até 0, decrescendo, inclusive**: `Life[X[i] × 64 + Y[i]] = T[i]` [código]. Consequências:
-   - a entrada de índice `_ListIndex?` (uma além da última usada) também é gravada. No `QUICK2.ANT` ela é toda zero e grava 0 na célula (0, 0) [save];
-   - entradas com `T = 0` (buracos ainda não compactados) gravam 0 e apagam o que estava na célula;
-   - quando duas formigas ocupam a mesma célula, **vence a de menor índice**, porque é gravada por último;
-   - X e Y não são conferidos. Valores fora do mapa escreveriam em outra memória no original [código]; o port ignora a entrada e a lista como pendência;
-4. se `_MeMode = 0`, chama `_SetMyLife(_MePlane, _MeLocX, _MeLocY, _MeType, _MeDir, 0xFF)` [código];
-5. `_FullCount` (contagens), grava o ponto lembrado e chama `_SetDefaultWindows` (ver acima).
+1. switches the ground tileset according to `_TERRAINset` (`_OverlayTileSet(0, 1000 or 1001)`) [code];
+2. clears `_LifeA`, `_LifeB` and `_LifeR` [code];
+3. for each list (A → `_LifeA`, B → `_LifeB`, R → `_LifeR`), walks the indices **from `_ListIndex?` down to 0, decreasing, inclusive**: `Life[X[i] × 64 + Y[i]] = T[i]` [code]. Consequences:
+   - the entry at index `_ListIndex?` (one past the last used) is also written. In `QUICK2.ANT` it is all zero and writes 0 to cell (0, 0) [save];
+   - entries with `T = 0` (holes not yet compacted) write 0 and erase whatever was in the cell;
+   - when two ants occupy the same cell, **the one with the lower index wins**, because it is written last;
+   - X and Y are not checked. Values outside the map would write to other memory in the original [code]; the port ignores the entry and lists it as pending;
+4. if `_MeMode = 0`, calls `_SetMyLife(_MePlane, _MeLocX, _MeLocY, _MeType, _MeDir, 0xFF)` [code];
+5. `_FullCount` (counts), writes the remembered point and calls `_SetDefaultWindows` (see above).
 
-### Formiga amarela (`_SetMyLife`, `1020:6536`, e `_SetLife`, `1020:5d18`)
+### Yellow ant (`_SetMyLife`, `1020:6536`, and `_SetLife`, `1020:5d18`)
 
-- Só age se (x, y) estiver dentro do mapa do plano (planos 0 e 1: 128 × 64; 2 e 3: 64 × 64).
-- Grava o valor (0xFF) em `_LifeA` (planos 0 e 1), `_LifeB` (2) ou `_LifeR` (3), por cima do que as listas deixaram.
-- Se `_MeType = 0x60` (rainha), grava também a segunda metade (0xFE) em `(x + _Dx8[_MeDir ^ 4], y + _Dy8[_MeDir ^ 4])`: `_SetMyLife` (`1020:6536`) lê `*(char *)(dir ^ 4)` e `((char *)(dir ^ 4))[8]`, que são `_Dx8` (DS:0) e `_Dy8` (DS:8) — a mesma tabela da cauda nas regras (`rules/amarela.rs`, `cauda`) [código: pseudocódigo, com os endereços DS:0 e DS:8 conferidos na tabela de símbolos; **bancada 2026-10-19**: vetor `amarela_rainha` (0xFF e 0xFE regravadas a cada passo da rainha no ninho preto, vida 307/307) e captura `re_trabalho/raros/b_amarela_rainha/rainha_amarela.png`, igual ao port (`--save` do estado depois do tick 1739 com `--exportar-tela-jogo`) em 99,90% da janela de edição, com toda a diferença no cursor do mouse]. A reconstrução do port (`core/vida.rs`) grava essa metade desde 2026-10-18.
-- Nos ninhos, `_SetLife` com valor > 0 em célula de terra (`_IsItDirt`) ou de grama (0x1C a 0x1F) escava o tile (`_DigMyTile`) e toca um som [código]. Isso não muda a camada de vida e não ocorre no `QUICK2.ANT` (a formiga está num túnel); o port não reproduz a escavação ao carregar [hipótese: caso raro].
+- Acts only if (x, y) is inside the plane's map (planes 0 and 1: 128 × 64; 2 and 3: 64 × 64).
+- Writes the value (0xFF) to `_LifeA` (planes 0 and 1), `_LifeB` (2) or `_LifeR` (3), over whatever the lists left.
+- If `_MeType = 0x60` (queen), also writes the second half (0xFE) at `(x + _Dx8[_MeDir ^ 4], y + _Dy8[_MeDir ^ 4])`: `_SetMyLife` (`1020:6536`) reads `*(char *)(dir ^ 4)` and `((char *)(dir ^ 4))[8]`, which are `_Dx8` (DS:0) and `_Dy8` (DS:8) — the same tail table as in the rules (`rules/amarela.rs`, `cauda`) [code: pseudocode, with the addresses DS:0 and DS:8 checked in the symbol table; **bench 2026-10-19**: tick vector `amarela_rainha` (0xFF and 0xFE rewritten at each step of the queen in the black nest, life 307/307) and capture `re_trabalho/raros/b_amarela_rainha/rainha_amarela.png`, equal to the port (`--save` of the state after tick 1739 with `--exportar-tela-jogo`) on 99.90% of the edit window, with all the difference in the mouse cursor]. The port's reconstruction (`core/vida.rs`) writes this half since 2026-10-18.
+- In the nests, `_SetLife` with value > 0 on a dirt cell (`_IsItDirt`) or a grass cell (0x1C to 0x1F) digs the tile (`_DigMyTile`) and plays a sound [code]. This does not change the life layer and does not occur in `QUICK2.ANT` (the ant is in a tunnel); the port does not reproduce the digging on load [hypothesis: rare case].
 
-No `QUICK2.ANT`, `_MeMode = 0` e a formiga amarela está em (34, 9) do ninho preto, a mesma célula da rainha preta (T = 102) e de um ovo. Resultado em `_LifeB`: (34, 9) = 0xFF, (35, 9) = 110 (metade da rainha), (36, 9) = 1 (ovo) [save + código].
+In `QUICK2.ANT`, `_MeMode = 0` and the yellow ant is at (34, 9) of the black nest, the same cell as the black queen (T = 102) and an egg. Result in `_LifeB`: (34, 9) = 0xFF, (35, 9) = 110 (half of the queen), (36, 9) = 1 (egg) [save + code].
 
-### Tile de vida de cada célula (`_DoCalcTile`, `1018:4a6b`, e `FUN_1010_63fe`)
+### Life tile of each cell (`_DoCalcTile`, `1018:4a6b`, and `FUN_1010_63fe`)
 
-Ver [tiles.md](../formatos/tiles.md), "Camada de vida". Já descontado o deslocamento de `FUN_1010_63fe`, o índice no buffer de vida do plano (superfície: objetos 9/15–17; ninhos: 9/18–20) é:
+See [tiles.md](../formatos/tiles.md), "Life layer". With the offset of `FUN_1010_63fe` already accounted for, the index into the plane's life buffer (surface: objects 9/15–17; nests: 9/18–20) is:
 
-| Byte de vida *v* | Índice no buffer |
+| Life byte *v* | Index in the buffer |
 |---|---|
-| 0 | nenhum (só o chão) |
+| 0 | none (ground only) |
 | 0xFF | `0x100 + _MeBase + _MeType + (_MeType < 8 ? _MeEgg : _MeDir)` |
 | 0xFE | `0x108 + _MeBase + _MeType + _MeDir` |
-| outro | *v* |
+| other | *v* |
 
-A formiga amarela usa a terceira parte do buffer (índices 0x100 a 0x17F). No `QUICK2.ANT`: `_MeBase = 0`, `_MeType = 16`, `_MeDir = 2`, `_MeEgg = 0`, logo o tile 0x112 do buffer dos ninhos [save].
+The yellow ant uses the third part of the buffer (indices 0x100 to 0x17F). In `QUICK2.ANT`: `_MeBase = 0`, `_MeType = 16`, `_MeDir = 2`, `_MeEgg = 0`, hence tile 0x112 of the nests buffer [save].
 
-A célula é o tile de chão e, por cima, o tile de vida com o índice 13 transparente [código].
+The cell is the ground tile with, on top, the life tile with index 13 transparent [code].
 
-## Desenho da janela de edição
+## Drawing the edit window
 
-`FUN_1010_16d4` (`1010:16d4`) desenha as `_editWidth × _editHeight` células no buffer `_editBuf`, linha a linha; `_win_DrawEditWindow` (`1010:14f0`) copia o buffer para a tela no canto do `editTileArea` [código]. Cada célula (col, lin) vem de `FUN_1010_6250`: célula do mapa `(_MapPnt.x + col, _MapPnt.y + lin)`; se y passar de 63, soma 64 a x e faz `y &= 63` (com os limites, só aconteceria com `_editHeight > 64`) [código]. Por cima do mapa vêm a aranha e os balões (`_DrawSpider`, `_DrawBalloons`; balões em [baloes.md](baloes.md)). Os gráficos de saúde (`_DrawEditGraphs`) não são desenhados nos modos do Windows (`_displayType` 9 e 10; baloes.md §3).
+`FUN_1010_16d4` (`1010:16d4`) draws the `_editWidth × _editHeight` cells into the buffer `_editBuf`, row by row; `_win_DrawEditWindow` (`1010:14f0`) copies the buffer to the screen at the corner of `editTileArea` [code]. Each cell (col, row) comes from `FUN_1010_6250`: map cell `(_MapPnt.x + col, _MapPnt.y + row)`; if y goes past 63, it adds 64 to x and does `y &= 63` (with the bounds, this would only happen with `_editHeight > 64`) [code]. On top of the map come the spider and the balloons (`_DrawSpider`, `_DrawBalloons`; balloons in [baloes.md](baloes.md)). The health graphs (`_DrawEditGraphs`) are not drawn in the Windows modes (`_displayType` 9 and 10; baloes.md §3).
 
-### Aranha na janela de edição (`_PreDrawSpider` `1010:1c18`, `_DrawSpider` `1010:1d6a`)
+### Spider in the edit window (`_PreDrawSpider` `1010:1c18`, `_DrawSpider` `1010:1d6a`)
 
-A aranha é o único bicho desenhado por cima das células; formiga-leão, lagarta, bicho-de-conta e pedrinhas são tiles do `_MapA` (abaixo). Fonte: pseudocódigo das rotinas citadas e de `_DrawLegs` (`1010:2be0`), `_DrawPalps` (`1010:2594`), `_ed_LineTo` (`1010:22fa`), `_PlotLine` (`1018:6fbe`) e `_CopyMaskBitmap2` (`1030:b110`); tabelas do segmento 8 com os nomes do `.SYM` (`tools/extrair_desenho_aranha.py` → `data/desenho_aranha.json`).
+The spider is the only creature drawn on top of the cells; antlion, caterpillar, pill bug and pebbles are tiles of `_MapA` (below). Source: pseudocode of the routines cited and of `_DrawLegs` (`1010:2be0`), `_DrawPalps` (`1010:2594`), `_ed_LineTo` (`1010:22fa`), `_PlotLine` (`1018:6fbe`) and `_CopyMaskBitmap2` (`1030:b110`); segment 8 tables with the names from the `.SYM` (`tools/extrair_desenho_aranha.py` → `data/desenho_aranha.json`).
 
-- **Quando** [código]: `FUN_1010_16d4` chama `_PreDrawSpider` antes das células e `_DrawSpider` depois delas (antes de `_DrawBalloons`). A aranha aparece com `_SpidOn` ≠ 0, `_MapPlane` 0 ou 1 e o centro (`_SpidX`, `_SpidY`, em pixels do mapa: 16 por célula) dentro da vista, bordas incluídas; o desenho é recortado ao buffer da vista (`_editWidth × _editHeight` células).
-- **Corpo** [código]: sprite tipo 2 `1000 + _SpidDir` (8 sprites, 14 × 36 a 36 × 14) com o canto em centro + (`_BodX[dir]`, `_BodY[dir]`). Em agonia (`_SMode` 5): sprite `1050 + _Scycle` (quatro quadros, de 67 × 67 a 41 × 36, já com as pernas) em centro + (`_DBodX[q]`, `_DBodY[q]`), sem pernas nem palpos. O índice 13 (0xD) do sprite é transparente.
-- **Pernas** (`_DrawLegs`) [código]: 4 de cada lado, cada uma em duas retas (corpo → joelho → pé), na cor `_ConvColor(0xF)`. As tabelas são de duas direções-base: `_Lx/_Ly` (onde sai cada perna) e `_L{k}xA/yA` (joelho), `_L{k}xB/yB` (pé) por quadro 0–7 para a direção 0; `_Dx/_Dy`, `_D{k}xA/yA`, `_D{k}xB/yB` para a direção 1. Um lado usa o quadro `_Scycle & 7`, o outro o quadro + 4 (passo alternado), espelhado no eixo do corpo (x → −x na base reta; (x, y) → (−y, −x) na diagonal). As outras direções são giros/espelhos da base: 2 → (−y, x), 4 → (−x, −y), 6 → (y, −x); 3 → (x, −y), 5 → (−x, −y), 7 → (−x, y).
-- **Palpos** (`_DrawPalps`) [código]: dois, cada um em duas retas (início → joelho → ponta), com o início em (±4, −10) na base reta e (10, −3)/(3, −10) na diagonal, e joelho e ponta das tabelas `_PxT/_PyT/_PxT2/_PyT2` (reta) e `_PxD/_PyD/_PxD2/_PyD2` (diagonal), índice r = `S1(4)` sorteado no desenho, ou 0 com `_SMode` < 2 e `_MeSMode` < 6 (sem sorteio; regras/rng.md). Mesmos giros. Cor `_ConvColor(1)` se `_MeMode` = 1 (a aranha do jogador), senão `_ConvColor(0xF)`.
-- **Retas** [código]: `_ed_LineTo` desenha cada reta duas vezes, a segunda 1 pixel abaixo (se |dx| > |dy|) ou à direita; `_PlotLine` usa um acumulador de 16 bits que começa em 0xFFFF (o eixo menor anda já no primeiro passo), percorre no sentido crescente do eixo maior, desenha |dy| + 1 pontos com o eixo y maior e |dx| pontos (sem o último) com o eixo x maior; com |dx| = |dy| vira eixo x com |dx| + 1.
-- **Cores na bancada** [medido]: `_ConvColor(0xF)` = preto (índice 0) e `_ConvColor(1)` = amarelo (11), a conversão Mac → Windows de [mapa.md](mapa.md).
-- O resto de `_DrawSpider` não desenha: marca as células sob a aranha para o próximo redesenho e cuida do balão da aranha ([baloes.md](baloes.md)).
+- **When** [code]: `FUN_1010_16d4` calls `_PreDrawSpider` before the cells and `_DrawSpider` after them (before `_DrawBalloons`). The spider appears with `_SpidOn` ≠ 0, `_MapPlane` 0 or 1 and the center (`_SpidX`, `_SpidY`, in map pixels: 16 per cell) inside the view, edges included; the drawing is clipped to the view buffer (`_editWidth × _editHeight` cells).
+- **Body** [code]: type 2 sprite `1000 + _SpidDir` (8 sprites, 14 × 36 to 36 × 14) with its corner at center + (`_BodX[dir]`, `_BodY[dir]`). In agony (`_SMode` 5): sprite `1050 + _Scycle` (four frames, from 67 × 67 to 41 × 36, legs already included) at center + (`_DBodX[q]`, `_DBodY[q]`), with no legs or palps. Index 13 (0xD) of the sprite is transparent.
+- **Legs** (`_DrawLegs`) [code]: 4 on each side, each in two lines (body → knee → foot), in color `_ConvColor(0xF)`. The tables are for two base directions: `_Lx/_Ly` (where each leg starts) and `_L{k}xA/yA` (knee), `_L{k}xB/yB` (foot) per frame 0–7 for direction 0; `_Dx/_Dy`, `_D{k}xA/yA`, `_D{k}xB/yB` for direction 1. One side uses frame `_Scycle & 7`, the other frame + 4 (alternating step), mirrored about the body axis (x → −x on the straight base; (x, y) → (−y, −x) on the diagonal). The other directions are rotations/mirrors of the base: 2 → (−y, x), 4 → (−x, −y), 6 → (y, −x); 3 → (x, −y), 5 → (−x, −y), 7 → (−x, y).
+- **Palps** (`_DrawPalps`) [code]: two, each in two lines (start → knee → tip), with the start at (±4, −10) on the straight base and (10, −3)/(3, −10) on the diagonal, and knee and tip from the tables `_PxT/_PyT/_PxT2/_PyT2` (straight) and `_PxD/_PyD/_PxD2/_PyD2` (diagonal), index r = `S1(4)` drawn at draw time, or 0 with `_SMode` < 2 and `_MeSMode` < 6 (no random draw; regras/rng.md). Same rotations. Color `_ConvColor(1)` if `_MeMode` = 1 (the player's spider), otherwise `_ConvColor(0xF)`.
+- **Lines** [code]: `_ed_LineTo` draws each line twice, the second 1 pixel lower (if |dx| > |dy|) or to the right; `_PlotLine` uses a 16-bit accumulator that starts at 0xFFFF (the minor axis moves already on the first step), walks in the increasing direction of the major axis, draws |dy| + 1 points with y as the major axis and |dx| points (without the last) with x as the major axis; with |dx| = |dy| it becomes x-axis with |dx| + 1.
+- **Colors on the bench** [measured]: `_ConvColor(0xF)` = black (index 0) and `_ConvColor(1)` = yellow (11), the Mac → Windows conversion from [mapa.md](mapa.md).
+- The rest of `_DrawSpider` does not draw: it marks the cells under the spider for the next redraw and handles the spider's balloon ([baloes.md](baloes.md)).
 
-**No port:** `core::aranha_edicao` (`DesenhoAranha`, `AranhaNaEdicao`), chamado por `TelaDeJogo::compor_com` depois das células e antes do balão; o índice dos palpos vem das regras (`rules::desenho::desenhar_palpos` guarda o `S1(4)` em `Estado::palpos_aranha`). Tabelas e cores em `data/desenho_aranha.json` (API de mods 0.24).
+**In the port:** `core::aranha_edicao` (`DesenhoAranha`, `AranhaNaEdicao`), called by `TelaDeJogo::compor_com` after the cells and before the balloon; the palps index comes from the rules (`rules::desenho::desenhar_palpos` stores the `S1(4)` in `Estado::palpos_aranha`). Tables and colors in `data/desenho_aranha.json` (mod API 0.24).
 
-**Verificado na bancada (2026-10-18, `tools/cenarios_regras.py gravar aranha_desenho`, snapshot `rico`, jogo pausado, a aranha posta no meio da vista e a vista redesenhada com Ctrl+↑/Ctrl+↓; capturas e estados em `re_trabalho/ag_aranha/desenho/`, fora do git; port com `cargo run -p engine --example tela_jogo -- JOGO NOME.ANT SAÍDA NOME.png`, `PALPOS=k` para o índice dos palpos):** 18 casos — andando nas 8 direções com os quadros 0–7, parada, perseguindo, comendo, fugindo, os 4 quadros da agonia, a aranha do jogador andando com `_MeSMode` 6 e parada. Área do mapa **99,99–100%** e a região de ±48 pixels em volta da aranha **99,91–100%** (13 casos 100%). Nos 4 casos com sorteio, o índice que dá 100% é sempre o resto por 4 do S depois do redesenho (o último `S1(4)` dos palpos), e os palpos do jogador são amarelos. As poucas diferenças: 8 pixels de uma perna que sai pela borda de baixo da vista (`andando_d7`, resolvida em 2026-10-19: ver "Recorte das retas") e 1–2 pixels na agonia.
+**Verified on the bench (2026-10-18, `tools/cenarios_regras.py gravar aranha_desenho`, snapshot `rico`, game paused, the spider placed in the middle of the view and the view redrawn with Ctrl+↑/Ctrl+↓; captures and states in `re_trabalho/ag_aranha/desenho/`, outside git; port with `cargo run -p engine --example tela_jogo -- JOGO NOME.ANT SAÍDA NOME.png`, `PALPOS=k` for the palps index):** 18 cases — walking in the 8 directions with frames 0–7, stopped, chasing, eating, fleeing, the 4 agony frames, the player's spider walking with `_MeSMode` 6 and stopped. Map area **99.99–100%** and the region of ±48 pixels around the spider **99.91–100%** (13 cases at 100%). In the 4 cases with a random draw, the index that gives 100% is always S mod 4 after the redraw (the last `S1(4)` of the palps), and the player's palps are yellow. The few differences: 8 pixels of a leg that goes past the bottom edge of the view (`andando_d7`, solved on 2026-10-19: see "Line clipping") and 1–2 pixels in the agony.
 
-**Recorte das retas (`_os_ClipLine`, `1018:6e24`, chamado por `_PlotLine` antes de percorrer a reta)** [código]: códigos de região das duas pontas em relação ao retângulo de recorte (bordas incluídas: 8 à esquerda de 0, 4 à direita do máximo, 1 acima, 2 abaixo); as duas do mesmo lado de fora → nada; as duas dentro → desenha. Senão, uma ponta de fora é trocada pelo ponto da borda achado **por bissecção**: o ponto médio do segmento até a outra ponta (média com deslocamento aritmético, ou seja, para baixo) substitui a metade que está do lado de fora, até o médio cair exatamente na borda; do lado das coordenadas menores o novo extremo anda 1 além do médio (senão a bissecção não termina). Bordas testadas na ordem: cima, baixo, esquerda, direita; repete até as duas pontas estarem dentro. A reta é então percorrida pelo `_PlotLine` a partir das pontas recortadas — o que não é, em geral, a reta original cortada na borda. **Port:** `core::aranha_edicao::recortar_reta` em cada reta de `_ed_LineTo` (com o recorte do quadro, que é o da vista). **Verificado (2026-10-19):** as 18 capturas da aranha de novo com `tela_jogo`: `andando_d7` passou a **100%** na região da aranha (era 8 pixels diferentes); as outras 17 continuam (13 em 100%, a agonia com 1–2 pixels). A captura do menu da aranha do jogador (`menu_amarela` com `ARANHA=1`, janelas.md §7) também bate: área do mapa e região da aranha 100%.
+**Line clipping (`_os_ClipLine`, `1018:6e24`, called by `_PlotLine` before walking the line)** [code]: region codes of the two endpoints relative to the clipping rectangle (edges included: 8 left of 0, 4 right of the maximum, 1 above, 2 below); both on the same outer side → nothing; both inside → draws. Otherwise, an outside endpoint is replaced by the edge point found **by bisection**: the midpoint of the segment to the other endpoint (average with arithmetic shift, i.e. rounded down) replaces the half that is outside, until the midpoint lands exactly on the edge; on the side of the smaller coordinates the new endpoint moves 1 beyond the midpoint (otherwise the bisection does not end). Edges tested in this order: top, bottom, left, right; repeats until both endpoints are inside. The line is then walked by `_PlotLine` from the clipped endpoints — which is not, in general, the original line cut at the edge. **Port:** `core::aranha_edicao::recortar_reta` on each line of `_ed_LineTo` (with the frame's clipping, which is the view's). **Verified (2026-10-19):** the 18 spider captures again with `tela_jogo`: `andando_d7` went to **100%** in the spider region (it was 8 different pixels); the other 17 stay the same (13 at 100%, the agony with 1–2 pixels). The capture of the player's spider menu (`menu_amarela` with `ARANHA=1`, janelas.md §7) also matches: map area and spider region 100%.
 
-**Bichos que são tiles** [medido, `cenarios_regras.py gravar bichos_desenho`, mesmo snapshot]: formiga-leão (9 células da armadilha), lagarta (5), bicho-de-conta (1) e pedrinhas (7, inclusive uma 0x51 posta ao lado da formiga-leão como a cuspida) saem **100%** iguais nas suas células; o resto das diferenças dessas capturas (0,1–0,8% da área do mapa) está em células de formigas, da reconstrução da vida do snapshot `rico` ([testes-tick.md](../regras/testes-tick.md), `vida_nao_reconstruivel`). Nada falta.
+**Creatures that are tiles** [measured, `cenarios_regras.py gravar bichos_desenho`, same snapshot]: antlion (9 cells of the trap), caterpillar (5), pill bug (1) and pebbles (7, including a 0x51 placed next to the antlion like the spat one) come out **100%** equal in their cells; the rest of the differences in these captures (0.1–0.8% of the map area) is in ant cells, from the life reconstruction of snapshot `rico` ([testes-tick.md](../regras/testes-tick.md), `vida_nao_reconstruivel`). Nothing is missing.
 
-### Faixa
+### Ribbon
 
-A faixa é a janela 34 desenhada como na abertura ([janela.md](../formatos/janela.md)), com uma diferença de estado: `_SetMapPlaneLocation` (`1000:a386`), quando há faixa, seleciona o botão do plano mostrado com `_win_MakeObjSelected`: `0x2205` (`ribToSurface`) no plano 1, `0x2203` (`ribToBNest`) no 2 e `0x2204` (`ribToRNest`) no 3; no plano 0 não seleciona nada [código; o pseudocódigo mostra esses números como ponteiros para texto, `s_Client_ERROR…_21ef + 0x14…0x16`]. O botão selecionado usa o bitmap alternativo (bit 2 das flags). Fica em `data/tela_jogo.json` (`botao_do_plano`). No `QUICK2.ANT` (plano 2), o `ribToBNest` selecionado bate pixel a pixel com a captura [medido].
+The ribbon is window 34 drawn as in the opening screen ([janela.md](../formatos/janela.md)), with one difference in state: `_SetMapPlaneLocation` (`1000:a386`), when there is a ribbon, selects the button of the plane shown with `_win_MakeObjSelected`: `0x2205` (`ribToSurface`) on plane 1, `0x2203` (`ribToBNest`) on 2 and `0x2204` (`ribToRNest`) on 3; on plane 0 it selects nothing [code; the pseudocode shows these numbers as pointers to text, `s_Client_ERROR…_21ef + 0x14…0x16`]. The selected button uses the alternate bitmap (bit 2 of the flags). It is in `data/tela_jogo.json` (`botao_do_plano`). In `QUICK2.ANT` (plane 2), the selected `ribToBNest` matches the capture pixel by pixel [measured].
 
-Barras e números da faixa (`ribBlacks`, `ribReds`, `ribYellowHealth`, `ribBlackHealth`, `ribRedHealth`, `ribBlackP`, `ribRedP`; `_DrawMapData`): reproduzidos desde 2026-10-18, conferidos com a bancada ([mensagens.md](mensagens.md) §9). O clique na área `mapRibCaste` (quadro das castas e limiares de saúde) está em [mensagens.md](mensagens.md) §9.1; as funções dos botões configuráveis `ribUserDef1A`–`1H` ficam entre partidas em `preferencias.json`, no lugar do `WIN.INI` (`_SetUserButton`; [../../decisoes.md](../../decisoes.md)).
+Ribbon bars and numbers (`ribBlacks`, `ribReds`, `ribYellowHealth`, `ribBlackHealth`, `ribRedHealth`, `ribBlackP`, `ribRedP`; `_DrawMapData`): reproduced since 2026-10-18, checked against the bench ([mensagens.md](mensagens.md) §9). The click on the `mapRibCaste` area (caste panel and health thresholds) is in [mensagens.md](mensagens.md) §9.1; the functions of the configurable buttons `ribUserDef1A`–`1H` are kept between games in `preferencias.json`, instead of `WIN.INI` (`_SetUserButton`; [../../decisoes.md](../../decisoes.md)).
 
-### Objetos da janela 0
+### Objects of window 0
 
-Os demais objetos da janela 0 não aparecem: só `editWinTitle` (tipo 18, título desenhado pelo Windows) e `editTileArea` (tipo 1) têm o bit "visível" [dados do `WINGANT`].
+The other objects of window 0 do not appear: only `editWinTitle` (type 18, title drawn by Windows) and `editTileArea` (type 1) have the "visible" bit [`WINGANT` data].
 
-### Moldura e posição na bancada QEMU (640×480)
+### Frame and position on the QEMU bench (640×480)
 
-A janela de edição é uma janela do Windows com barra de título, moldura grossa e barras de rolagem: o byte de flags 0x1C do layout vale 0x0E, e `_win_Open` (`1030:ca2e`) monta o estilo `WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_HSCROLL | WS_VSCROLL` e soma ao tamanho `SM_CXVSCROLL + 2·SM_CXFRAME` e `SM_CYHSCROLL + 2·SM_CYFRAME`, além de `SM_CYCAPTION` [código]. A conta exata da posição, com a maximização do passo 5, **não foi fechada** [em aberto]. O port usa a geometria medida em `qi_10_quick.png` e `qi_14_salvo.png`, guardada em `data/tela_jogo.json` [medido; coordenadas de tela]:
+The edit window is a Windows window with a title bar, thick frame and scroll bars: the flags byte 0x1C of the layout is 0x0E, and `_win_Open` (`1030:ca2e`) builds the style `WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_HSCROLL | WS_VSCROLL` and adds to the size `SM_CXVSCROLL + 2·SM_CXFRAME` and `SM_CYHSCROLL + 2·SM_CYFRAME`, plus `SM_CYCAPTION` [code]. The exact calculation of the position, with the maximization of step 5, **has not been worked out** [open]. The port uses the geometry measured in `qi_10_quick.png` and `qi_14_salvo.png`, stored in `data/tela_jogo.json` [measured; screen coordinates]:
 
-| Elemento | Retângulo (x, y, largura, altura) |
+| Element | Rectangle (x, y, width, height) |
 |---|---|
-| contorno externo (preto) | (20, 135, 424, 347) |
-| moldura (cinza claro, índice 8) | 2 pixels dentro do contorno |
-| linha interna (preta) | (23, 138, 418, 341) |
-| barra de título | (24, 139, 416, 18), linha preta embaixo em y = 157 |
-| caixa do menu de sistema | (24, 139, 18, 18), linha preta em x = 42 |
-| botão de maximizar | (422, 139, 18, 18), linha preta em x = 421 |
-| área do mapa visível | (24, 158, 400, 304) |
-| barra de rolagem vertical | (424, 158, 16, 304), linha preta em x = 424 |
-| barra de rolagem horizontal | (24, 462, 400, 16), linha preta em y = 462 |
-| canto entre as barras | (424, 462, 16, 16) |
+| outer outline (black) | (20, 135, 424, 347) |
+| frame (light gray, index 8) | 2 pixels inside the outline |
+| inner line (black) | (23, 138, 418, 341) |
+| title bar | (24, 139, 416, 18), black line below at y = 157 |
+| system menu box | (24, 139, 18, 18), black line at x = 42 |
+| maximize button | (422, 139, 18, 18), black line at x = 421 |
+| visible map area | (24, 158, 400, 304) |
+| vertical scroll bar | (424, 158, 16, 304), black line at x = 424 |
+| horizontal scroll bar | (24, 462, 400, 16), black line at y = 462 |
+| corner between the bars | (424, 462, 16, 16) |
 
-- A área cliente da janela principal começa em y = 38 (abaixo do menu), e a faixa ocupa as linhas 38 a 110 [medido], como no DOSBox-X ([janela.md](../formatos/janela.md)).
-- O canto do `editTileArea` cai em (24, 158), o canto da área cliente da janela de edição logo abaixo do título. Isso bate com as regras de `_win_Recalc` (coordenadas relativas ao objeto 0 encolhido, menos a altura do título) [medido; regra de `_win_Recalc` vista no código, conta completa em aberto].
-- O fundo da área cliente principal sai branco (255, 255, 255) na QEMU, e não (255, 251, 240) como no DOSBox-X [medido].
-- Barras de rolagem: botões com relevo (branco em cima e à esquerda, cinza escuro índice 7 embaixo e à direita) e trilho cinza claro (índice 8) [medido]. As setas, o texto do título e o polegar das barras (cuja posição depende de `_ResetEditScrollRange`, não estudado) **não são desenhados** pelo port.
+- The client area of the main window starts at y = 38 (below the menu), and the ribbon occupies rows 38 to 110 [measured], as in DOSBox-X ([janela.md](../formatos/janela.md)).
+- The corner of `editTileArea` falls at (24, 158), the corner of the edit window's client area right below the title. This matches the rules of `_win_Recalc` (coordinates relative to the shrunk object 0, minus the title height) [measured; `_win_Recalc` rule seen in the code, full calculation open].
+- The background of the main client area comes out white (255, 255, 255) in QEMU, and not (255, 251, 240) as in DOSBox-X [measured].
+- Scroll bars: buttons with relief (white on top and left, dark gray index 7 on bottom and right) and light gray track (index 8) [measured]. The arrows, the title text and the scroll bar thumbs (whose position depends on `_ResetEditScrollRange`, not studied) **are not drawn** by the port.
 
-### Cores na bancada QEMU
+### Colors on the QEMU bench
 
-O driver VGA do Windows na QEMU mostra algumas cores com valores diferentes da paleta padrão: índice 1 → (168, 0, 87), 2 → (0, 168, 87), 3 → (168, 168, 87), 4 → (0, 0, 168), 7 → (135, 136, 143), 8 → (192, 199, 200); 0, 9, 11, 12, 14 e 15 saem com os valores padrão; o fundo da aplicação (índice 17 no port) sai (255, 255, 255) [medido]. A comparação, por isso, mapeia cada índice do port para a cor RGB mais frequente da captura nos pixels com esse índice, e conta como igual o pixel cuja cor bate com o mapeamento. É uma diferença da bancada, não do jogo [hipótese].
+The Windows VGA driver in QEMU shows some colors with values different from the standard palette: index 1 → (168, 0, 87), 2 → (0, 168, 87), 3 → (168, 168, 87), 4 → (0, 0, 168), 7 → (135, 136, 143), 8 → (192, 199, 200); 0, 9, 11, 12, 14 and 15 come out with the standard values; the application background (index 17 in the port) comes out (255, 255, 255) [measured]. The comparison therefore maps each port index to the most frequent RGB color of the capture in the pixels with that index, and counts as equal a pixel whose color matches the mapping. It is a difference of the bench, not of the game [hypothesis].
 
-## Navegação
+## Navigation
 
-Como o original muda a vista da janela de edição e o plano mostrado. Implementação: `engine/src/core/navegacao.rs` (estado `Navegacao`, ações, repetição), `TelaDeJogo` em `tela_jogo.rs` (desenho com qualquer vista, cliques na faixa e nas setas das barras), dados em `data/navegacao.json`; o executável (`simant --save`) só traduz teclas e cliques do SDL. Fontes: o pseudocódigo do Ghidra (`re_trabalho/decomp/`, só consulta) e a tabela de aceleradores lida do `SIMANTW.EXE`. **Conferido na bancada em 2026-10-18** (ver "Verificação"): Ctrl+setas, troca de plano e o centralizar ao escolher o plano que já está na tela.
+How the original changes the edit window's view and the plane shown. Implementation: `engine/src/core/navegacao.rs` (state `Navegacao`, actions, repetition), `TelaDeJogo` in `tela_jogo.rs` (drawing with any view, clicks on the ribbon and on the scroll bar arrows), data in `data/navegacao.json`; the executable (`simant --save`) only translates SDL keys and clicks. Sources: the Ghidra pseudocode (`re_trabalho/decomp/`, reference only) and the accelerator table read from `SIMANTW.EXE`. **Checked on the bench on 2026-10-18** (see "Verification"): Ctrl+arrows, plane switching and the centering when choosing the plane already on screen.
 
-### Teclado: aceleradores e `_DoKeyDown`
+### Keyboard: accelerators and `_DoKeyDown`
 
-O laço de mensagens de `WINMAIN` (`1000:3fda`) carrega a tabela de aceleradores `ACCELERATORTABLE` (recurso do `SIMANTW.EXE`, deslocamento 500224 no arquivo) e passa cada mensagem por `TranslateAccelerator` [código]. As entradas que importam aqui (flags 0x09 = `FVIRTKEY | FCONTROL`) [dados do executável]:
+The message loop of `WINMAIN` (`1000:3fda`) loads the accelerator table `ACCELERATORTABLE` (a resource of `SIMANTW.EXE`, offset 500224 in the file) and passes each message through `TranslateAccelerator` [code]. The entries that matter here (flags 0x09 = `FVIRTKEY | FCONTROL`) [executable data]:
 
-| Tecla | Comando | Tratado em | Efeito |
+| Key | Command | Handled in | Effect |
 |---|---|---|---|
-| Ctrl+↑ | `0xFDA6` | `MAINWNDPROC`, `WM_COMMAND` com byte alto 0xFD e baixo 0xA0–0xAF | `_DoEditScroll(WM_VSCROLL, SB_LINEUP)` |
-| Ctrl+↓ | `0xFDA7` | idem | `_DoEditScroll(WM_VSCROLL, SB_LINEDOWN)` |
-| Ctrl+← | `0xFDA8` | idem | `_DoEditScroll(WM_HSCROLL, SB_LINEUP)` |
-| Ctrl+→ | `0xFDA9` | idem | `_DoEditScroll(WM_HSCROLL, SB_LINEDOWN)` |
-| Ctrl+8 | `0xFD26` | `_DoMenuEntry` → `_ProcMenu` (`1000:4fc2`), caso 0x26 | `_SetMapPlane(1)` e `_MakeEditOpen` |
-| Ctrl+9 | `0xFD27` | idem, caso 0x27 | `_SetMapPlane(2)` e `_MakeEditOpen` |
-| Ctrl+0 | `0xFD28` | idem, caso 0x28 | `_SetMapPlane(3)` e `_MakeEditOpen` |
+| Ctrl+↑ | `0xFDA6` | `MAINWNDPROC`, `WM_COMMAND` with high byte 0xFD and low byte 0xA0–0xAF | `_DoEditScroll(WM_VSCROLL, SB_LINEUP)` |
+| Ctrl+↓ | `0xFDA7` | same | `_DoEditScroll(WM_VSCROLL, SB_LINEDOWN)` |
+| Ctrl+← | `0xFDA8` | same | `_DoEditScroll(WM_HSCROLL, SB_LINEUP)` |
+| Ctrl+→ | `0xFDA9` | same | `_DoEditScroll(WM_HSCROLL, SB_LINEDOWN)` |
+| Ctrl+8 | `0xFD26` | `_DoMenuEntry` → `_ProcMenu` (`1000:4fc2`), case 0x26 | `_SetMapPlane(1)` and `_MakeEditOpen` |
+| Ctrl+9 | `0xFD27` | same, case 0x27 | `_SetMapPlane(2)` and `_MakeEditOpen` |
+| Ctrl+0 | `0xFD28` | same, case 0x28 | `_SetMapPlane(3)` and `_MakeEditOpen` |
 
-- Depois do primeiro passo, os comandos 0xFDA6–0xFDA9 repetem `_DoEditScroll` num laço enquanto `GetAsyncKeyState` diz que Ctrl **e** a seta continuam apertados, sem esperar mensagens [código, `MAINWNDPROC` casos 0xA6–0xA9]. A velocidade, portanto, é a do redesenho.
-- **Ritmo e simulação parada (bancada, 2026-10-19, `qemu_ritmo_rolagem.txt`, snapshot `quick`):** a seta de baixo da barra vertical segurada 1, 1 e 1,5 s andou 22, 25 e 35 linhas (~23 passos/s na QEMU TCG; o ritmo do original depende da CPU); a esquerda da horizontal, 0,5 s → 3 a 7 e 1 s → todas as 24 até o limite. Com o jogo rodando, `GameTime` ficou parado (102 → 102) durante 2 s com a seta segurada e andou 13 nos 2 s seguintes: o laço não trata `WM_TIMER`, **a simulação para** enquanto a rolagem repete. **Port (desde 2026-10-19):** o mesmo laço para o clique nas setas e para as teclas de rolagem por linha: primeiro passo no aperto, depois um a cada `repeticao.intervalo_ms` (43 ms ≈ 23/s, a partir de `atraso_ms` = 43) enquanto o botão, ou a tecla e o Ctrl, continuarem apertados (`GetAsyncKeyState`; a repetição de teclas do sistema é ignorada), e a partida não avança nesse tempo (`simant/src/jogo.rs`, `Repeticao::ativa`).
-- `_MakeEditOpen` (`1010:0e38`) abre a janela de edição se estiver fechada [código].
-- As setas **sem** Ctrl não rolam: `_DoKeyDown` (`1000:0e8c`) move o cursor do mouse 8 pixels (`GetCursorPos`/`SetCursorPos`) [código].
-- Pelo comportamento padrão do Windows, `TranslateAccelerator` só aceita a entrada se Shift e Alt estiverem soltos (as flags não pedem esses modificadores) [hipótese: regra da API, não testada no jogo].
+- After the first step, commands 0xFDA6–0xFDA9 repeat `_DoEditScroll` in a loop while `GetAsyncKeyState` says Ctrl **and** the arrow are still pressed, without waiting for messages [code, `MAINWNDPROC` cases 0xA6–0xA9]. The speed is therefore that of the redraw.
+- **Rate and stopped simulation (bench, 2026-10-19, `qemu_ritmo_rolagem.txt`, snapshot `quick`):** the down arrow of the vertical bar held for 1, 1 and 1.5 s moved 22, 25 and 35 rows (~23 steps/s on QEMU TCG; the original's rate depends on the CPU); the left arrow of the horizontal bar, 0.5 s → 3 to 7 and 1 s → all 24 up to the limit. With the game running, `GameTime` stayed still (102 → 102) for 2 s with the arrow held and advanced 13 in the following 2 s: the loop does not handle `WM_TIMER`, **the simulation stops** while the scrolling repeats. **Port (since 2026-10-19):** the same loop for clicking the arrows and for the line-scroll keys: first step on press, then one every `repeticao.intervalo_ms` (43 ms ≈ 23/s, starting after `atraso_ms` = 43) while the button, or the key and Ctrl, stay pressed (`GetAsyncKeyState`; the system's key repeat is ignored), and the game does not advance during that time (`simant/src/jogo.rs`, `Repeticao::ativa`).
+- `_MakeEditOpen` (`1010:0e38`) opens the edit window if it is closed [code].
+- The arrows **without** Ctrl do not scroll: `_DoKeyDown` (`1000:0e8c`) moves the mouse cursor 8 pixels (`GetCursorPos`/`SetCursorPos`) [code].
+- By standard Windows behavior, `TranslateAccelerator` only accepts the input if Shift and Alt are released (the flags do not ask for these modifiers) [hypothesis: API rule, not tested in the game].
 
-### Barras de rolagem (`_DoEditScroll`, `1010:5c6e`)
+### Scroll bars (`_DoEditScroll`, `1010:5c6e`)
 
-`MAINWNDPROC` repassa `WM_HSCROLL` (0x114) e `WM_VSCROLL` (0x115) da janela de edição a `_DoEditScroll`; nos códigos `SB_LINEUP`/`SB_LINEDOWN` (setas da barra), repete enquanto o botão esquerdo do mouse continuar apertado (`GetAsyncKeyState(VK_LBUTTON)`) [código, `MAINWNDPROC` (`1000:2930`), casos 0x114/0x115]. A faixa da barra é a de `_ResetEditScrollRange` (`1010:6086`): de 0 a `64 − _editHeight` na vertical e de 0 a `L − _editWidth` na horizontal, com `L` = 0x40 nos planos 2 e 3 e 0x80 nos outros [código]. Com `p` = `_MapPnt.x` (horizontal) ou `_MapPnt.y` (vertical) [código]:
+`MAINWNDPROC` forwards `WM_HSCROLL` (0x114) and `WM_VSCROLL` (0x115) of the edit window to `_DoEditScroll`; on the codes `SB_LINEUP`/`SB_LINEDOWN` (bar arrows), it repeats while the left mouse button is still pressed (`GetAsyncKeyState(VK_LBUTTON)`) [code, `MAINWNDPROC` (`1000:2930`), cases 0x114/0x115]. The bar's range is that of `_ResetEditScrollRange` (`1010:6086`): from 0 to `64 − _editHeight` vertically and from 0 to `L − _editWidth` horizontally, with `L` = 0x40 on planes 2 and 3 and 0x80 on the others [code]. With `p` = `_MapPnt.x` (horizontal) or `_MapPnt.y` (vertical) [code]:
 
-| Código | Efeito |
+| Code | Effect |
 |---|---|
-| 0 `SB_LINEUP` | se `p` > mínimo, `p −= 1`; senão nada |
-| 1 `SB_LINEDOWN` | se `p` < máximo, `p += 1`; senão nada |
-| 2 `SB_PAGEUP` | `p −= _editWidth` (ou `_editHeight`); se passar do mínimo, fica no mínimo |
-| 3 `SB_PAGEDOWN` | `p += _editWidth` (ou `_editHeight`); se passar do máximo, fica no máximo |
-| 4 `SB_THUMBPOSITION` | `p` = posição do polegar |
-| 5 `SB_THUMBTRACK` | idem, só se `_OptionStates ≠ 0` (arrasto ao vivo) |
-| 6 `SB_TOP` / 7 `SB_BOTTOM` | o pseudocódigo grava o mínimo (ou máximo) em **x e y** ao mesmo tempo [código; pode ser leitura errada do Ghidra, em aberto] |
+| 0 `SB_LINEUP` | if `p` > minimum, `p −= 1`; otherwise nothing |
+| 1 `SB_LINEDOWN` | if `p` < maximum, `p += 1`; otherwise nothing |
+| 2 `SB_PAGEUP` | `p −= _editWidth` (or `_editHeight`); if it goes past the minimum, stays at the minimum |
+| 3 `SB_PAGEDOWN` | `p += _editWidth` (or `_editHeight`); if it goes past the maximum, stays at the maximum |
+| 4 `SB_THUMBPOSITION` | `p` = thumb position |
+| 5 `SB_THUMBTRACK` | same, only if `_OptionStates ≠ 0` (live dragging) |
+| 6 `SB_TOP` / 7 `SB_BOTTOM` | the pseudocode writes the minimum (or maximum) to **x and y** at the same time [code; may be a misreading by Ghidra, open] |
 
-- Nas linhas, o mapa já desenhado é deslocado (`_EditScroll*Asm` ou `_DoEditScrollLine` + `_EditScroll*Color`) e só a faixa nova é desenhada; nos outros códigos, `_UpdateEdit` redesenha com `ScrollWindow` [código]. O resultado na tela é o mesmo: a vista começa em `_MapPnt`.
-- `_DoEditScroll` **não** atualiza o ponto lembrado do plano (`_AMapPnt` etc.) [código]. Quem atualiza são os `_goStep*` (`1030:6efe`ss.), que andam a vista um passo e gravam `_editWidth / 2 + _MapPnt` [código]. Porém nenhuma função do pseudocódigo chama os `_goStep*` nem os `_Finish*Step` [código: busca por referências em `Code*.c`; chamada indireta não procurada]: [hipótese] são restos da versão Mac, e a vista só segue a amarela por `_GotoMyAnt` (seção "Simulação ao vivo").
-- Os símbolos `_ScrollUp`, `_ScrollDown`, `_ScrollLeft`, `_ScrollRight`, `_ScrollUpS`, `_ScrollDownS` e `_ScrollRightS` (`1000:96b8`–`96c6`) são funções vazias na versão Windows (só `return`); são chamadas pelos `_goStep*` quando o passo é 1 [código]. Provavelmente restos da versão Mac [hipótese].
+- For lines, the map already drawn is shifted (`_EditScroll*Asm` or `_DoEditScrollLine` + `_EditScroll*Color`) and only the new strip is drawn; for the other codes, `_UpdateEdit` redraws with `ScrollWindow` [code]. The result on screen is the same: the view starts at `_MapPnt`.
+- `_DoEditScroll` does **not** update the plane's remembered point (`_AMapPnt` etc.) [code]. What updates them are the `_goStep*` (`1030:6efe` ff.), which move the view one step and write `_editWidth / 2 + _MapPnt` [code]. However, no function in the pseudocode calls the `_goStep*` or the `_Finish*Step` [code: search for references in `Code*.c`; indirect calls not searched]: [hypothesis] they are leftovers from the Mac version, and the view only follows the yellow ant through `_GotoMyAnt` (section "Live simulation").
+- The symbols `_ScrollUp`, `_ScrollDown`, `_ScrollLeft`, `_ScrollRight`, `_ScrollUpS`, `_ScrollDownS` and `_ScrollRightS` (`1000:96b8`–`96c6`) are empty functions in the Windows version (just `return`); they are called by the `_goStep*` when the step is 1 [code]. Probably leftovers from the Mac version [hypothesis].
 
-### Faixa: botões de plano (`_ProcMapRibbonEvent`, `1010:c3d4`)
+### Ribbon: plane buttons (`_ProcMapRibbonEvent`, `1010:c3d4`)
 
-Os eventos de objeto chegam por `_DoEvent` (`1000:0bc2`), que despacha pelo byte alto do id (a janela): 0x22 (janela 34, faixa do mapa) vai a `_ProcMapRibbonEvent`, 0x23 (janela 35, faixa do quintal) a `_ProcYardRibbonEvent` [código]. Na faixa 34 [código]:
+Object events arrive through `_DoEvent` (`1000:0bc2`), which dispatches by the high byte of the id (the window): 0x22 (window 34, map ribbon) goes to `_ProcMapRibbonEvent`, 0x23 (window 35, yard ribbon) to `_ProcYardRibbonEvent` [code]. On ribbon 34 [code]:
 
-| Id | Objeto | Efeito |
+| Id | Object | Effect |
 |---|---|---|
-| `0x2202` | 2 (botão Yard) | abre a janela do mapa (`_win_Open(0x100)`) se nem ela nem a do quintal estiverem abertas e põe a do quintal na frente (`_MapToYard`) ou a traz ao topo; **não muda a janela de edição** |
+| `0x2202` | 2 (Yard button) | opens the map window (`_win_Open(0x100)`) if neither it nor the yard window is open and brings the yard one to the front (`_MapToYard`) or raises it to the top; **does not change the edit window** |
 | `0x2203` | `ribToBNest` | `_ClearMapScentButtons`, `_SetMapPlane(2)` |
 | `0x2204` | `ribToRNest` | `_ClearMapScentButtons`, `_SetMapPlane(3)` |
 | `0x2205` | `ribToSurface` | `_ClearMapScentButtons`, `_SetMapPlane(1)` |
-| `0x2206` | `ribToYellow` | abre o mini mapa (`_OpenMiniMapWin`; [mapa.md](mapa.md) §7) |
-| `0x2207` | `ribToSpider` (botão da aranha) | `_GotoSpider` (`1000:a844`): sem `_SpidOn`, só o som de erro (`_myBeginSound(1, 0, 0x7e)`); senão, com a superfície na tela, `_CenterEdit(_SpidX >> 4, _SpidY >> 4)` e a alternância do mapa zerada; noutro plano, `_SetMapPlaneLocation(1, x, y)` (troca para a superfície centralizando uma vez, sem mexer no ponto lembrado) e `_DrawMap` |
-| `0x2208` | `ribHelp` | ajuda da faixa ([ajuda-contexto.md](ajuda-contexto.md)) |
-| `0x2209` | `ribStats` (Status Window Button) | `_ScoreDialog`: a janela Status, a mesma de Window → Status ([menus.md](menus.md) §6) |
+| `0x2206` | `ribToYellow` | opens the mini map (`_OpenMiniMapWin`; [mapa.md](mapa.md) §7) |
+| `0x2207` | `ribToSpider` (spider button) | `_GotoSpider` (`1000:a844`): without `_SpidOn`, only the error sound (`_myBeginSound(1, 0, 0x7e)`); otherwise, with the surface on screen, `_CenterEdit(_SpidX >> 4, _SpidY >> 4)` and the map toggle cleared; on another plane, `_SetMapPlaneLocation(1, x, y)` (switches to the surface centering once, without touching the remembered point) and `_DrawMap` |
+| `0x2208` | `ribHelp` | ribbon help ([ajuda-contexto.md](ajuda-contexto.md)) |
+| `0x2209` | `ribStats` (Status Window Button) | `_ScoreDialog`: the Status window, the same as Window → Status ([menus.md](menus.md) §6) |
 | `0x220A` | `ribTools` | `_RibbonToolsMenu` |
 
-**Port:** `ribToSpider` e `ribStats` em `data/navegacao.json` → `botoes_faixa_outros` (`Partida::ir_para_aranha`, `simant/src/modos.rs`; teste `botao_da_aranha` em `engine/tests/partida_quick2.rs`). A faixa 35 não tem esses botões [código: `_ProcYardRibbonEvent`]; `editGoSpider` (objeto 12 da janela de edição) chama o mesmo `_GotoSpider`, mas não é visível em 640×480.
+**Port:** `ribToSpider` and `ribStats` in `data/navegacao.json` → `botoes_faixa_outros` (`Partida::ir_para_aranha`, `simant/src/modos.rs`; test `botao_da_aranha` in `engine/tests/partida_quick2.rs`). Ribbon 35 does not have these buttons [code: `_ProcYardRibbonEvent`]; `editGoSpider` (object 12 of the edit window) calls the same `_GotoSpider`, but is not visible at 640×480.
 
-A janela do mapa (`_ProcMapEvent`, `1010:c222`) tem botões equivalentes (0x106–0x108 → planos 1 a 3) [código]; a janela existe no port desde 2026-10-18 ([mapa.md](mapa.md)). Não foi estudado em que fase do clique (apertar ou soltar) o evento é gerado [em aberto]; o port age ao apertar.
+The map window (`_ProcMapEvent`, `1010:c222`) has equivalent buttons (0x106–0x108 → planes 1 to 3) [code]; the window exists in the port since 2026-10-18 ([mapa.md](mapa.md)). It was not studied in which phase of the click (press or release) the event is generated [open]; the port acts on press.
 
-### Troca de plano (`_SetMapPlane`, `1000:a5ca`; `_SetMapPlaneLocation`, `1000:a386`)
+### Plane switching (`_SetMapPlane`, `1000:a5ca`; `_SetMapPlaneLocation`, `1000:a386`)
 
-`_SetMapPlane(n)` [código]:
+`_SetMapPlane(n)` [code]:
 
-1. se `n = 0`, guarda o plano atual em `_OldMapPlane`; senão invalida o mapa pequeno (`_InvalEuMap`);
+1. if `n = 0`, saves the current plane in `_OldMapPlane`; otherwise invalidates the small map (`_InvalEuMap`);
 2. `_MapPlane = n`;
-3. lê o ponto lembrado do plano `n` (`_YMapPnt`, `_AMapPnt`, `_BMapPnt` ou `_RMapPnt`);
-4. `_SetMapPlaneLocation(n, ponto)`: repete os passos 1 e 2; no plano ≠ 0, `_CenterEdit(ponto)` (com `_UpdateEdit` se andou) e redesenha o mapa; no plano 0, grava em `_YMapPnt` (`DS:789e`) o par de `DS:7a60` (não identificado); depois `_SetMapModeAnt` e a seleção do botão da faixa (seção "Faixa", acima);
-5. no plano ≠ 0, `_CenterEdit(ponto)` **de novo** e redesenha o mapa.
+3. reads the remembered point of plane `n` (`_YMapPnt`, `_AMapPnt`, `_BMapPnt` or `_RMapPnt`);
+4. `_SetMapPlaneLocation(n, point)`: repeats steps 1 and 2; on plane ≠ 0, `_CenterEdit(point)` (with `_UpdateEdit` if it moved) and redraws the map; on plane 0, writes to `_YMapPnt` (`DS:789e`) the pair from `DS:7a60` (not identified); then `_SetMapModeAnt` and the selection of the ribbon button (section "Ribbon", above);
+5. on plane ≠ 0, `_CenterEdit(point)` **again** and redraws the map.
 
-Consequências:
+Consequences:
 
-- A segunda `_CenterEdit` completa o passo que a primeira pode ter perdido no eixo menor (truncamento descrito em "Centralizar").
-- `_CenterEdit` parte do `_MapPnt` do plano anterior, já com os limites do plano novo.
-- Escolher o plano que já está na tela também centraliza: a vista volta ao ponto lembrado, desfazendo a rolagem feita pelas barras (que não atualiza o ponto) [código; não testado no original].
+- The second `_CenterEdit` completes the step that the first may have lost on the minor axis (truncation described in "Centering").
+- `_CenterEdit` starts from the `_MapPnt` of the previous plane, already with the bounds of the new plane.
+- Choosing the plane that is already on screen also centers: the view returns to the remembered point, undoing the scrolling done with the bars (which does not update the point) [code; not tested in the original].
 
-`_GotoMapPoint(n, x, y)` (`1000:a52a`): se `n` é o plano atual e > 0, só `_CenterEdit(x, y)`; senão `_SetMapPlaneLocation(n, x, y)` (troca de plano centralizando em (x, y), sem ler o ponto lembrado) [código]. É usada, por exemplo, por cliques no mapa pequeno; no port, só os marcadores 1–7 a chamam (`Navegacao`, `core/partida.rs`).
+`_GotoMapPoint(n, x, y)` (`1000:a52a`): if `n` is the current plane and > 0, only `_CenterEdit(x, y)`; otherwise `_SetMapPlaneLocation(n, x, y)` (switches plane centering on (x, y), without reading the remembered point) [code]. It is used, for example, by clicks on the small map; in the port, only markers 1–7 call it (`Navegacao`, `core/partida.rs`).
 
-### O que o port faz
+### What the port does
 
-- Estado: `Navegacao { plano_mapa, vista, pontos }`, iniciado do save. Com `posicao_inicial: "ao_carregar"` (padrão em `data/navegacao.json`) a vista é a de depois do "Load Game" (seção "Posição ao carregar") e o ponto do plano de `_MePlane` recebe `(_MeLocX, _MeLocY)`, como em `_DoLoadInitializations`; com `"salva"`, ficam os valores gravados.
-- Ações: `linha_*` e `pagina_*` seguem a tabela de `_DoEditScroll` (sem mexer nos pontos lembrados); `superficie`, `ninho_preto` e `ninho_vermelho` seguem `_SetMapPlane(1/2/3)` com as duas centralizações. O resultado é limitado com `_BoundEditPosition` também quando `_CenterEdit` não anda, como faz o desenho (`FUN_1010_16d4`).
-- Entradas ligadas por padrão: os aceleradores do original (Ctrl+setas, Ctrl+8/9/0), os botões `ribToSurface`, `ribToBNest` e `ribToRNest` da faixa e as setas das barras de rolagem (clique, com repetição enquanto o botão fica apertado). **Extensões do port**, marcadas em `data/navegacao.json` e em [divergencias.md](../../divergencias.md): setas sem Ctrl rolam (no original movem o cursor) e PageUp/PageDown rolam uma página na vertical.
-- Também implementados depois (2026-10-18): arrasto do polegar (com AutoTrack a vista acompanha, sem ele pula ao soltar, como no original; `divergencias.md`), página pelo clique no trilho (`SB_PAGEUP/PAGEDOWN`), botão Yard e janelas do mapa e do quintal ([mapa.md](mapa.md), [quintal.md](quintal.md)), marcadores com `_GotoMapPoint`. Ainda não: `SB_TOP/BOTTOM`. O mini mapa (botão `ribToYellow`) centraliza a vista com `_CenterEdit`, como a janela do mapa ([mapa.md](mapa.md) §7, no port desde 2026-10-18). A vista seguindo a amarela está na seção seguinte.
+- State: `Navegacao { plano_mapa, vista, pontos }`, initialized from the save. With `posicao_inicial: "ao_carregar"` (default in `data/navegacao.json`) the view is the one after "Load Game" (section "Position on load") and the point of the `_MePlane` plane receives `(_MeLocX, _MeLocY)`, as in `_DoLoadInitializations`; with `"salva"`, the saved values are kept.
+- Actions: `linha_*` and `pagina_*` follow the `_DoEditScroll` table (without touching the remembered points); `superficie`, `ninho_preto` and `ninho_vermelho` follow `_SetMapPlane(1/2/3)` with the two centerings. The result is bounded with `_BoundEditPosition` also when `_CenterEdit` does not move, as the drawing does (`FUN_1010_16d4`).
+- Inputs enabled by default: the original's accelerators (Ctrl+arrows, Ctrl+8/9/0), the ribbon buttons `ribToSurface`, `ribToBNest` and `ribToRNest` and the scroll bar arrows (click, with repetition while the button is held). **Port extensions**, marked in `data/navegacao.json` and in [divergencias.md](../../divergencias.md): arrows without Ctrl scroll (in the original they move the cursor) and PageUp/PageDown scroll one page vertically.
+- Also implemented later (2026-10-18): thumb dragging (with AutoTrack the view follows, without it it jumps on release, as in the original; `divergencias.md`), page by clicking the track (`SB_PAGEUP/PAGEDOWN`), the Yard button and the map and yard windows ([mapa.md](mapa.md), [quintal.md](quintal.md)), markers with `_GotoMapPoint`. Not yet: `SB_TOP/BOTTOM`. The mini map (`ribToYellow` button) centers the view with `_CenterEdit`, like the map window ([mapa.md](mapa.md) §7, in the port since 2026-10-18). The view following the yellow ant is in the next section.
 
-## Simulação ao vivo
+## Live simulation
 
-Como o original roda a partida enquanto a tela de jogo está aberta, e o que o port reproduz. Regras do temporizador, da velocidade e da pausa: [simulacao-visao-geral.md](../regras/simulacao-visao-geral.md) §1–4; controles da amarela: [formiga-amarela.md](../regras/formiga-amarela.md) §11. Implementação: `engine/src/core/partida.rs` (`Partida`, sem janela), dados em `data/partida.json`; o executável (`simant --save` / `--novo-jogo`) só traduz SDL em chamadas da `Partida` e redesenha.
+How the original runs the game while the game screen is open, and what the port reproduces. Rules for the timer, speed and pause: [simulacao-visao-geral.md](../regras/simulacao-visao-geral.md) §1–4; yellow ant controls: [formiga-amarela.md](../regras/formiga-amarela.md) §11. Implementation: `engine/src/core/partida.rs` (`Partida`, windowless), data in `data/partida.json`; the executable (`simant --save` / `--novo-jogo`) only translates SDL into `Partida` calls and redraws.
 
-### Relógio
+### Clock
 
-- Fonte de tempo: o `SetTimer` de 17 ms (`MYTIMERFUNC`), 170 ms com o aplicativo sem foco (`WM_ACTIVATEAPP`) [código]. No Windows 3.1 o intervalo é arredondado para a resolução do relógio do sistema (55 ms): o de 17 ms dá **uma `WM_TIMER` a cada 55 ms** [verificado na bancada, simulacao-visao-geral.md §3.1]; o de 170 ms, 220 ms [hipótese]. No port, `Partida::avancar(ms)` transforma o tempo real em mensagens a cada `intervalo_ms()` = `intervalo_mensagem_ms` (17) ou `intervalo_sem_foco_ms` (170) arredondado para cima até `resolucao_timer_ms` (55), guardando o resto. Como as `WM_TIMER` não se acumulam, no máximo `max_mensagens_por_avanco` (3) mensagens saem de uma chamada; o tempo excedente é descartado [escolha do port].
-- O laço de `MYTIMERFUNC` (simulacao-visao-geral.md §2): uma mensagem fora do laço abre uma chamada (atraso, DGROUP `0x02EE`, + 1); dentro dele, é drenada no fim da volta em curso (atraso + 1). Entre duas mensagens rodam `voltas_por_periodo[_GameSpeed]` voltas; cada uma soma 1 a `_gameCycles` (`Estado::ciclos_jogo`), passa por `Relogio::liberar_tick` (pausa, §4: roda se não está pausado, ou se `_MeMoveMe` ≠ 0 e `_CurGameTool` < 10; velocidade, §3: `_SpeedDelayVals` = 6, 2, 0, −1 de `data/simulacao.json`, roda se o limite ≤ 0 ou ≤ atraso e zera o atraso) e termina com o teste de saída do original (drenadas > 1 e (voltas > 2 ou drenadas > 2)). Cada chamada dura, portanto, 3 mensagens. Resultado: slow = 1 tick a cada 6 mensagens (3,03/s; bancada 3,0), normal = 1 a cada 3 (6,06/s; bancada 5,85–6,0), fast = 11 por chamada com o padrão 5 voltas (66,7/s; bancada 55–66), ultra = 15 por chamada com 7 voltas (90,9/s; bancada 91) [o número de voltas é dado: no original depende da CPU].
-- `_gameCycles` conta as voltas do laço, rode ou não o tick, como no original: em normal passa de 100 entre dois ticks (o pássaro é testado em todo tick, testes-tick.md), em fast/ultra anda 1 por tick (bancada). O relógio do Mac vem de `Estado::relogio_mac`, que a `Partida` preenche antes de cada tick com ⌊ms reais acumulados / 55⌋ × 3 (`_MacTickCount`, quintal.md "Relógios"); em normal anda 9 por tick, como na bancada.
-- Ignorado pelo port [divergencias.md]: a saída do laço quando o botão esquerdo do mouse foi apertado (`GetAsyncKeyState(VK_LBUTTON) & 1`).
-- O atraso continua contando durante a pausa: ao despausar, o primeiro tick sai na mensagem seguinte [código: o +1 vem antes do teste].
-- Animações da amarela dentro do tick (`_AnimYellowFight`, `_AnimYellowInsane`, [formiga-amarela.md](../regras/formiga-amarela.md) §10.2): o original redesenha a janela de edição a cada quadro e não volta ao laço de mensagens até o fim (~0,8 s na luta). O port recebe os quadros em `Evento::Animacao`, encerra a chamada de `MYTIMERFUNC`, soma a duração ao bloqueio (o mesmo da espera do clique simples) e, enquanto ele dura, não roda tick, mostra o quadro da vez (`Partida::quadro_animado`) e só depois mostra um quadro modal pedido no mesmo tick. O tempo real (e o relógio do Mac) continua andando. [escolha do port: as `WM_TIMER` do Windows durante a espera viram uma só, como no resto do port.]
-- Redesenho (`_UpdateWindows`, `1000:2224`): todo tick em slow/normal, 1 a cada 2 em fast e 1 a cada 4 em ultra (`redesenho_mapa_a_cada`); sem foco, só quando o contador de quadros é múltiplo de 8 (`redesenho_sem_foco_a_cada`) [código]. [hipótese] O port incrementa o contador antes do teste (no original a ordem não foi conferida). Rolagem, troca de plano, cliques e teclas pedem redesenho na hora.
+- Time source: the 17 ms `SetTimer` (`MYTIMERFUNC`), 170 ms with the application unfocused (`WM_ACTIVATEAPP`) [code]. On Windows 3.1 the interval is rounded to the system clock resolution (55 ms): the 17 ms one gives **one `WM_TIMER` every 55 ms** [verified on the bench, simulacao-visao-geral.md §3.1]; the 170 ms one, 220 ms [hypothesis]. In the port, `Partida::avancar(ms)` turns real time into messages every `intervalo_ms()` = `intervalo_mensagem_ms` (17) or `intervalo_sem_foco_ms` (170) rounded up to `resolucao_timer_ms` (55), keeping the remainder. Since `WM_TIMER` messages do not accumulate, at most `max_mensagens_por_avanco` (3) messages come out of one call; the excess time is discarded [port choice].
+- The `MYTIMERFUNC` loop (simulacao-visao-geral.md §2): a message outside the loop opens a call (delay, DGROUP `0x02EE`, + 1); inside it, it is drained at the end of the current pass (delay + 1). Between two messages, `voltas_por_periodo[_GameSpeed]` passes run; each adds 1 to `_gameCycles` (`Estado::ciclos_jogo`), goes through `Relogio::liberar_tick` (pause, §4: runs if not paused, or if `_MeMoveMe` ≠ 0 and `_CurGameTool` < 10; speed, §3: `_SpeedDelayVals` = 6, 2, 0, −1 from `data/simulacao.json`, runs if the limit ≤ 0 or ≤ delay and resets the delay) and ends with the original's exit test (drained > 1 and (passes > 2 or drained > 2)). Each call therefore lasts 3 messages. Result: slow = 1 tick every 6 messages (3.03/s; bench 3.0), normal = 1 every 3 (6.06/s; bench 5.85–6.0), fast = 11 per call with the default 5 passes (66.7/s; bench 55–66), ultra = 15 per call with 7 passes (90.9/s; bench 91) [the number of passes is data: in the original it depends on the CPU].
+- `_gameCycles` counts the loop passes, whether the tick runs or not, as in the original: in normal it goes past 100 between two ticks (the bird is tested every tick, testes-tick.md), in fast/ultra it advances 1 per tick (bench). The Mac clock comes from `Estado::relogio_mac`, which `Partida` fills before each tick with ⌊accumulated real ms / 55⌋ × 3 (`_MacTickCount`, regras/quintal.md "Clocks"); in normal it advances 9 per tick, as on the bench.
+- Ignored by the port [divergencias.md]: the loop exit when the left mouse button has been pressed (`GetAsyncKeyState(VK_LBUTTON) & 1`).
+- The delay keeps counting during the pause: on unpausing, the first tick comes on the following message [code: the +1 comes before the test].
+- Yellow ant animations within the tick (`_AnimYellowFight`, `_AnimYellowInsane`, [formiga-amarela.md](../regras/formiga-amarela.md) §10.2): the original redraws the edit window every frame and does not return to the message loop until the end (~0.8 s in the fight). The port receives the frames in `Evento::Animacao`, ends the `MYTIMERFUNC` call, adds the duration to the block (the same one as the single-click wait) and, while it lasts, runs no tick, shows the current frame (`Partida::quadro_animado`) and only afterwards shows a modal box requested in the same tick. Real time (and the Mac clock) keeps running. [port choice: the Windows `WM_TIMER` messages during the wait become a single one, as in the rest of the port.]
+- Redraw (`_UpdateWindows`, `1000:2224`): every tick in slow/normal, 1 every 2 in fast and 1 every 4 in ultra (`redesenho_mapa_a_cada`); unfocused, only when the frame counter is a multiple of 8 (`redesenho_sem_foco_a_cada`) [code]. [hypothesis] The port increments the counter before the test (in the original the order was not checked). Scrolling, plane switching, clicks and keys request an immediate redraw.
 
-### Camada de cheiro na janela de edição (`_ELayerMode`)
+### Scent layer in the edit window (`_ELayerMode`)
 
-[código] `_DoCalcTile` (`1018:4a6b`), nos planos 0 e 1: com `_ELayerMode` = 0 (alarme), 1 (ninho preto), 2 (trilha preta), 3 (ninho vermelho) ou 4 (trilha vermelha), lê o mapa de feromônio da célula 2×2 (`(x >> 1) × 32 + (y >> 1)`) e, se o valor passa de 0x10, desenha o tile `(valor >> 4) − 0x10` (0xF1–0xFF) no lugar do chão; a vida vai por cima. Quem muda `_ELayerMode` (fora do save; −1 = nenhuma):
+[code] `_DoCalcTile` (`1018:4a6b`), on planes 0 and 1: with `_ELayerMode` = 0 (alarm), 1 (black nest), 2 (black trail), 3 (red nest) or 4 (red trail), it reads the pheromone map of the 2×2 cell (`(x >> 1) × 32 + (y >> 1)`) and, if the value exceeds 0x10, draws tile `(value >> 4) − 0x10` (0xF1–0xFF) in place of the ground; life goes on top. What changes `_ELayerMode` (not in the save; −1 = none):
 
-| Origem | Valor |
+| Origin | Value |
 |---|---|
-| tecla 0 da amarela / `_SetAlarmDropState(1)` (só na superfície e como formiga) | 0 |
-| desligar o alarme (tecla 0 de novo, entrar num ninho, morte, `_InitYellow`, tutorial) | −1 |
-| botões de cheiro da faixa (`_ProcMapRibbonEvent` `0x220b`–`0x220f`): `_SetMapModeAnt(4..8)` e, se o modo ficou ligado, 1, 2, 0, 3, 4 (ninho preto, trilha preta, alarme, ninho vermelho, trilha vermelha); se o mesmo botão desligou, −1 | 0–4 / −1 |
-| menu do botão `editScent` da janela de edição (`_EditScentMenu`, `1010:675e`: Off, Alarm, BNest, BTrail, RNest, RTrail) | −1–4 |
+| yellow ant key 0 / `_SetAlarmDropState(1)` (only on the surface and as an ant) | 0 |
+| turning the alarm off (key 0 again, entering a nest, death, `_InitYellow`, tutorial) | −1 |
+| ribbon scent buttons (`_ProcMapRibbonEvent` `0x220b`–`0x220f`): `_SetMapModeAnt(4..8)` and, if the mode ended up on, 1, 2, 0, 3, 4 (black nest, black trail, alarm, red nest, red trail); if the same button turned it off, −1 | 0–4 / −1 |
+| menu of the edit window's `editScent` button (`_EditScentMenu`, `1010:675e`: Off, Alarm, BNest, BTrail, RNest, RTrail) | −1–4 |
 
-No port: `Estado::camada_edicao`, ligado por `rules/amarela.rs` (tecla 0 e desligamentos) e `Partida::botao_de_cheiro`; `TelaDeJogo::atualizar` copia a camada e `compor` a sobrepõe à superfície (`MapaChao::com_feromonio`). Teste `camada_de_cheiro_na_janela_de_edicao` (`engine/tests/tela_jogo_real.rs`): no `QUICK2.ANT`, com a camada 1, mudam exatamente os 4 tiles do buraco preto. **Não reproduzidos, de propósito:** o menu `_EditScentMenu` e o estado selecionado do botão `editScent`: no Windows o objeto não é visível nem clicável e nada o torna, então o menu é inalcançável ([mapa.md](mapa.md) §8). **Bancada** (roteiro `qemu_alarme.txt`, 2026-10-18): a amarela subiu à superfície por uma ordem, a tecla 0 deu `_ELayerMode` = 0 (lido na memória) e, sem andar, nada mudou na tela (`alarme_3_ligado.png`); depois de andar 7 células, a janela de edição mostrou o rastro em blocos de 2×2 tiles amarelos, os da trilha recente mais fortes e os espalhados pelo `_SmoothAlarm` mais fracos (`alarme_4_andou.png`). A comparação pixel a pixel com o port não foi feita (o caminho da amarela no port não é o mesmo).
+In the port: `Estado::camada_edicao`, set by `rules/amarela.rs` (key 0 and turn-offs) and `Partida::botao_de_cheiro`; `TelaDeJogo::atualizar` copies the layer and `compor` overlays it on the surface (`MapaChao::com_feromonio`). Test `camada_de_cheiro_na_janela_de_edicao` (`engine/tests/tela_jogo_real.rs`): in `QUICK2.ANT`, with layer 1, exactly the 4 tiles of the black hole change. **Not reproduced, on purpose:** the `_EditScentMenu` menu and the selected state of the `editScent` button: in Windows the object is neither visible nor clickable and nothing makes it so, so the menu is unreachable ([mapa.md](mapa.md) §8). **Bench** (script `qemu_alarme.txt`, 2026-10-18): the yellow ant went up to the surface by an order, key 0 gave `_ELayerMode` = 0 (read from memory) and, without walking, nothing changed on screen (`alarme_3_ligado.png`); after walking 7 cells, the edit window showed the trail in blocks of 2×2 yellow tiles, those of the recent trail stronger and those spread by `_SmoothAlarm` weaker (`alarme_4_andou.png`). The pixel-by-pixel comparison with the port was not done (the yellow ant's path in the port is not the same).
 
-### Fila de eventos
+### Event queue
 
-As regras não chamam janela nem som: deixam pedidos em `Estado::eventos`. Depois de cada tick e de cada entrada do jogador, a `Partida` esvazia essa fila numa **linha do tempo** e os apresenta em ordem (desde 2026-10-19; [../regras/formiga-amarela.md](../regras/formiga-amarela.md) §9.4): uma animação da amarela ou um aviso modal seguram os pedidos seguintes até acabarem, nenhum tick roda enquanto sobra pedido, e a janela de edição mostra o último instantâneo desenhado dentro do tick (`Evento::Instantaneo`):
+The rules do not call windows or sound: they leave requests in `Estado::eventos`. After each tick and each player input, `Partida` empties this queue into a **timeline** and presents them in order (since 2026-10-19; [../regras/formiga-amarela.md](../regras/formiga-amarela.md) §9.4): a yellow ant animation or a modal notice holds the following requests until they finish, no tick runs while requests remain, and the edit window shows the last snapshot drawn within the tick (`Evento::Instantaneo`):
 
-- `CentralizarNaAmarela` (`_GotoMyAnt`, `1000:a764`, pedido por `rules/amarela.rs` com AutoTrack ligado a cada passo de `_DoAntMoveY`, com Home, Backspace sem ordem, clique na própria amarela, ordem impossível, morte...) é tratado na hora: no Experimental nada (o original toca o som de erro); se a amarela está no plano mostrado (> 0), `_CenterEdit(_MeLoc)`; senão, `_SetMapPlaneLocation(_MePlane, _MeLoc)`, que troca o plano e centraliza **uma** vez, sem ler nem gravar o ponto lembrado [código].
-- `Mensagem(id)`, `Musica(id)` e `DialogoFimDeJogo` vão para a fila da interface (`Partida::retirar_eventos`, escritos no terminal; música sem som). `Mensagem` e `DialogoFimDeJogo` também viram **avisos modais** (`Partida::avisos`): o quadro de mensagem e o diálogo de fim de jogo, que param a simulação até serem fechados, como `_StopSimulation` ([mensagens.md](mensagens.md)). `_EndGameDialog` é pedido a cada tick enquanto `_IsGameOver` ≠ 0; a `Partida` repassa só o primeiro.
-- Depois de cada tick, o conselho de `_Feedback` (`rules::conselhos::conselho`) vai para a mensagem da faixa (`_EditMessage`, mensagens.md §2).
+- `CentralizarNaAmarela` (`_GotoMyAnt`, `1000:a764`, requested by `rules/amarela.rs` with AutoTrack on at each step of `_DoAntMoveY`, with Home, Backspace without an order, click on the yellow ant itself, impossible order, death...) is handled immediately: in Experimental nothing (the original plays the error sound); if the yellow ant is on the plane shown (> 0), `_CenterEdit(_MeLoc)`; otherwise, `_SetMapPlaneLocation(_MePlane, _MeLoc)`, which switches the plane and centers **once**, without reading or writing the remembered point [code].
+- `Mensagem(id)`, `Musica(id)` and `DialogoFimDeJogo` go to the interface queue (`Partida::retirar_eventos`, written to the terminal; music without sound). `Mensagem` and `DialogoFimDeJogo` also become **modal notices** (`Partida::avisos`): the message box and the game-over dialog, which stop the simulation until they are closed, like `_StopSimulation` ([mensagens.md](mensagens.md)). `_EndGameDialog` is requested every tick while `_IsGameOver` ≠ 0; `Partida` passes on only the first.
+- After each tick, the advice from `_Feedback` (`rules::conselhos::conselho`) goes to the ribbon message (`_EditMessage`, mensagens.md §2).
 
-### Vista e pontos lembrados
+### View and remembered points
 
-A `Navegacao` é a dona do plano mostrado e da vista. Antes de cada tick e de cada entrada, `_MapPlane`, `_MapPnt` e os pontos lembrados vão para o `Estado` (as regras leem `_MapPlane`, por exemplo ao decidir se centralizam quando a amarela entra num ninho); depois do tick, os pontos lembrados voltam (as regras podem gravá-los).
+`Navegacao` owns the plane shown and the view. Before each tick and each input, `_MapPlane`, `_MapPnt` and the remembered points go to `Estado` (the rules read `_MapPlane`, for example when deciding whether to center when the yellow ant enters a nest); after the tick, the remembered points come back (the rules may write them).
 
-A vista segue a amarela **só** pelo `_GotoMyAnt`: com AutoTrack (Options → AutoTrack, Ctrl+G, `_OptionStates[0]`) ligado, a cada passo de uma ordem; desligado (padrão de um jogo novo e do `QUICK2.ANT`), a vista fica parada e o jogador rola ou aperta Home. Os `_goStep*` não têm quem os chame no pseudocódigo (seção "Barras de rolagem").
+The view follows the yellow ant **only** through `_GotoMyAnt`: with AutoTrack (Options → AutoTrack, Ctrl+G, `_OptionStates[0]`) on, at each step of an order; off (default for a new game and for `QUICK2.ANT`), the view stays still and the player scrolls or presses Home. The `_goStep*` have no caller in the pseudocode (section "Scroll bars").
 
-### Entradas do jogador
+### Player inputs
 
-| Entrada | Original | Port |
+| Input | Original | Port |
 |---|---|---|
-| Clique esquerdo na área do mapa | `_processEdit` com 0x200; duplo clique (`WM_LBUTTONDBLCLK`) com 0x2000 [código] | célula = `((x − área.x) / 16 + _MapPnt.x, (y − área.y) / 16 + _MapPnt.y)` (com a volta de `FUN_1010_6250` depois da linha 63), só dentro da área cliente visível; `clicks` = 1 → `clicar_no_mapa(..., duplo = falso)`, `clicks` = 2 → duplo |
-| Clique direito | **liga/desliga o modo de ajuda** (`_bHelp`): o `MAINWNDPROC` desvia o `WM_RBUTTONDOWN` antes de `_DoMouse`; o ramo 0x800/0x4000 de `_processEdit` não é alcançado pelo mouse [código + bancada, 2026-10-18; ajuda-contexto.md §1] | igual (até 2026-10-18 o port tratava o direito como o esquerdo) |
-| Clique nas setas das barras e nos botões da faixa | seção "Navegação" | como antes; o clique nunca vira ordem |
-| Espaço / Insert | clique esquerdo na posição do cursor; duplo se a mensagem seguinte é a mesma tecla [código]. Delete liga/desliga o modo de ajuda (`_HelpKeyDown`, ajuda-contexto.md §2) | posição do último movimento do mouse; duplo se a mesma tecla vier em até `duplo_clique_teclado_ms` (250) [escolha do port] |
-| Teclas de comando (1–4, 0, X/F9, J e NumPad * com Tab, Backspace, Home, NumPad 0–4) | `_YellowCommandKey`, depois dos aceleradores [código] | `teclas_amarela` (nome da tecla do SDL → código de tecla virtual) → `tecla_de_comando`; Tab lido do estado do teclado |
-| Shift+0 / Shift+1..4 (também Shift + NumPad) | Speed → Pause (0x41, alterna `_GamePaused`; ao despausar encerra as ferramentas 10/11; "Game Paused" na faixa) e Slow/Normal/Fast/Ultra (0x43–0x46, `_GameSpeed` = 0..3, **sem** mensagem na faixa: só o botão de velocidade escreve "Game speed now …") [código, `_ProcMenu`; bancada, simulacao-visao-geral.md §3.2] | `teclas` → `AcaoPartida`; a velocidade aparece só no título da janela [extensão do port] |
-| Ctrl+G | Options → AutoTrack (0x31, alterna `_OptionStates[0]`) | igual |
+| Left click in the map area | `_processEdit` with 0x200; double click (`WM_LBUTTONDBLCLK`) with 0x2000 [code] | cell = `((x − area.x) / 16 + _MapPnt.x, (y − area.y) / 16 + _MapPnt.y)` (with the wrap of `FUN_1010_6250` past row 63), only inside the visible client area; `clicks` = 1 → `clicar_no_mapa(..., duplo = falso)`, `clicks` = 2 → double |
+| Right click | **toggles help mode** (`_bHelp`): `MAINWNDPROC` diverts `WM_RBUTTONDOWN` before `_DoMouse`; the 0x800/0x4000 branch of `_processEdit` is not reached by the mouse [code + bench, 2026-10-18; ajuda-contexto.md §1] | same (until 2026-10-18 the port treated the right button like the left) |
+| Click on the bar arrows and the ribbon buttons | section "Navigation" | as before; the click never becomes an order |
+| Space / Insert | left click at the cursor position; double if the next message is the same key [code]. Delete toggles help mode (`_HelpKeyDown`, ajuda-contexto.md §2) | position of the last mouse movement; double if the same key comes within `duplo_clique_teclado_ms` (250) [port choice] |
+| Command keys (1–4, 0, X/F9, J and NumPad * with Tab, Backspace, Home, NumPad 0–4) | `_YellowCommandKey`, after the accelerators [code] | `teclas_amarela` (SDL key name → virtual key code) → `tecla_de_comando`; Tab read from the keyboard state |
+| Shift+0 / Shift+1..4 (also Shift + NumPad) | Speed → Pause (0x41, toggles `_GamePaused`; on unpausing ends tools 10/11; "Game Paused" on the ribbon) and Slow/Normal/Fast/Ultra (0x43–0x46, `_GameSpeed` = 0..3, **without** a ribbon message: only the speed button writes "Game speed now …") [code, `_ProcMenu`; bench, simulacao-visao-geral.md §3.2] | `teclas` → `AcaoPartida`; the speed appears only in the window title [port extension] |
+| Ctrl+G | Options → AutoTrack (0x31, toggles `_OptionStates[0]`) | same |
 
-Ordem no port, como no original: aceleradores de `partida.json`, aceleradores de `navegacao.json`, `_YellowCommandKey`, teclas que imitam o mouse. O título da janela do port mostra velocidade, pausa e AutoTrack.
+Order in the port, as in the original: accelerators from `partida.json`, accelerators from `navegacao.json`, `_YellowCommandKey`, keys that imitate the mouse. The port's window title shows speed, pause and AutoTrack.
 
-Avisos e botões ([mensagens.md](mensagens.md)):
+Notices and buttons ([mensagens.md](mensagens.md)):
 
-| Entrada | Original | Port |
+| Input | Original | Port |
 |---|---|---|
-| Ctrl+S / Ctrl+A | File → Save / Save As (`_SaveGame`, diálogo de arquivo) | grava o `.ANT` no arquivo da partida / num nome novo (`--salvar` ou `SALVOnn.ANT`), sem diálogo |
-| Botões `ribUserDef1A`–`1H` da faixa | `_DoUserButton` (pausa, velocidade com "Game speed now …", opções, ir até a amarela, salvar; segurando: menu de ícones) | clique simples igual, exceto as funções que abrem janelas; sem o menu de ícones |
-| Pausa (Shift+0 ou botão) | `_SetPause`: "Game Paused" na faixa, permanente; despausar limpa | igual (mensagens.md §2.3) |
-| Clique simples no mapa | espera ~6 unidades de `_TickCount` (330 ms) sem simular; segurando, `_AntMenu`/Examine | espera igual; sem os menus |
-| Quadro de mensagem / fim de jogo na tela | só clique no quadro (ou Espaço no quadro) fecha; a simulação fica parada; o quadro fecha sozinho em ~14,85 s | igual; ao fechar o fim de jogo, o port abre o "Select a Game" como o original |
+| Ctrl+S / Ctrl+A | File → Save / Save As (`_SaveGame`, file dialog) | writes the `.ANT` to the game's file / to a new name (`--salvar` or `SALVOnn.ANT`), without a dialog |
+| Ribbon buttons `ribUserDef1A`–`1H` | `_DoUserButton` (pause, speed with "Game speed now …", options, go to the yellow ant, save; when held: icon menu) | single click the same, except the functions that open windows; no icon menu |
+| Pause (Shift+0 or button) | `_SetPause`: "Game Paused" on the ribbon, permanent; unpausing clears it | same (mensagens.md §2.3) |
+| Single click on the map | waits ~6 units of `_TickCount` (330 ms) without simulating; when held, `_AntMenu`/Examine | same wait; without the menus |
+| Message box / game over on screen | only a click on the box (or Space on the box) closes it; the simulation stays stopped; the box closes by itself in ~14.85 s | same; on closing the game over, the port opens "Select a Game" like the original |
 
-### Jogo novo
+### New game
 
-`--novo-jogo` cria um Quick Game como `_initStuff` + `_NewGame`: geradores semeados pelo relógio (`_SeedSRand`/`_SeedRRand`; no port, a mesma semente nas duas leituras do relógio: a de `--semente N` ou os milissegundos do relógio do sistema), `Mundo::novo_jogo(Rapido)` e `Estado::de_mundo`. A tela abre como em `_NewGame` passos 4 e 6: plano da amarela e vista centralizada nela (o mesmo cálculo da posição "ao carregar"). A janela não é maximizada nem há as janelas de casta/modo.
+`--novo-jogo` creates a Quick Game like `_initStuff` + `_NewGame`: generators seeded by the clock (`_SeedSRand`/`_SeedRRand`; in the port, the same seed in both clock reads: that of `--semente N` or the milliseconds of the system clock), `Mundo::novo_jogo(Rapido)` and `Estado::de_mundo`. The screen opens as in `_NewGame` steps 4 and 6: the yellow ant's plane and the view centered on it (the same calculation as the "on load" position). The window is not maximized and there are no caste/mode windows.
 
-### Fora do laço
+### Outside the loop
 
-`--ticks N` roda N ticks seguidos (`Partida::rodar_tick`, sem relógio, velocidade nem pausa) e sai; com `--exportar-tela-jogo`, grava a tela depois deles. Serve de teste de regressão sem janela (ex.: 50 ticks do `QUICK2.ANT`: `GameTime` 78 → 128).
+`--ticks N` runs N ticks in a row (`Partida::rodar_tick`, without clock, speed or pause) and exits; with `--exportar-tela-jogo`, it writes the screen after them. It serves as a windowless regression test (e.g.: 50 ticks of `QUICK2.ANT`: `GameTime` 78 → 128).
 
-## Verificação
+## Verification
 
-Exemplo `tela_jogo` com o `QUICK2.ANT` e a captura `qi_14_salvo.png`, tabela de posições 9/0, comparando a área cliente (linhas 38 a 479 da captura) e ignorando o diálogo "Saved correctly" (176 ≤ x < 472, 171 ≤ y < 310 na tela) [medido, 2026-10-16]:
+Example `tela_jogo` with `QUICK2.ANT` and the capture `qi_14_salvo.png`, position table 9/0, comparing the client area (rows 38 to 479 of the capture) and ignoring the "Saved correctly" dialog (176 ≤ x < 472, 171 ≤ y < 310 on screen) [measured, 2026-10-16]:
 
-| Região (coordenadas de tela) | Pixels iguais | O que difere |
+| Region (screen coordinates) | Equal pixels | What differs |
 |---|---|---|
-| mapa visível, (24, 158) a (423, 461) | **100%** (87.128 de 87.128) | nada: chão, túnel, grama e a vida (formiga amarela, metade da rainha, ovo) que aparece abaixo do diálogo |
-| janela de edição inteira, (20, 135) a (443, 479) | 99,33% | texto do título, desenhos da caixa do menu de sistema e do botão de maximizar, setas e polegares das barras de rolagem |
-| faixa, linhas 38 a 110 | 93,27% | barras de população/saúde e botões `ribUserDef*` |
-| área cliente inteira | 78,24% | o acima, mais as janelas `mapWin` e de controle de casta atrás da janela de edição, que o port ainda não desenhava em 2026-10-16 |
+| visible map, (24, 158) to (423, 461) | **100%** (87,128 of 87,128) | nothing: ground, tunnel, grass and the life (yellow ant, half of the queen, egg) that appears below the dialog |
+| whole edit window, (20, 135) to (443, 479) | 99.33% | title text, drawings of the system menu box and the maximize button, scroll bar arrows and thumbs |
+| ribbon, rows 38 to 110 | 93.27% | population/health bars and `ribUserDef*` buttons |
+| whole client area | 78.24% | the above, plus the `mapWin` and caste control windows behind the edit window, which the port did not yet draw on 2026-10-16 |
 
-Esta tabela é de 2026-10-16 e ficou como histórico: depois dela vieram as barras e os botões da faixa, a janela do mapa e as janelas de controle, cada uma comparada no seu documento (mensagens.md §9, [mapa.md](mapa.md), [janelas.md](janelas.md)); resumo em [../../estado-do-projeto.md](../../estado-do-projeto.md) §2.5.
+This table is from 2026-10-16 and is kept as history: after it came the ribbon bars and buttons, the map window and the control windows, each compared in its own document (mensagens.md §9, [mapa.md](mapa.md), [janelas.md](janelas.md)); summary in [../../estado-do-projeto.md](../../estado-do-projeto.md) §2.5.
 
-Mapeamento de cores inferido (índice do port → cor da captura) igual ao da seção anterior. Imagens geradas em `re_trabalho/tela_jogo/` (fora do git): `tela_jogo.png` (port), `tela_jogo_640x480_mapeada.png`, `diferencas.png` e recortes ampliados da faixa e das formigas.
+Inferred color mapping (port index → capture color) the same as in the previous section. Images generated in `re_trabalho/tela_jogo/` (outside git): `tela_jogo.png` (port), `tela_jogo_640x480_mapeada.png`, `diferencas.png` and enlarged crops of the ribbon and the ants.
 
-O teste `engine/tests/tela_jogo_real.rs` trava o resultado com um SHA-256 dos índices e confere a reconstrução de `_LifeA/B/R` do `QUICK2.ANT` (sem precisar dos bancos do jogo) e a vista salva (22, 0) e ao carregar (21, 0).
+The test `engine/tests/tela_jogo_real.rs` locks the result with a SHA-256 of the indices and checks the reconstruction of `_LifeA/B/R` of `QUICK2.ANT` (without needing the game's databases) and the view as saved (22, 0) and on load (21, 0).
 
-Navegação (2026-10-16): testes unitários em `navegacao.rs` e `tela_jogo.rs`; `tela_jogo_real.rs` confere, com o `QUICK2.ANT`, a navegação ao carregar (vista (21, 0), ponto do ninho preto (34, 9)), que os botões de `data/navegacao.json` existem na faixa e são achados pelo clique, e que os três planos desenham sem pendências. O executável exportou as telas do ninho preto (21, 0), da superfície (51, 23) e do ninho vermelho, conferidas a olho, e abriu a janela SDL por 2 s (`--sair-apos-ms`, `--capturar-janela`). **Bancada (2026-10-18, `cenarios_tick.py gravar navegacao`, snapshot rico, jogo pausado):** 12 vistas, cada uma com a captura e o estado lido. Uma Ctrl+seta andou 1 célula; mantida apertada ~150 ms pela bancada, 2 a 5 (o laço de repetição de `MAINWNDPROC`, confirmado). Ctrl+9 levou a vista a (24, 0) = `_CenterEdit` do ponto lembrado (36, 9); Ctrl+0 a (20, 0) a partir de (32, 1); Ctrl+8 a (52, 23) a partir de (64, 32), e Ctrl+8 com a superfície já na tela e a vista rolada para (52, 28) voltou a (52, 23); a rolagem e a troca de plano não mudaram os pontos lembrados. Teste `navegacao_igual_a_bancada` (`engine/tests/tela_jogo_real.rs`, save `tests/referencias/saves/NAV_RICO.ANT`). O desenho de cada vista (`examples/tela_jogo` com o estado lido): área do mapa **100%** nas 12, inclusive superfície e ninho vermelho; janela de edição 99,57% (título).
+Navigation (2026-10-16): unit tests in `navegacao.rs` and `tela_jogo.rs`; `tela_jogo_real.rs` checks, with `QUICK2.ANT`, the navigation on load (view (21, 0), black nest point (34, 9)), that the buttons from `data/navegacao.json` exist on the ribbon and are found by the click, and that the three planes draw with nothing pending. The executable exported the screens of the black nest (21, 0), the surface (51, 23) and the red nest, checked by eye, and opened the SDL window for 2 s (`--sair-apos-ms`, `--capturar-janela`). **Bench (2026-10-18, `cenarios_tick.py gravar navegacao`, snapshot rico, game paused):** 12 views, each with the capture and the state read. One Ctrl+arrow moved 1 cell; held ~150 ms by the bench, 2 to 5 (the `MAINWNDPROC` repeat loop, confirmed). Ctrl+9 took the view to (24, 0) = `_CenterEdit` of the remembered point (36, 9); Ctrl+0 to (20, 0) from (32, 1); Ctrl+8 to (52, 23) from (64, 32), and Ctrl+8 with the surface already on screen and the view scrolled to (52, 28) went back to (52, 23); scrolling and plane switching did not change the remembered points. Test `navegacao_igual_a_bancada` (`engine/tests/tela_jogo_real.rs`, save `tests/referencias/saves/NAV_RICO.ANT`). The drawing of each view (`examples/tela_jogo` with the state read): map area **100%** in all 12, including surface and red nest; edit window 99.57% (title).
 
-Simulação ao vivo (2026-10-17; ritmo revisto em 2026-10-18): testes unitários em `core/partida.rs` (timer de 17 ms vira 55 ms, com resto, limite de mensagens, taxa por velocidade 2/6/66/90 ticks em 18 mensagens, `_gameCycles` por volta, pausa e exceção da amarela em movimento, despausar encerra a ferramenta 10, AutoTrack e velocidade pelos aceleradores, 170 ms sem foco, redesenho em fast/ultra, centralizar no mesmo plano e em outro plano, fim de jogo repassado uma vez) e em `tela_jogo.rs` (área cliente calculada = desenhada); `engine/tests/partida_quick2.rs` (50 ticks do `QUICK2.ANT`, `GameTime` + 50; 3,3 s em normal = 20 ticks; clique simples dá a ordem de andar). O executável rodou `--save QUICK2.ANT --ticks 50` (78 → 128), `--novo-jogo --semente 1234 --ticks 300` e `--semente 77 --acoes superficie --ticks 2000` (telas conferidas a olho, formigas espalhadas pela superfície) e abriu a janela por 3 s. **Comparado com o original (2026-10-18):** a taxa de ticks por velocidade (simulacao-visao-geral.md §3.1; antes o port rodava cerca de 29 ticks/s em normal, cinco vezes o original). AutoTrack, Espaço como clique e o comportamento do clique simples (espera de 6 ticks) ficam para a bancada.
+Live simulation (2026-10-17; rate revised on 2026-10-18): unit tests in `core/partida.rs` (17 ms timer becomes 55 ms, with remainder, message limit, rate per speed 2/6/66/90 ticks in 18 messages, `_gameCycles` per pass, pause and the exception for the moving yellow ant, unpausing ends tool 10, AutoTrack and speed through the accelerators, 170 ms unfocused, redraw in fast/ultra, centering on the same plane and on another plane, game over passed on once) and in `tela_jogo.rs` (computed client area = drawn); `engine/tests/partida_quick2.rs` (50 ticks of `QUICK2.ANT`, `GameTime` + 50; 3.3 s in normal = 20 ticks; single click gives the walk order). The executable ran `--save QUICK2.ANT --ticks 50` (78 → 128), `--novo-jogo --semente 1234 --ticks 300` and `--semente 77 --acoes superficie --ticks 2000` (screens checked by eye, ants spread over the surface) and opened the window for 3 s. **Compared with the original (2026-10-18):** the tick rate per speed (simulacao-visao-geral.md §3.1; before, the port ran about 29 ticks/s in normal, five times the original). AutoTrack, Space as a click and the behavior of the single click (6-tick wait) are left for the bench.
 
-Avisos (2026-10-17): os quadros de mensagem (1 e 2 linhas) e a mensagem da faixa ("Game Paused", "Game speed now fast.") batem **100%** com as capturas da bancada; o diálogo de fim de jogo, 97,95%; a pontuação do C-10 (19785) bate. Detalhes em [mensagens.md](mensagens.md) §8.
+Notices (2026-10-17): the message boxes (1 and 2 lines) and the ribbon message ("Game Paused", "Game speed now fast.") match the bench captures **100%**; the game-over dialog, 97.95%; the C-10 score (19785) matches. Details in [mensagens.md](mensagens.md) §8.
 
-**Não verificado contra o original:** a vista ao carregar um save (falta uma captura depois de "Load Game"), e a moldura em outras resoluções (800×600 do DOSBox-X). A aranha passou a ser desenhada e conferida em 2026-10-18 ("Aranha na janela de edição").
+**Not verified against the original:** the view when loading a save (a capture after "Load Game" is missing), and the frame at other resolutions (800×600 in DOSBox-X). The spider has been drawn and checked since 2026-10-18 ("Spider in the edit window").

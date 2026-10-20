@@ -1,16 +1,18 @@
-# Menu e painel dos scripts de mods (extensão do port)
+*Leia em português: [menus-mods.md](../../pt-BR/spec/telas/menus-mods.md)*
 
-**Não existe no original.** É a parte de tela da API de mods 0.17 (`docs/api-mods.md`, "Scripts Lua"): um script pode ter um menu aberto por uma tecla e um painel de texto. O mod de trapaças de exemplo (`exemplos/mods/trapacas/`) é o primeiro uso. O jogo base não tem código específico de nenhum mod.
+# Mod script menu and panel (port extension)
 
-## Comportamento
+**Does not exist in the original.** It is the screen part of mod API 0.17 (`docs/api-mods.md`, "Lua scripts"): a script can have a menu opened by a key and a text panel. The example cheat mod (`exemplos/mods/trapacas/`) is the first use. The base game has no code specific to any mod.
 
-- **Tecla.** `definir_menu` registra a tecla do menu (F1–F24, ou uma combinação com Ctrl ou Alt). Na tela de jogo, a ordem das teclas é a do original (aceleradores de `partida.json` e `navegacao.json`, teclas de janela de `janelas.json`) e só depois as dos menus de mods; em seguida `_YellowCommandKey` e o anel dos códigos de trapaça do original (`regras/trapacas.md`). Uma tecla de mod igual a um atalho do jogo nunca abre o menu; o `simant` avisa no console ao abrir a partida.
-- **Menu.** Abre centrado em x, logo abaixo da faixa, por cima de todas as janelas e avisos. Desenho de menu suspenso do Windows 3.1: fundo branco, contorno preto, barra de título azul com o título e a tecla, item realçado em azul-escuro com texto branco, separadores cinza. Se os itens não cabem na altura da área cliente, o menu quebra em colunas (com uma linha cinza entre elas), sem começar coluna com separador. Geometria, fontes e cores: `data/menus_mods.json`.
-- **Entrada.** Com o menu aberto, ele recebe toda a entrada: o mouse realça o item sob o cursor, o clique escolhe (fora do menu fecha), setas sobem e descem pulando separadores (dando a volta), Enter escolhe o realçado, Esc fecha. A simulação fica parada enquanto o menu está aberto (como a fila de mensagens de um menu do Windows).
-- **Escolha.** Fecha o menu e chama o gancho `ao_menu(indice, texto, estado)` do mod dono. As ações pedidas no gancho são executadas logo em seguida (`core/acoes_mods.rs`) e os eventos que elas geram (sons, músicas, quadros) são tratados como depois de um tick.
-- **Painel.** `definir_painel` mostra até 16 linhas no canto escolhido em `menus_mods.json` (padrão: em cima, à direita, abaixo da faixa), com o nome do mod; um painel por mod, um embaixo do outro. Fica embaixo do menu e por cima das janelas.
-- **Texto.** Os textos dos scripts (UTF-8) são convertidos para a codificação da fonte: Latin-1 nas fontes do Windows (FNT) e Mac Roman nas do Macintosh (FONT); letra sem glifo vira a letra sem acento.
+## Behavior
 
-## Implementação
+- **Key.** `definir_menu` registers the menu key (F1–F24, or a combination with Ctrl or Alt). On the game screen, key order is the original's (accelerators from `partida.json` and `navegacao.json`, window keys from `janelas.json`) and only then the mod menus' keys; next `_YellowCommandKey` and the ring of the original's cheat codes (`regras/trapacas.md`). A mod key equal to a game shortcut never opens the menu; `simant` warns on the console when opening the game.
+- **Menu.** Opens centered in x, just below the ribbon, on top of all windows and notices. Windows 3.1 drop-down menu look: white background, black outline, blue title bar with the title and the key, highlighted item in dark blue with white text, gray separators. If the items do not fit in the client area's height, the menu wraps into columns (with a gray line between them), never starting a column with a separator. Geometry, fonts and colors: `data/menus_mods.json`.
+- **Input.** With the menu open, it receives all input: the mouse highlights the item under the cursor, a click chooses (outside the menu closes), arrows move up and down skipping separators (wrapping around), Enter chooses the highlighted one, Esc closes. The simulation stays stopped while the menu is open (like the message queue of a Windows menu).
+- **Choice.** Closes the menu and calls the owning mod's `ao_menu(indice, texto, estado)` hook. The actions requested in the hook are executed right after (`core/acoes_mods.rs`) and the events they generate (sounds, music, message boxes) are handled as after a tick.
+- **Panel.** `definir_painel` shows up to 16 lines in the corner chosen in `menus_mods.json` (default: top right, below the ribbon), with the mod's name; one panel per mod, one below the other. It sits below the menu and on top of the windows.
+- **Text.** Script texts (UTF-8) are converted to the font's encoding: Latin-1 in Windows fonts (FNT) and Mac Roman in Macintosh fonts (FONT); a letter without a glyph becomes the unaccented letter.
 
-`engine/src/core/menus_mods.rs` (geometria, entrada e desenho, sem janela), `simant/src/mods_ui.rs` (teclas, eventos do SDL e desenho na tela de jogo). Para testes sem janela: `simant --save ARQ --mods DIR --menu mod@F12 --exportar-tela-jogo tela.png` (`mod@F12#N` escolhe o item N antes de exportar).
+## Implementation
+
+`engine/src/core/menus_mods.rs` (geometry, input and drawing, headless), `simant/src/mods_ui.rs` (keys, SDL events and drawing on the game screen). For headless tests: `simant --save ARQ --mods DIR --menu mod@F12 --exportar-tela-jogo tela.png` (`mod@F12#N` chooses item N before exporting).

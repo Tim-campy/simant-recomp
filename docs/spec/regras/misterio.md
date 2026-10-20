@@ -1,60 +1,62 @@
+*Leia em português: [misterio.md](../../pt-BR/spec/regras/misterio.md)*
+
 # Mystery (`_MysteryButton`)
 
-Fonte: pseudocódigo do Ghidra (`_MysteryButton` `1000:b0bc`, `_KillSomeAnts` `1000:9d5e`, `_AddRedAnts` `1030:6cfe`, `_AddBlackAnts` `1030:6c5a`, `_IsItYellow` `1020:96b6`), análise de 2026-10-18. Tudo [código] salvo onde marcado.
+Source: Ghidra pseudocode (`_MysteryButton` `1000:b0bc`, `_KillSomeAnts` `1000:9d5e`, `_AddRedAnts` `1030:6cfe`, `_AddBlackAnts` `1030:6c5a`, `_IsItYellow` `1020:96b6`), analysis of 2026-10-18. Everything is [code] except where marked.
 
-## 1. Onde é chamado
+## 1. Where it is called
 
-- Função **8** dos botões configuráveis da faixa (`_DoUserButton` `1000:04c4`). A tabela padrão dos botões (15, 0, 1, 3, 7, 6, 5, 10) não tem o 8: só aparece se o jogador trocar a função de um botão (Ctrl+clique, menu de ícones; janelas.md §4.4).
-- Objeto 0x112 (`mapMystery`) da janela do mapa — oculto quando há faixa [hipótese: ver telas/mapa.md].
-- Nenhum item de menu nem tecla. `_CheatKeys` não o chama.
-- Roda no tratamento de mensagens (`_DoMouse`/`_DoKeyDown` → `_DoEvent` → `_DoUserButton`), **fora do tick**, entre dois ticks.
+- Function **8** of the configurable ribbon buttons (`_DoUserButton` `1000:04c4`). The default button table (15, 0, 1, 3, 7, 6, 5, 10) does not contain 8: it only appears if the player changes a button's function (Ctrl+click, icon menu; janelas.md §4.4).
+- Object 0x112 (`mapMystery`) of the map window — hidden when there is a ribbon [hypothesis: see telas/mapa.md].
+- No menu item and no key. `_CheatKeys` does not call it.
+- Runs in message handling (`_DoMouse`/`_DoKeyDown` → `_DoEvent` → `_DoUserButton`), **outside the tick**, between two ticks.
 
-## 2. O sorteio e os efeitos
+## 2. The random draw and the effects
 
-Um único `_RRand(15)` (gerador R, valor `k` de 0 a 14); depois, só sorteios de S, conforme o efeito:
+A single `_RRand(15)` (R generator, value `k` from 0 to 14); after that, only S draws, depending on the effect:
 
-| k | Efeito | Sorteios de S |
+| k | Effect | S draws |
 |---|---|---|
-| 0, 1 | formigas vermelhas novas: `_AddRedAnts(n)` se `_ListIndexA` < 1000, `_FullCount`, de novo `_AddRedAnts(n)` se ainda < 1000, `_FullCount` | 2 por formiga criada |
-| 2 | o mesmo com `_AddBlackAnts(n)` | 2 por formiga |
-| 3 | `_KillSomeAnts(0)` duas vezes (vermelhas) | os de `_DeadAntHere` |
-| 4 | `_KillSomeAnts(1)` duas vezes (pretas) | idem |
-| 5 | `_AddFood(150, 1)` | os de `_AddFood` |
-| 6 | som 0x20; cada célula da superfície (x 0..127, y 0..63, coluna a coluna) com comida (`_IsItFood`) recebe `_MapA = SRand16()`; `_FoodA = 0` (o corpo de `_SubtractFood`, que não tem chamador) | 1 por célula com comida |
-| 7 | `_myBeginSoundList(0)`, vazia no Windows: nada | — |
-| 8 | `_MakeNewHoleR(c)` para c = 0, 2, …, 62 | `S(31)` por chamada e os da escavação |
-| 9 | `_MakeNewHoleB(c)` idem | idem |
+| 0, 1 | new red ants: `_AddRedAnts(n)` if `_ListIndexA` < 1000, `_FullCount`, again `_AddRedAnts(n)` if still < 1000, `_FullCount` | 2 per ant created |
+| 2 | the same with `_AddBlackAnts(n)` | 2 per ant |
+| 3 | `_KillSomeAnts(0)` twice (red) | those of `_DeadAntHere` |
+| 4 | `_KillSomeAnts(1)` twice (black) | same |
+| 5 | `_AddFood(150, 1)` | those of `_AddFood` |
+| 6 | sound 0x20; every surface cell (x 0..127, y 0..63, column by column) with food (`_IsItFood`) gets `_MapA = SRand16()`; `_FoodA = 0` (the body of `_SubtractFood`, which has no caller) | 1 per cell with food |
+| 7 | `_myBeginSoundList(0)`, empty on Windows: nothing | — |
+| 8 | `_MakeNewHoleR(c)` for c = 0, 2, …, 62 | `S(31)` per call plus those of the digging |
+| 9 | `_MakeNewHoleB(c)` same | same |
 | 10 | `_AlwaysHealthy = 0`, `_HealthB = 0`, `_HealthR = 0` | — |
-| 11 | alterna `_Invincible`; som 2 ao ligar, 1 ao desligar | — |
-| 12 | alterna `_RevSpider` | — |
-| 13 | quadros 10022 ("How many Glen Campbells does it take to eat a llama?") e 10024 ("#GCs = EPs - 2 (or, Elvis Minus Two)"), não forçados (só com a opção Events) | — |
-| 14 | `_MeSMode = 8` (laser da aranha, inimigos.md) e som 2 | — |
+| 11 | toggles `_Invincible`; sound 2 when turning on, 1 when turning off | — |
+| 12 | toggles `_RevSpider` | — |
+| 13 | frames 10022 ("How many Glen Campbells does it take to eat a llama?") and 10024 ("#GCs = EPs - 2 (or, Elvis Minus Two)"), not forced (only with the Events option) | — |
+| 14 | `_MeSMode = 8` (spider laser, inimigos.md) and sound 2 | — |
 
-`n` = 1000 − `_ListIndexA` com `_CommandKey` (`8:85e2`) = 1, senão 32. O port não tem a tecla de comando (formiga-amarela.md já a trata como 0): `n` = 32.
+`n` = 1000 − `_ListIndexA` with `_CommandKey` (`8:85e2`) = 1, otherwise 32. The port has no command key (formiga-amarela.md already treats it as 0): `n` = 32.
 
-`_FullCount` (`1020:07b4`) = `_CountAnts` + `_Feedback` (pode abrir os quadros da rainha morta e dar conselhos; mensagens.md).
+`_FullCount` (`1020:07b4`) = `_CountAnts` + `_Feedback` (may open the dead-queen frames and give advice; mensagens.md).
 
 ## 3. `_AddBlackAnts(n)` / `_AddRedAnts(n)`
 
-Percorre a superfície por coluna — pretas: x de 0 a 63; vermelhas: x de 127 **descendo** a 64 — e, em cada coluna, y de 16 a 47. Em cada célula com `_MapA` < 0x50 e `_LifeA` = 0:
+Walks the surface by column — black: x from 0 to 63; red: x from 127 **down** to 64 — and, in each column, y from 16 to 47. In each cell with `_MapA` < 0x50 and `_LifeA` = 0:
 
-1. `r = SRand1(10)`: r de 0 a 3 → base 0x30 e modo 2; senão base 0x10 e modo 4.
-2. `T = SRand8() + base` (+ 0x80 nas vermelhas).
-3. `_LifeA = T` e `_AddAntToAList(x, y, T, modo, 0)`.
-4. `n` − 1; para com `n` < 1 ou `_ListIndexA` > 999 (o teste vem depois de acrescentar).
+1. `r = SRand1(10)`: r from 0 to 3 → base 0x30 and mode 2; otherwise base 0x10 and mode 4.
+2. `T = SRand8() + base` (+ 0x80 for red).
+3. `_LifeA = T` and `_AddAntToAList(x, y, T, mode, 0)`.
+4. `n` − 1; stops when `n` < 1 or `_ListIndexA` > 999 (the test comes after adding).
 
-## 4. `_KillSomeAnts(cor)`
+## 4. `_KillSomeAnts(color)`
 
 1. `_CompactListA`, `_FullCount`.
-2. Da última vaga da lista A até a primeira: com `cor` = 1 (pretas), as vagas sem o bit 7 no tipo; com `cor` = 0 (vermelhas), as com o bit 7, menos quando `_IsItYellow(1, x, y)` (a amarela no plano 1, sem ser a aranha, e a vida da célula é a marca dela, 0xFE/0xFF). Cada uma: `_DeadAntHere(x, y, vermelha)` e tipo = 0. Para depois da 51ª morte (contador > 50).
+2. From the last slot of list A to the first: with `color` = 1 (black), the slots without bit 7 in the type; with `color` = 0 (red), those with bit 7, except when `_IsItYellow(1, x, y)` (the yellow ant on plane 1, not being the spider, and the cell's life is its mark, 0xFE/0xFF). Each one: `_DeadAntHere(x, y, red)` and type = 0. Stops after the 51st death (counter > 50).
 3. `_CompactListA`, `_FullCount`.
 
-As vítimas são as do fim da lista; no máximo 102 no Mystery 3/4. As pretas não têm o teste da amarela.
+The victims are those at the end of the list; at most 102 in Mystery 3/4. Black ants do not have the yellow ant test.
 
-## 5. No port
+## 5. In the port
 
-`engine/src/rules/misterio.rs`: `botao_misterio(e, regras, tabelas)` (devolve o `EfeitoMisterio`), `adicionar_formigas(e, cor, n)` (usada também pelos conselhos no lugar do `_AddBlackAnts` antigo) e `matar_formigas(e, regras, cor)`. `_FullCount` = `Estado::contar_formigas` + `Regras::dar_conselhos`. Chamado por `Partida::botao_usuario(8)`; os quadros da piada saem como `Evento::Mensagem` e passam pelo filtro de `nao_forcadas`.
+`engine/src/rules/misterio.rs`: `botao_misterio(e, regras, tabelas)` (returns the `EfeitoMisterio`), `adicionar_formigas(e, cor, n)` (also used by the advice instead of the old `_AddBlackAnts`) and `matar_formigas(e, regras, cor)`. `_FullCount` = `Estado::contar_formigas` + `Regras::dar_conselhos`. Called by `Partida::botao_usuario(8)`; the joke frames come out as `Evento::Mensagem` and go through the `nao_forcadas` filter.
 
-Testes: `rules/misterio.rs` (vermelhas da direita para a esquerda com o bit 7 e dois sorteios de S cada; no máximo 51 mortes por chamada, do fim da lista, poupando a amarela; um só `_RRand(15)`).
+Tests: `rules/misterio.rs` (red ants from right to left with bit 7 and two S draws each; at most 51 deaths per call, from the end of the list, sparing the yellow ant; a single `_RRand(15)`).
 
-**Não verificado na bancada:** nenhum vetor do original com o Mystery (precisa trocar a função de um botão para 8 e gravar a ação com `cenarios_tick.py`, como as ações de `tests/referencias/acoes/`). Os vetores de tick não passam por aqui.
+**Not verified on the test bench:** no vector from the original with the Mystery (it requires changing a button's function to 8 and recording the action with `cenarios_tick.py`, like the actions in `tests/referencias/acoes/`). The tick vectors do not go through here.

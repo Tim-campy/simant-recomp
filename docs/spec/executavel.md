@@ -1,50 +1,52 @@
-# `SIMANTW.EXE`: mapa do executável
+*Leia em português: [executavel.md](../pt-BR/spec/executavel.md)*
 
-Arquivo analisado: `SimAnt-T/MAXIS/ANTWIN/SIMANTW.EXE` (516.096 bytes), acompanhado de `SIMANTW.SYM` (37.060 bytes, tabela de símbolos MAPSYM).
+# `SIMANTW.EXE`: executable map
 
-## Ferramentas e como reproduzir
+File analyzed: `SimAnt-T/MAXIS/ANTWIN/SIMANTW.EXE` (516,096 bytes), accompanied by `SIMANTW.SYM` (37,060 bytes, MAPSYM symbol table).
 
-- **REA (MCP):** a ferramenta recusa o executável com "unsupported NE executable in MZ image". O modo Ghidra do REA no Windows só aceita PE. Por isso o REA não foi usado no código, apenas a verificação de que ele está funcional.
-- **Ghidra 12.1.4 headless** (`C:\Ghidra`), loader NE, linguagem `x86:LE:16:Protected Mode`. Os scripts ficam em `re_trabalho/ghidra_scripts/`:
-  - `ApplySym.java`: aplica os 2.169 nomes do `.SYM` e cria 1.307 funções;
-  - `ExportDecomp.java`: exporta o pseudocódigo de 1.538 funções (sem falhas) para `re_trabalho/decomp/CodeN.c`.
-- `tools/ne_info.py`: cabeçalho NE, segmentos, recursos, importações e `.SYM`. Saída em `re_trabalho/simantw_ne.json`.
-- `tools/save_table.py`: tabela de blocos do jogo salvo (ver [formatos/save-ant.md](formatos/save-ant.md)).
+## Tools and how to reproduce
 
-`re_trabalho/` é material de trabalho e **não faz parte do port** (fica no `.gitignore`). Pelas regras do projeto, nenhum trecho decompilado deve ser copiado para o código.
+- **REA (MCP):** the tool rejects the executable with "unsupported NE executable in MZ image". REA's Ghidra mode on Windows only accepts PE. For this reason REA was not used on the code, only the check that it is working.
+- **Ghidra 12.1.4 headless** (`C:\Ghidra`), NE loader, language `x86:LE:16:Protected Mode`. The scripts are in `re_trabalho/ghidra_scripts/`:
+  - `ApplySym.java`: applies the 2,169 names from the `.SYM` and creates 1,307 functions;
+  - `ExportDecomp.java`: exports the pseudocode of 1,538 functions (no failures) to `re_trabalho/decomp/CodeN.c`.
+- `tools/ne_info.py`: NE header, segments, resources, imports and `.SYM`. Output in `re_trabalho/simantw_ne.json`.
+- `tools/save_table.py`: block table of the saved game (see [formatos/save-ant.md](formatos/save-ant.md)).
 
-Convenção de endereços: segmento N do NE = seletor Ghidra `0x1000 + (N−1)·8`. Exemplo: segmento 7 = `1030`.
+`re_trabalho/` is working material and **is not part of the port** (it is in `.gitignore`). By the project rules, no decompiled excerpt may be copied into the code.
 
-## Cabeçalho NE
+Address convention: NE segment N = Ghidra selector `0x1000 + (N−1)·8`. Example: segment 7 = `1030`.
 
-Linker 5.30, Windows 3.0 ou superior, flags `0x030a`, ponto de entrada `4:0061` (`__astart`), DGROUP = segmento 10. Importa de `KERNEL`, `GDI`, `USER`, `SOUND`, `KEYBOARD` e `WIN87EM`, num total de 195 funções por ordinal.
+## NE header
 
-Recursos dentro do EXE: só cursores (`HELPCURSOR`, `MAGCURSOR`, `ROCKCURSOR`, `DIGCURSOR`, `ANTCURSOR`, `FOODCURSOR`, `DROPCURSOR`, `SPRAYCURSOR`), ícones (`SIMANT`, `ANT0`–`ANT7`, `REDWIN`, `BLACKWIN`), os diálogos `OPEN`/`SAVEAS` e uma tabela de aceleradores. Todo o resto vem do banco `.DAT`.
+Linker 5.30, Windows 3.0 or later, flags `0x030a`, entry point `4:0061` (`__astart`), DGROUP = segment 10. Imports from `KERNEL`, `GDI`, `USER`, `SOUND`, `KEYBOARD` and `WIN87EM`, a total of 195 functions by ordinal.
 
-## Segmentos e módulos (nomes do `.SYM`)
+Resources inside the EXE: only cursors (`HELPCURSOR`, `MAGCURSOR`, `ROCKCURSOR`, `DIGCURSOR`, `ANTCURSOR`, `FOODCURSOR`, `DROPCURSOR`, `SPRAYCURSOR`), icons (`SIMANT`, `ANT0`–`ANT7`, `REDWIN`, `BLACKWIN`), the `OPEN`/`SAVEAS` dialogs and an accelerator table. Everything else comes from the `.DAT` bank.
 
-| Seg | Seletor | Nome no SYM | Tipo | Conteúdo, pelos nomes das funções |
+## Segments and modules (names from the `.SYM`)
+
+| Seg | Selector | Name in SYM | Type | Contents, judging by function names |
 |---|---|---|---|---|
-| 1 | 1000 | `SIMANT_MODULE` | código | `WINMAIN`, `MAINWNDPROC`, `MYTIMERFUNC`, menus, pausa, pontuação (`_CalcScore`), cenários, diálogos, histórico, controle de casta/modo (o triângulo), formiga amarela, novo jogo |
-| 2 | 1008 | `GR_MODULE` | código | vídeo (`_DetectDisplay`, `_InitGraphics`, `_ReadConfig`), primitivas `G*`, bitmaps, fontes, gerência de memória (`_mem_*`, `_Ralloc*`), animação (`_hanim_*`), som e MIDI |
-| 3 | 1010 | `ANTEDIT_MODULE` | código | janela de edição/zoom, desenho de aranha e balões, ferramentas, quintal (`_DrawYard`, gato, cachorro, menino, cortador de grama, chuva), mapa, minimapa, carregar/salvar |
-| 4 | 1018 | `_TEXT` | código | runtime C da Microsoft, tiles/escala em assembly, janela de informação, NetBIOS/DDE (modo em rede) |
-| 5 | 1020 | `SIMONE_MODULE` | código | inicialização, geradores aleatórios (`_SRand*`, `_RRand`), água, comida, ovos, escavação de túneis, listas de formigas, geração de mapas (casa, quintal, pedras), aranha |
-| 6 | 1028 | `SIMANT1_MODULE` | código | **núcleo da simulação de formigas**: `_DoAntSim`, comportamento por colônia (`A` superfície, `B` preta, `R` vermelha, `Y` amarela), feromônios, alarme, lutas, rainha |
-| 7 | 1030 | `SIMTWO_MODULE` | código | estratégia de colônia, quintal (menino, pássaro, gato, cachorro), colonização do quintal, formiga-leão, lagarta, geração de mundo/tutorial, banco de dados (`_db_*`, `_DB*`, cache `_ch_*`, índice), LZSS, fontes, sistema de janelas próprio (`_win_*`) |
-| 8 | 1038 | `SIMANT_DATA_GROUP` | dados | mapas de túneis, listas de formigas, feromônios, tabela do save (`0x9570`) |
-| 9 | 1040 | `PACK` | dados | contadores, históricos, estado do quintal |
-| 10 | 1048 | `DGROUP` | dados | variáveis globais, strings, pilha |
+| 1 | 1000 | `SIMANT_MODULE` | code | `WINMAIN`, `MAINWNDPROC`, `MYTIMERFUNC`, menus, pause, score (`_CalcScore`), scenarios, dialogs, history, caste/mode control (the triangle), yellow ant, new game |
+| 2 | 1008 | `GR_MODULE` | code | video (`_DetectDisplay`, `_InitGraphics`, `_ReadConfig`), `G*` primitives, bitmaps, fonts, memory management (`_mem_*`, `_Ralloc*`), animation (`_hanim_*`), sound and MIDI |
+| 3 | 1010 | `ANTEDIT_MODULE` | code | edit/zoom window, drawing of the spider and balloons, tools, yard (`_DrawYard`, cat, dog, boy, lawnmower, rain), map, minimap, load/save |
+| 4 | 1018 | `_TEXT` | code | Microsoft C runtime, tiles/scaling in assembly, information window, NetBIOS/DDE (network mode) |
+| 5 | 1020 | `SIMONE_MODULE` | code | initialization, random generators (`_SRand*`, `_RRand`), water, food, eggs, tunnel digging, ant lists, map generation (house, yard, rocks), spider |
+| 6 | 1028 | `SIMANT1_MODULE` | code | **core of the ant simulation**: `_DoAntSim`, behavior per colony (`A` surface, `B` black, `R` red, `Y` yellow), pheromones, alarm, fights, queen |
+| 7 | 1030 | `SIMTWO_MODULE` | code | colony strategy, yard (boy, bird, cat, dog), yard colonization, antlion, caterpillar, world/tutorial generation, database (`_db_*`, `_DB*`, `_ch_*` cache, index), LZSS, fonts, custom window system (`_win_*`) |
+| 8 | 1038 | `SIMANT_DATA_GROUP` | data | tunnel maps, ant lists, pheromones, save table (`0x9570`) |
+| 9 | 1040 | `PACK` | data | counters, histories, yard state |
+| 10 | 1048 | `DGROUP` | data | global variables, strings, stack |
 
-## Fluxo principal (visto no código, em alto nível)
+## Main flow (seen in the code, at a high level)
 
-- `_ReadConfig` (`1008:08f4`) → `_InitGraphics` (`1008:010c`) → `_db_SetDataBase` (abre `SHARED` e o banco gráfico).
-- A simulação avança dentro de `MYTIMERFUNC` (`1000:2440`), callback de `SetTimer`, que chama `_DoAntSim` e depois `_UpdateWindows` e `_UpdateYardMessage`. O `SetTimer` pede intervalo de 0x11 = 17 ms. No Windows 3.1, o timer tem resolução de 55 ms, então na prática dispara a cada 55 ms (medido na bancada: 6,0 ticks/s em normal e 3,0 em slow, simulacao-visao-geral.md §3.1). Correção de uma versão anterior deste documento: `1048:0042` **não** é o intervalo, é o segmento do ponteiro da função de callback (`MakeProcInstance` em `WINMAIN`).
-- Sequência de inicialização: ver [telas/abertura.md](telas/abertura.md).
-- As janelas do jogo usam um sistema próprio (`_win_LoadWindow`, `_win_Events`, …) sobre uma única janela Windows. As definições vêm dos objetos de tipo 0 e 1 do banco.
+- `_ReadConfig` (`1008:08f4`) → `_InitGraphics` (`1008:010c`) → `_db_SetDataBase` (opens `SHARED` and the graphics bank).
+- The simulation advances inside `MYTIMERFUNC` (`1000:2440`), a `SetTimer` callback, which calls `_DoAntSim` and then `_UpdateWindows` and `_UpdateYardMessage`. `SetTimer` requests an interval of 0x11 = 17 ms. On Windows 3.1 the timer has a 55 ms resolution, so in practice it fires every 55 ms (measured on the test bench: 6.0 ticks/s at normal and 3.0 at slow, simulacao-visao-geral.md §3.1). Correction of an earlier version of this document: `1048:0042` is **not** the interval, it is the segment of the callback function pointer (`MakeProcInstance` in `WINMAIN`).
+- Initialization sequence: see [telas/abertura.md](telas/abertura.md).
+- The game windows use a custom system (`_win_LoadWindow`, `_win_Events`, …) on top of a single Windows window. The definitions come from the type 0 and 1 objects in the bank.
 
-## Interface de dados
+## Data interface
 
-- Banco de objetos: ver [formatos/banco-dat-ndx.md](formatos/banco-dat-ndx.md). `_db_LoadObject(id, tipo, flag)` em `1030:8292` procura primeiro no cache (`_ch_LookUpId`) e depois em cada banco aberto, na ordem (`_DBRecall`).
-- Configuração: [formatos/simant-cfg.md](formatos/simant-cfg.md).
-- Jogo salvo: [formatos/save-ant.md](formatos/save-ant.md).
+- Object bank: see [formatos/banco-dat-ndx.md](formatos/banco-dat-ndx.md). `_db_LoadObject(id, type, flag)` at `1030:8292` looks first in the cache (`_ch_LookUpId`) and then in each open bank, in order (`_DBRecall`).
+- Configuration: [formatos/simant-cfg.md](formatos/simant-cfg.md).
+- Saved game: [formatos/save-ant.md](formatos/save-ant.md).

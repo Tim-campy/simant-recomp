@@ -1,3 +1,5 @@
+*Read in English: [README-user.md](README-user.md) (no pacote de lançamento: `README.txt`)*
+
 # SimAnt recomp — LEIAME
 
 Versão 1.0.0 (rascunho). Reimplementação moderna do **SimAnt: The Electronic Ant Colony** (Maxis, 1991,
@@ -50,7 +52,7 @@ dentro da pasta do pacote.
 
 ## 3. Rodar: o launcher
 
-O `simant` aberto **sem opções** (dois cliques, atalho, menu) mostra o launcher:
+O `simant` aberto **sem opções** (dois cliques, atalho, menu) mostra o launcher (em português ou em inglês):
 
 - **Pasta da instalação do SimAnt:** *Procurar...* abre o seletor de pastas do sistema (no Linux, o do
   `zenity` ou do `kdialog`, se instalados; sem eles, digite o caminho). Também dá para arrastar a pasta
@@ -112,7 +114,8 @@ outra.
 
 ## 4. Como se joga
 
-Você é a **formiga amarela** de uma colônia preta, contra as vermelhas, no quintal de uma casa.
+Você é a **formiga amarela** de uma colônia preta, contra as vermelhas, no quintal de uma casa. O jogo
+em si é em inglês, como o original (os textos vêm da sua cópia).
 
 - **Mouse:** clique leva a amarela até lá; **duplo clique** age (ataca, pede comida, pega ou larga,
   cava); segurar o botão sobre a amarela abre o menu dela.
@@ -180,3 +183,5 @@ launcher). As caixas do launcher ligam e desligam cada mod sem tirá-lo da pasta
   `AVISOS-TERCEIROS.txt`. O `SDL2.dll` (Windows) é o binário oficial do SDL 2.30.9, sob a licença zlib.
 - SimAnt © 1991 Maxis. Este projeto não usa nem distribui o código ou os arquivos do jogo.
 - Código-fonte, documentação e relato de problemas: https://github.com/Tim-campy/simant-recomp
+  (documentação em inglês, com versão em português em `README.pt-BR.md` e `docs/pt-BR/`).
+- Histórico de versões: `CHANGELOG.pt-BR.txt` (português) e `CHANGELOG.txt` (inglês).

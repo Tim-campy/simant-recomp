@@ -1,173 +1,175 @@
-# Formigas: listas, campos, castas, modos e máquina de estados
+*Leia em português: [formigas.md](../../pt-BR/spec/regras/formigas.md)*
 
-Este documento é a base para implementar o comportamento das formigas uma regra por vez. Descreve a representação (listas paralelas e mapas de "vida"), a codificação dos campos, castas e modos, a escolha de casta e modo (triângulos de controle) e a máquina de estados em alto nível. O laço que chama tudo isso está em [simulacao-visao-geral.md](simulacao-visao-geral.md); os cheiros estão em [feromonios.md](feromonios.md).
+# Ants: lists, fields, castes, modes and state machine
 
-Convenção de evidência: igual à de [simulacao-visao-geral.md](simulacao-visao-geral.md#convenção-de-evidência). Endereços de variáveis no formato `segmento lógico:offset` do `symbols.tsv` (8 = seletor `1038`, 9 = `1040`, 10 = `1048`/DGROUP). Textos citados de SHARED tipo 4 foram descomprimidos com `tools/lzss_probe.py` (função `lzss`, janela preenchida com 0x20) a partir do dump de `tools/db_list.py`.
+This document is the basis for implementing ant behavior one rule at a time. It describes the representation (parallel lists and "life" maps), the encoding of the fields, castes and modes, the choice of caste and mode (control triangles) and the state machine at a high level. The loop that calls all of this is in [simulacao-visao-geral.md](simulacao-visao-geral.md); the scents are in [feromonios.md](feromonios.md).
 
-## 1. Planos e coordenadas
+Evidence convention: the same as in [simulacao-visao-geral.md](simulacao-visao-geral.md#evidence-convention). Variable addresses in the `logical segment:offset` format of `symbols.tsv` (8 = selector `1038`, 9 = `1040`, 10 = `1048`/DGROUP). Texts quoted from SHARED type 4 were decompressed with `tools/lzss_probe.py` (function `lzss`, window filled with 0x20) from the dump of `tools/db_list.py`.
 
-**Fato visto no código.**
+## 1. Planes and coordinates
 
-| Plano | Código (`_MePlane`, `_SetLife`, `_GetLife`) | Mapa de terreno | Mapa de vida (quem ocupa a célula) | Tamanho | Lista |
+**Fact seen in the code.**
+
+| Plane | Code (`_MePlane`, `_SetLife`, `_GetLife`) | Terrain map | Life map (who occupies the cell) | Size | List |
 |---|---|---|---|---|---|
-| Superfície (quintal/casa) | 0 ou 1 | `_MapA` `10:28e8` | `_LifeA` `10:68e8` | 128 × 64 | A |
-| Ninho preto | 2 | `_MapB` `10:48e8` | `_LifeB` `10:88e8` | 64 × 64 | B |
-| Ninho vermelho | 3 | `_MapR` `10:58e8` | `_LifeR` `10:98e8` | 64 × 64 | R |
+| Surface (yard/house) | 0 or 1 | `_MapA` `10:28e8` | `_LifeA` `10:68e8` | 128 × 64 | A |
+| Black nest | 2 | `_MapB` `10:48e8` | `_LifeB` `10:88e8` | 64 × 64 | B |
+| Red nest | 3 | `_MapR` `10:58e8` | `_LifeR` `10:98e8` | 64 × 64 | R |
 
-- Índice das matrizes: `x × 64 + y`. Na superfície, x vai de 0 a 127 e y de 0 a 63 (limites em `_SetLife` `1020:5d18` e `_GetLife` `1020:6040`). No ninho, os dois vão de 0 a 63.
-- `_LifeA/B/R` **não** estão no save. São refeitos a partir das listas, ou o contrário: `_BuildAntListA` (`1020:3046`), chamada por `_RandWorld`, monta a lista A varrendo `_LifeA`.
-- **Passagem superfície ↔ ninho.** Quando uma formiga de superfície entra num buraco em (x, y), ela vai para o ninho na posição (**y**, 1), virada para a direção 4 (baixo). O ninho escolhido é o preto se x < 64 e o vermelho se não (`_GoInNest` `1028:257a`). Para sair, a formiga precisa estar na linha 0 do ninho, numa célula de buraco (tile 0x18), e sai pelo buraco cuja coluna de superfície está em `_HoleMapB[x_ninho]` (`_GetOutB` `1028:520a`, `_LeaveNestB` `1028:515e`). Leitura [hipótese]: o ninho é um corte vertical em que a coordenada x corresponde à linha y da superfície, e o y do ninho é a profundidade.
-- `_HoleMapB` (`8:82d2`, 64 bytes) e `_HoleMapR` (`8:8312`): índice = linha y da superfície (ou coluna x do ninho); valor = coluna x do buraco na superfície (0 = sem buraco). **Verificado** no `QUICK2.ANT`: `_HoleMapB[32] = 3` e `_HoleMapR[32] = 118`, ou seja, buracos em (3, 32) e (118, 32).
-- **Direções** (8, sentido horário, começando no norte): tabelas `_Dx8` (`8:0000`) = `0 1 1 1 0 -1 -1 -1` e `_Dy8` (`8:0008`) = `-1 -1 0 1 1 1 0 -1` (lidas do `SIMANTW.EXE`). Direção 0 = y−1 (cima), 2 = x+1 (direita), 4 = y+1, 6 = x−1. `_Dx9`/`_Dy9` (`8:0010`/`8:001a`) têm 9 entradas: a primeira é "parado" e as demais são as 8 direções.
+- Array index: `x × 64 + y`. On the surface, x goes from 0 to 127 and y from 0 to 63 (limits in `_SetLife` `1020:5d18` and `_GetLife` `1020:6040`). In the nest, both go from 0 to 63.
+- `_LifeA/B/R` are **not** in the save. They are rebuilt from the lists, or the other way around: `_BuildAntListA` (`1020:3046`), called by `_RandWorld`, builds list A by scanning `_LifeA`.
+- **Surface ↔ nest passage.** When a surface ant enters a hole at (x, y), it goes to the nest at position (**y**, 1), facing direction 4 (down). The chosen nest is the black one if x < 64 and the red one otherwise (`_GoInNest` `1028:257a`). To leave, the ant must be on row 0 of the nest, on a hole cell (tile 0x18), and it exits through the hole whose surface column is in `_HoleMapB[x_nest]` (`_GetOutB` `1028:520a`, `_LeaveNestB` `1028:515e`). Reading [hypothesis]: the nest is a vertical cross-section in which the x coordinate corresponds to the surface y row, and the nest's y is the depth.
+- `_HoleMapB` (`8:82d2`, 64 bytes) and `_HoleMapR` (`8:8312`): index = surface y row (or nest x column); value = x column of the hole on the surface (0 = no hole). **Verified** in `QUICK2.ANT`: `_HoleMapB[32] = 3` and `_HoleMapR[32] = 118`, that is, holes at (3, 32) and (118, 32).
+- **Directions** (8, clockwise, starting at north): tables `_Dx8` (`8:0000`) = `0 1 1 1 0 -1 -1 -1` and `_Dy8` (`8:0008`) = `-1 -1 0 1 1 1 0 -1` (read from `SIMANTW.EXE`). Direction 0 = y−1 (up), 2 = x+1 (right), 4 = y+1, 6 = x−1. `_Dx9`/`_Dy9` (`8:0010`/`8:001a`) have 9 entries: the first is "stopped" and the rest are the 8 directions.
 
-## 2. Listas paralelas
+## 2. Parallel lists
 
-**Fato visto no código** e tabela do save ([save-ant.md](../formatos/save-ant.md)).
+**Fact seen in the code** and the save table ([save-ant.md](../formatos/save-ant.md)).
 
-| Lista | Arrays (1 byte por formiga) | Capacidade | Contador | Quem está nela |
+| List | Arrays (1 byte per ant) | Capacity | Counter | Who is in it |
 |---|---|---|---|---|
-| A | `_AlistX` `8:23a4`, `_AlistY` `8:278e`, `_AlistM` `8:2b78`, `_AlistT` `8:2f62`, `_AlistS` `8:334c` | 1000 | `_ListIndexA` `9:80f0` | todas as formigas na superfície, das **duas** cores |
-| B | `_BlistX..S` `8:3736…8:3f0e` | 500 | `_ListIndexB` `9:99d4` | dentro do ninho **preto**: pretas e invasoras vermelhas |
-| R | `_RlistX..S` `8:4104…8:48dc` | 500 | `_ListIndexR` `9:72cc` | dentro do ninho **vermelho**: vermelhas e invasoras pretas |
+| A | `_AlistX` `8:23a4`, `_AlistY` `8:278e`, `_AlistM` `8:2b78`, `_AlistT` `8:2f62`, `_AlistS` `8:334c` | 1000 | `_ListIndexA` `9:80f0` | all ants on the surface, of **both** colors |
+| B | `_BlistX..S` `8:3736…8:3f0e` | 500 | `_ListIndexB` `9:99d4` | inside the **black** nest: blacks and red invaders |
+| R | `_RlistX..S` `8:4104…8:48dc` | 500 | `_ListIndexR` `9:72cc` | inside the **red** nest: reds and black invaders |
 
-A formiga amarela **não** está em lista nenhuma. Seu estado fica nas variáveis `_Me*` (`_MeLocX/Y`, `_MePlane`, `_MeType`, `_MeDir`, `_MeMode`, `_MeHealth`…).
+The yellow ant is **not** in any list. Its state lives in the `_Me*` variables (`_MeLocX/Y`, `_MePlane`, `_MeType`, `_MeDir`, `_MeMode`, `_MeHealth`…).
 
-### Campos
+### Fields
 
-| Campo | Significado | Evidência |
+| Field | Meaning | Evidence |
 |---|---|---|
-| X, Y | posição no plano da lista | todas as funções de movimento |
-| T | **tipo**: o mesmo byte gravado no mapa de vida. Codifica cor, casta/carga e direção (seção 3). T = 0 é uma vaga livre (formiga morta ou removida) | `_AddAntToAList` `1020:2ef0` grava T em `_LifeA`; `_CompactListA` descarta T = 0 |
-| M | **modo** (tarefa atual), 0..19 (seção 5) | `_DoAntSimA` `1028:04d8` despacha por M |
-| S | **contador ou memória**, conforme o modo: na superfície, quanto cheiro depositar no próximo passo (decresce 1 por passo; seção 7); na luta, o T do vencedor; no ninho, o estágio do ovo carregado e uma flag (bit 3) | `_DoRandAntA`, `_DoReturnFoodAnt`, `_StartFightA`, `_DoNestingB` |
+| X, Y | position in the list's plane | all movement functions |
+| T | **type**: the same byte written to the life map. Encodes color, caste/load and direction (section 3). T = 0 is a free slot (dead or removed ant) | `_AddAntToAList` `1020:2ef0` writes T into `_LifeA`; `_CompactListA` discards T = 0 |
+| M | **mode** (current task), 0..19 (section 5) | `_DoAntSimA` `1028:04d8` dispatches on M |
+| S | **counter or memory**, depending on the mode: on the surface, how much scent to deposit on the next step (decreases by 1 per step; section 7); in a fight, the winner's T; in the nest, the stage of the carried egg and a flag (bit 3) | `_DoRandAntA`, `_DoReturnFoodAnt`, `_StartFightA`, `_DoNestingB` |
 
-### Inserção, remoção e compactação
+### Insertion, removal and compaction
 
-- **Inserir:** `_AddAntToAList/BList/RList` (`1020:2ef0`/`2f4a`/`2fa4`) gravam na vaga `_ListIndex` e incrementam o contador. Também gravam T no mapa de vida. Se a lista está cheia, **descartam em silêncio**. `_AddAntToList` (`1020:5c78`) escolhe a lista pelo plano e chama `_SetLife`.
-- **Remover numa iteração:** o código põe T = 0 na lista e zera a célula do mapa de vida. A vaga só é reaproveitada depois da compactação.
-- **Compactar:** `_CompactListA/B/R` (`1020:2a16`/`2a7a`/`2ade`) deslizam as entradas com T ≠ 0 para a frente, mantendo a ordem, e diminuem o contador. Isso acontece a cada 128 ticks (uma lista por fase; ver a visão geral). Também acontece sob demanda: `_GoInNest` compacta a lista B/R se ela está cheia, e `_ExitHole` (`1020:2db6`) compacta a lista A (o mesmo algoritmo, embutido) se ela está cheia.
-- **Remoção imediata** com deslocamento (`_RemoveFromAList` `1020:2b42`, via `_BlockMove`): usada pela formiga-leão (`_DoAntLions`) e por `_GetFromAlist`.
-- **Busca por posição:** `_FindInAList(x, y)` (`1020:2c42`) varre a lista de trás para frente e devolve o primeiro índice com X, Y iguais e T ≠ 0, ou −1. As versões B e R recebem também o T esperado.
-- **Ordem de processamento:** de trás para frente (índice `_ListIndex − 1` até 0).
+- **Insert:** `_AddAntToAList/BList/RList` (`1020:2ef0`/`2f4a`/`2fa4`) write into slot `_ListIndex` and increment the counter. They also write T into the life map. If the list is full, they **silently discard**. `_AddAntToList` (`1020:5c78`) chooses the list by plane and calls `_SetLife`.
+- **Remove during an iteration:** the code sets T = 0 in the list and clears the life map cell. The slot is only reused after compaction.
+- **Compact:** `_CompactListA/B/R` (`1020:2a16`/`2a7a`/`2ade`) slide the entries with T ≠ 0 forward, keeping the order, and decrease the counter. This happens every 128 ticks (one list per phase; see the overview). It also happens on demand: `_GoInNest` compacts list B/R if it is full, and `_ExitHole` (`1020:2db6`) compacts list A (the same algorithm, inlined) if it is full.
+- **Immediate removal** with shifting (`_RemoveFromAList` `1020:2b42`, via `_BlockMove`): used by the antlion (`_DoAntLions`) and by `_GetFromAlist`.
+- **Search by position:** `_FindInAList(x, y)` (`1020:2c42`) scans the list from back to front and returns the first index with equal X, Y and T ≠ 0, or −1. The B and R versions also take the expected T.
+- **Processing order:** from back to front (index `_ListIndex − 1` down to 0).
 
-## 3. Codificação do tipo T
+## 3. Encoding of type T
 
-**Fato visto no código**, com nomes do jogo tirados das listas de texto de SHARED tipo 4 (ids 1100, 1101, 1103), indexadas pelo grupo `(T & 0x78) >> 3`.
+**Fact seen in the code**, with in-game names taken from the text lists of SHARED type 4 (ids 1100, 1101, 1103), indexed by the group `(T & 0x78) >> 3`.
 
 ```
-bit 7      : cor (0 = preta, 1 = vermelha)
-bits 6..3  : grupo (casta + o que carrega), 0..15
-bits 2..0  : direção 0..7 (nos ovos, estágio de desenvolvimento)
+bit 7      : color (0 = black, 1 = red)
+bits 6..3  : group (caste + what it carries), 0..15
+bits 2..0  : direction 0..7 (in eggs, development stage)
 ```
 
-| Grupo | T (preta) | Nome (4/1101) | Carga (4/1103) | Censo (`_CastePop*[i]`) | Classe de luta |
+| Group | T (black) | Name (4/1101) | Load (4/1103) | Census (`_CastePop*[i]`) | Fight class |
 |---|---|---|---|---|---|
-| 0 | 0x01–0x07 | ovo (estágios em 4/1100) | — | [0] ovos | 0 |
-| 1 | 0x08–0x0F | Worker | Egg (carregando ovo) | [1] operárias | 0 |
+| 0 | 0x01–0x07 | egg (stages in 4/1100) | — | [0] eggs | 0 |
+| 1 | 0x08–0x0F | Worker | Egg (carrying an egg) | [1] workers | 0 |
 | 2 | 0x10–0x17 | Worker | — | [1] | 0 |
 | 3 | 0x18–0x1F | Worker | Food | [1] | 0 |
-| 4 | 0x20–0x27 | Male | — | [3] machos | 2 |
+| 4 | 0x20–0x27 | Male | — | [3] males | 2 |
 | 5 | 0x28–0x2F | Worker | Dirt | [1] | 0 |
-| 6 | 0x30–0x37 | Soldier | — | [2] soldados | 1 |
+| 6 | 0x30–0x37 | Soldier | — | [2] soldiers | 1 |
 | 7 | 0x38–0x3F | Soldier | Food | [2] | 1 |
-| 8 | 0x40–0x47 | New Queen | — | [4] rainhas novas | 2 |
+| 8 | 0x40–0x47 | New Queen | — | [4] new queens | 2 |
 | 9 | 0x48–0x4F | Soldier | Dirt | [2] | 1 |
-| 10 | 0x50–0x57 | Replete | — | não contado | 0 |
-| 11 | 0x58–0x5F | "?" | — | não contado | 0 |
-| 12 | 0x60–0x67 | Queen (cabeça) | — | [5] rainha | 3 |
-| 13 | 0x68–0x6F | Queen (cauda) | — | não contado | 3 |
-| 14 | 0x70–0x77 | Fight (nuvem de luta) | — | não contado | 0 |
-| 15 | 0x78–0x7F | "?" | — | não contado | 0 |
+| 10 | 0x50–0x57 | Replete | — | not counted | 0 |
+| 11 | 0x58–0x5F | "?" | — | not counted | 0 |
+| 12 | 0x60–0x67 | Queen (head) | — | [5] queen | 3 |
+| 13 | 0x68–0x6F | Queen (tail) | — | not counted | 3 |
+| 14 | 0x70–0x77 | Fight (fight cloud) | — | not counted | 0 |
+| 15 | 0x78–0x7F | "?" | — | not counted | 0 |
 
-- Pegar comida soma 8 ao T (grupo 2→3 ou 6→7). Pegar terra vai de 2→5 ou 6→9 (soma 0x18), e largar a terra volta (`_DoDigOutAntA` subtrai 0x18). Pegar ovo vai de 2→1 (subtrai 8). **Fato visto** em `_DoRandAntA`, `_DoForageAnt`, `_DoDigOutAntA`, `_DoNestingB`.
-- **Ovos:** os bits 0..2 são o estágio. Estágios em 4/1100: Weird Egg, New Egg, Egg, 1st-Instar, 2nd-Instar, 3rd-Instar, Pupae, Hatching Pupae. `_IsThisEgg` (`1020:5ec8`) aceita `T & 0x7F` de 1 a 7.
-- **Rainha:** ocupa 2 células, a cabeça (grupo 12) e a cauda (grupo 13). A cauda fica na direção da cabeça e vale cabeça + 8. Se a outra metade some, a que restou também é removida (`_SimQueenA` `1028:0a74`, `_SimQueenB` `1028:3dc2`).
-- **Formiga amarela no mapa de vida:** 0xFF ou 0xFE (`_IsYellowAnt` `1020:5720`).
-- **Censo:** `_CountAnts` (`1020:04de`) soma as três listas e a amarela por grupo (`_TemCensus` `9:7c4e`, 32 palavras: 16 grupos × 2 cores). Depois preenche `_CastePopB` (`10:ac94`) e `_CastePopR` (`10:aca0`) como na coluna "Censo". `_BpopT`/`_RpopT` = soma de [1]..[5] (sem os ovos). **Verificado** no `QUICK2.ANT`: `_CastePopB = (2, 2, 0, 0, 0, 1)` e `_BpopT = 3`. A lista B tem 3 ovos (grupo 0, M = 8), mais a cabeça e a cauda da rainha (grupos 12 e 13, M = 9). Os dois ovos do censo contra 3 na lista vêm de momentos diferentes (o censo roda a cada 64 ticks).
+- Picking up food adds 8 to T (group 2→3 or 6→7). Picking up dirt goes from 2→5 or 6→9 (adds 0x18), and dropping the dirt goes back (`_DoDigOutAntA` subtracts 0x18). Picking up an egg goes from 2→1 (subtracts 8). **Fact seen** in `_DoRandAntA`, `_DoForageAnt`, `_DoDigOutAntA`, `_DoNestingB`.
+- **Eggs:** bits 0..2 are the stage. Stages in 4/1100: Weird Egg, New Egg, Egg, 1st-Instar, 2nd-Instar, 3rd-Instar, Pupae, Hatching Pupae. `_IsThisEgg` (`1020:5ec8`) accepts `T & 0x7F` from 1 to 7.
+- **Queen:** occupies 2 cells, the head (group 12) and the tail (group 13). The tail lies in the head's direction and equals head + 8. If the other half disappears, the remaining one is also removed (`_SimQueenA` `1028:0a74`, `_SimQueenB` `1028:3dc2`).
+- **Yellow ant on the life map:** 0xFF or 0xFE (`_IsYellowAnt` `1020:5720`).
+- **Census:** `_CountAnts` (`1020:04de`) sums the three lists and the yellow ant by group (`_TemCensus` `9:7c4e`, 32 words: 16 groups × 2 colors). Then it fills `_CastePopB` (`10:ac94`) and `_CastePopR` (`10:aca0`) as in the "Census" column. `_BpopT`/`_RpopT` = sum of [1]..[5] (without the eggs). **Verified** in `QUICK2.ANT`: `_CastePopB = (2, 2, 0, 0, 0, 1)` and `_BpopT = 3`. List B has 3 eggs (group 0, M = 8), plus the queen's head and tail (groups 12 and 13, M = 9). The two eggs in the census against 3 in the list come from different moments (the census runs every 64 ticks).
 
-## 4. Castas e o triângulo de castas
+## 4. Castes and the caste triangle
 
-**Fato visto no código.**
+**Fact seen in the code.**
 
-- `_casteLevels` (`9:9b64`, 3 palavras sem sinal, 0..65535) = posição do controle no triângulo "Workers/Soldiers/Breeders", na ordem **[reprodutores, operárias, soldados]**. Arrastar o controle (`_ProcCasteEvent` `1000:bd08`, via `_BoundPointToTri`/`_GetTriLatDist`) atualiza os níveis. Ao soltar o botão do mouse, o jogo grava o conjunto em `_casteSetLevels` e recalcula `_IdealCaste` (`8:8622`, 4 palavras, em %):
+- `_casteLevels` (`9:9b64`, 3 unsigned words, 0..65535) = position of the control in the "Workers/Soldiers/Breeders" triangle, in the order **[breeders, workers, soldiers]**. Dragging the control (`_ProcCasteEvent` `1000:bd08`, via `_BoundPointToTri`/`_GetTriLatDist`) updates the levels. When the mouse button is released, the game writes the set into `_casteSetLevels` and recomputes `_IdealCaste` (`8:8622`, 4 words, in %):
 
-  | `_IdealCaste[i]` | casta | fórmula |
+  | `_IdealCaste[i]` | caste | formula |
   |---|---|---|
-  | 0 | operária | `(casteLevels[1] × 100 + 0x3FFF) / 0xFFFF` |
-  | 1 | soldado | `(casteLevels[2] × 100 + 0x3FFF) / 0xFFFF` |
-  | 2 | macho | `(casteLevels[0] × 50 + 0x3FFF) / 0xFFFF` |
-  | 3 | rainha nova | igual ao macho (os reprodutores se dividem meio a meio) |
+  | 0 | worker | `(casteLevels[1] × 100 + 0x3FFF) / 0xFFFF` |
+  | 1 | soldier | `(casteLevels[2] × 100 + 0x3FFF) / 0xFFFF` |
+  | 2 | male | `(casteLevels[0] × 50 + 0x3FFF) / 0xFFFF` |
+  | 3 | new queen | same as the male (the breeders split half and half) |
 
-  A mesma conta existe em `_cvtLevels2IdealCaste` (`1000:c9de`), que não é chamada no código.
-- Padrões lidos do executável: `_casteSetLevels` (`8:863a`, 4 conjuntos de 3) = (0, 39321, 26214), (32767, 16383, 16383), (0, 65535, 0), (0, 0, 65535). `_IdealCaste` = 60, 40, 0, 0. **Verificado** no `QUICK2.ANT`: `casteLevels = (0, 39321, 26214)` e `IdealCaste = (60, 40, 0, 0)`.
-- [em aberto] Os botões de conjunto (objetos 0x1306–0x1308) trocam `_casteLevels`, mas não vi `_IdealCaste` ser recalculado nesse caminho. Conferir no original se trocar de conjunto muda a produção.
-- `_CasteAuto` (`8:8630`) só aparece no código da interface (mostra ou esconde o grupo de botões). Não achei uso na simulação.
+  The same calculation exists in `_cvtLevels2IdealCaste` (`1000:c9de`), which is not called in the code.
+- Defaults read from the executable: `_casteSetLevels` (`8:863a`, 4 sets of 3) = (0, 39321, 26214), (32767, 16383, 16383), (0, 65535, 0), (0, 0, 65535). `_IdealCaste` = 60, 40, 0, 0. **Verified** in `QUICK2.ANT`: `casteLevels = (0, 39321, 26214)` and `IdealCaste = (60, 40, 0, 0)`.
+- [open] The set buttons (objects 0x1306–0x1308) change `_casteLevels`, but I did not see `_IdealCaste` being recomputed on that path. Check in the original whether switching sets changes production.
+- `_CasteAuto` (`8:8630`) only appears in the interface code (shows or hides the button group). I found no use in the simulation.
 
-**Escolha da casta do próximo ovo**, `_SetCasteProd` (`1030:026e`), todo tick:
+**Choice of the next egg's caste**, `_SetCasteProd` (`1030:026e`), every tick:
 
 ```
-real[i]  = 100 × CastePopB[i+1] / Σ CastePopB[1..4]     (i = 0..3: operária, soldado, macho, rainha nova)
+real[i]  = 100 × CastePopB[i+1] / Σ CastePopB[1..4]     (i = 0..3: worker, soldier, male, new queen)
 ideal[i] = 100 × IdealCaste[i] / Σ IdealCaste
-escolhido = o i com a MENOR diferença (real − ideal), contando só diferenças < 0; se nenhuma, i = 0
-_MakeMe (8:8a56) = _CasteTabB[escolhido]      (_CasteTabB 8:89ae = 2, 6, 4, 8: grupos de operária, soldado, macho, rainha nova)
+chosen   = the i with the SMALLEST difference (real − ideal), counting only differences < 0; if none, i = 0
+_MakeMe (8:8a56) = _CasteTabB[chosen]      (_CasteTabB 8:89ae = 2, 6, 4, 8: groups of worker, soldier, male, new queen)
 ```
 
-**Eclosão** (`_SimEggB` `1028:3ca0`, só no ninho): a cada 32 ticks (se `_BpopT` < 3) ou 128 ticks, o estágio do ovo sobe 1. Ao chegar a 8, o ovo eclode:
+**Hatching** (`_SimEggB` `1028:3ca0`, only in the nest): every 32 ticks (if `_BpopT` < 3) or 128 ticks, the egg's stage goes up by 1. When it reaches 8, the egg hatches:
 
-- Com `_ModeAuto` = 0, o ovo **morre** (`_TotalEggsDiedB` += 1) se `SGRand(255)` > `modeLevels[2] >> 7` (nível de "cuidar das crias"). [hipótese] Com pouca gente cuidando, mais ovos se perdem. Com `_ModeAuto` = 1 o ovo sempre eclode.
-- Se não morre: T = `_MakeMe × 8 + 2` (virada para a direita). M = 1 (Nesting) se for operária; senão, M = `_GetNewModeB(_MakeMe)`.
+- With `_ModeAuto` = 0, the egg **dies** (`_TotalEggsDiedB` += 1) if `SGRand(255)` > `modeLevels[2] >> 7` ("nurse the brood" level). [hypothesis] With few ants nursing, more eggs are lost. With `_ModeAuto` = 1 the egg always hatches.
+- If it does not die: T = `_MakeMe × 8 + 2` (facing right). M = 1 (Nesting) if it is a worker; otherwise, M = `_GetNewModeB(_MakeMe)`.
 
-**Rainha põe ovos** (`_SimQueenB`, cauda, grupo 13): a cada 16 ticks, com probabilidade `SRand128() ≤ _HealthB`, põe um ovo (T = 1) atrás da cauda, se a posição estiver dentro do ninho. Cada ovo posto consome a reserva de comida (`_EatCountB` −1; quando fica negativa, `_HealthB` −1 e a reserva recomeça em `_BpopT/32`) e conta em `_TotalEggsLaidB`. A cabeça anda com chance 1/64 por tick (`_QueenMoveB`). Se `_HealthB` = 0 nesse momento, a rainha morre de fome (mensagem 10015).
+**Queen lays eggs** (`_SimQueenB`, tail, group 13): every 16 ticks, with probability `SRand128() ≤ _HealthB`, she lays an egg (T = 1) behind the tail, if the position is inside the nest. Each egg laid consumes the food reserve (`_EatCountB` −1; when it becomes negative, `_HealthB` −1 and the reserve restarts at `_BpopT/32`) and counts in `_TotalEggsLaidB`. The head moves with chance 1/64 per tick (`_QueenMoveB`). If `_HealthB` = 0 at that moment, the queen dies of starvation (message 10015).
 
-## 5. Modos
+## 5. Modes
 
-**Fato visto no código.** Nomes de 4/1102, na ordem do índice M. "A" = superfície (`_DoAntSimA` `1028:04d8`), "B" = ninho preto (`_DoNestAntB` `1028:2dae`); o ninho vermelho (`_DoNestAntR` `1028:53a4`) espelha o B [hipótese: espelho fiel; há uma função extra `_StayInR`].
+**Fact seen in the code.** Names from 4/1102, in the order of index M. "A" = surface (`_DoAntSimA` `1028:04d8`), "B" = black nest (`_DoNestAntB` `1028:2dae`); the red nest (`_DoNestAntR` `1028:53a4`) mirrors B [hypothesis: faithful mirror; there is an extra function `_StayInR`].
 
-| M | Nome (4/1102) | Superfície (A) | Ninho (B) |
+| M | Name (4/1102) | Surface (A) | Nest (B) |
 |---|---|---|---|
-| 0 | Bored | `_DoRandAntA`: anda ao acaso; numa célula de comida, operária ou soldado pega a comida (M = 3, S = 200); 1/8 de chance de virar Foraging | 1/32 de chance de sortear novo modo; anda |
-| 1 | Nesting | `_DoToNestAnt`: volta para o ninho seguindo o cheiro de ninho | `_DoNestingB`: cuida das crias (pega, carrega e larga ovos; come do estoque) |
-| 2 | Foraging | `_DoForageAnt`: segue a trilha; pega comida (M = 3, S = 200); entra em Alarmed se houver alarme na célula; 1/32 de chance de virar Resting | `_DoDigOutB`: vai para a saída |
-| 3 | Got Food | `_DoReturnFoodAnt`: volta ao ninho deixando trilha (S decrescente) | `_DoFoodInB`: leva a comida ao depósito |
-| 4 | Dig In | `_DoToNestAnt` (igual a 1) | `_DoDigInB`: escava |
-| 5 | Dig Out | `_DoDigOutAntA`: carrega terra para fora e larga (1/8 por passo) | `_DoDigOutB` |
-| 6 | Defense | `_DoRecruitAnt`: segue a formiga amarela (ou a aranha, ou o alarme) | se a amarela não está no ninho preto: `_DoDigOutB`; senão anda e briga |
-| 7 | Attack | `_DoAttackAnt`: vai para o ninho **inimigo** (segue o cheiro de ninho da outra cor) | `_DoDigOutB` (vermelho invasor: `_RaidInB`) |
-| 8 | Hatching | ovo na superfície: some com chance 1/200 por tick | `_SimEggB` |
-| 9 | Egg Laying | rainha na superfície: confere se a cauda/cabeça existe | `_SimQueenB` |
-| 10 | Fighting | `_DoFightA`: nuvem de luta (seção 6) | `_DoNestFightB` |
-| 11 | Alarmed | `_DoToAlarm`: sobe o gradiente de alarme; sem alarme, 1/4 de chance de sortear novo modo | `_DoDigOutB` |
-| 12 | Defend Nest | cheiro de ninho < 110 na célula: volta ao ninho; senão anda perto dele | `_DoDigOutB` |
-| 13 | Resting | parada; num buraco, entra; 1/4 de chance por tick de virar Foraging | parada; 1/20 de chance de sortear novo modo |
-| 14 | Pre-Flight | metade das vezes vai para o ninho, metade anda; se `_FlyAway*` > 100, passa a 15 | anda; se `_FlyAwayB` > 100, passa a 15 |
-| 15 | Take off | `_DoRepoExit`: cheiro de ninho < 100 → ninho, senão anda; quando `_FlyAway` = 1 (ou com chance 1/`_FlyAway`), passa a 16 | `_DoDigOutB` |
-| 16 | Flying | com chance 1/32 (e se `_SwarmCnt*` < 50), sai do mapa; no Jogo Completo, `_SwarmCnt*` += 1 e, com chance 1/16, `_QueenStorage*` += 1 | `_DoDigOutB` |
-| 17 | ??? | — | afogando [hipótese]: se o tile do ninho > 0x13, gira ao acaso e morre com chance 1/100; senão sorteia novo modo |
-| 18 | ??? | — | como Bored |
-| 19 | Avenger | `_DoRedInitiator`: a vermelha líder que conduz ataques | como Bored |
+| 0 | Bored | `_DoRandAntA`: walks at random; on a food cell, a worker or soldier picks up the food (M = 3, S = 200); 1/8 chance of becoming Foraging | 1/32 chance of drawing a new mode; walks |
+| 1 | Nesting | `_DoToNestAnt`: returns to the nest following the nest scent | `_DoNestingB`: tends the brood (picks up, carries and drops eggs; eats from the store) |
+| 2 | Foraging | `_DoForageAnt`: follows the trail; picks up food (M = 3, S = 200); enters Alarmed if there is alarm on the cell; 1/32 chance of becoming Resting | `_DoDigOutB`: goes to the exit |
+| 3 | Got Food | `_DoReturnFoodAnt`: returns to the nest leaving a trail (decreasing S) | `_DoFoodInB`: takes the food to the store |
+| 4 | Dig In | `_DoToNestAnt` (same as 1) | `_DoDigInB`: digs |
+| 5 | Dig Out | `_DoDigOutAntA`: carries dirt outside and drops it (1/8 per step) | `_DoDigOutB` |
+| 6 | Defense | `_DoRecruitAnt`: follows the yellow ant (or the spider, or the alarm) | if the yellow ant is not in the black nest: `_DoDigOutB`; otherwise walks and fights |
+| 7 | Attack | `_DoAttackAnt`: goes to the **enemy** nest (follows the nest scent of the other color) | `_DoDigOutB` (red invader: `_RaidInB`) |
+| 8 | Hatching | egg on the surface: disappears with chance 1/200 per tick | `_SimEggB` |
+| 9 | Egg Laying | queen on the surface: checks whether the tail/head exists | `_SimQueenB` |
+| 10 | Fighting | `_DoFightA`: fight cloud (section 6) | `_DoNestFightB` |
+| 11 | Alarmed | `_DoToAlarm`: climbs the alarm gradient; without alarm, 1/4 chance of drawing a new mode | `_DoDigOutB` |
+| 12 | Defend Nest | nest scent < 110 on the cell: returns to the nest; otherwise walks near it | `_DoDigOutB` |
+| 13 | Resting | stopped; on a hole, enters; 1/4 chance per tick of becoming Foraging | stopped; 1/20 chance of drawing a new mode |
+| 14 | Pre-Flight | half the time goes to the nest, half walks; if `_FlyAway*` > 100, moves to 15 | walks; if `_FlyAwayB` > 100, moves to 15 |
+| 15 | Take off | `_DoRepoExit`: nest scent < 100 → nest, otherwise walks; when `_FlyAway` = 1 (or with chance 1/`_FlyAway`), moves to 16 | `_DoDigOutB` |
+| 16 | Flying | with chance 1/32 (and if `_SwarmCnt*` < 50), leaves the map; in the Full Game, `_SwarmCnt*` += 1 and, with chance 1/16, `_QueenStorage*` += 1 | `_DoDigOutB` |
+| 17 | ??? | — | drowning [hypothesis]: if the nest tile > 0x13, turns at random and dies with chance 1/100; otherwise draws a new mode |
+| 18 | ??? | — | like Bored |
+| 19 | Avenger | `_DoRedInitiator`: the red leader that conducts attacks | like Bored |
 
-Regras comuns na superfície (vistas em `_DoRandAntA`, `_DoForageAnt`, `_DoToAlarm`…):
+Common rules on the surface (seen in `_DoRandAntA`, `_DoForageAnt`, `_DoToAlarm`…):
 
-- **Buraco:** se a formiga está sobre um buraco (tile 0x50 `'P'` no quintal; 0x80–0x8F na casa, `_TERRAINset` = 1), entra no ninho (`_GoInNest`), em quase todos os modos.
-- **Obstáculo:** se o tile de destino é maior que `_Barrier` (`9:7604`), a formiga não anda, só gira (tabela de giro, seção 7).
-- **Célula ocupada:** se for a amarela de outra cor, há luta com a amarela (`_YellowFight`). Se for a amarela da mesma cor, a formiga pode alimentá-la (`_DoTroph`, quando `_MeWantFood` = 1). Se for formiga da mesma cor, gira e sorteia novo modo. Se for inimiga, há luta (seção 6).
-- **Mudança de modo:** `_GetNewMode(grupo, T)` (`1030:0910`), explicado a seguir.
+- **Hole:** if the ant is on a hole (tile 0x50 `'P'` in the yard; 0x80–0x8F in the house, `_TERRAINset` = 1), it enters the nest (`_GoInNest`), in almost all modes.
+- **Obstacle:** if the destination tile is greater than `_Barrier` (`9:7604`), the ant does not move, it only turns (turn table, section 7).
+- **Occupied cell:** if it is the yellow ant of the other color, there is a fight with the yellow ant (`_YellowFight`). If it is the yellow ant of the same color, the ant may feed it (`_DoTroph`, when `_MeWantFood` = 1). If it is an ant of the same color, it turns and draws a new mode. If it is an enemy, there is a fight (section 6).
+- **Mode change:** `_GetNewMode(group, T)` (`1030:0910`), explained below.
 
-### Escolha de modo
+### Mode choice
 
-**Fato visto no código** (`_GetNewMode` `1030:0910`, `_GetNewModeB` `1030:09d0`, `_GetNewModeR` `1030:0a50`, `_SetModeProd` `1030:0326`).
+**Fact seen in the code** (`_GetNewMode` `1030:0910`, `_GetNewModeB` `1030:09d0`, `_GetNewModeR` `1030:0a50`, `_SetModeProd` `1030:0326`).
 
-| Quem | `_ModeAuto` (`9:9fce`) = 1 | `_ModeAuto` = 0 | Vermelhas |
+| Who | `_ModeAuto` (`9:9fce`) = 1 | `_ModeAuto` = 0 | Reds |
 |---|---|---|---|
-| Operária (grupo 2) | `_ModeTabWB[_StrategicModeB][SRand8]` | `_ModeMe` | `_ModeTabWB[_StrategicModeR][SRand8]` |
-| Soldado (grupo 6) | `_ModeTabSB[_StrategicModeB][SRand8]` | `_ModeMe` | `_ModeTabSB[_StrategicModeR][SRand8]` |
-| Demais grupos | `_CasteModeTabB[grupo]` | idem | idem |
+| Worker (group 2) | `_ModeTabWB[_StrategicModeB][SRand8]` | `_ModeMe` | `_ModeTabWB[_StrategicModeR][SRand8]` |
+| Soldier (group 6) | `_ModeTabSB[_StrategicModeB][SRand8]` | `_ModeMe` | `_ModeTabSB[_StrategicModeR][SRand8]` |
+| Other groups | `_CasteModeTabB[group]` | same | same |
 
-Tabelas lidas do `SIMANTW.EXE` (segmento 8):
+Tables read from `SIMANTW.EXE` (segment 8):
 
-`_ModeTabWB` (`8:89e6`, linha = modo estratégico 0..5, 8 sorteios):
+`_ModeTabWB` (`8:89e6`, row = strategic mode 0..5, 8 draws):
 
-| Estratégico | Modos |
+| Strategic | Modes |
 |---|---|
 | 0 | 1 2 7 7 7 7 7 7 |
 | 1 | 4 1 1 1 4 2 2 2 |
@@ -178,7 +180,7 @@ Tabelas lidas do `SIMANTW.EXE` (segmento 8):
 
 `_ModeTabSB` (`8:8a16`):
 
-| Estratégico | Modos |
+| Strategic | Modes |
 |---|---|
 | 0 | 7 7 7 7 7 7 7 7 |
 | 1 | 1 2 2 2 2 2 2 2 |
@@ -187,64 +189,64 @@ Tabelas lidas do `SIMANTW.EXE` (segmento 8):
 | 4 | 2 2 2 2 2 2 2 2 |
 | 5 | 2 2 2 2 2 2 2 2 |
 
-`_CasteModeTabB` (`8:8a46`, por grupo 0..15): `8 1 0 3 14 5 0 3 14 5 0 0 9 9 10 0`. Ou seja: ovo → 8, carregando ovo → 1, com comida → 3, com terra → 5, macho e rainha nova → 14 (Pre-Flight), rainha → 9, luta → 10.
+`_CasteModeTabB` (`8:8a46`, by group 0..15): `8 1 0 3 14 5 0 3 14 5 0 0 9 9 10 0`. That is: egg → 8, carrying an egg → 1, with food → 3, with dirt → 5, male and new queen → 14 (Pre-Flight), queen → 9, fight → 10.
 
-**Triângulo de tarefas** (Forage/Dig/Nurse): `_modeLevels` (`9:9c74`, 3 palavras: **[forragear, cavar, cuidar]**), conjuntos em `_modeSetLevels` (`8:8658`): (60%, 20%, 20%), (100%, 0, 0), (0, 100%, 0), (0, 0, 100%). **Verificado** no `QUICK2.ANT`: `modeLevels = (39321, 13107, 13107)`. `_SetModeProd`, todo tick:
+**Task triangle** (Forage/Dig/Nurse): `_modeLevels` (`9:9c74`, 3 words: **[forage, dig, nurse]**), sets in `_modeSetLevels` (`8:8658`): (60%, 20%, 20%), (100%, 0, 0), (0, 100%, 0), (0, 0, 100%). **Verified** in `QUICK2.ANT`: `modeLevels = (39321, 13107, 13107)`. `_SetModeProd`, every tick:
 
 ```
 total     = ModePopB[0] + ModePopB[1] + ModePopB[2]
 ideal[i]  = modeLevels[i] × total / 65535
-falta[i]  = ideal[i] − ModePopB[i]
-escolhido = o i com a MAIOR falta positiva (se nenhuma, 0)
-_ModeMe (8:8a58) = _ModeTabB[escolhido]       (_ModeTabB 8:89b6 = 2, 4, 1: Foraging, Dig In, Nesting)
+lack[i]   = ideal[i] − ModePopB[i]
+chosen    = the i with the LARGEST positive lack (if none, 0)
+_ModeMe (8:8a58) = _ModeTabB[chosen]       (_ModeTabB 8:89b6 = 2, 4, 1: Foraging, Dig In, Nesting)
 ```
 
-`_ModePopB` (`9:9e70`, 6 palavras) é montado no fim de cada tick a partir da contagem por modo daquele tick (`_TemBModePop`, A + B):
+`_ModePopB` (`9:9e70`, 6 words) is built at the end of each tick from that tick's count per mode (`_TemBModePop`, A + B):
 
-| `_ModePopB[i]` | Modos somados |
+| `_ModePopB[i]` | Modes summed |
 |---|---|
-| 0 forragear | 2 + 3 |
-| 1 cavar | 4 + 5 |
-| 2 cuidar | 1 |
+| 0 forage | 2 + 3 |
+| 1 dig | 4 + 5 |
+| 2 nurse | 1 |
 | 3 | 7 (Attack) |
 | 4 | 12 (Defend Nest) |
 | 5 | 6 (Defense) |
 
-`_ModePopR` (`9:a084`) segue a mesma regra. `_TemRModePop[19]` conta as líderes vermelhas.
+`_ModePopR` (`9:a084`) follows the same rule. `_TemRModePop[19]` counts the red leaders.
 
-`_ModeAuto` e `_CasteAuto` começam em 1 (`_initControls` `1000:cc84`); **verificado** no `QUICK2.ANT`. [hipótese] Mexer no triângulo de tarefas desliga `_ModeAuto` (`_ProcModeEvent` `1000:c07a` zera a flag nos ramos de arrasto); falta conferir.
+`_ModeAuto` and `_CasteAuto` start at 1 (`_initControls` `1000:cc84`); **verified** in `QUICK2.ANT`. [hypothesis] Moving the task triangle turns off `_ModeAuto` (`_ProcModeEvent` `1000:c07a` clears the flag in the drag branches); still to be checked.
 
-## 6. Luta, morte e saúde
+## 6. Fighting, death and health
 
-**Fato visto no código.**
+**Fact seen in the code.**
 
-- **Encontro:** quando uma formiga tenta entrar numa célula com inimiga, a que se move **desaparece na hora** (T = 0). A da célula vira nuvem de luta: T = 0x70 + bit de cor do vencedor, M = 10, S = T do vencedor. Também se marca alarme ≥ 40 ali (`_AlarmHere2`). O vencedor sai de `_GetWinner` (`1028:26f4`):
+- **Encounter:** when an ant tries to enter a cell with an enemy, the one moving **disappears immediately** (T = 0). The one in the cell becomes a fight cloud: T = 0x70 + the winner's color bit, M = 10, S = the winner's T. Alarm ≥ 40 is also marked there (`_AlarmHere2`). The winner comes from `_GetWinner` (`1028:26f4`):
 
   ```
-  classe = tabela por grupo (DGROUP 0x22C6): 0,0,0,0,2,0,1,1,2,1,0,0,3,3,0,0
-           (0 = operária/ovo, 1 = soldado, 2 = reprodutor, 3 = rainha)
-  P[a][b] = chance (em 10) de a vencer b, matriz 4×4 em DGROUP 0x22D6:
-            operária   5 2 7 3
-            soldado    8 5 9 4
-            reprodutor 3 1 5 2
-            rainha     7 6 8 5
-  vence a (a que estava na célula) se RRand(10) < P[classe(a)][classe(b)]
+  class = table by group (DGROUP 0x22C6): 0,0,0,0,2,0,1,1,2,1,0,0,3,3,0,0
+           (0 = worker/egg, 1 = soldier, 2 = breeder, 3 = queen)
+  P[a][b] = chance (out of 10) of a beating b, 4×4 matrix at DGROUP 0x22D6:
+            worker     5 2 7 3
+            soldier    8 5 9 4
+            breeder    3 1 5 2
+            queen      7 6 8 5
+  a wins (the one that was in the cell) if RRand(10) < P[class(a)][class(b)]
   ```
 
-  A perdedora conta em `_BlackLost`/`_RedLost` e `_BAntsKilled`/`_RAntsKilled`. Com `_Invincible` = 1, a vermelha sempre perde. O segmento das duas tabelas foi deduzido do conteúdo do `SIMANTW.EXE` (as linhas da matriz somam 10 com a transposta); elas não têm nome no `.SYM`.
-- **Nuvem de luta** (`_DoFightA` `1028:27e6`): a cada tick ela se redesenha. Com chance 1/16, a luta termina: T volta ao do vencedor (S), sorteia-se novo modo e um cadáver é posto no mapa (`_DeadAntHere`).
-- **Cadáver** (`_DeadAntHere` `1028:28c0`): guarda a posição num anel de 100 posições (`_DeadX` `9:9c82`, `_DeadY` `9:9d76`, ponteiro `_DdPtr`). O cadáver mais antigo do anel some do mapa. O tile vira "formiga morta" (comestível), em valores próprios por cor (ver `tiles-valores.md`).
-- **Morte natural (superfície):** a cada tick, para cada vaga da lista A, sorteia `SRand256()`. Se der 0 e a vaga estiver ocupada, compara a saúde da colônia (`_HealthB`/`_HealthR`) com `SRand32()`; se a saúde for menor, a formiga morre (cadáver, `_BAntsExpired` += 1, inclusive para vermelhas). Saúde ≥ 32 impede essa morte.
-- **Morte natural (ninho preto):** igual, só para pretas e não-rainhas (M ≠ 9), sem cadáver. Aqui o `SRand256()` só é sorteado para formigas vivas: `_DoAntSimB` pula as vagas com T = 0 antes de chamar `_DoNestAntB`.
-- **Saúde da colônia** (`_HealthB` `10:ac86`, `_HealthR` `10:ac88`, 0..100): perde 1 a cada 64 ticks. Ganha 1 quando as formigas comem o bastante: cada mordida no estoque soma 5 a `_EatCountB`, e quando ele passa de (`_BpopT` + soldados)/16 a saúde sobe 1 e o contador zera (`_EatFoodB` `1028:4844`, `_TryEatFoodB`, `_DoNestingB`). Os ovos consomem a reserva (`_DecEatB` `1028:48f8`).
+  The loser counts in `_BlackLost`/`_RedLost` and `_BAntsKilled`/`_RAntsKilled`. With `_Invincible` = 1, the red always loses. The segment of the two tables was deduced from the contents of `SIMANTW.EXE` (the matrix rows sum to 10 with the transpose); they have no name in the `.SYM`.
+- **Fight cloud** (`_DoFightA` `1028:27e6`): every tick it redraws itself. With chance 1/16, the fight ends: T returns to the winner's (S), a new mode is drawn and a corpse is placed on the map (`_DeadAntHere`).
+- **Corpse** (`_DeadAntHere` `1028:28c0`): stores the position in a ring of 100 positions (`_DeadX` `9:9c82`, `_DeadY` `9:9d76`, pointer `_DdPtr`). The oldest corpse in the ring disappears from the map. The tile becomes "dead ant" (edible), with values specific to each color (see `tiles-valores.md`).
+- **Natural death (surface):** every tick, for each slot of list A, it draws `SRand256()`. If it comes out 0 and the slot is occupied, it compares the colony's health (`_HealthB`/`_HealthR`) with `SRand32()`; if the health is lower, the ant dies (corpse, `_BAntsExpired` += 1, including for reds). Health ≥ 32 prevents this death.
+- **Natural death (black nest):** the same, only for blacks and non-queens (M ≠ 9), without a corpse. Here `SRand256()` is only drawn for living ants: `_DoAntSimB` skips the slots with T = 0 before calling `_DoNestAntB`.
+- **Colony health** (`_HealthB` `10:ac86`, `_HealthR` `10:ac88`, 0..100): loses 1 every 64 ticks. Gains 1 when the ants eat enough: each bite from the store adds 5 to `_EatCountB`, and when it exceeds (`_BpopT` + soldiers)/16 the health goes up by 1 and the counter resets (`_EatFoodB` `1028:4844`, `_TryEatFoodB`, `_DoNestingB`). Eggs consume the reserve (`_DecEatB` `1028:48f8`).
 
-## 7. Movimento e escolha de direção
+## 7. Movement and direction choice
 
-**Fato visto no código.**
+**Fact seen in the code.**
 
-- **Tabela de giro** `_TurnTab` (`8:0024`, 8 × 8 bytes): `TurnTab[dir_atual][alvo]` dá a nova direção, girando no máximo 1 passo (45°) em direção ao alvo. As 8 linhas, lidas do executável:
+- **Turn table** `_TurnTab` (`8:0024`, 8 × 8 bytes): `TurnTab[current_dir][target]` gives the new direction, turning at most 1 step (45°) toward the target. The 8 rows, read from the executable:
 
-| dir. atual | alvo 0 1 2 3 4 5 6 7 |
+| current dir. | target 0 1 2 3 4 5 6 7 |
 |---|---|
 | 0 | 0 1 1 1 7 7 7 7 |
 | 1 | 0 1 2 2 2 2 0 0 |
@@ -253,49 +255,49 @@ _ModeMe (8:8a58) = _ModeTabB[escolhido]       (_ModeTabB 8:89b6 = 2, 4, 1: Forag
 | 4 | 3 3 3 3 4 5 5 5 |
 | 5 | 6 6 4 4 4 5 6 6 |
 | 6 | 7 7 7 5 5 5 6 7 |
-| 7 | 0 0 0 0 6 6 6 7 | O passeio aleatório usa `TurnTab[dir][SRand8()]`, o que favorece manter a direção ou girar 45°.
-- **Bordas:** em todas as funções de direção, uma formiga na borda (x = 0 ou 127, y = 0 ou 63) sorteia uma direção que aponta para dentro. `_GetForageDir` usa 3 opções e cantos fixos; `_GetNestDir` e `_GetAlarmDir` usam 5 opções no meio da borda e 3 nos cantos (tabela em [feromonios.md](feromonios.md#4-leitura-escolha-de-direção)).
-- `_GetRandDir` (`1030:0f72`): passeio aleatório.
-- `_GetForageDir` (`1030:0ab0`): olha a trilha da própria cor nas 8 células vizinhas (resolução 2×2) e escolhe a maior. Se nenhuma tiver trilha, faz passeio aleatório. Se a maior for **menor** que a da célula atual, devolve −1 ("fim da trilha"): `_DoForageAnt` então põe a formiga em Bored (7/8) ou sorteia novo modo (1/8).
-- `_GetNestDir` (`1030:0c30`): sobe o gradiente do cheiro de ninho da cor pedida (`_DoAttackAnt` pede a cor inimiga). Sem cheiro na célula: em 3/4 das vezes aponta para o último buraco feito (`_LastNewHoleB/R`, `8:835a`/`8:835e`), senão passeio aleatório. Com cheiro: escolhe o vizinho de maior valor e aplica o giro limitado uma vez ou, em metade das vezes (`SRand2` ≠ 0), duas vezes seguidas (até 90°). Detalhes e ordem dos sorteios em [feromonios.md](feromonios.md#4-leitura-escolha-de-direção).
-- `_GetAlarmDir` (`1030:0e54`): sobe o gradiente do alarme (mapa comum às duas cores).
-- `_GetDefendDir` (`1030:1026`): segue a amarela. Se a amarela está no ninho, segue o cheiro de ninho daquela cor; se está caçando a aranha, vai para a aranha; se está perto da posição difusa (`_FuzLocX/Y`), passeia.
-- `_Recruit(n)` (`1030:06d2`): põe em Defense (M = 6, S = 0) até n operárias ou soldados pretos que ainda não estejam nesse modo. Varre a lista A e depois a B, de trás para frente.
-- **Saída do ninho** (`_ExitHole` `1020:2db6`): a formiga aparece na primeira célula vizinha válida do buraco, testando as direções 0 a 7, que tenha tile < 0x50. Se o modo não for 3, 6 nem 7 e o buraco for do próprio lado do mapa (pretas com x < 64; vermelhas com x ≥ 65), S = 120 (vai depositar cheiro de ninho). No modo 6, S é preservado.
+| 7 | 0 0 0 0 6 6 6 7 | The random walk uses `TurnTab[dir][SRand8()]`, which favors keeping the direction or turning 45°.
+- **Edges:** in all direction functions, an ant on the edge (x = 0 or 127, y = 0 or 63) draws a direction that points inward. `_GetForageDir` uses 3 options and fixed corners; `_GetNestDir` and `_GetAlarmDir` use 5 options in the middle of the edge and 3 in the corners (table in [feromonios.md](feromonios.md#4-reading-direction-choice)).
+- `_GetRandDir` (`1030:0f72`): random walk.
+- `_GetForageDir` (`1030:0ab0`): looks at the trail of its own color in the 8 neighboring cells (2×2 resolution) and picks the largest. If none has a trail, it does a random walk. If the largest is **smaller** than the current cell's, it returns −1 ("end of trail"): `_DoForageAnt` then puts the ant in Bored (7/8) or draws a new mode (1/8).
+- `_GetNestDir` (`1030:0c30`): climbs the gradient of the nest scent of the requested color (`_DoAttackAnt` requests the enemy color). Without scent on the cell: 3/4 of the time it points to the last hole made (`_LastNewHoleB/R`, `8:835a`/`8:835e`), otherwise random walk. With scent: picks the neighbor with the highest value and applies the limited turn once or, half the time (`SRand2` ≠ 0), twice in a row (up to 90°). Details and the order of the random draws in [feromonios.md](feromonios.md#4-reading-direction-choice).
+- `_GetAlarmDir` (`1030:0e54`): climbs the alarm gradient (map shared by both colors).
+- `_GetDefendDir` (`1030:1026`): follows the yellow ant. If the yellow ant is in the nest, it follows that color's nest scent; if it is hunting the spider, it goes to the spider; if it is near the fuzzy position (`_FuzLocX/Y`), it wanders.
+- `_Recruit(n)` (`1030:06d2`): puts into Defense (M = 6, S = 0) up to n black workers or soldiers that are not yet in that mode. Scans list A and then B, from back to front.
+- **Nest exit** (`_ExitHole` `1020:2db6`): the ant appears on the first valid neighboring cell of the hole, testing directions 0 to 7, that has tile < 0x50. If the mode is not 3, 6 or 7 and the hole is on the ant's own side of the map (blacks with x < 64; reds with x ≥ 65), S = 120 (it will deposit nest scent). In mode 6, S is preserved.
 
-## 8. Formiga vermelha líder ("Avenger", modo 19)
+## 8. Red leader ant ("Avenger", mode 19)
 
-**Fato visto no código.** Se nenhuma vermelha está no modo 19 e `_BpopT` ≥ 30, `_MakeRedInitiator` (`1028:967c`) transforma a última vermelha da lista A em líder: T = 0xB0 (soldado vermelho), M = 19, S = 0, `_RedTask` = 0, `_RedInitOn` = 1. `_DoRedInitiator` (`1028:96d4`) conduz recrutamentos e ataques vermelhos (`_RecruitRed`, `_UnRecruitRed`, `_GetNewRedTask`). Detalhamento [em aberto].
+**Fact seen in the code.** If no red is in mode 19 and `_BpopT` ≥ 30, `_MakeRedInitiator` (`1028:967c`) turns the last red of list A into a leader: T = 0xB0 (red soldier), M = 19, S = 0, `_RedTask` = 0, `_RedInitOn` = 1. `_DoRedInitiator` (`1028:96d4`) conducts red recruitments and attacks (`_RecruitRed`, `_UnRecruitRed`, `_GetNewRedTask`). Details [open].
 
-## 9. Formiga amarela (resumo)
+## 9. Yellow ant (summary)
 
-**Fato visto no código.** `_DoAntSimY` (`1028:7cf6`) roda todo tick. Com `_MeMode` = 0, ele:
+**Fact seen in the code.** `_DoAntSimY` (`1028:7cf6`) runs every tick. With `_MeMode` = 0, it:
 
-- grava a amarela no mapa de vida;
-- tira 1 de vida a cada 64 ticks, e mais 1 por tick dentro do ninho se o tile da célula for > 0x4D;
-- se a amarela é rainha (`_MeType` = 0x60) dentro de um ninho, a cada 16 ticks pode pôr ovo (custa 5 de vida).
+- writes the yellow ant into the life map;
+- takes 1 health every 64 ticks, and 1 more per tick inside the nest if the cell's tile is > 0x4D;
+- if the yellow ant is a queen (`_MeType` = 0x60) inside a nest, every 16 ticks it may lay an egg (costs 5 health).
 
-`_DoAntMoveY` (`1028:75f4`) move a amarela quando há ordem (`_MeMoveMe`). Ela pode depositar trilha (`_MeScent`, que começa em 200 ao pegar comida e não desce de 10) e alarme (+50 por passo, máximo 200, com `_MeDropAlarm`). A morte e a reencarnação estão em `_YellowDeath` (`1000:7746`). A ordem de busca de um novo corpo é: ovo no ninho preto, adulto preto no ninho preto, adulto preto na superfície, adulto preto no ninho vermelho. Detalhes da amarela num documento próprio [em aberto].
+`_DoAntMoveY` (`1028:75f4`) moves the yellow ant when there is an order (`_MeMoveMe`). It can deposit trail (`_MeScent`, which starts at 200 when picking up food and does not go below 10) and alarm (+50 per step, maximum 200, with `_MeDropAlarm`). Death and reincarnation are in `_YellowDeath` (`1000:7746`). The search order for a new body is: egg in the black nest, black adult in the black nest, black adult on the surface, black adult in the red nest. Details of the yellow ant in a document of its own [open].
 
-## 10. Funções presentes mas não chamadas
+## 10. Functions present but not called
 
-Sem chamada encontrada no pseudocódigo: `_DoDefendNest` (`1028:0df6`), `_DoRepoLoit` (`1028:0c1e`), `_DoRestAnt` (`1028:0b76`), `_DoRepoFly` (`1028:0d4a`), `_SimEggA` (`1028:0a1c`), `_SimQueenA` (`1028:0a74`), `_GetSmellT` (`1028:9612`), `_cvtLevels2IdealCaste`, `_GetFromAlist`. A lógica equivalente está embutida em `_DoAntSimA`: os casos 8, 9, 13, 14 e 16 repetem `_SimEggA`, `_SimQueenA`, `_DoRestAnt`, `_DoRepoLoit` e `_DoRepoFly`. [hipótese] São restos do port do Mac ou chamadas por ponteiro que o Ghidra não resolveu.
+No call found in the pseudocode: `_DoDefendNest` (`1028:0df6`), `_DoRepoLoit` (`1028:0c1e`), `_DoRestAnt` (`1028:0b76`), `_DoRepoFly` (`1028:0d4a`), `_SimEggA` (`1028:0a1c`), `_SimQueenA` (`1028:0a74`), `_GetSmellT` (`1028:9612`), `_cvtLevels2IdealCaste`, `_GetFromAlist`. The equivalent logic is inlined in `_DoAntSimA`: cases 8, 9, 13, 14 and 16 repeat `_SimEggA`, `_SimQueenA`, `_DoRestAnt`, `_DoRepoLoit` and `_DoRepoFly`. [hypothesis] They are leftovers from the Mac port or calls through pointers that Ghidra did not resolve.
 
-## 11. Como testar contra o original
+## 11. How to test against the original
 
-Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md). Ferramenta de leitura sugerida: um `tools/ant_dump.py`, a escrever, que use os offsets de [save-ant.md](../formatos/save-ant.md).
+Test bench: [docs/bancada-qemu.md](../../bancada-qemu.md). Suggested reading tool: a `tools/ant_dump.py`, yet to be written, that uses the offsets from [save-ant.md](../formatos/save-ant.md).
 
-1. **Codificação de T.** No original, abra a janela Examine sobre formigas conhecidas (operária, soldado, com comida) e compare com o T da lista no save feito logo depois (posição X, Y). Esperado: os nomes da tabela da seção 3.
-2. **Eclosão e castas.** Jogo Quick, triângulo de castas no vértice "Soldiers", sem `_ModeAuto`. Salve a cada ~128 ticks e conte os grupos novos na lista B: só devem nascer soldados (grupo 6, T = 0x32).
-3. **Modos.** Com `_ModeAuto` desligado e o triângulo de tarefas em "Dig", confira em saves sucessivos que as novas atribuições de operárias e soldados vão para M = 4 (Dig In).
-4. **Lista e compactação.** Em saves sucessivos, `_ListIndexA` só pode cair em ticks ≡ 0 (mod 128). Fora desses ticks, as vagas com T = 0 permanecem.
-5. **Luta.** No modo Experimental, ponha uma operária preta e uma vermelha lado a lado e repita várias vezes. A proporção de vitórias deve tender a 50%; soldado contra operária, a 80%.
-6. **Comparação com o port.** Carregue o mesmo `.ANT` no port, rode N ticks com o mesmo RNG e compare as listas por vaga, na mesma ordem, além de `_TemCensus`, `_CastePop*`, `_ModePop*`, `_MakeMe` e `_ModeMe`.
+1. **Encoding of T.** In the original, open the Examine window on known ants (worker, soldier, with food) and compare with the T in the list of the save made right after (position X, Y). Expected: the names in the table of section 3.
+2. **Hatching and castes.** Quick game, caste triangle at the "Soldiers" vertex, without `_ModeAuto`. Save every ~128 ticks and count the new groups in list B: only soldiers should be born (group 6, T = 0x32).
+3. **Modes.** With `_ModeAuto` off and the task triangle on "Dig", check in successive saves that the new assignments of workers and soldiers go to M = 4 (Dig In).
+4. **List and compaction.** In successive saves, `_ListIndexA` can only drop on ticks ≡ 0 (mod 128). Outside those ticks, slots with T = 0 remain.
+5. **Fighting.** In Experimental mode, place a black worker and a red one side by side and repeat several times. The proportion of wins should tend to 50%; soldier against worker, to 80%.
+6. **Comparison with the port.** Load the same `.ANT` in the port, run N ticks with the same RNG and compare the lists slot by slot, in the same order, as well as `_TemCensus`, `_CastePop*`, `_ModePop*`, `_MakeMe` and `_ModeMe`.
 
-## Lacunas
+## Gaps
 
-- Regras detalhadas de cada `_Do*Ant` (passo a passo) e das funções de ninho `_DoNestingB`, `_DoFoodInB`, `_DoDigInB`, `_DoDigOutB`, `_RaidInB/OutB`, `_DoNestFightB`, `_QueenMoveB`, e das diferenças do ninho vermelho.
-- Significado dos grupos 10 (Replete), 11 e 15, e de onde surgem.
-- Modo 17 (hipótese: afogamento) e modo 18.
-- Efeito exato de trocar o conjunto memorizado no triângulo de castas.
-- Formiga amarela, aranha, formiga-leão e lagarta: documentos próprios.
+- Detailed rules of each `_Do*Ant` (step by step) and of the nest functions `_DoNestingB`, `_DoFoodInB`, `_DoDigInB`, `_DoDigOutB`, `_RaidInB/OutB`, `_DoNestFightB`, `_QueenMoveB`, and of the differences of the red nest.
+- Meaning of groups 10 (Replete), 11 and 15, and where they come from.
+- Mode 17 (hypothesis: drowning) and mode 18.
+- Exact effect of switching the memorized set in the caste triangle.
+- Yellow ant, spider, antlion and caterpillar: documents of their own.
