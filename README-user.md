@@ -34,9 +34,10 @@ contain. (The full guide, in Portuguese, is `LEIAME.txt`.)
    - *Início* (start): the title screen and "Select a Game", a new game (*Rápido* = Quick,
      *Completo* = Full, *Experimental*, *Tutorial*) or a saved game (`.ANT`).
    - *Vídeo*: emulated resolution, window scale and size, the Windows 3.1 title bar, video driver
-     profile (with *Moldura Win 3.1*, the window loses the system frame and behaves like a Windows 3.1
-     window: drag by the title, double-click it or the right button to maximize/restore, resize by the
-     gray frame, Alt+F4 asks to save). *Som*: sound on/off and the music synthesizer (simple — the
+     profile (*Moldura Win 3.1*, on by default: the window loses the system frame and behaves like a
+     Windows 3.1 window: drag by the title, double-click it or the right button to maximize/restore,
+     resize by the gray frame, minimize and the system menu work even with a dialog open, Alt+F4 asks
+     to save; uncheck it for the normal system window). *Som*: sound on/off and the music synthesizer (simple — the
      default —, FM, SoundFont `.sf2`). *Mods*: the
      mods folder and a checkbox per mod. *Preferências*: keep options between games, `WIN.INI` to read
      the original's options from.

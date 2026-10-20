@@ -142,6 +142,21 @@ pub(crate) fn pasta_jogo_padrao(base: &Path) -> PathBuf {
     std::env::var_os("SIMANT_DIR").map(PathBuf::from).unwrap_or_else(|| base.join("SimAnt-T").join("MAXIS").join("ANTWIN"))
 }
 
+impl Opcoes {
+    /// Execução sem interação (testes, exportações, comparações com a bancada; as mesmas opções de
+    /// `config_launcher::OPCOES_DE_AUTOMACAO`): o resultado não pode depender dos padrões de vídeo.
+    pub(crate) fn automacao(&self) -> bool {
+        self.ticks.is_some()
+            || self.avancar_ms.is_some()
+            || self.exportar.is_some()
+            || self.exportar_tela_jogo.is_some()
+            || self.som.exportar.is_some()
+            || self.capturar_janela.is_some()
+            || self.sair_apos_ms.is_some()
+            || self.salvar.is_some()
+    }
+}
+
 /// Lê as opções `args` (sem o nome do programa; a configuração do launcher já combinada na frente,
 /// `config_launcher::combinar`). Padrões das pastas: `data/`, `mods/` e o jogo relativos à pasta base
 /// do port, não à pasta atual; caminhos relativos dados nas opções valem a partir da pasta atual ou,

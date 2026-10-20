@@ -221,11 +221,12 @@ pub fn soltar(s: &mut Sessao, x: i32, y: i32) -> bool {
 /// Tecla com o visor aberto e com o foco (nome da tecla do SDL). Devolve se tratou.
 #[cfg(test)]
 pub fn tecla_no_visor(s: &mut Sessao, nome: &str) -> bool {
-    tecla_no_visor_com(s, nome, false, false)
+    tecla_no_visor_com(s, nome, false, false, false)
 }
 
-/// Como [`tecla_no_visor`], com Alt (menus do WinHelp) e Shift (maiúsculas no Search).
-pub fn tecla_no_visor_com(s: &mut Sessao, nome: &str, alt: bool, shift: bool) -> bool {
+/// Como [`tecla_no_visor`], com Alt (menus do WinHelp), Shift (maiúsculas no Search) e Ctrl
+/// (Ctrl+F4 fecha a ajuda).
+pub fn tecla_no_visor_com(s: &mut Sessao, nome: &str, alt: bool, shift: bool, ctrl: bool) -> bool {
     if !(s.ajuda.na_tela() && s.ajuda.foco) {
         return false;
     }
@@ -237,12 +238,14 @@ pub fn tecla_no_visor_com(s: &mut Sessao, nome: &str, alt: bool, shift: bool) ->
             }
             return true;
         }
-        // Alt+Espaço abre o menu de sistema; Alt+F4 fecha (os atalhos da janela de nível superior).
+        // Alt+Espaço abre o menu de sistema (o atalho da janela de nível superior). Fechar é Ctrl+F4,
+        // não o Alt+F4 do WinHelp: o Alt+F4 fica só com o executável (fecha o SimAnt com a pergunta
+        // do Quit; extensão do port, docs/decisoes.md, 2026-10-19).
         if alt && nome == "Space" {
             g.abrir_menu(ID_AJUDA);
             return true;
         }
-        if alt && nome == "F4" {
+        if ctrl && !alt && nome == "F4" {
             fechar(s);
             return true;
         }
@@ -394,7 +397,11 @@ pub fn clique(s: &mut Sessao, x: i32, y: i32) -> bool {
 pub fn cursor_em(s: &Sessao, x: i32, y: i32) -> Option<String> {
     let c = &s.ajuda.cfg.cursores;
     if s.ajuda.na_tela() && s.ajuda.visor.as_ref().is_some_and(|v| v.contem(x, y)) {
-
+        return None;
+    }
+    // Com um diálogo ou aviso modal por cima (a pergunta do Quit, o Save As…), a seta: a lente do
+    // ANT INFO desenhada pelo port escondia o cursor do sistema por cima do diálogo.
+    if s.com_janela_modal() {
         return None;
     }
     if s.ajuda.modo {
@@ -660,8 +667,8 @@ mod testes {
         abrir_contexto(&mut s, 0x100);
         assert_eq!(externo(&s)[0], e);
         // Alt+Espaço abre o menu; "n" (Minimize) minimiza.
-        assert!(tecla_no_visor_com(&mut s, "Space", true, false));
-        assert!(tecla_no_visor_com(&mut s, "n", false, false));
+        assert!(tecla_no_visor_com(&mut s, "Space", true, false, false));
+        assert!(tecla_no_visor_com(&mut s, "n", false, false, false));
         assert!(s.ajuda.minimizada());
     }
 

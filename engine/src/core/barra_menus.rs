@@ -218,6 +218,10 @@ pub struct BarraMenus {
     pub sistema: Option<MenuSistema>,
     /// Primeira linha da barra na janela do port (0, ou a altura da barra de título).
     pub topo: i16,
+    /// Só o menu de sistema da janela principal responde (os títulos da barra ficam parados): com um
+    /// diálogo ou aviso modal aberto e no "Select a Game" da abertura, os controles da janela (a
+    /// moldura de verdade, extensão do port) continuam funcionando, o resto da barra não.
+    pub so_sistema: bool,
 }
 
 fn contem(r: Retangulo, x: i32, y: i32) -> bool {
@@ -231,7 +235,7 @@ fn sem_e(texto: &str) -> Vec<u8> {
 
 impl BarraMenus {
     pub fn new(cfg: ConfigBarraMenus, menu: MenuBanco) -> BarraMenus {
-        BarraMenus { cfg, menu, estado: Estado::Fechado, arrastando: false, reapertou: false, sistema: None, topo: 0 }
+        BarraMenus { cfg, menu, estado: Estado::Fechado, arrastando: false, reapertou: false, sistema: None, topo: 0, so_sistema: false }
     }
 
     /// Liga a barra de título do Windows 3.1 em cima da barra (`moldura_windows31`): a barra desce
@@ -275,7 +279,7 @@ impl BarraMenus {
 
     /// Ordem do percurso pelas setas: o menu de sistema antes do File.
     fn ordem(&self) -> Vec<usize> {
-        let n = self.menu.titulos.len();
+        let n = if self.so_sistema && self.sistema.is_some() { 0 } else { self.menu.titulos.len() };
         self.indice_sistema().into_iter().chain(0..n).collect()
     }
 
@@ -396,6 +400,9 @@ impl BarraMenus {
                 return Some(k);
             }
         }
+        if self.so_sistema {
+            return None;
+        }
         self.titulos(f).iter().position(|r| contem(*r, x, y))
     }
 
@@ -509,6 +516,9 @@ impl BarraMenus {
 
     /// Menu do título com a letra sublinhada `letra` (Alt+letra, ou a letra com a barra ativa).
     fn menu_da_letra(&self, letra: &str) -> Option<usize> {
+        if self.so_sistema {
+            return None;
+        }
         let l = letra.to_ascii_lowercase();
         self.menu.titulos.iter().position(|t| mnemonico(t).is_some_and(|c| l.len() == 1 && l.starts_with(c)))
     }

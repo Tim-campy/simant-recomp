@@ -254,9 +254,33 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
         let escolhendo = rep.atual().is_some_and(|t| t.nome == selecao.cfg.tela);
         let lote: Vec<Event> = eventos.poll_iter().collect();
         for ev in lote {
-            // Coordenadas da janela → área cliente (a moldura em volta e as barras em cima não respondem).
-            let ev = menus_ui::deslocar(moldura.deslocar(ev), barras);
-            // Clique nas barras: nada (medido no "Select a Game"; no título, [hipótese] o mesmo).
+            let ev = moldura.deslocar(ev);
+            // A barra de título e o menu de sistema são os controles da janela do executável:
+            // funcionam também aqui (extensão do port; no original nada responde no "Select a Game",
+            // bancada qemu_selecao_moldura.txt). A barra de menus fica parada.
+            if let Some(f) = menus_ui::evento_da_moldura(&mut menus, interface, lw as i16, &ev) {
+                use engine::core::moldura_principal::ComandoPrincipal as C;
+                match f {
+                    menus_ui::Filtro::Sistema(c) => {
+                        println!("menu de sistema: {c:?}");
+                        match c {
+                            C::Minimizar => canvas.window_mut().minimize(),
+                            C::Restaurar if canvas.window().is_maximized() => canvas.window_mut().restore(),
+                            C::Restaurar | C::Maximizar if moldura.restaurada() => canvas.window_mut().maximize(),
+                            // Close: sai, como fechar a janela do sistema aqui.
+                            C::Fechar => return Ok(None),
+                            _ => {}
+                        }
+                        desenhada = None;
+                    }
+                    menus_ui::Filtro::Tratada(true) => desenhada = None,
+                    _ => {}
+                }
+                continue;
+            }
+            // Coordenadas da janela → área cliente (a moldura em volta e a barra de menus não respondem).
+            let ev = menus_ui::deslocar(ev, barras);
+            // Clique nas barras: nada (medido no "Select a Game").
             if let Event::MouseButtonDown { y, .. } | Event::MouseButtonUp { y, .. } = ev {
                 if y < 0 {
                     continue;
@@ -311,6 +335,7 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
         moldura.atualizar(&mut canvas);
         if moldura.restaurada() != restaurada_desenhada {
             restaurada_desenhada = moldura.restaurada();
+            menus.definir_restaurada(restaurada_desenhada);
             desenhada = None;
         }
         if desenhada.as_deref() != Some(tela.nome.as_str()) || ativa != ativa_desenhada {
@@ -326,7 +351,7 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
                 }
                 None => compor_rgb(tela, recursos, interface, cores)?,
             };
-            let titulo = engine::core::moldura_principal::EstadoTitulo { ativa, restaurada: moldura.restaurada(), ..Default::default() };
+            let titulo = menus.estado_titulo(ativa);
             let estado = engine::core::barra_menus::EstadoMenus::default();
             let rgb = menus_ui::compor_barras(&menus, interface, cores, &titulo, &estado, &rgb, tela.largura as usize, tela.altura as usize);
             let altura = tela.altura + barras as u32;
@@ -385,8 +410,13 @@ fn principal(o: Opcoes) -> Result<(), String> {
     // data/video.json (opcional; um mod pode trocá-lo) e, por cima, --escala e --janela.
     let arquivo_video = if recursos.existe_dado(video::ARQUIVO) { recursos.dados(video::ARQUIVO)? } else { video::ConfigVideo::default() };
     o.video = arquivo_video.com_linha_de_comando(o.resolucao, o.escala, o.janela);
-    if let Some(m) = o.moldura {
-        o.video.moldura_windows31 = m;
+    match o.moldura {
+        Some(m) => o.video.moldura_windows31 = m,
+        // A moldura do Windows 3.1 vem ligada por padrão (data/video.json, docs/decisoes.md,
+        // 2026-10-19), mas as exportações, os testes e as comparações com a bancada produzem o que
+        // sempre produziram: sem --moldura explícito, ficam sem ela (a área cliente e a barra de menus).
+        None if o.automacao() => o.video.moldura_windows31 = false,
+        None => {}
     }
     if let Some(m) = o.substituir_moldura {
         o.video.substituir_moldura_do_sistema = m;

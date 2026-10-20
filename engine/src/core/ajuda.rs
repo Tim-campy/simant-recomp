@@ -138,7 +138,7 @@ pub struct ConfigJanelaAjuda {
     /// o título com a moldura).
     pub tamanho_minimo: [i16; 2],
     /// Itens do menu de sistema de uma janela de nível superior: Restore, Move, Size, Minimize,
-    /// Maximize, —, Close Alt+F4, —, Switch To... Ctrl+Esc.
+    /// Maximize, —, Close Alt+F4 (no port, Ctrl+F4: data/ajuda.json), —, Switch To... Ctrl+Esc.
     pub itens: Vec<super::gerenciador::ItemMenuSistema>,
     pub largura_menu: i16,
     pub coluna_atalho: i16,

@@ -31,9 +31,10 @@ pub struct ConfigVideo {
     #[serde(default = "verdadeiro")]
     pub escala_inteira: bool,
     /// Desenha a barra de título e o menu de sistema da janela principal do Windows 3.1 em cima da
-    /// barra de menus (a janela do port fica com a altura toda da tela imitada). Padrão `false`: a
-    /// janela do sistema atual já tem título (docs/decisoes.md, 2026-10-19).
-    #[serde(default)]
+    /// barra de menus (a janela do port fica com a altura toda da tela imitada). Padrão `true` na 1.0
+    /// (escolha do usuário, docs/decisoes.md, 2026-10-19); as exportações e os testes ficam sem ela
+    /// sem `--moldura` explícito (`Opcoes::automacao`).
+    #[serde(default = "verdadeiro")]
     pub moldura_windows31: bool,
     /// Com `moldura_windows31`, a barra desenhada substitui a moldura do sistema: a janela fica sem
     /// borda, arrasta-se pela faixa do título e, restaurada, ganha a moldura grossa do Windows 3.1
@@ -63,7 +64,7 @@ impl Default for ConfigVideo {
             janela: None,
             redimensionavel: true,
             escala_inteira: true,
-            moldura_windows31: false,
+            moldura_windows31: true,
             substituir_moldura_do_sistema: true,
         }
     }
@@ -139,7 +140,7 @@ mod testes {
     #[test]
     fn linha_de_comando_vence_o_arquivo() {
         let arq: ConfigVideo = serde_json::from_str(r#"{"escala": 3, "janela": [900, 700]}"#).unwrap();
-        assert!(arq.redimensionavel && arq.escala_inteira && !arq.moldura_windows31, "chaves ausentes ficam no padrão");
+        assert!(arq.redimensionavel && arq.escala_inteira && arq.moldura_windows31, "chaves ausentes ficam no padrão");
         assert!(arq.substituir_moldura_do_sistema, "a moldura do Windows 3.1, se ligada, substitui a do sistema");
         assert_eq!(arq.resolucao_virtual, [640, 480], "tela virtual padrão");
         let c = arq.clone().com_linha_de_comando(None, Some(2), None);

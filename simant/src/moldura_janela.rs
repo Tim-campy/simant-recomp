@@ -21,38 +21,101 @@ use sdl2::event::Event;
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, WindowCanvas};
 
-/// Onde o jogo (com a moldura) fica na janela: tamanho lógico, escala e canto, em pixels da saída.
+/// Onde o jogo e a moldura ficam na janela, em pixels da saída. Restaurada, a moldura grossa fica
+/// rente às bordas da janela (é a borda dela, com qualquer tamanho que o jogador der) e o jogo fica
+/// centrado dentro dela, com tarjas pretas entre os dois se o tamanho não for um múltiplo exato.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Posicao {
-    /// Tamanho lógico com a moldura.
+    /// Tamanho lógico do jogo (barras e área cliente), sem a moldura.
     largura: i32,
     altura: i32,
+    /// Espessura lógica da moldura (0 = maximizada).
     borda: i32,
-    /// Pixels da saída por pixel lógico e canto lógico (0, 0) na saída.
+    /// Pixels da saída por pixel lógico e canto (0, 0) do jogo na saída.
     escala: f32,
     origem: (f32, f32),
+    /// Parte visível da janela na saída (a moldura fica rente a ela): canto e tamanho.
+    visivel: (f32, f32, f32, f32),
     /// Pixels da saída por unidade de coordenada da janela (DPI).
     saida_por_janela: (f32, f32),
 }
 
 impl Posicao {
-    /// Ponto em coordenadas da janela → pixel lógico (com a moldura).
+    /// Ponto em coordenadas da janela → pixel da saída.
+    fn na_saida(&self, x: f32, y: f32) -> (f32, f32) {
+        (x * self.saida_por_janela.0, y * self.saida_por_janela.1)
+    }
+
+    /// Ponto em coordenadas da janela → pixel lógico do jogo (sem a moldura).
     fn logico(&self, x: f32, y: f32) -> (i32, i32) {
-        let lx = (x * self.saida_por_janela.0 - self.origem.0) / self.escala;
-        let ly = (y * self.saida_por_janela.1 - self.origem.1) / self.escala;
-        (lx.floor() as i32, ly.floor() as i32)
+        let (sx, sy) = self.na_saida(x, y);
+        (((sx - self.origem.0) / self.escala).floor() as i32, ((sy - self.origem.1) / self.escala).floor() as i32)
     }
 
-    /// Coluna/linha lógica → pixel da saída (as bordas arredondadas, sem frestas entre retângulos).
-    fn saida(&self, x: i32, y: i32) -> (i32, i32) {
-        ((self.origem.0 + x as f32 * self.escala).round() as i32, (self.origem.1 + y as f32 * self.escala).round() as i32)
+    /// Tamanho lógico da moldura: a parte visível na escala do jogo.
+    fn tamanho_moldura(&self) -> (i32, i32) {
+        ((self.visivel.2 / self.escala).floor() as i32, (self.visivel.3 / self.escala).floor() as i32)
     }
 
-    /// Retângulo lógico → retângulo na saída.
-    fn retangulo(&self, esq: i32, topo: i32, dir: i32, base: i32) -> Option<Rect> {
-        let (x0, y0) = self.saida(esq, topo);
-        let (x1, y1) = self.saida(dir, base);
+    /// Coordenada lógica da moldura → saída: até o meio, contada da borda de cima (ou da esquerda);
+    /// depois, da de baixo (ou da direita): as duas bordas ficam rentes à janela.
+    fn moldura_na_saida(&self, v: i32, total: i32, ini: f32, tam: f32) -> i32 {
+        if 2 * v <= total {
+            (ini + v as f32 * self.escala).round() as i32
+        } else {
+            (ini + tam - (total - v) as f32 * self.escala).round() as i32
+        }
+    }
+
+    /// Ponto em coordenadas da janela → pixel lógico da moldura (o inverso de `moldura_na_saida`).
+    fn logico_moldura(&self, x: f32, y: f32) -> (i32, i32) {
+        let (sx, sy) = self.na_saida(x, y);
+        let (fw, fh) = self.tamanho_moldura();
+        let (x0, y0, w, h) = self.visivel;
+        let eixo = |s: f32, ini: f32, tam: f32, total: i32| {
+            let d = s - ini;
+            if 2.0 * d <= tam {
+                (d / self.escala).floor() as i32
+            } else {
+                total - 1 - ((ini + tam - 1.0 - s) / self.escala).floor() as i32
+            }
+        };
+        (eixo(sx, x0, w, fw), eixo(sy, y0, h, fh))
+    }
+
+    /// Retângulo lógico da moldura → retângulo na saída.
+    fn retangulo_moldura(&self, esq: i32, topo: i32, dir: i32, base: i32) -> Option<Rect> {
+        let (fw, fh) = self.tamanho_moldura();
+        let (x0, y0, w, h) = self.visivel;
+        let (sx0, sx1) = (self.moldura_na_saida(esq, fw, x0, w), self.moldura_na_saida(dir, fw, x0, w));
+        let (sy0, sy1) = (self.moldura_na_saida(topo, fh, y0, h), self.moldura_na_saida(base, fh, y0, h));
+        (sx1 > sx0 && sy1 > sy0).then(|| Rect::new(sx0, sy0, (sx1 - sx0) as u32, (sy1 - sy0) as u32))
+    }
+
+    /// Retângulo do jogo na saída.
+    fn retangulo_jogo(&self) -> Option<Rect> {
+        let (x0, y0) = (self.origem.0.round() as i32, self.origem.1.round() as i32);
+        let x1 = (self.origem.0 + self.largura as f32 * self.escala).round() as i32;
+        let y1 = (self.origem.1 + self.altura as f32 * self.escala).round() as i32;
         (x1 > x0 && y1 > y0).then(|| Rect::new(x0, y0, (x1 - x0) as u32, (y1 - y0) as u32))
+    }
+
+    /// O que fica sob o ponto (coordenadas da janela): a moldura grossa (rente às bordas), a faixa
+    /// do título do jogo ou o resto (as tarjas entre a moldura e o jogo não fazem nada).
+    fn parte(&self, cfg: &ConfigMolduraPrincipal, redimensionavel: bool, x: f32, y: f32) -> ParteJanela {
+        if self.borda > 0 {
+            let (fw, fh) = self.tamanho_moldura();
+            let (mx, my) = self.logico_moldura(x, y);
+            if let r @ ParteJanela::Redimensionar { .. } = cfg.parte_da_janela(fw, fh, self.borda, redimensionavel, mx, my) {
+                return r;
+            }
+            let (esq, dir, topo, base) = (mx < self.borda, mx >= fw - self.borda, my < self.borda, my >= fh - self.borda);
+            if esq || dir || topo || base {
+                return ParteJanela::Normal;
+            }
+        }
+        let (gx, gy) = self.logico(x, y);
+        cfg.parte_da_janela(self.largura, self.altura, 0, redimensionavel, gx, gy)
     }
 }
 
@@ -74,9 +137,7 @@ unsafe extern "C" fn teste_de_clique(
     // programa) e `ponto` vem do SDL, válido durante a chamada.
     let (g, p) = unsafe { (&*(dados as *const Mutex<Geometria>), *ponto) };
     let Ok(g) = g.lock() else { return R::SDL_HITTEST_NORMAL };
-    let pos = g.posicao;
-    let (x, y) = pos.logico(p.x as f32, p.y as f32);
-    match g.cfg.parte_da_janela(pos.largura, pos.altura, pos.borda, g.redimensionavel, x, y) {
+    match g.posicao.parte(&g.cfg, g.redimensionavel, p.x as f32, p.y as f32) {
         ParteJanela::Normal => R::SDL_HITTEST_NORMAL,
         ParteJanela::Arrastar => R::SDL_HITTEST_DRAGGABLE,
         ParteJanela::Redimensionar { esq, dir, topo, base } => match (esq, dir, topo, base) {
@@ -109,7 +170,7 @@ pub struct MolduraJanela {
 impl MolduraJanela {
     /// A janela fica com a borda do sistema.
     pub fn desligada() -> MolduraJanela {
-        let posicao = Posicao { largura: 0, altura: 0, borda: 0, escala: 1.0, origem: (0.0, 0.0), saida_por_janela: (1.0, 1.0) };
+        let posicao = Posicao { largura: 0, altura: 0, borda: 0, escala: 1.0, origem: (0.0, 0.0), visivel: (0.0, 0.0, 1.0, 1.0), saida_por_janela: (1.0, 1.0) };
         MolduraJanela { geometria: None, cfg: None, largura: 0, altura: 0, escala_inteira: true, posicao, cores: Vec::new() }
     }
 
@@ -200,8 +261,20 @@ impl MolduraJanela {
         if self.escala_inteira && escala >= 1.0 {
             escala = escala.floor();
         }
-        let origem = ((vx0 + (vw - lw as f32 * escala) / 2.0).floor(), (vy0 + (vh - lh as f32 * escala) / 2.0).floor());
-        self.posicao = Posicao { largura: lw, altura: lh, borda, escala, origem, saida_por_janela };
+        // O jogo fica centrado dentro da moldura (que fica rente às bordas da parte visível).
+        let b = borda as f32 * escala;
+        let (iw, ih) = (vw - 2.0 * b, vh - 2.0 * b);
+        let (jw, jh) = (self.largura as f32 * escala, self.altura as f32 * escala);
+        let origem = ((vx0 + b + (iw - jw) / 2.0).floor(), (vy0 + b + (ih - jh) / 2.0).floor());
+        self.posicao = Posicao {
+            largura: self.largura as i32,
+            altura: self.altura as i32,
+            borda,
+            escala,
+            origem,
+            visivel: (vx0, vy0, vw, vh),
+            saida_por_janela,
+        };
         if let Ok(mut g) = g.lock() {
             g.posicao = self.posicao;
         }
@@ -213,10 +286,7 @@ impl MolduraJanela {
             return ev;
         }
         let p = &self.posicao;
-        let ponto = |x: i32, y: i32| {
-            let (lx, ly) = p.logico(x as f32, y as f32);
-            (lx - p.borda, ly - p.borda)
-        };
+        let ponto = |x: i32, y: i32| p.logico(x as f32, y as f32);
         match ev {
             Event::MouseMotion { timestamp, window_id, which, mousestate, x, y, xrel, yrel } => {
                 let (x, y) = ponto(x, y);
@@ -241,18 +311,19 @@ impl MolduraJanela {
     pub fn copiar(&self, canvas: &mut WindowCanvas, textura: &Texture) -> Result<(), String> {
         let Some(cfg) = self.cfg.as_ref().filter(|_| self.ligada()) else { return canvas.copy(textura, None, None) };
         let p = &self.posicao;
-        let d = p.borda.max(0);
-        if d > 0 {
-            for (r, cor) in cfg.retangulos_da_borda(p.largura as i16, p.altura as i16) {
+        if p.borda > 0 {
+            let (fw, fh) = p.tamanho_moldura();
+            let lim = |v: i32| v.clamp(0, i32::from(i16::MAX)) as i16;
+            for (r, cor) in cfg.retangulos_da_borda(lim(fw), lim(fh)) {
                 let [cr, cg, cb] = self.cores.get(cor as usize).copied().unwrap_or([255, 0, 255]);
                 canvas.set_draw_color(sdl2::pixels::Color::RGB(cr, cg, cb));
-                if let Some(r) = p.retangulo(i32::from(r.esq), i32::from(r.topo), i32::from(r.dir), i32::from(r.base)) {
+                if let Some(r) = p.retangulo_moldura(i32::from(r.esq), i32::from(r.topo), i32::from(r.dir), i32::from(r.base)) {
                     canvas.fill_rect(r)?;
                 }
             }
             canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
         }
-        match p.retangulo(d, d, d + self.largura as i32, d + self.altura as i32) {
+        match p.retangulo_jogo() {
             Some(r) => canvas.copy(textura, None, r),
             None => Ok(()),
         }
@@ -263,17 +334,62 @@ impl MolduraJanela {
 mod testes {
     use super::*;
 
+    fn cfg() -> ConfigMolduraPrincipal {
+        serde_json::from_str(&engine::recursos::marcar_referencias(include_str!("../../data/moldura_principal.json"))).unwrap()
+    }
+
     #[test]
     fn coordenadas_da_janela_e_do_jogo() {
-        // Escala 2 com tarjas de 10 pixels e a moldura de 4: o pixel (0, 0) do jogo fica em (18, 18).
-        let p = Posicao { largura: 648, altura: 488, borda: 4, escala: 2.0, origem: (10.0, 10.0), saida_por_janela: (1.0, 1.0) };
-        assert_eq!(p.logico(18.0, 18.0), (4, 4));
-        assert_eq!(p.logico(17.0, 19.0), (3, 4));
-        assert_eq!(p.logico(9.0, 9.0), (-1, -1), "tarja");
-        assert_eq!(p.retangulo(4, 4, 644, 484), Some(Rect::new(18, 18, 1280, 960)));
-        assert_eq!(p.retangulo(4, 4, 4, 484), None);
+        // Escala 2, janela de 1316 × 996 (20 pixels a mais que 2 × 648 × 488 nos dois eixos): a
+        // moldura fica rente às bordas e o jogo, centrado dentro dela (tarjas de 20 / 2 = 10).
+        let p = Posicao {
+            largura: 640,
+            altura: 480,
+            borda: 4,
+            escala: 2.0,
+            origem: (8.0 + 10.0, 8.0 + 10.0),
+            visivel: (0.0, 0.0, 1316.0, 996.0),
+            saida_por_janela: (1.0, 1.0),
+        };
+        assert_eq!(p.logico(18.0, 18.0), (0, 0));
+        assert_eq!(p.logico(17.0, 19.0), (-1, 0));
+        assert_eq!(p.retangulo_jogo(), Some(Rect::new(18, 18, 1280, 960)));
+        // Moldura de 658 × 498 lógicos: a linha de fora, à esquerda e à direita, rente às bordas.
+        assert_eq!(p.tamanho_moldura(), (658, 498));
+        assert_eq!(p.retangulo_moldura(0, 0, 1, 498), Some(Rect::new(0, 0, 2, 996)));
+        assert_eq!(p.retangulo_moldura(657, 0, 658, 498), Some(Rect::new(1314, 0, 2, 996)));
+        assert_eq!(p.logico_moldura(1315.0, 995.0), (657, 497));
+        assert_eq!(p.logico_moldura(0.0, 7.0), (0, 3));
         // DPI: a janela em pontos, a saída em pixels (1,25).
         let q = Posicao { saida_por_janela: (1.25, 1.25), escala: 1.25, origem: (0.0, 0.0), ..p };
         assert_eq!(q.logico(100.0, 8.0), (100, 8));
+    }
+
+    /// Restaurada com qualquer tamanho, a moldura grossa fica nas bordas da janela e redimensiona;
+    /// a faixa do título (dentro, onde o jogo está) arrasta; as tarjas não fazem nada.
+    #[test]
+    fn partes_com_a_moldura_rente_as_bordas() {
+        let c = cfg();
+        let p = Posicao {
+            largura: 640,
+            altura: 480,
+            borda: 4,
+            escala: 1.0,
+            origem: (4.0 + 100.0, 4.0 + 50.0),
+            visivel: (0.0, 0.0, 848.0, 588.0),
+            saida_por_janela: (1.0, 1.0),
+        };
+        let lados = |esq, dir, topo, base| ParteJanela::Redimensionar { esq, dir, topo, base };
+        assert_eq!(p.parte(&c, true, 1.0, 300.0), lados(true, false, false, false));
+        assert_eq!(p.parte(&c, true, 846.0, 300.0), lados(false, true, false, false));
+        assert_eq!(p.parte(&c, true, 846.0, 587.0), lados(false, true, false, true));
+        assert_eq!(p.parte(&c, true, 50.0, 300.0), ParteJanela::Normal, "tarja");
+        assert_eq!(p.parte(&c, true, 104.0 + 300.0, 54.0 + 5.0), ParteJanela::Arrastar, "faixa do título");
+        assert_eq!(p.parte(&c, true, 104.0 + 5.0, 54.0 + 5.0), ParteJanela::Normal, "caixa do menu de sistema");
+        assert_eq!(p.parte(&c, false, 1.0, 300.0), ParteJanela::Normal, "sem redimensionar");
+        // Maximizada: sem moldura.
+        let m = Posicao { borda: 0, origem: (0.0, 0.0), visivel: (0.0, 0.0, 640.0, 480.0), ..p };
+        assert_eq!(m.parte(&c, true, 300.0, 5.0), ParteJanela::Arrastar);
+        assert_eq!(m.parte(&c, true, 0.0, 300.0), ParteJanela::Normal);
     }
 }

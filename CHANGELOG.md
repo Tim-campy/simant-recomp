@@ -45,10 +45,12 @@ arquivo do jogo é distribuído; os textos do jogo também são lidos da instala
 
 - Janela nítida: ciente de DPI, ampliação por múltiplos inteiros, redimensionável.
 - Tela virtual de 640×480 (padrão), 800×600 ou 1024×768, com o layout que o original usa em cada uma.
-- Barra de título do Windows 3.1 opcional (`--moldura`), que substitui a moldura do sistema: janela
-  sem borda, arrastada pelo título, maximizar/restaurar/minimizar e menu de sistema na janela de
-  verdade, moldura grossa de 4 pixels com a janela restaurada, Alt+F4 (`--moldura-do-sistema` mantém a
-  borda do sistema). Escolha do usuário.
+- Barra de título do Windows 3.1, ligada por padrão (`--sem-moldura` desliga), que substitui a moldura
+  do sistema: janela sem borda, arrastada pelo título, maximizar/restaurar/minimizar e menu de sistema
+  na janela de verdade (também com um diálogo aberto e no "Select a Game"), moldura grossa de 4 pixels
+  rente às bordas com a janela restaurada, Alt+F4 sempre com a pergunta do Quit
+  (`--moldura-do-sistema` mantém a borda do sistema). Os testes e exportações ficam sem ela. Escolha
+  do usuário. Na ajuda, fechar é Ctrl+F4 (o Alt+F4 fica só com o jogo).
 - Velocidades rápida e ultra a 2,5× e 5× a normal (escolha do usuário; `--velocidades original` volta ao
   ritmo do 486 da bancada) e simulação na lenta enquanto a janela está sem foco (`--sem-foco original`
   mantém o ritmo); o tick, o save e o menu Speed não mudam. Caixas no launcher.

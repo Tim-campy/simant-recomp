@@ -35,6 +35,17 @@ pub(crate) enum RespostaDialogo {
     Sair,
 }
 
+/// Nome do diálogo para o terminal.
+fn nome_do_dialogo(d: &Dialogo) -> &'static str {
+    match d {
+        Dialogo::PerguntaLoad(_) => "pergunta do Load",
+        Dialogo::SalvarAntesDoLoad(_) | Dialogo::SalvarComo(_) | Dialogo::SalvarAntesDeSair(_) => "Save As",
+        Dialogo::Load(_) => "Load",
+        Dialogo::Salvo(..) => "Saved correctly",
+        Dialogo::PerguntaSair(_) => "pergunta do Quit",
+    }
+}
+
 impl Sessao<'_> {
     /// Pasta dos diálogos: a do arquivo da partida ou a atual.
     fn pasta_dos_dialogos(&self) -> PathBuf {
@@ -63,6 +74,38 @@ impl Sessao<'_> {
     /// `_gGameNeedsSaving`).
     pub(crate) fn abrir_pergunta_sair(&mut self) {
         self.dialogo = Some(Dialogo::PerguntaSair(CaixaMensagem::pergunta_sair(&self.dialogos_cfg)));
+    }
+
+    /// Fechar a janela principal (duplo clique na caixa, Close do menu de sistema, Alt+F4 ou o
+    /// fechamento pelo sistema): a pergunta do Quit, sempre. Com um diálogo do Windows aberto, o
+    /// original desabilita a janela principal e o SC_CLOSE não chega ao `MAINWNDPROC` (o Alt+F4 vai
+    /// ao diálogo, que o trata como Cancel) [hipótese: comportamento do Windows 3.1, não conferido na
+    /// bancada]; no port (extensão, docs/decisoes.md, 2026-10-19), o diálogo aberto é cancelado e a
+    /// pergunta abre no lugar dele. Com a própria pergunta (ou o Save As do Yes dela) aberta, nada.
+    /// Menus de segurar, o Examine, o mini mapa, o menu de um mod, o About e o Status fecham antes.
+    /// Devolve se a pergunta abriu.
+    pub(crate) fn pedir_para_fechar(&mut self) -> bool {
+        if matches!(self.dialogo, Some(Dialogo::PerguntaSair(_) | Dialogo::SalvarAntesDeSair(_))) {
+            println!("(bip)");
+            return false;
+        }
+        if let Some(d) = &self.dialogo {
+            println!("fechar: o diálogo aberto ({}) é cancelado", nome_do_dialogo(d));
+        }
+        self.menus.barra.fechar();
+        self.menu = None;
+        self.exame = None;
+        modos::soltar_segurado(self);
+        self.menu_mod = None;
+        if self.mini.aberto() {
+            mini_ui::fechar(self);
+        }
+        if let Some(sobre) = self.menus.sobre.take() {
+            self.partida.definir_pausa(sobre.pausado_antes);
+        }
+        self.menus.status = false;
+        self.abrir_pergunta_sair();
+        true
     }
 
     /// File → Save (`_SaveGame(1)`) e Save As (`_SaveGame(0)`): sem arquivo, ou em Save As, o

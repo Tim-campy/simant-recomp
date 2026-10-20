@@ -59,10 +59,11 @@ O `simant` aberto **sem opções** (dois cliques, atalho, menu) mostra o launche
   Completo, Experimental ou Tutorial) ou num **jogo salvo** (`.ANT`, com *Procurar...*).
 - **Vídeo:** resolução imitada (640×480, 800×600, 1024×768), escala da janela (1x a 4x ou a máxima que
   cabe), tamanho inicial da janela (`LxA`), a barra de título do Windows 3.1 e o perfil de driver (as
-  cores do Windows 3.1 em VGA de 16 cores, SVGA de 256 ou o S3 do DOSBox-X). Com a "Moldura Win 3.1",
-  a janela fica sem a borda do sistema e se comporta como uma janela do Windows 3.1: arraste pelo
-  título, duplo clique nele (ou o botão da direita) maximiza ou restaura, a moldura cinza redimensiona,
-  Alt+F4 pergunta se quer salvar.
+  cores do Windows 3.1 em VGA de 16 cores, SVGA de 256 ou o S3 do DOSBox-X). A "Moldura Win 3.1" vem
+  marcada: a janela fica sem a borda do sistema e se comporta como uma janela do Windows 3.1: arraste
+  pelo título, duplo clique nele (ou o botão da direita) maximiza ou restaura, a moldura cinza
+  redimensiona, minimizar e o menu de sistema funcionam até com um diálogo aberto, e Alt+F4 pergunta
+  se quer salvar. Desmarque para usar a janela normal do sistema.
 - **Som:** ligado ou não, e o sintetizador das músicas (simples — o padrão —, FM ou SoundFont, com o
   arquivo `.sf2`).
 - **Mods:** a pasta (`mods`, `exemplos/mods` ou outra) e uma caixa para ligar ou desligar cada mod dela.
@@ -138,7 +139,7 @@ Todas as teclas podem ser trocadas em `data/partida.json`, `data/navegacao.json`
 | `--save ARQ.ANT` | abre um save |
 | `--resolucao LxA` | tela do Windows 3.1 imitada: `640x480` (padrão), `800x600` ou `1024x768` |
 | `--escala N`, `--janela LxA` | ampliação inteira e tamanho inicial da janela |
-| `--moldura`, `--sem-moldura` | barra de título do Windows 3.1 no lugar da moldura do sistema (`--moldura-do-sistema`: dentro dela) |
+| `--moldura`, `--sem-moldura` | barra de título do Windows 3.1 no lugar da moldura do sistema (ligada por padrão; `--sem-moldura` desliga; `--moldura-do-sistema`: dentro da moldura do sistema) |
 | `--velocidades proporcional\|original` | rápida e ultra a 2,5× e 5× a normal (padrão) ou no ritmo do original |
 | `--sem-foco lenta\|original` | sem foco, a lenta (padrão) ou o ritmo de sempre, como o original |
 | `--perfil-driver vga\|svga256\|s3_dosbox` | cores e alinhamentos do driver de vídeo do Windows 3.1 imitado (padrão: `vga`) |
