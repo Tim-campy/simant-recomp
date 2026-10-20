@@ -353,7 +353,7 @@ Coordinate convention: `x` is the column (horizontal) and `y` the row (vertical;
 
 ### Life maps (not saved)
 
-`_LifeA` (128 × 64), `_LifeB` and `_LifeR` (64 × 64) store, per cell, the T field of the ant that is there (0 = empty; 0xFF and 0xFE = yellow ant) [code: `_DoCalcTile`, `_AddAntToAList`]. **They are not in the save**: `_DoLoadInitializations` (`1010:9dbe`) clears all three and rebuilds them from the lists, walking each one from `_ListIndex?` down to 0 inclusive (the lowest-index entry wins when two occupy the same cell), and then calls `_SetMyLife` for the yellow ant if `_MeMode == 0` and `_FullCount` [code]. Full rules in [telas/jogo.md](../telas/jogo.md#camada-de-vida).
+`_LifeA` (128 × 64), `_LifeB` and `_LifeR` (64 × 64) store, per cell, the T field of the ant that is there (0 = empty; 0xFF and 0xFE = yellow ant) [code: `_DoCalcTile`, `_AddAntToAList`]. **They are not in the save**: `_DoLoadInitializations` (`1010:9dbe`) clears all three and rebuilds them from the lists, walking each one from `_ListIndex?` down to 0 inclusive (the lowest-index entry wins when two occupy the same cell), and then calls `_SetMyLife` for the yellow ant if `_MeMode == 0` and `_FullCount` [code]. Full rules in [telas/jogo.md](../telas/jogo.md#life-layer).
 
 ### Ant lists
 
