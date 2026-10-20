@@ -1,646 +1,648 @@
-# Formiga amarela e controles do jogador
+*Leia em português: [formiga-amarela.md](../../pt-BR/spec/regras/formiga-amarela.md)*
 
-Este documento especifica, para reimplementação 1:1, a **formiga amarela** (o corpo do jogador): estado, presença no mapa, o que acontece com ela a cada tick, como anda até o destino clicado, como acha caminho, entra e sai dos ninhos, pega e larga objetos, come, luta, recruta, troca de corpo, funda uma colônia, morre e reencarna. No fim, os **controles**: como cliques, teclas, menus e aceleradores viram ordens. A formiga amarela também pode controlar a aranha; a parte da aranha está em [inimigos.md](inimigos.md#27-aranha-controlada-pelo-jogador-_memode--1). O tick está em [simulacao-visao-geral.md](simulacao-visao-geral.md) (passos 17 e 20); as formigas comuns em [superficie.md](superficie.md); a criação da amarela no novo jogo em [geracao-mundo.md](geracao-mundo.md) (3.D).
+# Yellow ant and player controls
 
-Convenção de evidência e notação: iguais às de [superficie.md](superficie.md#convenção-de-evidência). "Fato verificado no `QUICK2.ANT`" usa os offsets de [save-ant.md](../formatos/save-ant.md). Nenhum código decompilado é reproduzido.
+This document specifies, for 1:1 reimplementation, the **yellow ant** (the player's body): state, presence on the map, what happens to it each tick, how it walks to the clicked destination, how it finds a path, enters and leaves the nests, picks up and drops objects, eats, fights, recruits, swaps bodies, founds a colony, dies and reincarnates. At the end, the **controls**: how clicks, keys, menus and accelerators become orders. The yellow ant can also control the spider; the spider part is in [inimigos.md](inimigos.md#27-player-controlled-spider-_memode--1). The tick is in [simulacao-visao-geral.md](simulacao-visao-geral.md) (steps 17 and 20); the ordinary ants in [superficie.md](superficie.md); the creation of the yellow ant in a new game in [geracao-mundo.md](geracao-mundo.md) (3.D).
 
-## 1. Estado: as variáveis `_Me*`
+Evidence and notation conventions: the same as in [superficie.md](superficie.md#evidence-convention). "Fact verified in `QUICK2.ANT`" uses the offsets of [save-ant.md](../formatos/save-ant.md). No decompiled code is reproduced.
 
-**Fato visto no código** (endereços do `symbols.tsv`; todas estão no save). Valores do `QUICK2.ANT` (tick 78, Quick Game) **verificados**.
+## 1. State: the `_Me*` variables
 
-| Variável | Endereço | Significado | `QUICK2.ANT` |
+**Fact seen in the code** (addresses from `symbols.tsv`; all of them are in the save). Values from `QUICK2.ANT` (tick 78, Quick Game) **verified**.
+
+| Variable | Address | Meaning | `QUICK2.ANT` |
 |---|---|---|---|
-| `_MePlane` | `10:ce80` | plano: 0 vista do quintal, 1 superfície, 2 ninho preto, 3 ninho vermelho | 2 |
-| `_MeLocX`, `_MeLocY` | `10:cd88`, `10:ce7e` | célula | 34, 9 |
-| `_MeType` | `10:cc84` | grupo × 8 **sem** cor e sem direção: 0x10 operária, 0x30 soldado, 0x40 rainha alada, 0x60 rainha; +8 = carregando (0x08 ovo, 0x18/0x38 comida, 0x28/0x48 terra) | 0x10 |
-| `_MeDir` | `10:cf50` | direção 0–7 | 2 |
-| `_MeColor` | `10:ce98` | 0 = preta, 0x80 = vermelha (byte alto de `_grndTile`+2 no pseudocódigo) | 0 |
-| `_MeHealth` | `10:ac8a` | vida 0–100 | 99 |
-| `_MeHealthCntDwn` | `9:9cf0` | ticks com vida 0 (morre ao passar de 99) | 0 |
-| `_MeWarnHealth` | `9:9bec` | limiar de fome escolhido no controle `editHealthY` (padrão 30, `_InitSimVars`) | 30 |
-| `_MeWantFood` | `9:9af2` | 1 = com fome (vida ≤ `_MeWarnHealth` ou ≤ 9) | — |
-| `_MeEgg` | `10:ce92` | estágio de ovo exibido durante o renascimento | — |
-| `_MeEggCarried` | `8:8a6a` | T do ovo carregado (0xFD quando nenhum) | — |
-| `_MeFoodInType` | `8:8a6e` | o que foi comido no último pegar: −1 nada, 0 comida, 3 ovo | — |
-| `_MeNestStarted` | `8:8a6c` | 1 = a colônia do jogador já foi fundada | 1 |
-| `_MeBase` | `10:cf54` | zerado na troca de corpo [uso em aberto] | 0 |
-| `_MeMode` | `9:9fe8` | 0 = formiga, 1 = **aranha**, 2 = modo Experimental (sem corpo) | 0 |
-| `_MeSMode` | `9:7d60` | modo de caça da aranha (ver [inimigos.md](inimigos.md)) | 0 |
-| `_MeMoveMe` | `9:7d24` | 1 = há uma ordem em andamento | 0 |
-| `_MeCmd` | `9:9bc4` | ordem: 0 ir, 1 ir e pegar/largar, 2 ir cavando, 3 atacar o alvo, 4 ser alimentada pelo alvo | 0 |
-| `_MeGoalPlane`, `_MeGoalX`, `_MeGoalY` | `9:9be0`, `9:80c6`, `9:80d2` | destino da ordem | — |
-| `_MeLastX`, `_MeLastY` | `9:a0d6`, `9:a0da` | célula anterior (não volta para ela ao contornar) | — |
-| `_MeSteps` | `9:9c7e` | passos dados (a paridade cobra a vida) | — |
-| `_MeDis`, `_MePrevDis` | `9:9fe2`, `9:80aa` | distância ao buraco ao pegar comida [uso em aberto] | — |
-| `_MeCrazyCnt`, `_MeCrazyDir`, `_MeCrazyRot` | `9:72e4`, `9:a0d8`, `9:78a4` | estado do contorno de obstáculos (5.3) | −2, —, — |
-| `_MeTargIndex`, `_MeTargLife`, `_MeTargLifePlane`, `_MeTargLifeX/Y` | `9:99e4`, `9:72ee`, `9:9c6c`, `9:99e8/99ea` | formiga-alvo de uma ordem 3 ou 4 | — |
-| `_MeStartedFight` | `9:9e7c` | 1 enquanto a luta foi iniciada pela amarela (escolhe a mensagem de morte) | — |
-| `_MeDropAlarm` | `9:75fa` | 1 = soltando feromônio de alarme a cada passo | — |
-| `_MeScent` | `10:ce88` | intensidade da trilha ao carregar comida (200 → 10) | 0 |
-| `_FuzLocX/Y` | `9:9fe4/9fea` | posição "difusa" para as recrutadas ([superficie.md](superficie.md), 9.1) | 34, 0 |
+| `_MePlane` | `10:ce80` | plane: 0 yard view, 1 surface, 2 black nest, 3 red nest | 2 |
+| `_MeLocX`, `_MeLocY` | `10:cd88`, `10:ce7e` | cell | 34, 9 |
+| `_MeType` | `10:cc84` | group × 8 **without** color and without direction: 0x10 worker, 0x30 soldier, 0x40 winged queen, 0x60 queen; +8 = carrying (0x08 egg, 0x18/0x38 food, 0x28/0x48 dirt) | 0x10 |
+| `_MeDir` | `10:cf50` | direction 0–7 | 2 |
+| `_MeColor` | `10:ce98` | 0 = black, 0x80 = red (high byte of `_grndTile`+2 in the pseudocode) | 0 |
+| `_MeHealth` | `10:ac8a` | health 0–100 | 99 |
+| `_MeHealthCntDwn` | `9:9cf0` | ticks with health 0 (dies when it goes past 99) | 0 |
+| `_MeWarnHealth` | `9:9bec` | hunger threshold chosen in the `editHealthY` control (default 30, `_InitSimVars`) | 30 |
+| `_MeWantFood` | `9:9af2` | 1 = hungry (health ≤ `_MeWarnHealth` or ≤ 9) | — |
+| `_MeEgg` | `10:ce92` | egg stage shown during rebirth | — |
+| `_MeEggCarried` | `8:8a6a` | T of the carried egg (0xFD when none) | — |
+| `_MeFoodInType` | `8:8a6e` | what was eaten in the last pickup: −1 nothing, 0 food, 3 egg | — |
+| `_MeNestStarted` | `8:8a6c` | 1 = the player's colony has already been founded | 1 |
+| `_MeBase` | `10:cf54` | zeroed on body swap [use unknown] | 0 |
+| `_MeMode` | `9:9fe8` | 0 = ant, 1 = **spider**, 2 = Experimental mode (no body) | 0 |
+| `_MeSMode` | `9:7d60` | spider hunting mode (see [inimigos.md](inimigos.md)) | 0 |
+| `_MeMoveMe` | `9:7d24` | 1 = there is an order in progress | 0 |
+| `_MeCmd` | `9:9bc4` | order: 0 go, 1 go and pick up/drop, 2 go digging, 3 attack the target, 4 be fed by the target | 0 |
+| `_MeGoalPlane`, `_MeGoalX`, `_MeGoalY` | `9:9be0`, `9:80c6`, `9:80d2` | destination of the order | — |
+| `_MeLastX`, `_MeLastY` | `9:a0d6`, `9:a0da` | previous cell (does not go back to it when going around) | — |
+| `_MeSteps` | `9:9c7e` | steps taken (the parity charges health) | — |
+| `_MeDis`, `_MePrevDis` | `9:9fe2`, `9:80aa` | distance to the hole when picking up food [use unknown] | — |
+| `_MeCrazyCnt`, `_MeCrazyDir`, `_MeCrazyRot` | `9:72e4`, `9:a0d8`, `9:78a4` | state of the obstacle avoidance (5.3) | −2, —, — |
+| `_MeTargIndex`, `_MeTargLife`, `_MeTargLifePlane`, `_MeTargLifeX/Y` | `9:99e4`, `9:72ee`, `9:9c6c`, `9:99e8/99ea` | target ant of an order 3 or 4 | — |
+| `_MeStartedFight` | `9:9e7c` | 1 while the fight was started by the yellow ant (chooses the death message) | — |
+| `_MeDropAlarm` | `9:75fa` | 1 = dropping alarm pheromone on each step | — |
+| `_MeScent` | `10:ce88` | trail intensity when carrying food (200 → 10) | 0 |
+| `_FuzLocX/Y` | `9:9fe4/9fea` | "fuzzy" position for the recruited ants ([superficie.md](superficie.md), 9.1) | 34, 0 |
 
-## 2. Presença no mapa de vida
+## 2. Presence on the life map
 
-**Fato visto no código.** A amarela não está em lista nenhuma. Ela marca a célula com 0xFF; a rainha (`_MeType = 0x60`) marca também a célula atrás, na direção oposta (`_MeDir ^ 4`), com 0xFE.
+**Fact seen in the code.** The yellow ant is in no list at all. It marks its cell with 0xFF; the queen (`_MeType = 0x60`) also marks the cell behind it, in the opposite direction (`_MeDir ^ 4`), with 0xFE.
 
-- `_SetMyLife(plano, x, y, tipo, dir, v)` (`1020:6536`): grava `v` (e `v` ou 0xFE na cauda) e, se `v ≠ 0`, copia plano/posição/tipo/direção para as `_Me*`. Com `v` = 0 apaga sem mexer nas `_Me*`.
-- `_ClearMyLife(plano, x, y, tipo, dir)` (`1020:631e`): apaga a célula só se ela contém 0xFF (e a cauda só se contém 0xFE).
-- `_MoveMyLife(plano, x, y, tipo, dir)` (`1020:65fa`): `_ClearMyLife` na posição atual, grava 0xFF (e 0xFE) na nova e atualiza as `_Me*`. Plano 0 é tratado como 1.
-- `_SetLife` (`1020:5d18`), usado por todas: num **ninho**, ao gravar um valor ≥ 1 numa célula de terra (0x20–0x2E) ou de superfície fechada (0x1C–0x1F), **escava** a célula (`_DigMyTile`) e toca um som. É assim que a amarela cava: basta entrar na terra (vale também para qualquer formiga posta no ninho por essa função).
+- `_SetMyLife(plane, x, y, type, dir, v)` (`1020:6536`): writes `v` (and `v` or 0xFE in the tail) and, if `v ≠ 0`, copies plane/position/type/direction into the `_Me*` variables. With `v` = 0 it erases without touching the `_Me*` variables.
+- `_ClearMyLife(plane, x, y, type, dir)` (`1020:631e`): erases the cell only if it contains 0xFF (and the tail only if it contains 0xFE).
+- `_MoveMyLife(plane, x, y, type, dir)` (`1020:65fa`): `_ClearMyLife` at the current position, writes 0xFF (and 0xFE) at the new one and updates the `_Me*` variables. Plane 0 is treated as 1.
+- `_SetLife` (`1020:5d18`), used by all of them: in a **nest**, when writing a value ≥ 1 into a dirt cell (0x20–0x2E) or a closed surface cell (0x1C–0x1F), it **digs** the cell (`_DigMyTile`) and plays a sound. This is how the yellow ant digs: it just has to enter the dirt (this also applies to any ant placed in the nest by this function).
 
-## 3. A cada tick: `_DoAntSimY` (`1028:7cf6`)
+## 3. Each tick: `_DoAntSimY` (`1028:7cf6`)
 
-**Fato visto no código.** Só age com `_MeMode = 0`:
+**Fact seen in the code.** It only acts with `_MeMode = 0`:
 
 ```
-_SetMyLife(_MePlane, _MeLoc, _MeType, _MeDir, 0xFF)          ← regrava a marca todo tick
-se (_Cycle & 63) == 0: _SetMyHealth(_MeHealth − 1)
-se _MePlane ≥ 2 e (t = tile do ninho na célula) > 0x4D: _SetMyHealth(_MeHealth − 1)   ← célula inundada
-se _MeType == 0x60 e _MePlane ≥ 2 e (_Cycle & 15) == 0:                              ← rainha põe ovo
+_SetMyLife(_MePlane, _MeLoc, _MeType, _MeDir, 0xFF)          ← rewrites the mark every tick
+if (_Cycle & 63) == 0: _SetMyHealth(_MeHealth − 1)
+if _MePlane ≥ 2 and (t = nest tile at the cell) > 0x4D: _SetMyHealth(_MeHealth − 1)   ← flooded cell
+if _MeType == 0x60 and _MePlane ≥ 2 and (_Cycle & 15) == 0:                              ← queen lays egg
     p = _MeLoc + 2·D8[_MeDir ^ 4]
-    se _InNestBounds(p) (0 ≤ x < 64, 0 < y < 64) e S128() ≤ _MeHealth:   ← S128 só dentro dos limites
-        _PlaceEggB(p, 1) e _DecEatB()   (ou R, conforme _MeColor)
+    if _InNestBounds(p) (0 ≤ x < 64, 0 < y < 64) and S128() ≤ _MeHealth:   ← S128 only inside the bounds
+        _PlaceEggB(p, 1) and _DecEatB()   (or R, according to _MeColor)
         _SetMyHealth(_MeHealth − 5)
-se _MeHealth < 1:
+if _MeHealth < 1:
     _MeHealthCntDwn += 1
-    se _MeHealthCntDwn > 99: _YellowDeath(7 se está num ninho com t ≥ 0x4E, senão 8)   ← afogada / de fome
+    if _MeHealthCntDwn > 99: _YellowDeath(7 if in a nest with t ≥ 0x4E, else 8)   ← drowned / starved
 ```
 
-`_SetMyHealth(v)` (`1020:8c70`): se `_NeverHungry` (`8:8a5e`) ≠ 0, v = 100; se v > 0, `_MeHealthCntDwn = 0`; limita v a 0..100; `_MeHealth = v`; `_MeWantFood = 0` se `v > _MeWarnHealth` e `v > 9`, senão 1.
+`_SetMyHealth(v)` (`1020:8c70`): if `_NeverHungry` (`8:8a5e`) ≠ 0, v = 100; if v > 0, `_MeHealthCntDwn = 0`; clamps v to 0..100; `_MeHealth = v`; `_MeWantFood = 0` if `v > _MeWarnHealth` and `v > 9`, else 1.
 
-## 4. Andar por ordem: `_DoAntMoveY` (`1028:75f4`)
+## 4. Walking by order: `_DoAntMoveY` (`1028:75f4`)
 
-Chamado no passo 20 do tick. Também roda com o jogo pausado se `_MeMoveMe ≠ 0` e nenhuma ferramenta especial estiver ativa ([simulacao-visao-geral.md](simulacao-visao-geral.md), seção 4). **Fato visto no código.**
+Called in step 20 of the tick. It also runs with the game paused if `_MeMoveMe ≠ 0` and no special tool is active ([simulacao-visao-geral.md](simulacao-visao-geral.md), section 4). **Fact seen in the code.**
 
 ```
-se _MeMoveMe == 0: fim
-r = 0                                          ← 0 = continua ; −1 = concluída ; −2 = fracassou
-se _MeCmd ≥ 3 (alvo):
-    (tx, ty, Tt) = posição e T atuais da vaga _MeTargIndex no plano _MeTargLifePlane
-    se a vaga sumiu ou (Tt ^ _MeTargLife) & 0xF0 ≠ 0: r = −2 ; FIM
-    se o alvo está em outro plano, ou a mais de 1 célula: destino = (tx, ty) ; segue como ordem de andar
-    senão (vizinho): vira-se para ele ; r = −1 ; FIM
-ANDAR:
-    se _MeCmd == 1 e _MeGoalPlane == _MePlane:
-        k = _GetDir(_MeLoc, destino) ; p = _MeLoc + D9[k] (limitado ao mapa)
-        se p == destino: q = _TryMyDropOrLift(_MePlane, destino)
-            se q ≠ 0: r = (q == 1 ? −1 : −2) ; FIM
-    d = _GetMyDir(_MePlane, _MeLoc, _MeGoalPlane, destino)     (seção 5)
-    se d < 0: r = d ; FIM
+if _MeMoveMe == 0: end
+r = 0                                          ← 0 = continue ; −1 = completed ; −2 = failed
+if _MeCmd ≥ 3 (target):
+    (tx, ty, Tt) = current position and T of slot _MeTargIndex in plane _MeTargLifePlane
+    if the slot vanished or (Tt ^ _MeTargLife) & 0xF0 ≠ 0: r = −2 ; END
+    if the target is on another plane, or more than 1 cell away: destination = (tx, ty) ; continues as a walk order
+    else (neighbor): turns toward it ; r = −1 ; END
+WALK:
+    if _MeCmd == 1 and _MeGoalPlane == _MePlane:
+        k = _GetDir(_MeLoc, destination) ; p = _MeLoc + D9[k] (clamped to the map)
+        if p == destination: q = _TryMyDropOrLift(_MePlane, destination)
+            if q ≠ 0: r = (q == 1 ? −1 : −2) ; END
+    d = _GetMyDir(_MePlane, _MeLoc, _MeGoalPlane, destination)     (section 5)
+    if d < 0: r = d ; END
     _MeLast = _MeLoc ; _MoveMyLife(_MePlane, _MeLoc + D8[d], _MeType, d) ; _MeSteps += 1
-    superfície:
-        se _MeScent > 0 e carrega comida (_MeType 0x18 ou 0x38):
-            deposita _MeScent na trilha da cor _MeColor (c = max) ; se _MeScent > 10: _MeScent −= 1
-        se _MeDropAlarm: alarme = min(alarme + 50, 200)
-    ninho: atualiza o mapa de saídas (_FixExitMapB/R)
-    se _MeSteps ímpar:
-        se rainha alada (0x40) sem colônia (_MeNestStarted = 0) e _HealthB > 0 e não _AlwaysHealthy: _HealthB −= 1
-        _SetMyHealth(_MeHealth − 1)                            ← 1 de vida a cada 2 passos
-    superfície e célula é buraco e (destino num ninho, ou destino é esta célula): ENTRA (6.1)
-    ninho, linha y ≠ 0: se o tile do destino é 0x14 e não é rainha e destino == célula atual:
-        troca de ninho (6.3) ; r = −1
-    ninho, linha 0: SAI (6.2)
-    depois de ENTRA/SAI: se o destino era exatamente esta célula/plano e o plano novo ≠ plano exibido:
-        centraliza (se AutoTrack desligado) e r = −1 (a ordem termina; o código cai no rótulo de
-        "concluída", `1028:7b6b`)  ← verificado no vetor amarela_superficie/1852
-        (se o plano novo é o exibido, r continua 0 e a ordem segue, com destino ainda na superfície)
-FIM:
-    se "AutoTrack": centraliza a vista na amarela
-    se r == 0 e chegou (plano e célula do destino) e _MeCmd == 0: r = −1
-    se r ≠ 0:
-        r == −2: som de erro e centraliza
-        r == −1 e _MeCmd == 3: _MeStartedFight = 1 ; _YellowFight(_MeTargLifePlane, _MeTargIndex) ; _MeStartedFight = 0
-        r == −1 e _MeCmd == 4: vira o alvo para a amarela (exceto rainhas) e _EatMyFood(1)
-        _ResetYellowVars(_MePlane, _MeLoc)                       ← encerra a ordem
-        casa e superfície e tile sob a amarela = 0x76 ou 0x78: _YellowDeath(10)   ← choque elétrico
+    surface:
+        if _MeScent > 0 and carrying food (_MeType 0x18 or 0x38):
+            deposits _MeScent in the trail of color _MeColor (c = max) ; if _MeScent > 10: _MeScent −= 1
+        if _MeDropAlarm: alarm = min(alarm + 50, 200)
+    nest: updates the exit map (_FixExitMapB/R)
+    if _MeSteps odd:
+        if winged queen (0x40) without colony (_MeNestStarted = 0) and _HealthB > 0 and not _AlwaysHealthy: _HealthB −= 1
+        _SetMyHealth(_MeHealth − 1)                            ← 1 health every 2 steps
+    surface and cell is a hole and (destination in a nest, or destination is this cell): ENTER (6.1)
+    nest, row y ≠ 0: if the destination tile is 0x14 and not a queen and destination == current cell:
+        nest swap (6.3) ; r = −1
+    nest, row 0: EXIT (6.2)
+    after ENTER/EXIT: if the destination was exactly this cell/plane and the new plane ≠ displayed plane:
+        centers (if AutoTrack off) and r = −1 (the order ends; the code falls into the
+        "completed" label, `1028:7b6b`)  ← verified in the vector amarela_superficie/1852
+        (if the new plane is the displayed one, r stays 0 and the order goes on, with the destination still on the surface)
+END:
+    if "AutoTrack": centers the view on the yellow ant
+    if r == 0 and arrived (plane and cell of the destination) and _MeCmd == 0: r = −1
+    if r ≠ 0:
+        r == −2: error sound and centers
+        r == −1 and _MeCmd == 3: _MeStartedFight = 1 ; _YellowFight(_MeTargLifePlane, _MeTargIndex) ; _MeStartedFight = 0
+        r == −1 and _MeCmd == 4: turns the target toward the yellow ant (except queens) and _EatMyFood(1)
+        _ResetYellowVars(_MePlane, _MeLoc)                       ← ends the order
+        house and surface and tile under the yellow ant = 0x76 or 0x78: _YellowDeath(10)   ← electric shock
 ```
 
-`_ResetYellowVars(plano, x, y)` (`1000:72ba`): `_MePlane` e `_MeLoc` = argumentos (correção: a versão anterior desta spec omitia), destino = posição, `_MeLast` = posição, `_MeCmd = 0`, `_MeMoveMe = 0`, `_MeDis = _MePrevDis = _MeSteps = 0`, `_MeCrazyCnt = −2`.
+`_ResetYellowVars(plane, x, y)` (`1000:72ba`): `_MePlane` and `_MeLoc` = arguments (correction: the previous version of this spec omitted this), destination = position, `_MeLast` = position, `_MeCmd = 0`, `_MeMoveMe = 0`, `_MeDis = _MePrevDis = _MeSteps = 0`, `_MeCrazyCnt = −2`.
 
-`D9` = `_Dx9/_Dy9` (índice 0 = parado). Sem sorteio em todo este fluxo, exceto o `S8()` de `_ExitNest` (6.2) e os sorteios das ações chamadas.
+`D9` = `_Dx9/_Dy9` (index 0 = standing still). No random draw in this whole flow, except the `S8()` of `_ExitNest` (6.2) and the random draws of the actions called.
 
-## 5. Caminho: `_GetMyDir` e companhia
+## 5. Path: `_GetMyDir` and company
 
-### 5.1 Alvo intermediário — `_GetMyDir(plano, x, y, plano_dest, dx, dy)` (`1028:8eca`)
+### 5.1 Intermediate target — `_GetMyDir(plane, x, y, dest_plane, dx, dy)` (`1028:8eca`)
 
-**Fato visto no código.** Primeiro escolhe para onde andar agora:
+**Fact seen in the code.** First it chooses where to walk now:
 
-| Onde está | Destino | Alvo imediato |
+| Where it is | Destination | Immediate target |
 |---|---|---|
-| superfície (plano < 2) | superfície | o destino |
-| superfície | ninho preto | `_LastNewHoleB` (`8:835a`, último buraco preto criado) |
-| superfície | ninho vermelho | `_LastNewHoleR` (`8:835e`) |
-| ninho | o mesmo ninho | o destino |
-| ninho preto | outro plano | `_LastNewExitB` (`8:8352`: coluna do último buraco preto, linha 0) |
-| ninho vermelho | outro plano | `_LastNewExitR` (`8:8356`) |
+| surface (plane < 2) | surface | the destination |
+| surface | black nest | `_LastNewHoleB` (`8:835a`, last black hole created) |
+| surface | red nest | `_LastNewHoleR` (`8:835e`) |
+| nest | the same nest | the destination |
+| black nest | another plane | `_LastNewExitB` (`8:8352`: column of the last black hole, row 0) |
+| red nest | another plane | `_LastNewExitR` (`8:8356`) |
 
-Depois aplica a máquina de contorno (5.3) com esse alvo.
+Then it applies the avoidance machine (5.3) with that target.
 
-### 5.2 Passo guloso — `_GetMyBestDirs(plano, x, y, tx, ty)` (`1028:8828`)
+### 5.2 Greedy step — `_GetMyBestDirs(plane, x, y, tx, ty)` (`1028:8828`)
 
-Mesma regra de `_GetRedBestDirs` ([superficie.md](superficie.md), 9.2), com o teste de passagem `_TileCanBeMovedOn(plano, vizinha, _MeGoalPlane, _MeGoalX, _MeGoalY, cavar = (_MeCmd == 2))` (5.4): −1 se já está no alvo; senão a melhor vizinha livre que reduz a distância (com o limiar caindo a cada melhora), ou a melhor bloqueada por formiga/tile não-livre, ou −2 se nenhuma vizinha passável reduz a distância. Sem sorteio.
+Same rule as `_GetRedBestDirs` ([superficie.md](superficie.md), 9.2), with the passability test `_TileCanBeMovedOn(plane, neighbor, _MeGoalPlane, _MeGoalX, _MeGoalY, dig = (_MeCmd == 2))` (5.4): −1 if it is already at the target; otherwise the best free neighbor that reduces the distance (with the threshold dropping at each improvement), or the best one blocked by an ant/non-free tile, or −2 if no passable neighbor reduces the distance. No random draw.
 
-`_CheckMyBestDirs(&n, plano, x, y, tx, ty)` (`1028:8b40`) simula o guloso sem mexer em nada: aplica `_GetMyBestDirs` a partir da posição, até 64 passos. Devolve −2 se a simulação empacou (mínimo local), −1 se chegou ou se completou 64 passos.
+`_CheckMyBestDirs(&n, plane, x, y, tx, ty)` (`1028:8b40`) simulates the greedy step without changing anything: applies `_GetMyBestDirs` from the position, up to 64 steps. Returns −2 if the simulation got stuck (local minimum), −1 if it arrived or completed 64 steps.
 
-### 5.3 Contorno de obstáculos — `_MeCrazyCnt`, `_MeCrazyDir`, `_MeCrazyRot`
+### 5.3 Obstacle avoidance — `_MeCrazyCnt`, `_MeCrazyDir`, `_MeCrazyRot`
 
-**Fato visto no código.** Cada clique de destino põe `_MeCrazyCnt = −2`.
+**Fact seen in the code.** Each destination click sets `_MeCrazyCnt = −2`.
 
 ```
-se _MeCrazyCnt < 0:                                          (modo direto)
-    d = _GetMyBestDirs(alvo)
-    se d == −2 e _MeCrazyCnt == −2:                            ← só na primeira trava depois do clique
-        _MeCrazyDir = _GetDir(posição, alvo) − 1 ; _MeCrazyCnt = 16 ; _MeCrazyRot = 0
+if _MeCrazyCnt < 0:                                          (direct mode)
+    d = _GetMyBestDirs(target)
+    if d == −2 and _MeCrazyCnt == −2:                            ← only on the first block after the click
+        _MeCrazyDir = _GetDir(position, target) − 1 ; _MeCrazyCnt = 16 ; _MeCrazyRot = 0
         d = _GetMyRandDirs(...)
-    devolve d
-senão:                                                       (contornando)
-    se _CheckMyBestDirs(alvo) == −2: d = _GetMyRandDirs(...)
-    senão: _MeCrazyCnt = −1 ; d = _GetMyBestDirs(alvo)
+    return d
+else:                                                       (going around)
+    if _CheckMyBestDirs(target) == −2: d = _GetMyRandDirs(...)
+    else: _MeCrazyCnt = −1 ; d = _GetMyBestDirs(target)
     _MeCrazyCnt −= 1
-    devolve d
+    return d
 ```
 
-Consequência: o contorno dura no máximo 17 passos; se o guloso voltar a ter caminho livre, o contador vai a −2 e um novo contorno pode começar. Se o contorno terminar e o guloso ainda travar, `_MeCrazyCnt = −1` e `_GetMyBestDirs` devolve −2: a ordem fracassa (som de erro).
+Consequence: the avoidance lasts at most 17 steps; if the greedy step has a free path again, the counter goes to −2 and a new avoidance can start. If the avoidance ends and the greedy step is still blocked, `_MeCrazyCnt = −1` and `_GetMyBestDirs` returns −2: the order fails (error sound).
 
-`_GetMyRandDirs(&rot, &dirc, plano, x, y, tx, ty)` (`1028:8928`), sem sorteio:
+`_GetMyRandDirs(&rot, &dirc, plane, x, y, tx, ty)` (`1028:8928`), with no random draw:
 
 ```
-dist = _GetDis(posição, alvo) ; se dist ≤ 0: devolve −1
-ok[k] = vizinha k passável (5.4, com cavar = (_MeCmd == 2)) e ≠ (_MeLastX, _MeLastY)
-se nenhuma ok: devolve −2
+dist = _GetDis(position, target) ; if dist ≤ 0: return −1
+ok[k] = neighbor k passable (5.4, with dig = (_MeCmd == 2)) and ≠ (_MeLastX, _MeLastY)
+if none ok: return −2
 a = b = dirc
-se rot == 0:                                       ← primeiro passo do contorno: escolhe o lado
-    para j = 0..7:
-        se ok[a]: dirc = _GetDir(posição, alvo) − 1 ; rot = +1 ; devolve a
-        se ok[b]: dirc = _GetDir(posição, alvo) − 1 ; rot = −1 ; devolve b
+if rot == 0:                                       ← first step of the avoidance: chooses the side
+    for j = 0..7:
+        if ok[a]: dirc = _GetDir(position, target) − 1 ; rot = +1 ; return a
+        if ok[b]: dirc = _GetDir(position, target) − 1 ; rot = −1 ; return b
         a = (a + 1) & 7 ; b = (b − 1) & 7
-senão:
-    para j = 0..7:
+else:
+    for j = 0..7:
         c = (rot ≥ 1 ? a : b)
-        se ok[c]:
-            se _GetDis(posição + D8[c], alvo) > dist: devolve c       ← ainda se afastando: mantém o lado
-            dirc = _GetDir(posição, alvo) − 1 ; rot = 0 ; devolve c      ← melhorou: recomeça
+        if ok[c]:
+            if _GetDis(position + D8[c], target) > dist: return c       ← still moving away: keeps the side
+            dirc = _GetDir(position, target) − 1 ; rot = 0 ; return c      ← improved: starts over
         a = (a + 1) & 7 ; b = (b − 1) & 7
-devolve −1
+return −1
 ```
 
-`_GetMyBestDir`, `_GetMyNextRandDirs` e `_GetMyInitialRandDir` (`1028:8d3a`, `8bea`, `8cde`) repetem partes dessa lógica e não têm chamador; `_GetMyDis` (`1028:8682`) também não.
+`_GetMyBestDir`, `_GetMyNextRandDirs` and `_GetMyInitialRandDir` (`1028:8d3a`, `8bea`, `8cde`) repeat parts of this logic and have no caller; neither does `_GetMyDis` (`1028:8682`).
 
-### 5.4 Onde a amarela pode pisar — `_TileCanBeMovedOn` (`1020:9342`)
+### 5.4 Where the yellow ant can step — `_TileCanBeMovedOn` (`1020:9342`)
 
-**Fato visto no código.**
+**Fact seen in the code.**
 
-- Superfície: dentro do mapa e tile ≤ 0x53 no quintal (chão, objetos, comida, buraco e pedrinhas; pedras 0x54+ e a lagarta/bicho-de-conta não) ou ≤ 0x90 na casa.
-- Ninho: dentro do mapa e: tile < 0x19 ou pedrinha 0x30–0x31 (passável sem cavar); ou, com `cavar`, terra 0x20–0x2E ou superfície fechada 0x1C–0x1F (passável cavando). Nas linhas y ≥ 2, ou se o destino é outro plano, isso basta. Com o destino neste ninho, as linhas 0 e 1 têm restrições:
+- Surface: inside the map and tile ≤ 0x53 in the yard (ground, objects, food, hole and pebbles; rocks 0x54+ and the caterpillar/pill bug are not) or ≤ 0x90 in the house.
+- Nest: inside the map and: tile < 0x19 or pebble 0x30–0x31 (passable without digging); or, with `dig`, dirt 0x20–0x2E or closed surface 0x1C–0x1F (passable by digging). In rows y ≥ 2, or if the destination is another plane, this is enough. With the destination in this nest, rows 0 and 1 have restrictions:
 
-| Linha | Sem `cavar` | Com `cavar`, célula a cavar | Com `cavar`, célula já aberta |
+| Row | Without `dig` | With `dig`, cell to dig | With `dig`, cell already open |
 |---|---|---|---|
-| y = 1 | só na coluna do destino, ou se o destino não está na linha 0 | só na coluna do destino | sim |
-| y = 0 | só se for exatamente o destino | só na coluna do destino e se a célula de baixo (linha 1) não for terra | só se for exatamente o destino |
+| y = 1 | only in the destination's column, or if the destination is not in row 0 | only in the destination's column | yes |
+| y = 0 | only if it is exactly the destination | only in the destination's column and if the cell below (row 1) is not dirt | only if it is exactly the destination |
 
-## 6. Ninho: entrar, sair, trocar de ninho
+## 6. Nest: entering, exiting, switching nests
 
-### 6.1 Entrar (embutido em `_DoAntMoveY`; igual a `_EnterNest` `1028:8408`)
+### 6.1 Entering (embedded in `_DoAntMoveY`; same as `_EnterNest` `1028:8408`)
 
-**Fato visto no código.** Música do ninho (`_TryAntTheme`); se soltava alarme, desliga (`_SetAlarmDropState(0, 1)`); apaga a marca; `_MePlane = 2` se `_MeLocX < 65`, senão 3; `_MeLocX` ← a linha da superfície (`_MeLocY`), `_MeLocY` ← 2 se rainha (0x60), senão 1; `_MeDir = 4`; `_DigMyTile` na nova célula; marca 0xFF.
+**Fact seen in the code.** Nest music (`_TryAntTheme`); if it was dropping alarm, turns it off (`_SetAlarmDropState(0, 1)`); erases the mark; `_MePlane = 2` if `_MeLocX < 65`, else 3; `_MeLocX` ← the surface row (`_MeLocY`), `_MeLocY` ← 2 if queen (0x60), else 1; `_MeDir = 4`; `_DigMyTile` on the new cell; marks 0xFF.
 
-**Peculiaridade A1:** o limite é x < 65, enquanto as formigas comuns (`_GoInNest`) e a criação de buracos (`_CreateNewHole`) usam x < 64. Um buraco na coluna 64 pertence ao ninho vermelho, mas a amarela que entra nele vai para o ninho preto.
+**Quirk A1:** the limit is x < 65, while the ordinary ants (`_GoInNest`) and the hole creation (`_CreateNewHole`) use x < 64. A hole in column 64 belongs to the red nest, but the yellow ant that enters it goes to the black nest.
 
-### 6.2 Sair: `_ExitNest` (`1028:84a4`)
+### 6.2 Exiting: `_ExitNest` (`1028:84a4`)
 
-**Fato visto no código.**
-
-```
-música ; apaga a marca
-linha = _MeLocX & 63                         (coluna do ninho = linha da superfície)
-se _HoleMap(cor do ninho)[linha] == 0: _MakeNewHoleB/R(_MeLocX)     ← abre um buraco novo
-x0 = _HoleMap[linha] ; passo = (rainha ? 2 : 1)
-direção base:
-    destino na superfície: _GetDir((x0, linha), destino) − 1 (0 se coincidir)
-    destino neste mesmo ninho: 2 se x0 < 64, senão 6
-    outro: _GetMyDir(1, (x0, linha), destino) ; se < 0: S8()
-para j = 0..7 (desvios _absSearchDirs `8:006c` = 0, +1, −1, +2, −2, +3, −3, +4):
-    d = (base + desvio) & 7 ; p = (x0, linha) + passo·D8[d]
-    se _IsNotObstacle(1, p): posição = p ; _MeDir = d ; para
-se nenhuma: _MeDir = base ; posição = ((x0 + passo) & 127, linha)
-_MePlane = 1 ; marca 0xFF
-```
-
-### 6.3 Passagem entre os ninhos (tile 0x14)
-
-Num ninho, fora da linha 0, se a amarela (não-rainha) chega ao destino e o tile do destino é 0x14, ela passa para o **outro** ninho na mesma célula (`_MePlane` 2 ↔ 3), com som e centralização; entrando no vermelho, mostra a mensagem 4 de SHARED 4/1010 ("You have entered the red nest", parâmetro 360). Confirma a [hipótese] de [tiles-valores.md](tiles-valores.md) de que 0x14 é a passagem entre os ninhos.
-
-## 7. Pegar, largar, cavar, comer e saúde
-
-### 7.1 `_TryMyDropOrLift(plano, x, y)` (`1020:98de`)
-
-**Fato visto no código.** Chamada quando a ordem 1 chega ao lado do destino, ou pelo comando 8.
+**Fact seen in the code.**
 
 ```
-se carrega algo (_MeType & 8):
-    0x08 → _DropMyEgg ; 0x18/0x38 → _DropMyFood ; 0x28/0x48 → _DropMyRock ; outro → falha
-    devolve 1 se largou, −1 se não
-senão:
-    ok = PEGA_OVO (se _MeType == 0x10 ou _MeHealth < 10)
-    se não ok: ok = _PickupMyRock(plano, x, y)
-    se não ok: ok = _PickupMyFood(plano, x, y)
-    se ok:
-        vira-se para (x, y) ; se _MeFoodInType ≥ 0: _EatMyFood(_MeFoodInType) ; _MeFoodInType = −1
-        devolve 1
-    se (_CommandKey (8:85e2) ≠ 0 ou (rainha alada 0x40 e _MeNestStarted = 0)) e superfície e (x, y) == posição:
-        se _DigMyNewHole(x, y): _EnterNest() ; centraliza ; devolve 1
-        senão devolve −1
-    devolve 0
+music ; erases the mark
+row = _MeLocX & 63                         (nest column = surface row)
+if _HoleMap(nest color)[row] == 0: _MakeNewHoleB/R(_MeLocX)     ← opens a new hole
+x0 = _HoleMap[row] ; step = (queen ? 2 : 1)
+base direction:
+    destination on the surface: _GetDir((x0, row), destination) − 1 (0 if they coincide)
+    destination in this same nest: 2 if x0 < 64, else 6
+    other: _GetMyDir(1, (x0, row), destination) ; if < 0: S8()
+for j = 0..7 (offsets _absSearchDirs `8:006c` = 0, +1, −1, +2, −2, +3, −3, +4):
+    d = (base + offset) & 7 ; p = (x0, row) + step·D8[d]
+    if _IsNotObstacle(1, p): position = p ; _MeDir = d ; stop
+if none: _MeDir = base ; position = ((x0 + step) & 127, row)
+_MePlane = 1 ; marks 0xFF
 ```
 
-| Função | Endereço | Condição | Efeito |
+### 6.3 Passage between the nests (tile 0x14)
+
+In a nest, outside row 0, if the yellow ant (non-queen) reaches the destination and the destination tile is 0x14, it passes to the **other** nest at the same cell (`_MePlane` 2 ↔ 3), with sound and centering; when entering the red one, it shows message 4 of SHARED 4/1010 ("You have entered the red nest", parameter 360). This confirms the [hypothesis] of [tiles-valores.md](tiles-valores.md) that 0x14 is the passage between the nests.
+
+## 7. Picking up, dropping, digging, eating and health
+
+### 7.1 `_TryMyDropOrLift(plane, x, y)` (`1020:98de`)
+
+**Fact seen in the code.** Called when order 1 arrives next to the destination, or by command 8.
+
+```
+if carrying something (_MeType & 8):
+    0x08 → _DropMyEgg ; 0x18/0x38 → _DropMyFood ; 0x28/0x48 → _DropMyRock ; other → fails
+    returns 1 if dropped, −1 if not
+else:
+    ok = PICK_EGG (if _MeType == 0x10 or _MeHealth < 10)
+    if not ok: ok = _PickupMyRock(plane, x, y)
+    if not ok: ok = _PickupMyFood(plane, x, y)
+    if ok:
+        turns toward (x, y) ; if _MeFoodInType ≥ 0: _EatMyFood(_MeFoodInType) ; _MeFoodInType = −1
+        returns 1
+    if (_CommandKey (8:85e2) ≠ 0 or (winged queen 0x40 and _MeNestStarted = 0)) and surface and (x, y) == position:
+        if _DigMyNewHole(x, y): _EnterNest() ; centers ; returns 1
+        else returns −1
+    returns 0
+```
+
+| Function | Address | Condition | Effect |
 |---|---|---|---|
-| PEGA_OVO (embutido; igual a `_PickupMyEgg` `1020:8e96`) | — | operária vazia (0x10) ou vida < 10; ovo (T & 0x7F de 1 a 7) na célula (`_FindEggAt` `1020:88a2`: pelo mapa de vida, ou, se a célula tem 0xFF/0xFE ou nada, pela lista; devolve o T da vaga, conferido na desmontagem `1020:8a55`–`8a80`) | `_MeEggCarried = 0xFD`; remove o ovo da lista; se vida < 10: **come o ovo** (`_MeFoodInType = 3`); senão `_MeEggCarried = T do ovo`, `_MeType = 8`, som |
-| `_PickupMyRock` | `1020:85ee` | 0x10 ou 0x30 vazia; pedrinha (superfície 0x51–0x53; ninho 0x30–0x31) | superfície: se a pedrinha tampava um buraco (a coluna/linha consta em `_HoleMap`), reabre (`_MapB/R` linha 0 = 0x18; superfície = 0x50 no quintal, `S1(7) + 0x59` na casa); senão o chão vira `S16()` (quintal) ou 0 (casa). Ninho: 0x30 → `S8()` (túnel); 0x31 (tampa) → 0x18 e o buraco da superfície volta a 0x50. `_MeType` → 0x28 (operária) ou 0x48 (soldado) |
-| `_PickupMyFood` | `1020:8f4c` | comida na célula; se sem fome, só 0x10/0x30 vazia | superfície: `_PickupFoodA`; se vai carregar: `_MeScent = 200`, `_MeDis = _GetDis(célula, _LastNewHoleB)`, `_MePrevDis = _MeDis + 1`, deposita 200 na **trilha preta** (sempre `_JamScentBT`). Ninho: 0x10 → `S8()`, senão tile − 1; `_FoodB/R` −1. Com fome: `_MeFoodInType = 0` (come na hora); senão som e `_MeType += 8` |
-| `_DropMyFood` | `1020:7576` | carrega comida | procura onde largar começando na direção do destino (`_GetDir − 1`, ou `_MeDir`) com os desvios `_absSearchDirs`; serve uma célula sem formiga que seja comida com menos de 3 unidades (+1), ou livre (`_IsClearTile`), ou o centro de uma formiga-leão (0x38); se nenhuma vizinha serve, tenta a própria célula. Superfície: `_DropFoodA`; ninho: grava o tile (0x10 numa célula livre) e `_FoodB/R` +1. `_MeType &= ~8`, som |
-| `_DropMyRock` | `1020:7c52` | carrega terra/pedrinha (0x28/0x48) | mesma busca; serve célula sem formiga e livre, ou que não seja comida nem pedrinha mas seja buraco ou 0x38. `_DropPebble`: na superfície grava 0x51 e, se a célula é um buraco, tampa a abertura no ninho (linha 0 = 0x31); no ninho grava 0x30, ou 0x31 numa abertura (e 0x51 no buraco da superfície). `_MeType −= 0x18`, som |
-| `_DropMyEgg` | `1020:8188` | carrega ovo (0x08) | mesma busca (célula sem formiga e livre, ou 0x38); devolve o ovo à lista do plano com `T = _MeEggCarried`, `M = 8`, `S = 0`; `_MeType = 0x10`, `_MeEggCarried = 0xFD` |
-| `_DigMyNewHole` | `1020:16ae` | rainha alada sem colônia (ou `_CommandKey`), na própria célula, 1 ≤ x < 128, 1 ≤ y < 64 | quintal: exige 3 × 3 livre; casa: tile < 200. `_CreateNewHole` grava o buraco (0x50 e borda 0x18–0x1F; 0x59 na casa), atualiza `_HoleMap`, `_LastNewHole*` e `_LastNewExit*`, escava a linha 1 do ninho |
+| PICK_EGG (embedded; same as `_PickupMyEgg` `1020:8e96`) | — | empty worker (0x10) or health < 10; egg (T & 0x7F from 1 to 7) at the cell (`_FindEggAt` `1020:88a2`: via the life map, or, if the cell has 0xFF/0xFE or nothing, via the list; returns the T of the slot, checked in the disassembly `1020:8a55`–`8a80`) | `_MeEggCarried = 0xFD`; removes the egg from the list; if health < 10: **eats the egg** (`_MeFoodInType = 3`); else `_MeEggCarried = T of the egg`, `_MeType = 8`, sound |
+| `_PickupMyRock` | `1020:85ee` | empty 0x10 or 0x30; pebble (surface 0x51–0x53; nest 0x30–0x31) | surface: if the pebble was plugging a hole (the column/row is listed in `_HoleMap`), reopens it (`_MapB/R` row 0 = 0x18; surface = 0x50 in the yard, `S1(7) + 0x59` in the house); else the ground becomes `S16()` (yard) or 0 (house). Nest: 0x30 → `S8()` (tunnel); 0x31 (plug) → 0x18 and the surface hole goes back to 0x50. `_MeType` → 0x28 (worker) or 0x48 (soldier) |
+| `_PickupMyFood` | `1020:8f4c` | food at the cell; if not hungry, only empty 0x10/0x30 | surface: `_PickupFoodA`; if it is going to carry: `_MeScent = 200`, `_MeDis = _GetDis(cell, _LastNewHoleB)`, `_MePrevDis = _MeDis + 1`, deposits 200 in the **black trail** (always `_JamScentBT`). Nest: 0x10 → `S8()`, else tile − 1; `_FoodB/R` −1. Hungry: `_MeFoodInType = 0` (eats on the spot); else sound and `_MeType += 8` |
+| `_DropMyFood` | `1020:7576` | carrying food | looks for where to drop starting in the direction of the destination (`_GetDir − 1`, or `_MeDir`) with the `_absSearchDirs` offsets; a cell qualifies if it has no ant and is food with fewer than 3 units (+1), or free (`_IsClearTile`), or the center of an antlion (0x38); if no neighbor qualifies, tries its own cell. Surface: `_DropFoodA`; nest: writes the tile (0x10 on a free cell) and `_FoodB/R` +1. `_MeType &= ~8`, sound |
+| `_DropMyRock` | `1020:7c52` | carrying dirt/pebble (0x28/0x48) | same search; a cell qualifies if it has no ant and is free, or is neither food nor pebble but is a hole or 0x38. `_DropPebble`: on the surface writes 0x51 and, if the cell is a hole, plugs the opening in the nest (row 0 = 0x31); in the nest writes 0x30, or 0x31 at an opening (and 0x51 in the surface hole). `_MeType −= 0x18`, sound |
+| `_DropMyEgg` | `1020:8188` | carrying an egg (0x08) | same search (cell without ant and free, or 0x38); returns the egg to the plane's list with `T = _MeEggCarried`, `M = 8`, `S = 0`; `_MeType = 0x10`, `_MeEggCarried = 0xFD` |
+| `_DigMyNewHole` | `1020:16ae` | winged queen without colony (or `_CommandKey`), at its own cell, 1 ≤ x < 128, 1 ≤ y < 64 | yard: requires a free 3 × 3; house: tile < 200. `_CreateNewHole` writes the hole (0x50 and border 0x18–0x1F; 0x59 in the house), updates `_HoleMap`, `_LastNewHole*` and `_LastNewExit*`, digs row 1 of the nest |
 
-`_PickupMyObject` (`1020:9250`) e `_DropMyObject` (`1020:91ec`) agrupam as mesmas regras (só `_DropMyObject` é chamada, por `_YellowDeath`). `_IsLiftable` (`1020:97ca`) decide se um duplo clique no ninho vira "pegar" (comida, pedrinha ou ovo na célula).
+`_PickupMyObject` (`1020:9250`) and `_DropMyObject` (`1020:91ec`) group the same rules (only `_DropMyObject` is called, by `_YellowDeath`). `_IsLiftable` (`1020:97ca`) decides whether a double click in the nest becomes "pick up" (food, pebble or egg at the cell).
 
-### 7.2 Comer: `_EatMyFood(tipo)` (`1020:8cda`)
+### 7.2 Eating: `_EatMyFood(type)` (`1020:8cda`)
 
-**Fato visto no código.** Mensagens de SHARED 4/1010 (`_WindPromptStrs`, `9:737a`).
+**Fact seen in the code.** Messages from SHARED 4/1010 (`_WindPromptStrs`, `9:737a`).
 
-| tipo | Quando | Efeito |
+| type | When | Effect |
 |---|---|---|
-| 0 | comeu comida que pegou (`_MeFoodInType = 0`) | som; se `_MeHealth > 0` e `_BpopT > 1`: `_HealthB += _MeHealth / (_BpopT − 1)` (limitado a 100); `_MeHealth = 100` |
-| 1 | foi alimentada por uma formiga (trofalaxia, `_DoTroph` e ordem 4) | diálogo; mensagem 11 "You feel much better now!"; `_MeHealth = 100` (sem bônus à colônia) |
-| 2 | [sem chamador visto] | mensagem 12 "Thank you for your contribution"; se `_MeHealth ≥ 11`: `_MeHealth −= 10` |
-| 3 | comeu um ovo (vida < 10) | sons; mensagem 13 "Cannibalism has restored your health" (parâmetro 180); mesmo efeito do tipo 0 |
+| 0 | ate food it picked up (`_MeFoodInType = 0`) | sound; if `_MeHealth > 0` and `_BpopT > 1`: `_HealthB += _MeHealth / (_BpopT − 1)` (capped at 100); `_MeHealth = 100` |
+| 1 | was fed by an ant (trophallaxis, `_DoTroph` and order 4) | dialog; message 11 "You feel much better now!"; `_MeHealth = 100` (no bonus to the colony) |
+| 2 | [no caller seen] | message 12 "Thank you for your contribution"; if `_MeHealth ≥ 11`: `_MeHealth −= 10` |
+| 3 | ate an egg (health < 10) | sounds; message 13 "Cannibalism has restored your health" (parameter 180); same effect as type 0 |
 
-Em todos: `_MeHealthCntDwn = 0` e `_MeWantFood` recalculado como em `_SetMyHealth`.
+In all of them: `_MeHealthCntDwn = 0` and `_MeWantFood` recomputed as in `_SetMyHealth`.
 
-**Trofalaxia** (`_DoTroph` `1000:846e`): quando uma formiga da mesma cor tenta entrar na célula da amarela com `_MeWantFood` ligado (modos 0, 1/4, 2 e 6, ver [superficie.md](superficie.md), 2.3), a amarela se vira para ela (`_MoveMyLife` na mesma célula) e chama `_EatMyFood(1)`.
+**Trophallaxis** (`_DoTroph` `1000:846e`): when an ant of the same color tries to enter the yellow ant's cell with `_MeWantFood` on (modes 0, 1/4, 2 and 6, see [superficie.md](superficie.md), 2.3), the yellow ant turns toward it (`_MoveMyLife` on the same cell) and calls `_EatMyFood(1)`.
 
-### 7.3 Alarme: `_SetAlarmDropState` (`1000:84cc`) e comando 7
+### 7.3 Alarm: `_SetAlarmDropState` (`1000:84cc`) and command 7
 
-Ligar só é possível na superfície e como formiga (`_MeMode = 0`); liga `_MeDropAlarm`, põe `_ELayerMode = 0` e seleciona o botão `editScent` da janela de edição. A cada passo na superfície, +50 de alarme (máximo 200). Entrar num ninho, morrer ou reiniciar a amarela desliga (`_MeDropAlarm = 0`, `_ELayerMode = −1`). Som 0xF (ok) ou 1 (erro) [código: `_YellowCommandKey` caso 7 `1000:8562`, `_SetAlarmDropState` `1000:84cc`, `_EnterNest`, `_YellowDeath`, `_InitYellow`].
+Turning it on is only possible on the surface and as an ant (`_MeMode = 0`); it turns on `_MeDropAlarm`, sets `_ELayerMode = 0` and selects the `editScent` button of the edit window. On each step on the surface, +50 alarm (maximum 200). Entering a nest, dying or restarting the yellow ant turns it off (`_MeDropAlarm = 0`, `_ELayerMode = −1`). Sound 0xF (ok) or 1 (error) [code: `_YellowCommandKey` case 7 `1000:8562`, `_SetAlarmDropState` `1000:84cc`, `_EnterNest`, `_YellowDeath`, `_InitYellow`].
 
-**O que se vê** [código]: com `_ELayerMode = 0`, a janela de edição desenha, na superfície, o feromônio de alarme no lugar do chão (`_DoCalcTile`: valor > 0x10 → tiles 0xF1–0xFF, pontos amarelos a vermelhos; jogo.md, "Camada de cheiro na janela de edição"). Logo depois de apertar 0 nada muda, porque ainda não há alarme: os pontos aparecem atrás da amarela quando ela anda. As formigas que forrageiam e pisam numa célula com alarme passam ao modo Alarmed e sobem o gradiente; as de Defense também o seguem ([feromonios.md](feromonios.md) §4). O alarme se espalha e enfraquece a cada 64 ticks (`_SmoothAlarm`). **No port** (2026-10-18): a tecla 0 já ligava o alarme e o depósito (+50 por passo), mas a janela de edição não mostrava a camada, e o usuário "não percebia nada de diferente"; agora `Estado::camada_edicao` (`_ELayerMode`) é ligado aqui e pelos botões de cheiro da faixa, e a tela de jogo o desenha. **Conferido na bancada** (`qemu_alarme.txt`): `_ELayerMode` = 0 depois da tecla 0 e o rastro amarelo na janela de edição depois de andar (jogo.md, "Camada de cheiro na janela de edição").
+**What you see** [code]: with `_ELayerMode = 0`, the edit window draws, on the surface, the alarm pheromone in place of the ground (`_DoCalcTile`: value > 0x10 → tiles 0xF1–0xFF, yellow to red dots; jogo.md, "Camada de cheiro na janela de edição"). Right after pressing 0 nothing changes, because there is no alarm yet: the dots appear behind the yellow ant when it walks. Foraging ants that step on a cell with alarm switch to Alarmed mode and climb the gradient; those in Defense also follow it ([feromonios.md](feromonios.md) §4). The alarm spreads and weakens every 64 ticks (`_SmoothAlarm`). **In the port** (2026-10-18): the 0 key already turned on the alarm and the deposit (+50 per step), but the edit window did not show the layer, and the user "did not notice anything different"; now `Estado::camada_edicao` (`_ELayerMode`) is turned on here and by the scent buttons of the ribbon, and the game screen draws it. **Checked on the test bench** (`qemu_alarme.txt`): `_ELayerMode` = 0 after the 0 key and the yellow trail in the edit window after walking (jogo.md, "Camada de cheiro na janela de edição").
 
-## 8. Troca de corpo e alvo: `_ExchangeLives`, `_DoLifeExchange`
+## 8. Body swap and target: `_ExchangeLives`, `_DoLifeExchange`
 
-### 8.1 Modos de ferramenta
+### 8.1 Tool modes
 
-**Fato visto no código.** `_CurGameTool` (`9:7c22`): −1 nenhuma, 10 troca de corpo, 11 alvo. `_StartLifeTransfer` (`1020:6744`) e `_TargetAnt` (`1020:66dc`) alternam a ferramenta: ao ligar, guardam `_GamePaused` em `_SaveGamePaused` (`9:9ea2`) e **pausam o jogo**; ao desligar (ou por `_EndLifeTransferMode`/`_EndTargetMode`), restauram a pausa anterior. A mensagem 3 de 4/1010 ("Click on ant to exchange bodies") e a 17 ("Click on ant to chase or UnPause") acompanham esses modos [hipótese: mostradas pela pausa].
+**Fact seen in the code.** `_CurGameTool` (`9:7c22`): −1 none, 10 body swap, 11 target. `_StartLifeTransfer` (`1020:6744`) and `_TargetAnt` (`1020:66dc`) toggle the tool: when turning it on, they save `_GamePaused` in `_SaveGamePaused` (`9:9ea2`) and **pause the game**; when turning it off (or via `_EndLifeTransferMode`/`_EndTargetMode`), they restore the previous pause. Message 3 of 4/1010 ("Click on ant to exchange bodies") and message 17 ("Click on ant to chase or UnPause") accompany these modes [hypothesis: shown by the pause].
 
-### 8.2 `_ExchangeLives(plano, x, y)` (`1020:67ac`)
+### 8.2 `_ExchangeLives(plane, x, y)` (`1020:67ac`)
 
-Põe `_LessonTemp` (`9:9fb0`) = 1 e chama `_DoLifeExchange`. Sucesso: desliga a ferramenta (restaura a pausa); se o novo corpo é a rainha, som e música especiais. Fracasso: som de erro.
+Sets `_LessonTemp` (`9:9fb0`) = 1 and calls `_DoLifeExchange`. Success: turns off the tool (restores the pause); if the new body is the queen, special sound and music. Failure: error sound.
 
-### 8.3 `_DoLifeExchange(plano, x, y)` (`1020:6842`)
+### 8.3 `_DoLifeExchange(plane, x, y)` (`1020:6842`)
 
-**Fato visto no código.** `v` = valor do mapa de vida na célula (−1 se vazia).
+**Fact seen in the code.** `v` = life map value at the cell (−1 if empty).
 
-1. **Célula vazia, na superfície, a menos de ~1,4 célula da aranha** (`_GetDis((x·16 + 8, y·16 + 8), (_SpidX, _SpidY)) < 512`): vira **aranha**. Se já é aranha, nada. Senão devolve o corpo atual à lista como formiga comum (2.1 abaixo), apaga a marca, `_Starg = −2`, destino da aranha = célula da aranha, `_MeMode = 1`, `_SMode = _MeSMode = 0`, `_MeColor = 0`, `_ResetYellowVars(1, célula da aranha)`, `_MeHealth = 100`, `_MeHealthCntDwn = 0`, `_MeWantFood` conforme `_MeWarnHealth`.
-2. **Clicou em si mesma** (0xFF/0xFE, ou, sendo aranha, perto da aranha): devolve 1 sem fazer nada.
-3. **Rainha:** se clicou na cauda (grupo 13), a cabeça é a célula `+ D8[dir]`; se na cabeça (grupo 12), a cauda é `+ D8[dir ^ 4]`. Ambas são tratadas.
-4. Procura a vaga na lista do plano (de trás para frente) com X, Y e T exatos (e a da cauda). Não achou → 0.
-5. Recusa (devolve 0): alvo vermelho; ovo (grupo 0); grupos 10, 11, 14, 15.
-6. Ajustes do alvo: carregando terra (grupos 5/9) → perde a terra (`_UnCarryCaste`); carregando ovo (grupo 1) → `_MeEggCarried` = S da vaga (estágio do ovo).
-7. Se era formiga (`_MeMode = 0`): o corpo antigo vira formiga comum no plano/posição atuais: `T = grupo' << 3 | cor do alvo | _MeDir`, com grupo' = grupo de `_MeType` (carregando terra → sem terra; carregando ovo → S = `_MeEggCarried`), `M = 9` se era rainha (0x60) senão 0, e a cauda (`T + 8`) se rainha. Se a lista está cheia (A ≥ 1000, B/R ≥ 500), devolve 0 **depois** de ter removido o alvo (peculiaridade A2). Se era aranha, a aranha só volta a ser controlada pela simulação.
-8. As vagas do alvo (e da cauda) são zeradas na lista.
-9. Novo corpo: `_MeColor = cor do alvo`, `_MeBase = 0`, `_MeMode = _MeSMode = 0`, `_MeHealth = 100`, `_MeHealthCntDwn = 0`, `_MeWantFood` recalculado; marca 0xFF (e 0xFE na cauda); `_MeLoc` = célula da cabeça; `_MeDir = T & 7`; `_MeType = T & 0x78`; `_MePlane = plano`.
+1. **Empty cell, on the surface, less than ~1.4 cells from the spider** (`_GetDis((x·16 + 8, y·16 + 8), (_SpidX, _SpidY)) < 512`): becomes the **spider**. If it is already the spider, nothing. Otherwise returns the current body to the list as an ordinary ant (2.1 below), erases the mark, `_Starg = −2`, spider destination = spider's cell, `_MeMode = 1`, `_SMode = _MeSMode = 0`, `_MeColor = 0`, `_ResetYellowVars(1, spider's cell)`, `_MeHealth = 100`, `_MeHealthCntDwn = 0`, `_MeWantFood` according to `_MeWarnHealth`.
+2. **Clicked on itself** (0xFF/0xFE, or, being the spider, near the spider): returns 1 without doing anything.
+3. **Queen:** if it clicked on the tail (group 13), the head is the cell `+ D8[dir]`; if on the head (group 12), the tail is `+ D8[dir ^ 4]`. Both are handled.
+4. Looks for the slot in the plane's list (from back to front) with exact X, Y and T (and the tail's). Not found → 0.
+5. Refuses (returns 0): red target; egg (group 0); groups 10, 11, 14, 15.
+6. Target adjustments: carrying dirt (groups 5/9) → loses the dirt (`_UnCarryCaste`); carrying an egg (group 1) → `_MeEggCarried` = S of the slot (egg stage).
+7. If it was an ant (`_MeMode = 0`): the old body becomes an ordinary ant at the current plane/position: `T = group' << 3 | target color | _MeDir`, with group' = group of `_MeType` (carrying dirt → without dirt; carrying egg → S = `_MeEggCarried`), `M = 9` if it was a queen (0x60) else 0, and the tail (`T + 8`) if queen. If the list is full (A ≥ 1000, B/R ≥ 500), returns 0 **after** having removed the target (quirk A2). If it was the spider, the spider just goes back to being controlled by the simulation.
+8. The target's slots (and the tail's) are zeroed in the list.
+9. New body: `_MeColor = target color`, `_MeBase = 0`, `_MeMode = _MeSMode = 0`, `_MeHealth = 100`, `_MeHealthCntDwn = 0`, `_MeWantFood` recomputed; marks 0xFF (and 0xFE on the tail); `_MeLoc` = head cell; `_MeDir = T & 7`; `_MeType = T & 0x78`; `_MePlane = plane`.
 
-## 9. Morte: `_YellowDeath` (`1000:7746`)
+## 9. Death: `_YellowDeath` (`1000:7746`)
 
-### 9.1 Causas
+### 9.1 Causes
 
-**Fato visto no código; textos de SHARED 4 (ids decimais).** "Events" é a opção do menu Options que mostra os quadros (`_OptionStates[3]`, `8:85f8`). Os casos 0, 1, 2, 5, 6, 7, 8 e 9 tocam uma música `0x4E27 + S1(5)` (um sorteio); 3 e 4 só um som de erro; 10 nenhuma música.
+**Fact seen in the code; texts from SHARED 4 (decimal ids).** "Events" is the Options menu option that shows the dialog boxes (`_OptionStates[3]`, `8:85f8`). Cases 0, 1, 2, 5, 6, 7, 8 and 9 play a music `0x4E27 + S1(5)` (a random draw); 3 and 4 only an error sound; 10 no music.
 
-| Código | Quem chama | Mensagem (se "Events") | Contador |
+| Code | Who calls | Message (if "Events") | Counter |
 |---|---|---|---|
-| 0 | `_YellowFight` (perdeu) | 10030 "Your brave attack…" se a amarela atacou (`_MeStartedFight`), senão 10032 "The enemy ant has attacked you!…" | — (já contado em `_GetWinner`) |
-| 1 | aranha a comeu | quadro da aranha (`_SpiderDialog`, com o sorteio `S1(2)` do texto) e, depois da luta, `_YellowDialog(9100)` | `_BAntsEaten` |
-| 2 | formiga-leão | quadro da formiga-leão (`_LionDialog`) e, depois da luta, `_YellowDialog(9100)` | `_BAntsEaten` |
-| 3 | jogador-aranha cercado | 10026 "You have been overcome by the massive onslaught of ants!…" | `_BAntsKilled` |
-| 4 | jogador-aranha saiu do mapa | 10028 "Due to a latent fear of being eaten by ants, you go insane…" | `_BAntsKilled` |
-| 5 | pisada (`_FootFall`) | 10034 "The inconsiderate human has stepped on you!…" | `_BAntsKilled` |
-| 6 | cortador (`_MowerFall`, `_SimKidOutside`) | 10036 "The evil lawn mower…" | `_BAntsKilled` |
-| 7 | afogada (vida 0 em célula inundada) | 10038 "You swim for your life…" | `_BAntsKilled` |
-| 8 | fome | 10040 "After going berserk with hunger…" | `_BAntsExpired` |
-| 9 | inseticida (`_SimKidInside`) | 10042 "You are covered with insecticide!…" | `_BAntsKilled` |
-| 10 | choque elétrico (tile 0x76/0x78 na casa) | 10045 "You have been electrocuted." | `_BAntsKilled` |
+| 0 | `_YellowFight` (lost) | 10030 "Your brave attack…" if the yellow ant attacked (`_MeStartedFight`), else 10032 "The enemy ant has attacked you!…" | — (already counted in `_GetWinner`) |
+| 1 | spider ate it | spider box (`_SpiderDialog`, with the `S1(2)` random draw of the text) and, after the fight, `_YellowDialog(9100)` | `_BAntsEaten` |
+| 2 | antlion | antlion box (`_LionDialog`) and, after the fight, `_YellowDialog(9100)` | `_BAntsEaten` |
+| 3 | spider-player surrounded | 10026 "You have been overcome by the massive onslaught of ants!…" | `_BAntsKilled` |
+| 4 | spider-player left the map | 10028 "Due to a latent fear of being eaten by ants, you go insane…" | `_BAntsKilled` |
+| 5 | stepped on (`_FootFall`) | 10034 "The inconsiderate human has stepped on you!…" | `_BAntsKilled` |
+| 6 | lawnmower (`_MowerFall`, `_SimKidOutside`) | 10036 "The evil lawn mower…" | `_BAntsKilled` |
+| 7 | drowned (health 0 in a flooded cell) | 10038 "You swim for your life…" | `_BAntsKilled` |
+| 8 | starvation | 10040 "After going berserk with hunger…" | `_BAntsExpired` |
+| 9 | insecticide (`_SimKidInside`) | 10042 "You are covered with insecticide!…" | `_BAntsKilled` |
+| 10 | electric shock (tile 0x76/0x78 in the house) | 10045 "You have been electrocuted." | `_BAntsKilled` |
 
-**Verificado no original** (vetores de tick de 2026-10-18, [testes-tick.md](testes-tick.md#quinta-rodada-2026-10-18-regras-não-verificadas-da-revisão); todos 307/307 com S, R e vida, salvo indicação): 2 `amarela_morte_leao`, 3 `aranha_jogador_cercada`, 4 `aranha_jogador_fora`, 5 `amarela_morte_pisada`, 6 `amarela_morte_cortador`, 7 `amarela_morte_afogada`, 8 `amarela_morte_fome`, 9 `inseticida_morte` (2026-10-17), 10 `amarela_morte_choque` (patch da casa (1, 5) no Jogo Completo, tomada 0x76), 0 `amarela_luta` (2026-10-17). A 1 (`amarela_morte_aranha`) fica pendente só pelos sorteios do desenho dentro do tick (`S1(4)` de `_DrawPalps` três vezes e `S1(2)` de `_SpiderDialog`; ver inimigos.md, "Verificado"). Em todas o renascimento como ovo (`_MeEgg` 1 → 7) ou a transferência acontecem dentro do mesmo tick. Na morte 2 o original centraliza a vista duas vezes no tick: onde a amarela morreu e no corpo novo (`_GotoMyAnt` duas vezes; o port passou a levar a posição em `Evento::CentralizarNaAmarela`).
+**Verified against the original** (tick vectors from 2026-10-18, [testes-tick.md](testes-tick.md#fifth-round-2026-10-18-unverified-rules-from-the-review); all 307/307 with S, R and health, unless noted): 2 `amarela_morte_leao`, 3 `aranha_jogador_cercada`, 4 `aranha_jogador_fora`, 5 `amarela_morte_pisada`, 6 `amarela_morte_cortador`, 7 `amarela_morte_afogada`, 8 `amarela_morte_fome`, 9 `inseticida_morte` (2026-10-17), 10 `amarela_morte_choque` (house patch (1, 5) in the Full Game, outlet 0x76), 0 `amarela_luta` (2026-10-17). Code 1 (`amarela_morte_aranha`) is pending only because of the drawing random draws inside the tick (`S1(4)` of `_DrawPalps` three times and `S1(2)` of `_SpiderDialog`; see inimigos.md, "Verificado"). In all of them the rebirth as an egg (`_MeEgg` 1 → 7) or the transfer happens within the same tick. In death 2 the original centers the view twice in the tick: where the yellow ant died and on the new body (`_GotoMyAnt` twice; the port now carries the position in `Evento::CentralizarNaAmarela`).
 
-Ordem: para a simulação, encerra as ferramentas 10/11, e, se carregava algo, tenta largar (`_DropMyObject` na própria célula); se não conseguir, perde a carga. Animações que **consomem sorteios** e dependem da interface: 7, 8 e 9 → `_AnimYellowInsane`, **antes** do sorteio da música (gerador R, `R(7)` ao chegar a cada alvo, e `S8()` quando trava; 32 quadros com a janela de edição à frente, 8 senão); 1, 2 e 10 → `_AnimYellowFight` (10.2). Depois (1 e 2) o quadro "Your ant has been killed" (4/1010 nº 23). Em todos os casos: `_UnRecruit(1)` (libera todas as recrutadas) e desliga o alarme.
+Order: stops the simulation, ends tools 10/11, and, if it was carrying something, tries to drop it (`_DropMyObject` on its own cell); if it cannot, it loses the load. Animations that **consume random draws** and depend on the interface: 7, 8 and 9 → `_AnimYellowInsane`, **before** the music random draw (R generator, `R(7)` on reaching each target, and `S8()` when stuck; 32 frames with the edit window in front, 8 otherwise); 1, 2 and 10 → `_AnimYellowFight` (10.2). Afterwards (1 and 2) the "Your ant has been killed" box (4/1010 no. 23). In all cases: `_UnRecruit(1)` (releases all recruited ants) and turns off the alarm.
 
-### 9.2 Reencarnação
+### 9.2 Reincarnation
 
-**Fato visto no código.** A busca por um novo corpo, nesta ordem:
+**Fact seen in the code.** The search for a new body, in this order:
 
-1. **Ovo preto no ninho preto**: lista B do índice `_ListIndexB` (inclusive; peculiaridade A3) até 0, primeiro T com 1 ≤ T ≤ 7. Remove o ovo e renasce como ovo (9.3, modo 0).
-2. **Adulto preto no ninho preto**: mesma varredura, T de 8 a 0x67 (inclui a cabeça da rainha, 0x60–0x67).
-3. **Adulto preto na superfície**: lista A, de `_ListIndexA` (inclusive) até 0, T de 8 a 0x67.
-4. **Adulto preto no ninho vermelho**: lista R, idem.
+1. **Black egg in the black nest**: list B from index `_ListIndexB` (inclusive; quirk A3) down to 0, first T with 1 ≤ T ≤ 7. Removes the egg and is reborn as an egg (9.3, mode 0).
+2. **Black adult in the black nest**: same scan, T from 8 to 0x67 (includes the queen's head, 0x60–0x67).
+3. **Black adult on the surface**: list A, from `_ListIndexA` (inclusive) down to 0, T from 8 to 0x67.
+4. **Black adult in the red nest**: list R, likewise.
 
-Num adulto (2–4): a vaga é zerada e a amarela assume a posição com o **tipo do adulto** (`T & 0xF8`) e a direção antiga; a marca gravada no mapa de vida é o próprio T do adulto, não 0xFF (peculiaridade A4: corrigida no tick seguinte por `_DoAntSimY`). `_MeMode = 0`, ordem zerada (`_MeCrazyCnt = −2`), vida 100, mensagem 10059 "You have been transferred to an existing ant.".
+In an adult (2–4): the slot is zeroed and the yellow ant takes the position with the **adult's type** (`T & 0xF8`) and the old direction; the mark written on the life map is the adult's own T, not 0xFF (quirk A4: corrected on the next tick by `_DoAntSimY`). `_MeMode = 0`, order zeroed (`_MeCrazyCnt = −2`), health 100, message 10059 "You have been transferred to an existing ant.".
 
-Sem corpo: Tutorial e Quick → **derrota** (`_IsGameOver = 1`, `_BlackWon = 0`). Jogo Completo → se há mais de uma colônia preta (`_ColonyTotalBlack > 1`), mensagem 10058 e `_SpecialXfer` (o jogador clica numa colônia preta do mapa do quintal); senão derrota com 10056.
+No body: Tutorial and Quick → **defeat** (`_IsGameOver = 1`, `_BlackWon = 0`). Full Game → if there is more than one black colony (`_ColonyTotalBlack > 1`), message 10058 and `_SpecialXfer` (the player clicks on a black colony on the yard map); otherwise defeat with 10056.
 
-### 9.3 Nascimento: `_YellowBirth(plano, x, y, tipo, rainha)` (`1000:739e`)
+### 9.3 Birth: `_YellowBirth(plane, x, y, type, queen)` (`1000:739e`)
 
-**Fato visto no código.** Para a simulação durante a animação (tempo real, não ticks).
+**Fact seen in the code.** Stops the simulation during the animation (real time, not ticks).
 
-- **Renascer como ovo** (`rainha = 0`, chamado pela reencarnação 9.2.1 com `tipo = _MeType`, e 0x10 se era rainha): a amarela aparece como ovo na célula do ovo (`_MeEgg` 1 → 7, um estágio a cada ~10 ticks do relógio do Mac), depois vira `tipo` virada para 2 (se era rainha) ou 6. Na prática sempre 6: `_YellowDeath` já trocou 0x60 por 0x10 antes de chamar (fato visto no código; ver divergencias.md). Mensagem 24 "You have been reborn!".
-- **Fundar a colônia** (`rainha = 1`, comando 9): a amarela vira rainha (0x60) na própria célula, um ovo aparece em `x, y` (2 células atrás) e passa pelos estágios; no fim, a rainha vira uma rainha comum da simulação (`_MakeBlkQueen`/`_MakeRedQueen`, `_CastePop[5] += 1`) e a amarela renasce como **operária** (0x10) na célula do ovo, virada para trás; `_CastePop[1] += 1`, `_CastePop[4] −= 1`, `_BpopT/_RpopT += 1`. Mensagem 25 "You are now a worker!".
-- Em ambos: destino = posição, ordem zerada, `_MeNestStarted = 1`, vida 100.
-- **Tempo dos estágios** (fato visto no código): cada estágio 2–7 é desenhado (`_DoEditUpdateDraw`) e espera `_MacTickCount` chegar a "início + 10" (ou um evento, `_win_Events`); como o relógio do Mac anda 3 a cada 55 ms, são 4 degraus = 220 ms por estágio (~1,3 s os seis). Antes dos estágios, o som 0x1C e um `_myDelay(45)` (que volta logo, telas/mensagens.md §10); depois, o som 0x31, a forma final desenhada, a espera do som (`_mySoundIsDone`), a música e o `_YellowDialog(9101)`. Na bancada (`morte_leao`, `morte_aranha`, telas/mensagens.md §11) o trecho entre o 9100 e o 9101 durou ~2,7 s.
+- **Reborn as an egg** (`queen = 0`, called by reincarnation 9.2.1 with `type = _MeType`, and 0x10 if it was a queen): the yellow ant appears as an egg at the egg's cell (`_MeEgg` 1 → 7, one stage every ~10 ticks of the Mac clock), then becomes `type` facing 2 (if it was a queen) or 6. In practice always 6: `_YellowDeath` already replaced 0x60 with 0x10 before calling (fact seen in the code; see divergencias.md). Message 24 "You have been reborn!".
+- **Founding the colony** (`queen = 1`, command 9): the yellow ant becomes a queen (0x60) at its own cell, an egg appears at `x, y` (2 cells behind) and goes through the stages; at the end, the queen becomes an ordinary simulation queen (`_MakeBlkQueen`/`_MakeRedQueen`, `_CastePop[5] += 1`) and the yellow ant is reborn as a **worker** (0x10) at the egg's cell, facing backward; `_CastePop[1] += 1`, `_CastePop[4] −= 1`, `_BpopT/_RpopT += 1`. Message 25 "You are now a worker!".
+- In both: destination = position, order zeroed, `_MeNestStarted = 1`, health 100.
+- **Stage timing** (fact seen in the code): each stage 2–7 is drawn (`_DoEditUpdateDraw`) and waits for `_MacTickCount` to reach "start + 10" (or an event, `_win_Events`); since the Mac clock advances 3 every 55 ms, that is 4 steps = 220 ms per stage (~1.3 s for all six). Before the stages, sound 0x1C and a `_myDelay(45)` (which returns right away, telas/mensagens.md §10); afterwards, sound 0x31, the final form drawn, the wait for the sound (`_mySoundIsDone`), the music and `_YellowDialog(9101)`. On the test bench (`morte_leao`, `morte_aranha`, telas/mensagens.md §11) the stretch between 9100 and 9101 lasted ~2.7 s.
 
-### 9.4 Ordem dentro do tick e apresentação no port
+### 9.4 Order within the tick and presentation in the port
 
-**Fato visto no código** (`_YellowFight` `1028:823e`, `_YellowDeath` `1000:7746`, `_YellowBirth` `1000:739e`, `_SpiderDialog`, `_LionDialog`, `_AnimYellowFight`, `_AnimYellowInsane`) **e conferido nas capturas sequenciais da bancada** (`re_trabalho/cen/morte_leao`, `le_000`–`le_047`, e `cen/morte_aranha`, 2026-10-18; fora do git): tudo acontece **dentro do tick**, um passo depois do outro, com o programa parado em cada quadro e em cada animação. A vista só sai do lugar da morte depois que os quadros da morte fecham.
+**Fact seen in the code** (`_YellowFight` `1028:823e`, `_YellowDeath` `1000:7746`, `_YellowBirth` `1000:739e`, `_SpiderDialog`, `_LionDialog`, `_AnimYellowFight`, `_AnimYellowInsane`) **and checked in the sequential captures of the test bench** (`re_trabalho/cen/morte_leao`, `le_000`–`le_047`, and `cen/morte_aranha`, 2026-10-18; outside git): everything happens **within the tick**, one step after the other, with the program halted at each box and each animation. The view only leaves the place of death after the death boxes close.
 
-| Passo | O que o original faz | Na tela |
+| Step | What the original does | On screen |
 |---|---|---|
-| 1 (só luta, código 0) | `_YellowFight`: a inimiga sai do mapa de vida; se a amarela perdeu, `_GotoMyAnt`; `_AnimYellowFight(0)`: um desenho e 6 quadros de 165 ms **no lugar da luta**; a inimiga volta ao mapa e o cadáver da amarela fica na célula dela | a nuvem amarela e vermelha girando no lugar da luta |
-| 2 | `_YellowDeath(c)`: `_StopSimulation`, encerra as ferramentas 10/11, larga a carga; `_GotoMyAnt` (vista no lugar da morte) e `_DoEditAndMapUpdateDraw` | a janela de edição no lugar da morte (na luta, o cadáver; nas outras, a amarela ainda na célula) |
-| 3 (7, 8, 9) | `_AnimYellowInsane`: 32 quadros de 110 ms (8 com a edição atrás) | a amarela correndo em volta e voltando |
-| 4 | por causa: 0 música e 10030/10032; 1 `_SpiderDialog`, música, `_AnimYellowFight(1)`; 2 `_LionDialog`, música, `_AnimYellowFight(2)`; 3/4 som de erro e 10026/10028; 5, 6, 7, 9 música e o quadro com imagem; 8 música e 10040; 10 `_AnimYellowFight(10)` (32 quadros) e 10045 (os quadros só com Events; §9.1) | `le_008`: o quadro da formiga-leão com a vista na superfície |
-| 5 (1, 2) | `_YellowDialog(9100)` | `le_010`: "Your ant has been killed" com a vista **ainda na superfície** |
-| 6 | `_UpdateEverything`; `_ClearMyLife` (a amarela sai do mapa de vida, sem redesenho); `_UnRecruit(1)`; alarme desligado | — |
-| 7 | busca do corpo (§9.2). Ovo: `_YellowBirth` — marca o ovo, `_GotoMyAnt` **no corpo novo**, desenho, som, estágios 2–7 (220 ms cada), som, forma final, música 11005 e `_YellowDialog(9101)`. Adulto: marca, `_GotoMyAnt`, desenho e 10059. Nenhum: derrota (Tutorial/Quick), ou 10058 e `_SpecialXfer` / 10056 (Jogo Completo) | `le_015`: o ovo no ninho preto; `le_018`: "You have been reborn!" com a vista no ninho |
+| 1 (fight only, code 0) | `_YellowFight`: the enemy leaves the life map; if the yellow ant lost, `_GotoMyAnt`; `_AnimYellowFight(0)`: one drawing and 6 frames of 165 ms **at the place of the fight**; the enemy returns to the map and the yellow ant's corpse stays at its cell | the yellow and red cloud spinning at the place of the fight |
+| 2 | `_YellowDeath(c)`: `_StopSimulation`, ends tools 10/11, drops the load; `_GotoMyAnt` (view at the place of death) and `_DoEditAndMapUpdateDraw` | the edit window at the place of death (in the fight, the corpse; in the others, the yellow ant still at its cell) |
+| 3 (7, 8, 9) | `_AnimYellowInsane`: 32 frames of 110 ms (8 with the edit window behind) | the yellow ant running around and coming back |
+| 4 | by cause: 0 music and 10030/10032; 1 `_SpiderDialog`, music, `_AnimYellowFight(1)`; 2 `_LionDialog`, music, `_AnimYellowFight(2)`; 3/4 error sound and 10026/10028; 5, 6, 7, 9 music and the box with an image; 8 music and 10040; 10 `_AnimYellowFight(10)` (32 frames) and 10045 (the boxes only with Events; §9.1) | `le_008`: the antlion box with the view on the surface |
+| 5 (1, 2) | `_YellowDialog(9100)` | `le_010`: "Your ant has been killed" with the view **still on the surface** |
+| 6 | `_UpdateEverything`; `_ClearMyLife` (the yellow ant leaves the life map, no redraw); `_UnRecruit(1)`; alarm off | — |
+| 7 | search for the body (§9.2). Egg: `_YellowBirth` — marks the egg, `_GotoMyAnt` **on the new body**, drawing, sound, stages 2–7 (220 ms each), sound, final form, music 11005 and `_YellowDialog(9101)`. Adult: mark, `_GotoMyAnt`, drawing and 10059. None: defeat (Tutorial/Quick), or 10058 and `_SpecialXfer` / 10056 (Full Game) | `le_015`: the egg in the black nest; `le_018`: "You have been reborn!" with the view in the nest |
 
-**Port (2026-10-19).** As regras rodam o tick inteiro, como antes (o estado do fim do tick e os vetores não mudam), e deixam os pedidos na fila na ordem acima: `Evento::CentralizarNaAmarela { plano, x, y }` em cada `_GotoMyAnt`, `Evento::Instantaneo { plano, quadro }` em cada redesenho da janela de edição dentro do tick (`desenho::desenhar_no_tick`: cópia do mapa de chão, do mapa de vida do plano mostrado e dos campos `_Me*`, `desenho::foto_da_edicao`), `Evento::Animacao` em cada animação (luta, morte, choque, loucura e agora os estágios do ovo: código −2 ao renascer, −3 ao fundar a colônia, `animacao.espera_ovo_ms` = 220), as músicas, os sons e os quadros. A `Partida` (`core/partida.rs`) põe os pedidos numa **linha do tempo** (`apresentacao`) e os apresenta um depois do outro (`seguir_apresentacao`): uma animação ou um aviso modal (ou a escolha do `_SpecialXfer`) seguram o resto até acabarem; os sons e as esperas que vêm logo depois de uma animação vão junto com ela. Enquanto a apresentação não acaba, nenhum tick roda e a janela de edição mostra o último instantâneo (ou o último quadro da animação; `Partida::quadro_animado`), não o estado do fim do tick. Assim: a luta no lugar dela, o quadro da morte com a vista ainda lá (a janela parada no instante da morte), e só depois a vista vai ao corpo novo, o ovo cresce e aparece o 9101. Vale para as onze causas (§9.1) e para a trofalaxia (o 9110 com a amarela virada para quem a alimenta). Os scripts dos mods recebem cada pedido (`ao_evento`) quando ele é apresentado; os instantâneos não vão aos scripts. Testes: `core::partida::testes::morte_na_luta_e_apresentada_na_ordem_do_original` (regras de verdade, luta perdida e ovo), `regras_amarela.rs::linha_do_tempo_da_morte_e_do_renascimento`.
+**Port (2026-10-19).** The rules run the whole tick, as before (the end-of-tick state and the vectors do not change), and leave the requests in the queue in the order above: `Evento::CentralizarNaAmarela { plano, x, y }` at each `_GotoMyAnt`, `Evento::Instantaneo { plano, quadro }` at each redraw of the edit window within the tick (`desenho::desenhar_no_tick`: copy of the ground map, the life map of the displayed plane and the `_Me*` fields, `desenho::foto_da_edicao`), `Evento::Animacao` at each animation (fight, death, shock, insanity and now the egg stages: code −2 on rebirth, −3 on founding the colony, `animacao.espera_ovo_ms` = 220), the music, the sounds and the boxes. The `Partida` (`core/partida.rs`) puts the requests on a **timeline** (`apresentacao`) and presents them one after the other (`seguir_apresentacao`): an animation or a modal notice (or the `_SpecialXfer` choice) holds back the rest until they finish; the sounds and waits that come right after an animation go along with it. While the presentation has not finished, no tick runs and the edit window shows the last snapshot (or the last frame of the animation; `Partida::quadro_animado`), not the end-of-tick state. Thus: the fight at its place, the death box with the view still there (the window frozen at the moment of death), and only afterwards does the view go to the new body, the egg grows and 9101 appears. This applies to all eleven causes (§9.1) and to trophallaxis (9110 with the yellow ant turned toward whoever feeds it). Mod scripts receive each request (`ao_evento`) when it is presented; snapshots do not go to scripts. Tests: `core::partida::testes::morte_na_luta_e_apresentada_na_ordem_do_original` (real rules, lost fight and egg), `regras_amarela.rs::linha_do_tempo_da_morte_e_do_renascimento`.
 
-**Fica de fora** [limitação]: a janela do mapa, a faixa, as janelas de controle e os bichos desenhados por cima do mapa (aranha) mostram o estado do fim do tick durante a apresentação; o relógio dos balões "Silly" não anda nos estágios do ovo (o desenho do original lê `_TickCount` a cada estágio); o `_UpdateEverything` do passo 6 não tem instantâneo próprio (o quadro seguinte é o do corpo novo).
+**Left out** [limitation]: the map window, the ribbon, the control windows and the creatures drawn over the map (spider) show the end-of-tick state during the presentation; the clock of the "Silly" balloons does not advance during the egg stages (the original's drawing reads `_TickCount` at each stage); the `_UpdateEverything` of step 6 has no snapshot of its own (the next frame is the new body's).
 
-## 10. Luta e comandos de colônia
+## 10. Fighting and colony commands
 
-### 10.1 `_YellowFight(plano, i)` (`1028:823e`)
+### 10.1 `_YellowFight(plane, i)` (`1028:823e`)
 
-**Fato visto no código.** Chamado quando uma inimiga tenta entrar na célula da amarela, ou ao concluir a ordem 3.
+**Fact seen in the code.** Called when an enemy tries to enter the yellow ant's cell, or when order 3 completes.
 
 ```
-apaga a inimiga do mapa de vida
-v = _GetWinner(_MeType, T[i])               ← a amarela é "a" (a da célula); R(10) ; _MeType não tem bit de cor
-se v ≠ _MeType: centraliza
+erases the enemy from the life map
+v = _GetWinner(_MeType, T[i])               ← the yellow ant is "a" (the one in the cell); R(10) ; _MeType has no color bit
+if v ≠ _MeType: centers
 _AnimYellowFight(_MePlane, _MeLoc, _MeDir, 0x70, 0)          (10.2)
-se a amarela venceu:
-    marca 0xFF ; superfície: _DeadAntHere(célula da inimiga, cor dela) ; T[i] = 0
-    se era o alvo da ordem 3: encerra a ordem
-senão:
-    devolve a inimiga ao mapa de vida ; superfície: _DeadAntHere(célula da amarela, _MeColor)
+if the yellow ant won:
+    marks 0xFF ; surface: _DeadAntHere(enemy's cell, its color) ; T[i] = 0
+    if it was the target of order 3: ends the order
+else:
+    returns the enemy to the life map ; surface: _DeadAntHere(yellow ant's cell, _MeColor)
     _YellowDeath(0)
 ```
 
-Como `_MeType` não tem cor, com `_Invincible = 1` a amarela sempre vence (a regra de `_GetWinner` faz a preta vencer). Os contadores de baixa seguem `_GetWinner` ([superficie.md](superficie.md), 6.2).
+Since `_MeType` has no color, with `_Invincible = 1` the yellow ant always wins (the `_GetWinner` rule makes the black one win). The casualty counters follow `_GetWinner` ([superficie.md](superficie.md), 6.2).
 
-### 10.2 `_AnimYellowFight` (`1028:7e56`): animação que consome sorteios
+### 10.2 `_AnimYellowFight` (`1028:7e56`): an animation that consumes random draws
 
-**Fato visto no código.** Quadros: 6 na luta (código 0); 32 na morte por eletricidade (10); 8 nas mortes 1/2 com a janela de edição atrás; 32 (música desligada) ou 64 (música ligada, `_OptionStates[1]`) com a janela à frente. Antes do laço: `_SetMyLife(…, 0xFF)` e `_DoEditUpdateDraw` (a amarela ainda com o seu tipo; na luta a inimiga já saiu do mapa de vida). Cada quadro começa esperando o relógio do Mac passar de "início do quadro anterior + 6" (3 degraus de 55 ms = 165 ms; o primeiro quadro espera só o próximo degrau) e então: `S2()` e som 0x25 se ≠ 0 (só na luta); som 0x31 e `S2()` que pisca o tile (só no choque); com música ligada e código 1–9, **sai se `_mySongIsDone()`**; na morte por formiga-leão, o centro da armadilha anima; **sempre** `S8()` (direção), `_MoveMyLife(plano, x, y, tipo, dir)` e `_DoEditUpdateDraw` (`_UpdateEdit` → `UPDATEWINDOW`: o desenho é síncrono, sem passar pelo laço de mensagens). Na luta o tipo é 0x70: a marca 0xFF é desenhada com o tile 0x170 + direção do buffer de vida, a "nuvem" de formiga amarela e vermelha embolada. Não há laço de mensagens durante a animação: **o programa inteiro fica parado** (~0,8 s na luta, ~5,3 s no choque).
+**Fact seen in the code.** Frames: 6 in the fight (code 0); 32 in the death by electricity (10); 8 in deaths 1/2 with the edit window behind; 32 (music off) or 64 (music on, `_OptionStates[1]`) with the window in front. Before the loop: `_SetMyLife(…, 0xFF)` and `_DoEditUpdateDraw` (the yellow ant still with its own type; in the fight the enemy has already left the life map). Each frame begins by waiting for the Mac clock to pass "start of previous frame + 6" (3 steps of 55 ms = 165 ms; the first frame only waits for the next step) and then: `S2()` and sound 0x25 if ≠ 0 (fight only); sound 0x31 and `S2()` that blinks the tile (shock only); with music on and code 1–9, **exits if `_mySongIsDone()`**; in the death by antlion, the center of the trap animates; **always** `S8()` (direction), `_MoveMyLife(plane, x, y, type, dir)` and `_DoEditUpdateDraw` (`_UpdateEdit` → `UPDATEWINDOW`: the drawing is synchronous, without going through the message loop). In the fight the type is 0x70: the 0xFF mark is drawn with tile 0x170 + direction from the life buffer, the "cloud" of tangled yellow and red ants. There is no message loop during the animation: **the whole program stays halted** (~0.8 s in the fight, ~5.3 s in the shock).
 
-`_mySongIsDone` (`1008:a1a0`) devolve sempre verdadeiro no caminho multimídia (MCI) do Windows ([som.md](som.md)): com música ligada as mortes 1–9 saem no primeiro quadro, depois do som e antes do `S8()` — nenhum quadro desenhado. Só no caminho Sound Blaster os 64 quadros correriam.
+`_mySongIsDone` (`1008:a1a0`) always returns true on the Windows multimedia (MCI) path ([som.md](som.md)): with music on, deaths 1–9 exit on the first frame, after the sound and before the `S8()` — no frame drawn. Only on the Sound Blaster path would the 64 frames run.
 
-**Verificado no original (bancada QEMU, 2026-10-18, `cenarios_tick.py gravar luta_quadros`, snapshot `rico`):** amarela soldado posta ao lado de uma operária vermelha parada e duplo clique nela (ordem 3); no tick 1799 a luta acontece e a tela foi capturada parada logo depois de cada `_DoEditUpdateDraw` (breakpoints em `1028:7e86`, `1028:8019` e `1028:7f1c`, ver `tools/cenarios_tick.py`). Foram **7 desenhos**: o de antes do laço (amarela soldado, `_MeType` 0x30, a vermelha já fora do mapa de vida) e 6 quadros com `_MeType` 0x70 e `_MeDir` 0, 2, 5, 6, 2, 0, na mesma célula. A imagem é a nuvem amarela e vermelha, girando a cada quadro. Capturas em `re_trabalho/a51/luta_quadros/` (fora do git, imagens do jogo).
+**Verified against the original (QEMU bench, 2026-10-18, `cenarios_tick.py gravar luta_quadros`, snapshot `rico`):** soldier yellow ant placed next to a stationary red worker and a double click on it (order 3); at tick 1799 the fight happens and the screen was captured halted right after each `_DoEditUpdateDraw` (breakpoints at `1028:7e86`, `1028:8019` and `1028:7f1c`, see `tools/cenarios_tick.py`). There were **7 drawings**: the one before the loop (soldier yellow ant, `_MeType` 0x30, the red one already off the life map) and 6 frames with `_MeType` 0x70 and `_MeDir` 0, 2, 5, 6, 2, 0, at the same cell. The image is the yellow and red cloud, spinning on each frame. Captures in `re_trabalho/a51/luta_quadros/` (outside git, game images).
 
-**Port.** `animar_luta` (`rules/amarela.rs`) guarda, depois de cada `_MoveMyLife`, o mapa de chão, o mapa de vida do plano e os campos `_Me*` do desenho (`QuadroAnimacao`) e pede `Evento::Animacao` (antes das esperas e dos sons do quadro). A interface (`core/partida.rs`) para a simulação por `espera_ms × (quadros − 1)` ms (`bloqueio_ms`; nenhum tick roda, o relógio de parede anda) e a janela de edição mostra o quadro da vez (`Partida::quadro_animado`, `TelaDeJogo::mostrar_quadro_animado`); um quadro modal pedido no mesmo tick (a morte depois de uma luta perdida) só aparece depois. Entre os quadros, `Evento::Espera(165)` continua espalhando os sons (regras/som.md). `_AnimYellowInsane` (§9.1, mortes 7–9) faz o mesmo com 110 ms por quadro (`espera_loucura_ms`; até 2026-10-18 o port usava 55, conta errada de "início + 3"). O desenho de antes do laço não é mostrado como quadro da animação (dura até 55 ms), mas fica como instantâneo (§9.4). Desde 2026-10-19 os pedidos do tick são apresentados em ordem (§9.4): o quadro da morte espera a luta acabar e a vista só vai ao corpo novo depois dele. Com música ligada as mortes 1–9 saem no primeiro quadro (`animacao.morte_para_com_musica`, padrão verdadeiro). Os ticks pedidos pelos mods (`avancar_ticks`) não param. A animação só lê o estado: os vetores de tick do original (`ticks_originais`, `ticks_longos`) continuam iguais. Conferido com o mesmo estado de entrada (`estado_antes.bin` do tick 1799 carregado como save; `simant --save … --ticks 1 --avancar-ms 0/200/400/600/800 --exportar-tela-jogo`): os quadros do port mostram a mesma nuvem na mesma célula; as direções diferem porque o Load do port ressemeia S.
+**Port.** `animar_luta` (`rules/amarela.rs`) saves, after each `_MoveMyLife`, the ground map, the plane's life map and the `_Me*` fields of the drawing (`QuadroAnimacao`) and requests `Evento::Animacao` (before the frame's waits and sounds). The interface (`core/partida.rs`) stops the simulation for `espera_ms × (quadros − 1)` ms (`bloqueio_ms`; no tick runs, the wall clock advances) and the edit window shows the current frame (`Partida::quadro_animado`, `TelaDeJogo::mostrar_quadro_animado`); a modal box requested in the same tick (the death after a lost fight) only appears afterwards. Between frames, `Evento::Espera(165)` keeps spreading out the sounds (regras/som.md). `_AnimYellowInsane` (§9.1, deaths 7–9) does the same with 110 ms per frame (`espera_loucura_ms`; until 2026-10-18 the port used 55, a wrong computation of "start + 3"). The drawing before the loop is not shown as an animation frame (it lasts up to 55 ms), but it remains as a snapshot (§9.4). Since 2026-10-19 the tick's requests are presented in order (§9.4): the death box waits for the fight to end and the view only goes to the new body after it. With music on, deaths 1–9 exit on the first frame (`animacao.morte_para_com_musica`, default true). Ticks requested by mods (`avancar_ticks`) do not stop. The animation only reads the state: the original's tick vectors (`ticks_originais`, `ticks_longos`) remain the same. Checked with the same input state (`estado_antes.bin` of tick 1799 loaded as a save; `simant --save … --ticks 1 --avancar-ms 0/200/400/600/800 --exportar-tela-jogo`): the port's frames show the same cloud at the same cell; the directions differ because the port's Load reseeds S.
 
-**Peculiaridade A5:** o número de sorteios depende da janela à frente e da opção de música. Para o determinismo do port, reproduzir a mesma regra (com o mesmo estado de interface) ou aceitar divergência a partir de uma morte ou luta da amarela.
+**Quirk A5:** the number of random draws depends on the window in front and on the music option. For the port's determinism, reproduce the same rule (with the same interface state) or accept divergence from a death or fight of the yellow ant onward.
 
-### 10.3 Comandos: `_YellowCommand(c)` (`1000:87ba`)
+### 10.3 Commands: `_YellowCommand(c)` (`1000:87ba`)
 
-**Fato visto no código.** Ignorado se `_MeMode > 1` (Experimental) ou se o jogo acabou.
+**Fact seen in the code.** Ignored if `_MeMode > 1` (Experimental) or if the game is over.
 
-| c | Efeito | Música/som |
+| c | Effect | Music/sound |
 |---|---|---|
-| 0 | ajuda (`WinHelp`; tópico 1 formiga, 2 aranha, 3 rainha alada) | — |
+| 0 | help (`WinHelp`; topic 1 ant, 2 spider, 3 winged queen) | — |
 | 1 | `_Recruit(5)` | 0x2B05 |
 | 2 | `_Recruit(10)` | 0x2B06 |
-| 3 | `_Recruit(1000)` (todas) | 0x2B07 |
-| 4 | `_UnRecruit(0)` (libera metade) | 0x2B08 |
-| 5 | `_UnRecruit(1)` (libera todas) | 0x2B09 |
-| 6 | liga/desliga a troca de corpo (`_StartLifeTransfer`) | — |
-| 7 | liga/desliga o alarme (7.3) | 0xF / 1 |
-| 8 | na superfície: `_TryMyDropOrLift(1, posição)` (pega/larga na própria célula; rainha alada sem colônia: cava o ninho) | erro 1 se devolver −1 ou fora da superfície |
-| 9 | no ninho preto, com y > 2: `_YellowBirth(2, posição + 2·D8[_MeDir ^ 4], 0x10, 1)` (fundar) | erro 1 senão |
-| 10 | liga/desliga o modo alvo (`_TargetAnt`; usado pela aranha) | — |
-| 11 | aranha: alterna `_MeSMode` 7 (caça por faro) / 0 | som 2 |
-| 12 | aranha: alterna `_MeSMode` 8 (laser) / 0 | som 0x29 |
+| 3 | `_Recruit(1000)` (all) | 0x2B07 |
+| 4 | `_UnRecruit(0)` (releases half) | 0x2B08 |
+| 5 | `_UnRecruit(1)` (releases all) | 0x2B09 |
+| 6 | toggles body swap (`_StartLifeTransfer`) | — |
+| 7 | toggles the alarm (7.3) | 0xF / 1 |
+| 8 | on the surface: `_TryMyDropOrLift(1, position)` (picks up/drops at its own cell; winged queen without colony: digs the nest) | error 1 if it returns −1 or outside the surface |
+| 9 | in the black nest, with y > 2: `_YellowBirth(2, position + 2·D8[_MeDir ^ 4], 0x10, 1)` (found) | error 1 otherwise |
+| 10 | toggles target mode (`_TargetAnt`; used by the spider) | — |
+| 11 | spider: toggles `_MeSMode` 7 (hunting by scent) / 0 | sound 2 |
+| 12 | spider: toggles `_MeSMode` 8 (laser) / 0 | sound 0x29 |
 
-`_Recruit`/`_UnRecruit` estão em [superficie.md](superficie.md) (9.4).
+`_Recruit`/`_UnRecruit` are in [superficie.md](superficie.md) (9.4).
 
-## 11. Controles do jogador
+## 11. Player controls
 
-### 11.1 Do Windows ao evento do jogo
+### 11.1 From Windows to the game event
 
-**Fato visto no código** (`MAINWNDPROC` → `_DoMouse` `1000:13f6` / `_DoKeyDown` `1000:0e8c` → `_DoEvent`). O evento carrega a posição e um campo de bits:
+**Fact seen in the code** (`MAINWNDPROC` → `_DoMouse` `1000:13f6` / `_DoKeyDown` `1000:0e8c` → `_DoEvent`). The event carries the position and a bit field:
 
-| Origem | Bits |
+| Source | Bits |
 |---|---|
-| botão esquerdo apertado (`WM_LBUTTONDOWN`) | 0x200 |
-| botão direito apertado (`WM_RBUTTONDOWN`) | 0x800 no código de `_DoMouse`, mas o `MAINWNDPROC` desvia o 0x204 para o modo de ajuda antes (telas/ajuda-contexto.md §1) |
-| **duplo clique** esquerdo (`WM_LBUTTONDBLCLK`) | 0x2000 |
-| duplo clique direito (`WM_RBUTTONDBLCLK`) | 0x4000 |
-| Shift / Ctrl seguros | bit 0 / bit 1 |
-| teclas **Espaço** ou **Insert** | como clique esquerdo na posição do cursor (0x200); se a mensagem seguinte já é outra Espaço/Insert, como duplo clique (0x2000) |
-| tecla **Delete** | no código de `_DoKeyDown`, como clique direito (0x800) ou duplo (0x4000); mas o ramo só é alcançado com Espaço/Insert: Delete vai a `_HelpKeyDown` e liga/desliga o modo de ajuda (telas/ajuda-contexto.md §2) |
-| setas | movem o cursor 8 pixels (`SetCursorPos`) |
+| left button pressed (`WM_LBUTTONDOWN`) | 0x200 |
+| right button pressed (`WM_RBUTTONDOWN`) | 0x800 in the `_DoMouse` code, but `MAINWNDPROC` diverts 0x204 to help mode first (telas/ajuda-contexto.md §1) |
+| left **double click** (`WM_LBUTTONDBLCLK`) | 0x2000 |
+| right double click (`WM_RBUTTONDBLCLK`) | 0x4000 |
+| Shift / Ctrl held | bit 0 / bit 1 |
+| **Space** or **Insert** keys | like a left click at the cursor position (0x200); if the next message is already another Space/Insert, like a double click (0x2000) |
+| **Delete** key | in the `_DoKeyDown` code, like a right click (0x800) or double (0x4000); but the branch is only reached with Space/Insert: Delete goes to `_HelpKeyDown` and toggles help mode (telas/ajuda-contexto.md §2) |
+| arrows | move the cursor 8 pixels (`SetCursorPos`) |
 
-Antes de chegar ao jogo, `_HelpKeyDown` e `_YellowCommandKey` (11.4) têm prioridade sobre as demais teclas. Letras A–Z alimentam um anel de 4 caracteres; se `_Cheats` (`8:83bc`) estiver habilitado e as 4 últimas letras formarem um código da tabela (guardada com os bits invertidos; lida do `SIMANTW.EXE`: `oops rand erad FUND joke hole HOLE qeen QEEN eggs EGGS heal HEAL zhea ZHEA just will mick jeff joel fred jenn susi data serv clie`), chama `_CheatKeys`. Enter limpa o anel. Códigos e efeitos: [trapacas.md](trapacas.md).
+Before reaching the game, `_HelpKeyDown` and `_YellowCommandKey` (11.4) take priority over the other keys. Letters A–Z feed a 4-character ring; if `_Cheats` (`8:83bc`) is enabled and the last 4 letters form a code from the table (stored with the bits inverted; read from `SIMANTW.EXE`: `oops rand erad FUND joke hole HOLE qeen QEEN eggs EGGS heal HEAL zhea ZHEA just will mick jeff joel fred jenn susi data serv clie`), it calls `_CheatKeys`. Enter clears the ring. Codes and effects: [trapacas.md](trapacas.md).
 
-### 11.2 Janela de edição: `_ProcEditEvent` (`1010:0b7a`)
+### 11.2 Edit window: `_ProcEditEvent` (`1010:0b7a`)
 
-Objetos da janela 0 (nomes de SHARED 1/0, **fato verificado** no dump):
+Objects of window 0 (names from SHARED 1/0, **fact verified** in the dump):
 
-| Objeto | Nome | Ação |
+| Object | Name | Action |
 |---|---|---|
 | 4, 0x15 | `editTileArea`, `editTileArea2` | `_processEdit` (11.3) |
-| 6 | `editHelpBut` | ajuda |
-| 7 | `editTools` | menu de ferramentas (`_EditToolsMenu`: Quick → passa para Experimental; Experimental → ferramentas 11.6) |
-| 8, 9, 0xA | `editTopBut`, `editBNestBut`, `editRNestBut` | mostra a superfície, o ninho preto ou o vermelho (`_SetMapPlane(1/2/3)`) |
-| 0xB | `editGoYellow` | centraliza na amarela |
-| 0xC, 0xD, 0xE | `editGoSpider`, `editGoBQueen`, `editGoRQueen` | centraliza na aranha / rainha preta / rainha vermelha |
-| 0xF | `editPause` | pausa/despausa |
-| 0x10 | `editScent` | menu de camada de cheiro exibida (SHARED 1/6: Off, Alarm, BNest, BTrail, RNest, RTrail) |
-| 0x11 | `editHealthY` | arrastar define `_MeWarnHealth` = altura × 100 / altura total |
-| 0x12 | `editHealthB` | define `_BlkWarnHealth` (`9:769c`) do mesmo modo |
+| 6 | `editHelpBut` | help |
+| 7 | `editTools` | tools menu (`_EditToolsMenu`: Quick → switches to Experimental; Experimental → tools 11.6) |
+| 8, 9, 0xA | `editTopBut`, `editBNestBut`, `editRNestBut` | shows the surface, the black nest or the red one (`_SetMapPlane(1/2/3)`) |
+| 0xB | `editGoYellow` | centers on the yellow ant |
+| 0xC, 0xD, 0xE | `editGoSpider`, `editGoBQueen`, `editGoRQueen` | centers on the spider / black queen / red queen |
+| 0xF | `editPause` | pause/unpause |
+| 0x10 | `editScent` | menu of the displayed scent layer (SHARED 1/6: Off, Alarm, BNest, BTrail, RNest, RTrail) |
+| 0x11 | `editHealthY` | dragging sets `_MeWarnHealth` = height × 100 / total height |
+| 0x12 | `editHealthB` | sets `_BlkWarnHealth` (`9:769c`) the same way |
 
-A rolagem da vista (`_goStepUp/Down/Left/Right/NE/SE/SW/NW`, `1030:6efe`–`754e`, e `_FinishDiagStep/HorzStep/VertStep`) só move a janela (`_MapPnt`, `9:7d2e`) e guarda o centro por plano; não mexe na simulação.
+Scrolling the view (`_goStepUp/Down/Left/Right/NE/SE/SW/NW`, `1030:6efe`–`754e`, and `_FinishDiagStep/HorzStep/VertStep`) only moves the window (`_MapPnt`, `9:7d2e`) and stores the center per plane; it does not touch the simulation.
 
-### 11.3 Clique no mapa: `_processEdit` (`1000:6a38`)
+### 11.3 Click on the map: `_processEdit` (`1000:6a38`)
 
-**Fato visto no código.** `dupla` = bits 0x6000 (duplo clique, esquerdo ou direito). Um clique direito simples (0x800) é tratado como clique simples. Célula = `((px − esquerda) / largura_tile + _MapPnt.x, (py − topo) / altura_tile + _MapPnt.y)`. Clique simples com a janela de edição à frente espera ~6 ticks do relógio antes de processar.
+**Fact seen in the code.** `double` = bits 0x6000 (double click, left or right). A single right click (0x800) is treated as a single click. Cell = `((px − left) / tile_width + _MapPnt.x, (py − top) / tile_height + _MapPnt.y)`. A single click with the edit window in front waits ~6 clock ticks before processing.
 
 ```
-Experimental (_CurGameType = 3): _processExp (ferramenta, 11.6) ; fim
-ferramenta 10: _ExchangeLives(plano exibido, célula) ; fim
-ferramenta 11: se superfície e o jogador é a aranha: _processSpider(célula, dupla) ; fim
-clique simples:
-    na amarela: se o botão continua apertado (sem Shift): menu da amarela (_AntMenu, 11.5)
-                senão, se clicou na cauda da rainha (0xFE): nada ; senão centraliza
-    em outra célula com formiga: se o botão continua apertado (sem Shift): janela Examine (_MagnifyMenu) ; fim
-    senão: ORDEM(cmd = 0)
-duplo clique:
-    em formiga não-amarela, não-ovo, sendo formiga (_MeMode = 0):
-        _MeTargIndex = vaga ; _MeCmd = 4 (mesma cor: ser alimentada) ou 3 (outra cor: atacar)
-        guarda T, plano e posição do alvo ; destino = célula ; _MeMoveMe = 1
-    senão: ORDEM(cmd = 1)
-ORDEM(cmd):
-    vista da superfície (plano exibido < 2):
-        jogador-aranha: _processSpider(célula, cmd)
-        senão: destino = (plano 1, célula) ; _MeCmd = cmd ; _MeMoveMe = 1 ; _MeCrazyCnt = −2
-    vista de ninho (só formiga):
-        cmd 1 → _MeCmd = 2 (cavar) se a célula é escavável (terra/superfície fechada) ou é a linha 0
-                fechada com a amarela num ninho ; 1 (pegar/largar) se carrega algo ou a célula tem
-                comida/pedrinha/ovo ; 2 nos demais casos
+Experimental (_CurGameType = 3): _processExp (tool, 11.6) ; end
+tool 10: _ExchangeLives(displayed plane, cell) ; end
+tool 11: if surface and the player is the spider: _processSpider(cell, double) ; end
+single click:
+    on the yellow ant: if the button is still held (no Shift): yellow ant menu (_AntMenu, 11.5)
+                else, if it clicked on the queen's tail (0xFE): nothing ; else centers
+    on another cell with an ant: if the button is still held (no Shift): Examine window (_MagnifyMenu) ; end
+    else: ORDER(cmd = 0)
+double click:
+    on a non-yellow, non-egg ant, while being an ant (_MeMode = 0):
+        _MeTargIndex = slot ; _MeCmd = 4 (same color: be fed) or 3 (other color: attack)
+        stores T, plane and position of the target ; destination = cell ; _MeMoveMe = 1
+    else: ORDER(cmd = 1)
+ORDER(cmd):
+    surface view (displayed plane < 2):
+        spider-player: _processSpider(cell, cmd)
+        else: destination = (plane 1, cell) ; _MeCmd = cmd ; _MeMoveMe = 1 ; _MeCrazyCnt = −2
+    nest view (ant only):
+        cmd 1 → _MeCmd = 2 (dig) if the cell is diggable (dirt/closed surface) or is the closed
+                row 0 with the yellow ant in a nest ; 1 (pick up/drop) if carrying something or the cell has
+                food/pebble/egg ; 2 in the other cases
         cmd 0 → _MeCmd = 0
-        destino = (plano exibido, célula), com x limitado a 1..62 nas linhas 0–1 ; _MeMoveMe = 1 ; _MeCrazyCnt = −2
+        destination = (displayed plane, cell), with x clamped to 1..62 in rows 0–1 ; _MeMoveMe = 1 ; _MeCrazyCnt = −2
 ```
 
-`_processSpider(x, y, dupla)` (`1000:7198`): clique simples (fora do modo alvo) → anda até lá (`_SuserX/Y`, `_SMode = 0`, sem presa). Duplo clique ou modo alvo: se há formiga na célula, ela vira a presa (`_SMode = 2`); no modo alvo, `_MeSMode = 6` e o modo é encerrado. `_MeCmd = dupla` decide entre andar e correr.
+`_processSpider(x, y, double)` (`1000:7198`): single click (outside target mode) → walks there (`_SuserX/Y`, `_SMode = 0`, no prey). Double click or target mode: if there is an ant at the cell, it becomes the prey (`_SMode = 2`); in target mode, `_MeSMode = 6` and the mode is ended. `_MeCmd = double` decides between walking and running.
 
-### 11.4 Teclas de comando: `_YellowCommandKey` (`1000:8562`)
+### 11.4 Command keys: `_YellowCommandKey` (`1000:8562`)
 
-**Fato visto na desmontagem** (tabela de saltos em `1000:85c8`). Códigos de tecla virtual do Windows:
+**Fact seen in the disassembly** (jump table at `1000:85c8`). Windows virtual key codes:
 
-| Tecla | Formiga comum | Rainha alada sem colônia | Aranha |
+| Key | Ordinary ant | Winged queen without colony | Spider |
 |---|---|---|---|
-| `1` ou NumPad 1 | 1 recrutar 5 | 8 cavar ninho | 10 alvo |
-| `2` ou NumPad 2 | 2 recrutar 10 (com Ctrl: 3 todas) | 9 fundar | 11 faro |
-| `3` ou NumPad 3 | 4 liberar metade | idem | idem |
-| `4` ou NumPad 4 | 5 liberar todas | idem | idem |
-| `0` ou NumPad 0 | 7 alarme | idem | idem |
-| `X` ou F9 | 6 troca de corpo | idem | idem |
-| `J` ou NumPad `*`, com Tab apertado | — | — | 12 laser |
-| Backspace | parar a ordem em andamento (zera destino e `_MeMoveMe`); sem ordem, centraliza; com Shift, centraliza | idem | aranha: para (destino = posição, `_SMode = 0`) ou centraliza |
-| Home | centraliza (som 0xF) | idem | idem |
+| `1` or NumPad 1 | 1 recruit 5 | 8 dig nest | 10 target |
+| `2` or NumPad 2 | 2 recruit 10 (with Ctrl: 3 all) | 9 found | 11 scent |
+| `3` or NumPad 3 | 4 release half | same | same |
+| `4` or NumPad 4 | 5 release all | same | same |
+| `0` or NumPad 0 | 7 alarm | same | same |
+| `X` or F9 | 6 body swap | same | same |
+| `J` or NumPad `*`, with Tab held | — | — | 12 laser |
+| Backspace | stops the order in progress (zeroes destination and `_MeMoveMe`); without an order, centers; with Shift, centers | same | spider: stops (destination = position, `_SMode = 0`) or centers |
+| Home | centers (sound 0xF) | same | same |
 
-Observação: o acelerador do Windows é aplicado antes (11.7); por isso Shift+0..4 vão para o menu Speed e Ctrl+0 para o menu View, e não para esta tabela [hipótese: precedência do `TranslateAccelerator` no laço de mensagens de `WINMAIN`, fato visto no código].
+Note: the Windows accelerator is applied first (11.7); that is why Shift+0..4 go to the Speed menu and Ctrl+0 to the View menu, and not to this table [hypothesis: precedence of `TranslateAccelerator` in the `WINMAIN` message loop, fact seen in the code].
 
-### 11.5 Janelas de menu da amarela
+### 11.5 Yellow ant menu windows
 
-**Fato verificado** nos nomes de objeto de SHARED tipo 1 e nas tabelas `10:1ba6`/`10:1baa`/`10:1bb0` do `SIMANTW.EXE`. `_AntMenu` (`1010:6d24`) abre um menu de proximidade conforme o corpo e traduz o item em comando:
+**Fact verified** in the object names of SHARED type 1 and in the tables `10:1ba6`/`10:1baa`/`10:1bb0` of `SIMANTW.EXE`. `_AntMenu` (`1010:6d24`) opens a proximity menu according to the body and translates the item into a command:
 
-| Janela | Itens (nome do objeto) → comando |
+| Window | Items (object name) → command |
 |---|---|
-| 7 `yllwRecruitWin` (formiga) | `yllwRecruit5` → 1, `yllwRecruit10` → 2 (com Shift: 3), `yllwReleaseHalf` → 4, `yllwReleaseAll` → 5, `yllwExchange` → 6, `yllwRecruitHelp` → 0 |
-| 8 `yllwStartMenu` (rainha alada sem colônia) | `yllwStartDig` → 8, `yllwStartBrood` → 9, `yllwStartHelp` → 0 |
-| 32 `editSpiderMenu` (aranha) | `spiderMenuChase` → 10, `spiderMenuHunt` → 11, `spiderMenuXchange` → 6, `spiderMenuHelp` → 0 |
+| 7 `yllwRecruitWin` (ant) | `yllwRecruit5` → 1, `yllwRecruit10` → 2 (with Shift: 3), `yllwReleaseHalf` → 4, `yllwReleaseAll` → 5, `yllwExchange` → 6, `yllwRecruitHelp` → 0 |
+| 8 `yllwStartMenu` (winged queen without colony) | `yllwStartDig` → 8, `yllwStartBrood` → 9, `yllwStartHelp` → 0 |
+| 32 `editSpiderMenu` (spider) | `spiderMenuChase` → 10, `spiderMenuHunt` → 11, `spiderMenuXchange` → 6, `spiderMenuHelp` → 0 |
 
-### 11.6 Modo Experimental: `_processExp` e `_DoTool` (`1010:7022`, `1010:727e`)
+### 11.6 Experimental mode: `_processExp` and `_DoTool` (`1010:7022`, `1010:727e`)
 
-**Fato visto no código.** A ferramenta é `_CurExpTool` (`9:79e2`), escolhida no menu `editToolsMenu` (SHARED 1/9). Com o botão apertado, a ferramenta é reaplicada a cada célula nova sob o cursor (e continuamente para as ferramentas ≥ 5).
+**Fact seen in the code.** The tool is `_CurExpTool` (`9:79e2`), chosen in the `editToolsMenu` menu (SHARED 1/9). With the button held, the tool is reapplied to each new cell under the cursor (and continuously for tools ≥ 5).
 
-| `_CurExpTool` | Objeto | Efeito |
+| `_CurExpTool` | Object | Effect |
 |---|---|---|
-| 0 | `editExpInfo` | janela Examine da formiga na célula |
-| 1 | `editExpBarrier` | parede (só superfície; `_DropWall`) |
-| 2 | `editExpDig` | cavar (`_ExpDig`) |
-| 3 | `editExpAddAnt` | pôr formiga (`_ExpAddAnt`) |
-| 4 | `editExpAddFood` | comida (com a variante do submenu: 20 vezes em `S1(9) − 4` em volta, `_IncFoodHere`) |
-| 5 | `editExpTrails` | cheiro (`_ExpIncSmell`, [feromonios.md](feromonios.md)) |
-| 6 | `editExpInsecticide` | inseticida (`_ExpKillAnts`: 8 vezes; mata formigas, aranha e formiga-leão) |
-| 7 | `editExpStartGame` | sai do Experimental e começa a simulação com a amarela |
+| 0 | `editExpInfo` | Examine window of the ant at the cell |
+| 1 | `editExpBarrier` | wall (surface only; `_DropWall`) |
+| 2 | `editExpDig` | dig (`_ExpDig`) |
+| 3 | `editExpAddAnt` | place ant (`_ExpAddAnt`) |
+| 4 | `editExpAddFood` | food (with the submenu variant: 20 times at `S1(9) − 4` around, `_IncFoodHere`) |
+| 5 | `editExpTrails` | scent (`_ExpIncSmell`, [feromonios.md](feromonios.md)) |
+| 6 | `editExpInsecticide` | insecticide (`_ExpKillAnts`: 8 times; kills ants, spider and antlion) |
+| 7 | `editExpStartGame` | leaves Experimental and starts the simulation with the yellow ant |
 
-### 11.7 Menus e aceleradores
+### 11.7 Menus and accelerators
 
-**Fato verificado:** textos do menu de SHARED 6/0 e tabela de aceleradores do recurso `ACCELERATORTABLE` do `SIMANTW.EXE` (offset 500224, entradas de 5 bytes). Comandos (byte baixo do id) tratados por `_ProcMenu` (`1000:4fc2`).
+**Fact verified:** menu texts from SHARED 6/0 and accelerator table from the `ACCELERATORTABLE` resource of `SIMANTW.EXE` (offset 500224, 5-byte entries). Commands (low byte of the id) handled by `_ProcMenu` (`1000:4fc2`).
 
-| Menu | Item | Atalho | Id |
+| Menu | Item | Shortcut | Id |
 |---|---|---|---|
 | File | New / Load / Save / Save As / Quit | Ctrl+N / L / S / A / Q | 3 / 4 / 5 / 6 / 8 |
 | Window | Edit, Map, Behavior, Caste, History, Info, Status | Ctrl+E, M, B, C, H, I, T | 0x11–0x17 |
 | Window | Help | F1 | 0x18 |
 | View | Yard, House, Strategic, Graphic | Ctrl+Y, 5, 6, 7 | 0x21–0x24 |
 | View | Surface, Black Nest, Red Nest | Ctrl+8, 9, 0 | 0x26–0x28 |
-| Options | AutoTrack, Music, Sound Effects, Events, Messages, Silly | Ctrl+G, J, K, —, —, — | 0x31–0x36 (alternam `_OptionStates[0..5]`, `8:85f2`) |
-| Speed | Pause / Slow / Normal / Fast / Ultra | Shift+0 / 1 / 2 / 3 / 4 (também Shift+NumPad 0–4) | 0x41 / 0x43–0x46 |
+| Options | AutoTrack, Music, Sound Effects, Events, Messages, Silly | Ctrl+G, J, K, —, —, — | 0x31–0x36 (toggle `_OptionStates[0..5]`, `8:85f2`) |
+| Speed | Pause / Slow / Normal / Fast / Ultra | Shift+0 / 1 / 2 / 3 / 4 (also Shift+NumPad 0–4) | 0x41 / 0x43–0x46 |
 
-A tabela de aceleradores tem mais 13 entradas sem item de menu (ids 0xA0–0xAC: Ctrl+F4, Ctrl+NumPad−, Ctrl+Espaço, Ctrl+F6, Ctrl+NumPad+, Ctrl+P, Ctrl+A, Ctrl+Z, Ctrl+setas, Ctrl+U, Ctrl+V, Ctrl+F) [em aberto: quem as trata; Ctrl+A aparece duas vezes, a primeira, Save As, vence]. O índice da opção "Silly" = `_OptionStates[5]` confirma o uso em [superficie.md](superficie.md) (balões).
+The accelerator table has 13 more entries without a menu item (ids 0xA0–0xAC: Ctrl+F4, Ctrl+NumPad−, Ctrl+Space, Ctrl+F6, Ctrl+NumPad+, Ctrl+P, Ctrl+A, Ctrl+Z, Ctrl+arrows, Ctrl+U, Ctrl+V, Ctrl+F) [open: who handles them; Ctrl+A appears twice, the first one, Save As, wins]. The index of the "Silly" option = `_OptionStates[5]` confirms its use in [superficie.md](superficie.md) (balloons).
 
-## 12. Peculiaridades a reproduzir
+## 12. Quirks to reproduce
 
-| Id | O quê | Onde |
+| Id | What | Where |
 |---|---|---|
-| A1 | a amarela entra no ninho preto até a coluna 64 (as demais formigas só até 63) | 6.1 |
-| A2 | troca de corpo com a lista cheia remove o alvo e falha | 8.3 |
-| A3 | a busca de reencarnação começa no índice `_ListIndex` (uma vaga além do fim) | 9.2 |
-| A4 | ao reencarnar num adulto, o mapa de vida recebe o T do adulto em vez de 0xFF até o próximo tick | 9.2 |
-| A5 | sorteios das animações dependem da janela à frente e da música | 10.2, 9.1 |
-| A6 | `_PickupMyFood` sempre marca a trilha **preta**, mesmo com a amarela vermelha (o resto da trilha usa `_MeColor`) | 7.1 |
-| A7 | `_GetWinner` com `_MeType` sem cor: a amarela é tratada como preta | 10.1 |
-| A8 | o choque elétrico só é testado quando uma ordem termina | 4 |
+| A1 | the yellow ant enters the black nest up to column 64 (the other ants only up to 63) | 6.1 |
+| A2 | body swap with the list full removes the target and fails | 8.3 |
+| A3 | the reincarnation search starts at index `_ListIndex` (one slot past the end) | 9.2 |
+| A4 | when reincarnating into an adult, the life map receives the adult's T instead of 0xFF until the next tick | 9.2 |
+| A5 | random draws of the animations depend on the window in front and on the music | 10.2, 9.1 |
+| A6 | `_PickupMyFood` always marks the **black** trail, even with a red yellow ant (the rest of the trail uses `_MeColor`) | 7.1 |
+| A7 | `_GetWinner` with `_MeType` without color: the yellow ant is treated as black | 10.1 |
+| A8 | the electric shock is only tested when an order ends | 4 |
 
-## 13. Casos de teste sugeridos (bancada QEMU)
+## 13. Suggested test cases (QEMU bench)
 
-Bancada: [docs/bancada-qemu.md](../../bancada-qemu.md) (comandos `clicar_em`, `teclas`, `capturar`, save com Ctrl+A). Coordenadas de tela dependem da janela de edição aberta na posição padrão de 640 × 480 [a medir uma vez e registrar no roteiro].
+Test bench: [docs/bancada-qemu.md](../../bancada-qemu.md) (commands `clicar_em`, `teclas`, `capturar`, save with Ctrl+A). Screen coordinates depend on the edit window being open at the default 640 × 480 position [to be measured once and recorded in the script].
 
-| # | Regra | Roteiro | Esperado |
+| # | Rule | Script | Expected |
 |---|---|---|---|
-| Y1 | Vida por tempo e por passo (3, 4) | Quick Game; salvar parado em dois momentos; depois clicar longe e salvar ao chegar | parado: −1 a cada 64 ticks (`_MeHealth`); andando: −1 a cada 2 passos (`_MeSteps`) |
-| Y2 | Ordem simples (4) | clique simples numa célula livre da superfície | `_MeMoveMe = 1`, `_MeCmd = 0`, `_MeCrazyCnt = −2` logo depois; ao chegar, `_MeMoveMe = 0` e posição = destino |
-| Y3 | Contorno (5.3) | clique atrás de uma pedra grande | o caminho contorna a pedra (capturas a cada segundo); `_MeCrazyCnt` entre 16 e −2 durante o contorno |
-| Y4 | Pegar e largar comida (7.1) | duplo clique em comida; depois duplo clique em chão perto do buraco | `_MeType` 0x10 → 0x18, `_MeScent = 200`; trilha preta 200, 199… no caminho; ao largar, tile 0x48 e `_MeType = 0x10` |
-| Y5 | Comer com fome (7.2) | baixar `editHealthY` até a vida atual; duplo clique em comida | `_MeHealth = 100`, `_HealthB` sobe `vida / (_BpopT − 1)`; tile de comida −1 |
-| Y6 | Trofalaxia (7.2) | com fome, duplo clique numa operária preta | ao encostar, mensagem "You feel much better now!", `_MeHealth = 100` |
-| Y7 | Recrutar e liberar (10.3, 11.4) | teclas 1, 2, Ctrl+2, 3, 4 | `_ModePopB[5]` (Defense) +5, +10, todas; metade; 0. **Conferido (2026-10-19, ações `amarela_*` em `tests/referencias/acoes/`, 307/307):** cada tecla com o jogo pausado faz exatamente o `_Recruit`/`_UnRecruit` de superficie.md 9.4, inclusive as listas B e R |
-| Y8 | Alarme (7.3) | tecla 0 na superfície e andar | `_MeDropAlarm = 1`; `_PherMapA` +50 por passo (máx. 200); entrar no ninho desliga |
-| Y9 | Entrar/sair do ninho (6) | clique simples no buraco; depois clique na superfície estando no ninho | `_MePlane` 1 → 2 com (x, y) = (y_buraco, 1), dir 4; saída numa célula vizinha do buraco na direção do destino |
-| Y10 | Coluna 64 (A1) | Experimental: criar buraco na coluna 64 e fazer a amarela entrar | `_MePlane = 2` (preto), enquanto formigas comuns no mesmo buraco vão para a lista R |
-| Y11 | Luta (10.1) | duplo clique numa vermelha | `_MeCmd = 3`; ao encostar, luta; vitória → cadáver vermelho; derrota → morte código 0 com 10030 |
-| Y12 | Troca de corpo (8.3) | tecla X e clique numa soldado preta | `_MeType = 0x30`, o corpo antigo na lista como operária (T grupo 2, M 0) na posição antiga |
-| Y13 | Virar aranha (8.3) | tecla X e clique na célula da aranha | `_MeMode = 1`; `_MeLoc` acompanha `_SpidX >> 4` |
-| Y14 | Morte e reencarnação (9.2) | deixar a amarela morrer de fome | mensagem 10040; amarela renasce como ovo se houver ovo preto no ninho (`_MeEgg` 1→7) ou transferida para adulto (10059) |
-| Y15 | Fundar colônia (9.3) | Jogo Completo: rainha alada, tecla 1 (cavar) e depois tecla 2 no ninho com y > 2 | buraco novo; `_MeType` 0x40 → amarela operária; rainha comum na lista B; `_MeNestStarted = 1` |
-| Y16 | Teclado como mouse (11.1) | posicionar o cursor e apertar Espaço duas vezes rapidamente | mesmo efeito de um duplo clique |
-| Y17 | Aceleradores (11.7) | Shift+3, Ctrl+9, Ctrl+G | velocidade "fast", vista do ninho preto, AutoTrack alternado (`_GameSpeed`, `_MapPlane`, `_OptionStates[0]` no save) |
+| Y1 | Health over time and per step (3, 4) | Quick Game; save while standing still at two moments; then click far away and save on arrival | standing still: −1 every 64 ticks (`_MeHealth`); walking: −1 every 2 steps (`_MeSteps`) |
+| Y2 | Simple order (4) | single click on a free surface cell | `_MeMoveMe = 1`, `_MeCmd = 0`, `_MeCrazyCnt = −2` right after; on arrival, `_MeMoveMe = 0` and position = destination |
+| Y3 | Avoidance (5.3) | click behind a large rock | the path goes around the rock (captures every second); `_MeCrazyCnt` between 16 and −2 during the avoidance |
+| Y4 | Picking up and dropping food (7.1) | double click on food; then double click on ground near the hole | `_MeType` 0x10 → 0x18, `_MeScent = 200`; black trail 200, 199… along the path; on dropping, tile 0x48 and `_MeType = 0x10` |
+| Y5 | Eating while hungry (7.2) | lower `editHealthY` to the current health; double click on food | `_MeHealth = 100`, `_HealthB` rises by `health / (_BpopT − 1)`; food tile −1 |
+| Y6 | Trophallaxis (7.2) | while hungry, double click on a black worker | on contact, message "You feel much better now!", `_MeHealth = 100` |
+| Y7 | Recruiting and releasing (10.3, 11.4) | keys 1, 2, Ctrl+2, 3, 4 | `_ModePopB[5]` (Defense) +5, +10, all; half; 0. **Checked (2026-10-19, `amarela_*` actions in `tests/referencias/acoes/`, 307/307):** each key with the game paused does exactly the `_Recruit`/`_UnRecruit` of superficie.md 9.4, including lists B and R |
+| Y8 | Alarm (7.3) | key 0 on the surface and walk | `_MeDropAlarm = 1`; `_PherMapA` +50 per step (max. 200); entering the nest turns it off |
+| Y9 | Entering/exiting the nest (6) | single click on the hole; then click on the surface while in the nest | `_MePlane` 1 → 2 with (x, y) = (y_hole, 1), dir 4; exit at a cell neighboring the hole in the direction of the destination |
+| Y10 | Column 64 (A1) | Experimental: create a hole in column 64 and make the yellow ant enter it | `_MePlane = 2` (black), while ordinary ants at the same hole go to list R |
+| Y11 | Fight (10.1) | double click on a red ant | `_MeCmd = 3`; on contact, fight; victory → red corpse; defeat → death code 0 with 10030 |
+| Y12 | Body swap (8.3) | X key and click on a black soldier | `_MeType = 0x30`, the old body in the list as a worker (T group 2, M 0) at the old position |
+| Y13 | Becoming the spider (8.3) | X key and click on the spider's cell | `_MeMode = 1`; `_MeLoc` follows `_SpidX >> 4` |
+| Y14 | Death and reincarnation (9.2) | let the yellow ant starve to death | message 10040; the yellow ant is reborn as an egg if there is a black egg in the nest (`_MeEgg` 1→7) or transferred to an adult (10059) |
+| Y15 | Founding a colony (9.3) | Full Game: winged queen, key 1 (dig) and then key 2 in the nest with y > 2 | new hole; `_MeType` 0x40 → yellow worker; ordinary queen in list B; `_MeNestStarted = 1` |
+| Y16 | Keyboard as mouse (11.1) | position the cursor and press Space twice quickly | same effect as a double click |
+| Y17 | Accelerators (11.7) | Shift+3, Ctrl+9, Ctrl+G | speed "fast", black nest view, AutoTrack toggled (`_GameSpeed`, `_MapPlane`, `_OptionStates[0]` in the save) |
 
-## 14. Implementação no port
+## 14. Implementation in the port
 
-**Onde:** `engine/src/rules/amarela.rs`. Dados: `data/amarela.json`, gerado por `tools/extrair_amarela.py` a partir do `SIMANTW.EXE` (`_Dx8/_Dy8` 8:0000/0008, `_Dx9/_Dy9` 8:0010/001a, `_absSearchDirs` 8:006c, `_UnCarryCaste` 8:0094, classe e matriz de luta 10:22c6/22d6, borda do buraco 10:230c), mais as constantes das regras, os quadros das animações, as músicas e as mensagens (origem de cada valor em `_origem`).
+**Where:** `engine/src/rules/amarela.rs`. Data: `data/amarela.json`, generated by `tools/extrair_amarela.py` from `SIMANTW.EXE` (`_Dx8/_Dy8` 8:0000/0008, `_Dx9/_Dy9` 8:0010/001a, `_absSearchDirs` 8:006c, `_UnCarryCaste` 8:0094, class and fight matrix 10:22c6/22d6, hole border 10:230c), plus the rule constants, the animation frames, the music and the messages (origin of each value in `_origem`).
 
-- Tick: `impl RegrasAmarela for RegrasOriginais` chama `simular_amarela` (§3) e `mover_amarela` (§4) com `RegrasOriginais::amarela` (carregado de `data/amarela.json` com mods; `TabelasAmarela::padrao()` é a cópia embutida, para testes).
-- Usadas por outras regras: `lutar_com_amarela(e, t, plano, i)` (`_YellowFight`; plano < 2 = lista A, 2 = B, 3 = R; chamada pela superfície e pelos dois ninhos), `trofalaxia(e, t, x, y, d)` (`_DoTroph`; superfície e ninho preto), `matar_amarela(e, t, CausaMorte)` (`_YellowDeath`, códigos 0–10; quintal: 5, 6, 9; formiga-leão: 2; aranha: 1, 3, 4) e `mover_marca` (`_MoveMyLife`, antes da morte pela formiga-leão e pela aranha).
-- Comandos do jogador (sem SDL; a interface converte pixel → célula, §11.3, e chama):
+- Tick: `impl RegrasAmarela for RegrasOriginais` calls `simular_amarela` (§3) and `mover_amarela` (§4) with `RegrasOriginais::amarela` (loaded from `data/amarela.json` with mods; `TabelasAmarela::padrao()` is the embedded copy, for tests).
+- Used by other rules: `lutar_com_amarela(e, t, plano, i)` (`_YellowFight`; plane < 2 = list A, 2 = B, 3 = R; called by the surface and by both nests), `trofalaxia(e, t, x, y, d)` (`_DoTroph`; surface and black nest), `matar_amarela(e, t, CausaMorte)` (`_YellowDeath`, codes 0–10; yard: 5, 6, 9; antlion: 2; spider: 1, 3, 4) and `mover_marca` (`_MoveMyLife`, before the death by antlion and by spider).
+- Player commands (no SDL; the interface converts pixel → cell, §11.3, and calls):
 
-| Função | Original | Uso |
+| Function | Original | Use |
 |---|---|---|
-| `clicar_no_mapa(e, t, ctl, plano_vista, x, y, duplo, segurando)` | `_processEdit` | clique completo: Experimental, ferramentas 10/11, clique na amarela (centralizar ou menu), Examine, ordem. Devolve `RespostaClique` |
-| `ordem_ir(e, plano_vista, x, y)` | ORDEM(0) | "ir para (x, y)" (clique simples) |
-| `ordem_agir(e, plano_vista, x, y)` | duplo clique | atacar ou pedir comida a uma formiga (ordens 3/4); senão ir e pegar/largar/cavar (1/2) |
-| `comando(e, t, ctl, c)` | `_YellowCommand` | comandos 0–12 (§10.3), também os itens dos menus da §11.5; `false` = som de erro |
-| `tecla_de_comando(e, t, ctl, vk, Modificadores)` | `_YellowCommandKey` | teclas virtuais do Windows (módulo `vk`): 1–4, 0, X/F9, J/NumPad* com Tab, Backspace, Home; devolve `RespostaTecla` |
-| `trocar_de_corpo(e, t, ctl, plano, x, y)` | `_ExchangeLives` | clique com a ferramenta 10 |
+| `clicar_no_mapa(e, t, ctl, plano_vista, x, y, duplo, segurando)` | `_processEdit` | full click: Experimental, tools 10/11, click on the yellow ant (center or menu), Examine, order. Returns `RespostaClique` |
+| `ordem_ir(e, plano_vista, x, y)` | ORDER(0) | "go to (x, y)" (single click) |
+| `ordem_agir(e, plano_vista, x, y)` | double click | attack or ask an ant for food (orders 3/4); otherwise go and pick up/drop/dig (1/2) |
+| `comando(e, t, ctl, c)` | `_YellowCommand` | commands 0–12 (§10.3), also the menu items of §11.5; `false` = error sound |
+| `tecla_de_comando(e, t, ctl, vk, Modificadores)` | `_YellowCommandKey` | Windows virtual keys (module `vk`): 1–4, 0, X/F9, J/NumPad* with Tab, Backspace, Home; returns `RespostaTecla` |
+| `trocar_de_corpo(e, t, ctl, plano, x, y)` | `_ExchangeLives` | click with tool 10 |
 
-`ControleJogador` guarda o que não vai para o save (`_SaveGamePaused`). Diálogos, mensagens de vento (4/1010) e o movimento da vista não são simulados: as músicas viram `Evento::Musica`, os efeitos sonoros `Evento::Som` (ids em `sons` de `amarela.json`, ver [som.md](som.md)) e `_TryAntTheme` `Evento::TemaDoNinho`, os quadros da §9.1 viram `Evento::Mensagem`, e "centralizar" (`_GotoMyAnt`) grava `_LessonTemp = 1` e deixa `Evento::CentralizarNaAmarela` na fila; quem move a vista é o laço de jogo (`core/partida.rs`, ver [jogo.md](../telas/jogo.md), "Simulação ao vivo").
+`ControleJogador` holds what does not go into the save (`_SaveGamePaused`). Dialogs, wind messages (4/1010) and the view movement are not simulated: the music becomes `Evento::Musica`, the sound effects `Evento::Som` (ids in `sons` of `amarela.json`, see [som.md](som.md)) and `_TryAntTheme` `Evento::TemaDoNinho`, the boxes of §9.1 become `Evento::Mensagem`, and "centering" (`_GotoMyAnt`) writes `_LessonTemp = 1` and leaves `Evento::CentralizarNaAmarela` in the queue; what moves the view is the game loop (`core/partida.rs`, see [jogo.md](../telas/jogo.md), "Simulação ao vivo").
 
-**Sorteios e animações.** Todos os sorteios acontecem na ordem do original, inclusive os das animações: `_AnimYellowFight` (S2 por quadro na luta ou no choque, S8 sempre; na formiga-leão o tile do centro oscila 0x3B–0x3D e fica no último valor) e `_AnimYellowInsane` (gerador R para o alvo, S8 quando trava; a amarela anda de verdade pelo mapa de vida e volta). O número de quadros usa `animacao.janela_edicao_na_frente` (padrão: verdadeiro) e `_OptionStates[1]` (música); com música ligada as mortes 1–9 saem no primeiro quadro, como no caminho MCI (§10.2). Os quadros desenhados vão para a interface em `Evento::Animacao` (§10.2). `_YellowBirth` é em tempo real e não sorteia: o port aplica o estado final no tick e mostra os estágios do ovo como uma animação de apresentação (`Evento::Animacao` com código −2/−3, 220 ms por estágio; §9.3 e §9.4).
+**Random draws and animations.** All random draws happen in the original's order, including those of the animations: `_AnimYellowFight` (S2 per frame in the fight or in the shock, S8 always; with the antlion the center tile oscillates 0x3B–0x3D and stays at the last value) and `_AnimYellowInsane` (R generator for the target, S8 when stuck; the yellow ant actually walks across the life map and comes back). The number of frames uses `animacao.janela_edicao_na_frente` (default: true) and `_OptionStates[1]` (music); with music on, deaths 1–9 exit on the first frame, as on the MCI path (§10.2). The drawn frames go to the interface in `Evento::Animacao` (§10.2). `_YellowBirth` is in real time and makes no random draws: the port applies the final state in the tick and shows the egg stages as a presentation animation (`Evento::Animacao` with code −2/−3, 220 ms per stage; §9.3 and §9.4).
 
-**Escolhas e lacunas do port:** `_CommandKey` (8:85e2) não está no estado: tratado como 0. A queda da comida na casa segue `_DROPdir` (`Estado::passo_queda`, superficie.md 8.2). `_SpecialXfer` (escolher outra colônia no Jogo Completo): desde 2026-10-19 a troca acontece dentro do tick, no ponto do original, quando a escolha é conhecida (`Estado::transferencia_no_tick`); sem ela, o tick emite a mensagem 10058 e `Evento::EscolherColonia`, e a interface roda o tick de novo com a escolha (telas/quintal.md §8; `rules/troca_patch.rs`; ação `special_xfer` em `tests/referencias/acoes/`, 307/307). Ao morrer com a ferramenta 10/11 ligada, a ferramenta é desligada mas a pausa salva não é restaurada (está na interface; pela regra da pausa a amarela não morre pelo tick com essas ferramentas). As peças comuns com o ninho e a superfície (`_GetMap`, `_GetLife`, `_IsClearTile`, `_IsNotObstacle`, `_IsThisPebble`, `_IsItHole`, `_TileCanBeMovedOn` na superfície, `_GetBestDir`, `_FindAntIndex`, `_DigTileB/R`, `_SmoothEdges*`, `_FixExitMap*`, `_MakeNewHole*`, borda do buraco, `_PlaceEgg*`, `_DecEat*`, `_PickupFoodA`, `_DropFoodA`, `_DeadAntHere`, `_GetWinner`, `_Recruit`, `_UnRecruit`, `_GetDir`, `_GetDis`) estão em `engine/src/rules/comum.rs` (ver [../../decisoes.md](../../decisoes.md), "Módulo comum das regras"); `amarela.rs` guarda só o que é da amarela.
+**Port choices and gaps:** `_CommandKey` (8:85e2) is not in the state: treated as 0. The food drop in the house follows `_DROPdir` (`Estado::passo_queda`, superficie.md 8.2). `_SpecialXfer` (choosing another colony in the Full Game): since 2026-10-19 the swap happens within the tick, at the original's point, when the choice is known (`Estado::transferencia_no_tick`); without it, the tick emits message 10058 and `Evento::EscolherColonia`, and the interface runs the tick again with the choice (telas/quintal.md §8; `rules/troca_patch.rs`; action `special_xfer` in `tests/referencias/acoes/`, 307/307). When dying with tool 10/11 on, the tool is turned off but the saved pause is not restored (it is in the interface; by the pause rule the yellow ant does not die through the tick with these tools). The pieces shared with the nest and the surface (`_GetMap`, `_GetLife`, `_IsClearTile`, `_IsNotObstacle`, `_IsThisPebble`, `_IsItHole`, `_TileCanBeMovedOn` on the surface, `_GetBestDir`, `_FindAntIndex`, `_DigTileB/R`, `_SmoothEdges*`, `_FixExitMap*`, `_MakeNewHole*`, hole border, `_PlaceEgg*`, `_DecEat*`, `_PickupFoodA`, `_DropFoodA`, `_DeadAntHere`, `_GetWinner`, `_Recruit`, `_UnRecruit`, `_GetDir`, `_GetDis`) are in `engine/src/rules/comum.rs` (see [../../decisoes.md](../../decisoes.md), "Common rules module"); `amarela.rs` holds only what belongs to the yellow ant.
 
-**Verificado:**
+**Verified:**
 
-- `engine/tests/regras_amarela.rs`: casos Y1–Y15 da §13 que não precisam de interface (Y16/Y17 são da interface), postura da rainha, Backspace e clique na própria amarela; testes de unidade em `amarela.rs` (`_TileCanBeMovedOn`, `_GetDir`).
-- Vetores de tick do original (`tests/referencias/ticks`, ticks 79–83, amarela parada no ninho; [testes-tick.md](testes-tick.md)): campos `_Me*` e a marca 0xFF iguais.
-- Casos na bancada QEMU (2026-10-17), `tests/referencias/casos/Y-01..Y-04.json`, saves `tests/referencias/saves/Ynn_{ENTRADA,CARREGADO,FIM}.ANT`. No original a amarela com ordem anda durante a pausa do load, então o port parte do arquivo injetado (tick 78) e roda ticks completos; os campos `_Me*` (posição, tipo, direção, vida, ordem, último passo, passos, contorno, rastro) batem com o original no `GameTime` do estado lido logo após o load e no final:
+- `engine/tests/regras_amarela.rs`: cases Y1–Y15 of §13 that do not need the interface (Y16/Y17 belong to the interface), the queen's egg laying, Backspace and the click on the yellow ant itself; unit tests in `amarela.rs` (`_TileCanBeMovedOn`, `_GetDir`).
+- The original's tick vectors (`tests/referencias/ticks`, ticks 79–83, yellow ant standing still in the nest; [testes-tick.md](testes-tick.md)): `_Me*` fields and the 0xFF mark identical.
+- Cases on the QEMU bench (2026-10-17), `tests/referencias/casos/Y-01..Y-04.json`, saves `tests/referencias/saves/Ynn_{ENTRADA,CARREGADO,FIM}.ANT`. In the original the yellow ant with an order walks during the load pause, so the port starts from the injected file (tick 78) and runs full ticks; the `_Me*` fields (position, type, direction, health, order, last step, steps, avoidance, scent trail) match the original at the `GameTime` of the state read right after the load and at the end:
 
-| Caso | Entrada | Original | Port |
+| Case | Input | Original | Port |
 |---|---|---|---|
-| Y-01 andar em linha reta | (10, 20) → (50, 20) | tick 100: x = 32, vida 88, 22 passos; tick 108: x = 40, vida 84, 30 passos | igual |
-| Y-02 contorno | parede 0x5C em x = 30, y 15–25; (25, 20) → (35, 20) | chegou a (35, 20) antes do tick 94, vida 91 | igual |
-| Y-03 comer com fome | (59, 36), ordem 1 na comida (62, 36) = 0x49; vida 50, aviso 60, `_HealthB` 40 | tick 81: (61, 36), vida 100, `_HealthB` 88 (40 + 49, −1 do ovo da rainha), tile 0x48 | igual (o −1 do ovo vem das regras do ninho, ainda vazias neste ramo) |
-| Y-04 entrar no ninho | (8, 32) → ninho preto (31, 4) | tick 86: plano 2, (31, 4), vida 95, ordem encerrada | igual |
+| Y-01 walking in a straight line | (10, 20) → (50, 20) | tick 100: x = 32, health 88, 22 steps; tick 108: x = 40, health 84, 30 steps | same |
+| Y-02 avoidance | wall 0x5C at x = 30, y 15–25; (25, 20) → (35, 20) | reached (35, 20) before tick 94, health 91 | same |
+| Y-03 eating while hungry | (59, 36), order 1 on the food (62, 36) = 0x49; health 50, warning 60, `_HealthB` 40 | tick 81: (61, 36), health 100, `_HealthB` 88 (40 + 49, −1 from the queen's egg), tile 0x48 | same (the −1 from the egg comes from the nest rules, still empty in this branch) |
+| Y-04 entering the nest | (8, 32) → black nest (31, 4) | tick 86: plane 2, (31, 4), health 95, order ended | same |
 
-Também conferidos no original por vetores de tick ([testes-tick.md](testes-tick.md)): andar no ninho (`amarela_andando`), sair do ninho, pegar comida e entrar no ninho vermelho (`amarela_superficie`), luta com derrota, morte e renascimento como ovo (`amarela_luta`), luta com vitória (`amarela_vitoria`) e morte pelo inseticida sem corpo, com fim de jogo (`inseticida_morte`).
+Also checked against the original via tick vectors ([testes-tick.md](testes-tick.md)): walking in the nest (`amarela_andando`), exiting the nest, picking up food and entering the red nest (`amarela_superficie`), fight with defeat, death and rebirth as an egg (`amarela_luta`), fight with victory (`amarela_vitoria`) and death by insecticide with no body, with game over (`inseticida_morte`).
 
-Não verificado no original: troca de corpo, recrutamento, alarme, fundação da colônia, as outras causas de morte e os comandos por tecla (só testes a partir da spec).
+Not verified against the original: body swap, recruiting, alarm, colony founding, the other causes of death and the key commands (only tests based on the spec).
 
-## Lacunas
+## Gaps
 
-- Efeitos de `_CommandKey` (os códigos de trapaça, `_CheatKeys`, estão em [trapacas.md](trapacas.md)).
-- Quem trata os aceleradores 0xA0–0xAC.
-- A revoada controlada pelo jogador (rainha alada voando, `_FlyAwayB`): documento de ciclo de vida. (`_SpecialXfer`/`_XferPatch` estão em [geracao-mundo.md](geracao-mundo.md) e `rules/troca_patch.rs`.)
-- Uso de `_MeDis`, `_MePrevDis` e `_MeBase`.
-- Detalhes de desenho das janelas Examine (`_MagnifyMenu`), de recrutamento e dos diálogos de morte (posições, bitmaps).
-- Conferidos no original os casos Y-01..Y-04 (andar, contorno, comer, entrar no ninho; seção 14), os vetores de tick listados em "Verificado" e, desde 2026-10-18, as mortes de 9.1 em vetores de tick (abaixo) e a aranha do jogador (Y13: `aranha_jogador`). O resto da seção 13 (Y1, Y4–Y8, Y10–Y12, Y14–Y17 como roteiros de interface) continua por rodar.
-- Animações (§10.2): conferidos no original os quadros da luta (`luta_quadros`) e, pelo estado e pelos geradores (vetores de tick, 2026-10-18), o choque (`amarela_morte_choque`, 32 quadros de `_AnimYellowFight`) e a loucura (`_AnimYellowInsane` em `amarela_morte_fome` e `amarela_morte_afogada`: R e S iguais depois do tick); os quadros do choque e da loucura não foram capturados como imagem, e as mortes com a janela de edição atrás não foram gravadas. O som da luta no tempo do original não foi ouvido lado a lado com o original (a bancada não tem placa de som). O desenho de antes do laço (até 55 ms) não é mostrado. As capturas do original e do port partem do mesmo estado, mas o Load do port ressemeia S, então as direções da nuvem diferem.
+- Effects of `_CommandKey` (the cheat codes, `_CheatKeys`, are in [trapacas.md](trapacas.md)).
+- Who handles accelerators 0xA0–0xAC.
+- The player-controlled mating flight (winged queen flying, `_FlyAwayB`): life cycle document. (`_SpecialXfer`/`_XferPatch` are in [geracao-mundo.md](geracao-mundo.md) and `rules/troca_patch.rs`.)
+- Use of `_MeDis`, `_MePrevDis` and `_MeBase`.
+- Drawing details of the Examine windows (`_MagnifyMenu`), recruiting windows and death dialogs (positions, bitmaps).
+- Checked against the original: cases Y-01..Y-04 (walking, avoidance, eating, entering the nest; section 14), the tick vectors listed in "Verified" and, since 2026-10-18, the deaths of 9.1 in tick vectors (below) and the player's spider (Y13: `aranha_jogador`). The rest of section 13 (Y1, Y4–Y8, Y10–Y12, Y14–Y17 as interface scripts) remains to be run.
+- Animations (§10.2): checked against the original are the fight frames (`luta_quadros`) and, via the state and the generators (tick vectors, 2026-10-18), the shock (`amarela_morte_choque`, 32 frames of `_AnimYellowFight`) and the insanity (`_AnimYellowInsane` in `amarela_morte_fome` and `amarela_morte_afogada`: R and S identical after the tick); the shock and insanity frames were not captured as images, and the deaths with the edit window behind were not recorded. The fight sound at the original's timing was not heard side by side with the original (the bench has no sound card). The drawing before the loop (up to 55 ms) is not shown. The captures of the original and of the port start from the same state, but the port's Load reseeds S, so the directions of the cloud differ.

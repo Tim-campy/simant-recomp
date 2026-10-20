@@ -1,152 +1,154 @@
-# Conselhos e tutorial: `_Feedback` (`1030:78ca`)
+*Leia em português: [conselhos.md](../../pt-BR/spec/regras/conselhos.md)*
 
-`_Feedback` roda em todo tick (passo 21 de [simulacao-visao-geral.md](simulacao-visao-geral.md) §5) e também dentro de `_FullCount` (fases 0 e 2, a cada 64 ticks). Tem duas partes: o **tutorial** (só no Tutorial, `_CurGameType = 0`) e a **mensagem de conselho** da faixa de mensagens (todos os tipos de jogo, se a opção estiver ligada).
+# Advice and tutorial: `_Feedback` (`1030:78ca`)
 
-Convenção de evidência: **fato visto no código** = pseudocódigo do Ghidra (`re_trabalho/decomp/Code7.c`, `Code1.c`, `Code5.c`) com endereço e nome do `SIMANTW.SYM`; textos lidos do banco `SHARED` descomprimido (`re_trabalho/dump2/SHARED/t04_*.bin`); **[hipótese]** como no [README](../README.md).
+`_Feedback` runs every tick (step 21 of [simulacao-visao-geral.md](simulacao-visao-geral.md) §5) and also inside `_FullCount` (phases 0 and 2, every 64 ticks). It has two parts: the **tutorial** (only in the Tutorial, `_CurGameType = 0`) and the **advice message** of the message ribbon (all game types, if the option is turned on).
 
-## 1. Variáveis
+Evidence convention: **fact seen in the code** = Ghidra pseudocode (`re_trabalho/decomp/Code7.c`, `Code1.c`, `Code5.c`) with address and name from `SIMANTW.SYM`; texts read from the decompressed `SHARED` bank (`re_trabalho/dump2/SHARED/t04_*.bin`); **[hypothesis]** as in the [README](../README.md).
 
-| Símbolo | Endereço | No save | Uso |
+## 1. Variables
+
+| Symbol | Address | In the save | Use |
 |---|---|---|---|
-| `_TutorCnt` | `8:85ec` | sim | contador do tutor, 0..0x400 |
-| `_TutLesson` | `8:85ee` | sim | lição atual (1 = primeira) |
-| `_TutGiven` | `8:85f0` | sim | a lição atual já foi mostrada |
-| `_TutHowLong` | `9:7d62` | sim | quantas vezes (de 8 em 8 chamadas) a lição está sendo esperada |
-| `_LessonTemp` | `9:9fb0` | sim | memória da lição (posição, vista, tarefas, resultado) |
-| `_TimeTemp` | `9:9b10` | **não** | 32 bits: prazo no relógio do Mac (1/60 s) ou marco de escavação |
-| `_OptionStates[4]` | `8:85fa` | sim | liga a mensagem de conselho ([hipótese]: item de menu de conselhos/mensagens) |
-| `_AdviceStrs` | `9:7c94` | não | lista de strings SHARED 4/1020, carregada por `_initStuff` (`_LoadStringAnt(0x3fc)`) |
+| `_TutorCnt` | `8:85ec` | yes | tutor counter, 0..0x400 |
+| `_TutLesson` | `8:85ee` | yes | current lesson (1 = first) |
+| `_TutGiven` | `8:85f0` | yes | the current lesson has already been shown |
+| `_TutHowLong` | `9:7d62` | yes | how many times (every 8 calls) the lesson has been awaited |
+| `_LessonTemp` | `9:9fb0` | yes | lesson memory (position, view, tasks, result) |
+| `_TimeTemp` | `9:9b10` | **no** | 32 bits: deadline on the Mac clock (1/60 s) or digging milestone |
+| `_OptionStates[4]` | `8:85fa` | yes | turns on the advice message ([hypothesis]: advice/messages menu item) |
+| `_AdviceStrs` | `9:7c94` | no | SHARED string list 4/1020, loaded by `_initStuff` (`_LoadStringAnt(0x3fc)`) |
 
-## 2. Fluxo de `_Feedback`
+## 2. Flow of `_Feedback`
 
-**Fato visto no código.**
+**Fact seen in the code.**
 
 ```
-se _CurGameType == 0:                                     (tutorial; o mesmo corpo de _RunTutor 1030:7a90)
-    _TutorCnt += 1; se _TutorCnt > 0x400: _TutorCnt = 0
-    se _TutorCnt & 7 == 0:
+if _CurGameType == 0:                                     (tutorial; the same body as _RunTutor 1030:7a90)
+    _TutorCnt += 1; if _TutorCnt > 0x400: _TutorCnt = 0
+    if _TutorCnt & 7 == 0:
         _TutHowLong += 1
-        se _TutGiven == 0:
+        if _TutGiven == 0:
             _GiveLesson(_TutLesson); _TutGiven = 1; _TutHowLong = 0
-        senão se _LessonDone(_TutLesson):
-            _TutLesson += 1; _TutGiven = 0                  (a próxima lição sai daqui a 8 chamadas)
-        senão se _TutHowLong ≥ 16 e relógio > _TimeTemp:
-            _TutGiven = 0                                   (repete a mesma lição)
-se _OptionStates[4] == 0: FIM
-se _MeMode == 0 e (_MeHealth < _MeWarnHealth ou _MeHealth < 10):
-    conselho = (_MeHealth < 10 ? nº 0 (importante) : nº 1)
-senão se _HealthB < _BlkWarnHealth: conselho nº 2
-senão se _BpopT ≤ _TilesDugB: _SetDefaultWindPrompt(0) (texto padrão da janela, conforme a ferramenta); FIM
-senão se _MeMode == 0 e _MeNestStarted == 0 e _TilesDugB == 0: conselho nº 3
-senão: conselho nº 4
-_EditMessage(texto do conselho, duração 0x78, importante)
+        else if _LessonDone(_TutLesson):
+            _TutLesson += 1; _TutGiven = 0                  (the next lesson comes out 8 calls from now)
+        else if _TutHowLong ≥ 16 and clock > _TimeTemp:
+            _TutGiven = 0                                   (repeats the same lesson)
+if _OptionStates[4] == 0: END
+if _MeMode == 0 and (_MeHealth < _MeWarnHealth or _MeHealth < 10):
+    advice = (_MeHealth < 10 ? no. 0 (important) : no. 1)
+else if _HealthB < _BlkWarnHealth: advice no. 2
+else if _BpopT ≤ _TilesDugB: _SetDefaultWindPrompt(0) (default window text, according to the tool); END
+else if _MeMode == 0 and _MeNestStarted == 0 and _TilesDugB == 0: advice no. 3
+else: advice no. 4
+_EditMessage(advice text, duration 0x78, important)
 ```
 
-Textos da lista 4/1020 (fato verificado no banco):
+Texts of list 4/1020 (fact verified in the bank):
 
-| nº | Texto | Quando |
+| no. | Text | When |
 |---|---|---|
-| 0 | "Your health is critical - You must eat" | amarela (formiga) com vida < 10; mostrado mesmo com outra mensagem na faixa |
-| 1 | "Your health is low - Find some food" | vida < `_MeWarnHealth` (30 no início) |
+| 0 | "Your health is critical - You must eat" | yellow (ant) with health < 10; shown even with another message on the ribbon |
+| 1 | "Your health is low - Find some food" | health < `_MeWarnHealth` (30 at the start) |
 | 2 | "Your colony needs food" | `_HealthB` < `_BlkWarnHealth` (30) |
-| 3 | "You need to dig a nest" | colônia maior que a escavação, amarela sem ninho e nada escavado |
-| 4 | "Your nest needs expansion" | `_BpopT` > `_TilesDugB` nos demais casos |
-| 5 | "The red ants are attacking!" | não é usado aqui (`_GstrR`, [simulacao-visao-geral.md](simulacao-visao-geral.md) §7) |
+| 3 | "You need to dig a nest" | colony larger than the digging, yellow ant without a nest and nothing dug |
+| 4 | "Your nest needs expansion" | `_BpopT` > `_TilesDugB` in the other cases |
+| 5 | "The red ants are attacking!" | not used here (`_GstrR`, [simulacao-visao-geral.md](simulacao-visao-geral.md) §7) |
 
-`_EditMessage` (`1000:…`, Code1) só troca a mensagem da faixa quando o pedido é "importante" ou quando a opção está ligada e a faixa está vazia; o prazo de remoção é refeito a cada chamada (com o mesmo texto, a mensagem fica enquanto a condição durar). É interface: não muda o estado da simulação nem sorteia.
+`_EditMessage` (`1000:…`, Code1) only replaces the ribbon message when the request is "important" or when the option is on and the ribbon is empty; the removal deadline is reset on every call (with the same text, the message stays as long as the condition lasts). It is interface: it does not change the simulation state nor make random draws.
 
-## 3. Lições: `_GiveLesson(n)` (`1030:7b4e`) e `_LessonDone(n)` (`1030:7f02`)
+## 3. Lessons: `_GiveLesson(n)` (`1030:7b4e`) and `_LessonDone(n)` (`1030:7f02`)
 
-**Fato visto no código.** Cada lição mostra um quadro (`_PictStrnDialog(imagem, texto, 1)`) com o texto SHARED 4/`11000 + 2(n − 1)` (exceções na tabela) e às vezes faz uma ação. A lição termina quando a condição vale. Textos: 50 objetos 4/11000…11112 no banco (ex.: 11000 "Welcome to the SimAnt Tutorial…", 11004 "Try double-clicking somewhere in the black dirt near the yellow ant.", 11112 "This is the end of the SimAnt tutorial…").
+**Fact seen in the code.** Each lesson shows a box (`_PictStrnDialog(image, text, 1)`) with the SHARED text 4/`11000 + 2(n − 1)` (exceptions in the table) and sometimes performs an action. The lesson ends when the condition holds. Texts: 50 objects 4/11000…11112 in the bank (e.g.: 11000 "Welcome to the SimAnt Tutorial…", 11004 "Try double-clicking somewhere in the black dirt near the yellow ant.", 11112 "This is the end of the SimAnt tutorial…").
 
-Ações ao dar a lição:
+Actions when giving the lesson:
 
-| Lição | Ação |
+| Lesson | Action |
 |---|---|
-| 3, 4 | `_TimeTemp = _TilesDugB + 2` (3) ou `+ 10` (4): marco de escavação |
-| 7, 0x1A | `_LessonTemp = _MeLocY + _MeLocX`; `_TimeTemp = relógio + 600` |
-| 9 | `_LessonTemp = _MapPnt.y + _MapPnt.x`; `_TimeTemp = relógio + 600` |
+| 3, 4 | `_TimeTemp = _TilesDugB + 2` (3) or `+ 10` (4): digging milestone |
+| 7, 0x1A | `_LessonTemp = _MeLocY + _MeLocX`; `_TimeTemp = clock + 600` |
+| 9 | `_LessonTemp = _MapPnt.y + _MapPnt.x`; `_TimeTemp = clock + 600` |
 | 0x1B | `_LessonTemp = _MeLocY + _MeLocX` |
 | 0x29 | `_LessonTemp = _modeLevels[1] + _modeLevels[0]` |
 | 8, 0x1E, 0x2E, 0x32 | `_LessonTemp = 0` |
-| 0xE | `_SetMyHealth(8)` (a amarela fica com fome, [formiga-amarela.md](formiga-amarela.md)) |
-| 0x17 | `_AddBlackAnts(10)` **antes** do quadro ([geracao-mundo.md](geracao-mundo.md): sorteia `S(10)` e `S8()` por formiga) |
-| 0x31 | quadro; `_AddBlackAnts(80)`; zera `_PherMapA` inteiro |
-| 0x2B | `_TutLesson += 1` e mostra o texto da lição 0x2C (11086, imagem 0x4271): o texto 11084 nunca aparece |
-| 0x37 | texto 11108 se `_LessonTemp == 0`, senão 11110 ("Too bad. Your attack on the red ants has failed…") |
-| 0x38 | texto 11112 |
-| 0 e > 0x38 | nada (fim do tutorial) |
+| 0xE | `_SetMyHealth(8)` (the yellow ant becomes hungry, [formiga-amarela.md](formiga-amarela.md)) |
+| 0x17 | `_AddBlackAnts(10)` **before** the box ([geracao-mundo.md](geracao-mundo.md): draws `S(10)` and `S8()` per ant) |
+| 0x31 | box; `_AddBlackAnts(80)`; clears the whole `_PherMapA` |
+| 0x2B | `_TutLesson += 1` and shows the text of lesson 0x2C (11086, image 0x4271): text 11084 never appears |
+| 0x37 | text 11108 if `_LessonTemp == 0`, otherwise 11110 ("Too bad. Your attack on the red ants has failed…") |
+| 0x38 | text 11112 |
+| 0 and > 0x38 | nothing (end of the tutorial) |
 
-Imagens (primeiro argumento; 0 = nenhuma): 2 → 17000, 5 → 0x4269, 0xB → 0x4276, 0xD e 0xE → 0x426A, 0x11 → 0x4275, 0x12 → 0x426B, 0x15 → 0x426C, 0x21 → 0x426D, 0x24 → 0x426E, 0x26 → 0x426F, 0x27–0x29 → 0x4270, 0x2B e 0x2C → 0x4271, 0x2D e 0x2E → 0x4272, 0x2F e 0x30 → 0x4273, 0x32 → 0x4274. [em aberto: a que recurso esses ids se referem; não estão entre os tipos 10 do SHARED.]
+Images (first argument; 0 = none): 2 → 17000, 5 → 0x4269, 0xB → 0x4276, 0xD and 0xE → 0x426A, 0x11 → 0x4275, 0x12 → 0x426B, 0x15 → 0x426C, 0x21 → 0x426D, 0x24 → 0x426E, 0x26 → 0x426F, 0x27–0x29 → 0x4270, 0x2B and 0x2C → 0x4271, 0x2D and 0x2E → 0x4272, 0x2F and 0x30 → 0x4273, 0x32 → 0x4274. [open: which resource these ids refer to; they are not among the SHARED type 10 objects.]
 
-Condições de conclusão (`_LessonDone`):
+Completion conditions (`_LessonDone`):
 
-| Lições | Termina quando |
+| Lessons | Ends when |
 |---|---|
-| 1, 2, 6, 0xB, 0xF, 0x11, 0x17, 0x19, 0x1C, 0x1D, 0x1F, 0x22, 0x23, 0x25, 0x28, 0x2C, 0x2D, 0x30, 0x33, 0x35, 0x37, 0x38 | sempre (só texto) |
-| 3, 4 | `_TilesDugB > _TimeTemp` e `_MeMoveMe == 0` |
-| 5, 0x14 | `_MePlane == 1` (superfície) |
-| 0x12 | `_MePlane == 2` (ninho preto) |
-| 7, 0x1A | a posição mudou (`_MeLocY + _MeLocX ≠ _LessonTemp`), `_MeDis == 0` e relógio > `_TimeTemp` |
-| 9 | a vista mudou (`_MapPnt.y + _MapPnt.x ≠ _LessonTemp`), **ou** relógio > `_TimeTemp` |
-| 0xA, 0x20, 0x2A | janela 0x100 na frente (`_win_IsWinInFront`) |
-| 0xC, 0x31 | janela 0 na frente |
-| 0x27 | janela 0x1200 na frente |
-| 0x2F | janela 0x1300 na frente |
-| 0xD | amarela na superfície sobre tile > 0x47 |
+| 1, 2, 6, 0xB, 0xF, 0x11, 0x17, 0x19, 0x1C, 0x1D, 0x1F, 0x22, 0x23, 0x25, 0x28, 0x2C, 0x2D, 0x30, 0x33, 0x35, 0x37, 0x38 | always (text only) |
+| 3, 4 | `_TilesDugB > _TimeTemp` and `_MeMoveMe == 0` |
+| 5, 0x14 | `_MePlane == 1` (surface) |
+| 0x12 | `_MePlane == 2` (black nest) |
+| 7, 0x1A | the position changed (`_MeLocY + _MeLocX ≠ _LessonTemp`), `_MeDis == 0` and clock > `_TimeTemp` |
+| 9 | the view changed (`_MapPnt.y + _MapPnt.x ≠ _LessonTemp`), **or** clock > `_TimeTemp` |
+| 0xA, 0x20, 0x2A | window 0x100 in front (`_win_IsWinInFront`) |
+| 0xC, 0x31 | window 0 in front |
+| 0x27 | window 0x1200 in front |
+| 0x2F | window 0x1300 in front |
+| 0xD | yellow ant on the surface over a tile > 0x47 |
 | 0xE | `_MeHealth > 90` |
 | 0x10 / 0x13, 0x16 / 0x15 | `_MeType == 0x18` / `0x10` / `0x28` |
 | 0x18 / 0x34 | `_ModePopB[5]` (`9:9e7a`) > 1 / > 40 |
-| 0x1B | a posição mudou, `_MeDropAlarm ≠ 0` e `_MeDis == 0` |
-| 0x1E | (se `_MeDropAlarm ≠ 0`, desliga o alarme: `_SetAlarmDropState(0, 1)`) e `_LessonTemp ≠ 0` |
-| 8, 0x2B, 0x2E, 0x32 | `_LessonTemp ≠ 0` (posto por ações do jogador, ex.: `_ExchangeLives` põe 1) |
+| 0x1B | the position changed, `_MeDropAlarm ≠ 0` and `_MeDis == 0` |
+| 0x1E | (if `_MeDropAlarm ≠ 0`, turns off the alarm: `_SetAlarmDropState(0, 1)`) and `_LessonTemp ≠ 0` |
+| 8, 0x2B, 0x2E, 0x32 | `_LessonTemp ≠ 0` (set by player actions, e.g.: `_ExchangeLives` sets 1) |
 | 0x21 / 0x26 | `_MapPlane == 0` / `== 1` |
 | 0x24 | `_YardMode == 1` |
 | 0x29 | `_modeLevels[1] + _modeLevels[0] ≠ _LessonTemp` |
-| 0x36 | `_MePlane == 3` (põe `_LessonTemp = 0`) ou `_MePlane == 2` (põe 1) |
-| outras | nunca |
+| 0x36 | `_MePlane == 3` (sets `_LessonTemp = 0`) or `_MePlane == 2` (sets 1) |
+| others | never |
 
-As comparações com `_TimeTemp` são de 32 bits com sinal. As lições 3 e 4 usam `_TimeTemp` como marco de escavação: no `_Feedback`, "relógio > `_TimeTemp`" fica então sempre verdadeiro e a lição é repetida a cada 16 × 8 chamadas.
+The comparisons with `_TimeTemp` are signed 32-bit. Lessons 3 and 4 use `_TimeTemp` as a digging milestone: in `_Feedback`, "clock > `_TimeTemp`" is then always true and the lesson is repeated every 16 × 8 calls.
 
-### 3.1 Conferido no original: o tutorial inteiro (2026-10-18)
+### 3.1 Checked against the original: the whole tutorial (2026-10-18)
 
-**Verificado** na bancada QEMU (`python tools/cenarios_tick.py gravar tutorial_completo DIR --snapshot tut`, cópia do overlay `ov_tut.qcow2`): o roteiro faz a ação que cada lição pede e grava inteiros os ticks em que `_TutorCnt` chega a múltiplo de 8. As 56 lições foram dadas e concluídas, da lição 1 (tick 8) ao fim (`_TutLesson` = 57 no tick 1632, sem nada a mostrar). Duas gravações: 124 ticks (lições 1–26) e 185 ticks (lições 1–57); todos 307/307 no port, menos os três casos explicados em [testes-tick.md](testes-tick.md) ("Quinta rodada"). 16 deles estão em `tests/referencias/ticks/tutorial_completo/`.
+**Verified** on the QEMU bench (`python tools/cenarios_tick.py gravar tutorial_completo DIR --snapshot tut`, copy of the overlay `ov_tut.qcow2`): the script performs the action each lesson asks for and records in full the ticks in which `_TutorCnt` reaches a multiple of 8. All 56 lessons were given and completed, from lesson 1 (tick 8) to the end (`_TutLesson` = 57 at tick 1632, with nothing to show). Two recordings: 124 ticks (lessons 1–26) and 185 ticks (lessons 1–57); all 307/307 in the port, except the three cases explained in [testes-tick.md](testes-tick.md) ("Fifth round"). 16 of them are in `tests/referencias/ticks/tutorial_completo/`.
 
-Ações usadas (o que o texto da lição pede; coordenadas da bancada, janela de edição do Tutorial com 39 × 21 tiles a partir de (0, 128)): duplo clique na terra perto da amarela (3, 4); duplo clique na linha 0 acima dela (5; a 20 com clique simples na abertura 0x18); clique simples no chão (7, 26); clique na própria amarela (8, 50: `_LessonTemp` = 1 pelo centralizar); nenhuma (9: venceu o prazo de 600); Ctrl+M (10, 32, 42), Ctrl+E (12, 49), Ctrl+Y (33), Ctrl+5 (36), Ctrl+8 (38), Ctrl+B (39), Ctrl+C (47); clique simples numa comida (13) e duplo clique em outra (14 comer, 16 pegar); clique no buraco preto (18) e duplo clique no túnel (19, larga a comida); duplo clique numa pedrinha (21) e no chão (22); tecla 2 (24) e cinco vezes (52); tecla 0 e andar (27); X e clique numa preta (30); arrastar o círculo do triângulo do Behavior (41); clique segurado 1,5 s no gráfico de barras (46: `_LessonTemp` = 1); clique no buraco vermelho (54: entrou no ninho vermelho, `_LessonTemp` = 0 e a lição 55 mostrou o texto 11108).
+Actions used (what the lesson text asks for; bench coordinates, Tutorial edit window with 39 × 21 tiles starting at (0, 128)): double click on the dirt near the yellow ant (3, 4); double click on row 0 above it (5; for 20 with a single click on the 0x18 opening); single click on the ground (7, 26); click on the yellow ant itself (8, 50: `_LessonTemp` = 1 from the centering); none (9: the 600 deadline expired); Ctrl+M (10, 32, 42), Ctrl+E (12, 49), Ctrl+Y (33), Ctrl+5 (36), Ctrl+8 (38), Ctrl+B (39), Ctrl+C (47); single click on a food item (13) and double click on another (14 eat, 16 pick up); click on the black hole (18) and double click on the tunnel (19, drops the food); double click on a pebble (21) and on the ground (22); key 2 (24) and five times (52); key 0 and walk (27); X and click on a black ant (30); drag the circle of the Behavior triangle (41); click held for 1.5 s on the bar chart (46: `_LessonTemp` = 1); click on the red hole (54: entered the red nest, `_LessonTemp` = 0 and lesson 55 showed text 11108).
 
-Observado, além do que a tabela acima já diz:
+Observed, beyond what the table above already says:
 
-- **O prazo das lições 7, 9 e 0x1A conta do fechamento da caixa.** `_GiveLesson` chama `_PictStrnDialog` (modal) **antes** de ler `_MacTickCount` para `_TimeTemp` (visto no código, `1030:7c4d`/`7c5e`; o mesmo vale para todas as ações: a caixa vem primeiro, menos na 0x17, em que `_AddBlackAnts` vem antes). Na bancada: lição 7 dada no tick 291 com o relógio em 10704 no começo do tick; a caixa ficou aberta até 12213, e `_TimeTemp` = 12813 = 12213 + 600. Lição 9 (tick 448): 15090 + 600 = 15690. O port fazia `_TimeTemp` = relógio do tick + 600; agora a interface refaz o prazo ao fechar a caixa (`MemoriaTutor::caixa_fechada`, abaixo).
-- **Lição 0x2B pula para a 0x2C no mesmo tick** (tick 1245: `_TutLesson` 43 → 44 com `_TutGiven` = 1, caixa 11086), como na tabela.
-- **Lição 0x29** guarda `_modeLevels[1] + _modeLevels[0]` em 16 bits com sinal (13107 + 39321 = −13108 no tick 1151).
-- **Condições de janela:** as lições 0xA, 0xC, 0x20, 0x27, 0x2A e 0x2F concluíram com a janela pedida na frente (Ctrl+M, Ctrl+E, Ctrl+B, Ctrl+C). A 0x2A (voltar ao mapa) **não** concluiu com o botão Patch da faixa, com o Behavior aberto e a House View por baixo: o mapa troca de lugar com o quintal (`_YardToMap`), mas não fica na frente; só Ctrl+M concluiu. Depois de Ctrl+Y/Ctrl+5 com o quintal aberto, Ctrl+M traz o **quintal** (0x1900) para a frente, não o mapa (`_OpenMapYard`, mapa.md). A janela na frente não está na memória do jogo: o roteiro anota a que pôs na frente (`JanelaNaFrente` nos extras) e a anotação foi conferida pelo resultado (a lição conclui ou não no original). A 0x31 (janela 0 depois de `_AddBlackAnts(80)`) concluiu com Ctrl+E.
-- `_TutorCnt` passa de 0x400 a 0 (a fronteira de 8 também acontece em 0x400 → 0) e anda **2** no tick em que `_FullCount` chama `_Feedback` de novo (`_Cycle` múltiplo de 64): tick 575, `_TutorCnt` 583 → 585.
+- **The deadline of lessons 7, 9 and 0x1A counts from the closing of the box.** `_GiveLesson` calls `_PictStrnDialog` (modal) **before** reading `_MacTickCount` for `_TimeTemp` (seen in the code, `1030:7c4d`/`7c5e`; the same holds for all actions: the box comes first, except in 0x17, where `_AddBlackAnts` comes before). On the bench: lesson 7 given at tick 291 with the clock at 10704 at the start of the tick; the box stayed open until 12213, and `_TimeTemp` = 12813 = 12213 + 600. Lesson 9 (tick 448): 15090 + 600 = 15690. The port set `_TimeTemp` = tick clock + 600; now the interface resets the deadline when the box is closed (`MemoriaTutor::caixa_fechada`, below).
+- **Lesson 0x2B skips to 0x2C in the same tick** (tick 1245: `_TutLesson` 43 → 44 with `_TutGiven` = 1, box 11086), as in the table.
+- **Lesson 0x29** stores `_modeLevels[1] + _modeLevels[0]` as signed 16-bit (13107 + 39321 = −13108 at tick 1151).
+- **Window conditions:** lessons 0xA, 0xC, 0x20, 0x27, 0x2A and 0x2F completed with the requested window in front (Ctrl+M, Ctrl+E, Ctrl+B, Ctrl+C). 0x2A (back to the map) did **not** complete with the ribbon's Patch button, with Behavior open and the House View underneath: the map swaps places with the yard (`_YardToMap`), but does not come to the front; only Ctrl+M completed it. After Ctrl+Y/Ctrl+5 with the yard open, Ctrl+M brings the **yard** (0x1900) to the front, not the map (`_OpenMapYard`, mapa.md). The window in front is not in the game's memory: the script notes which one it put in front (`JanelaNaFrente` in the extras) and the note was checked by the result (the lesson completes or not in the original). 0x31 (window 0 after `_AddBlackAnts(80)`) completed with Ctrl+E.
+- `_TutorCnt` goes from 0x400 to 0 (the multiple-of-8 boundary also happens at 0x400 → 0) and advances by **2** in the tick in which `_FullCount` calls `_Feedback` again (`_Cycle` a multiple of 64): tick 575, `_TutorCnt` 583 → 585.
 
-## 4. Casos de teste
+## 4. Test cases
 
-| Caso | Entrada | Esperado |
+| Case | Input | Expected |
 |---|---|---|
-| C-U1 conselho | `_OptionStates[4] = 1`, `_MeMode = 0`, `_MeHealth = 5` | conselho nº 0, importante |
-| C-U2 | vida 20 (< 30) | nº 1 |
-| C-U3 | vida 80, `_HealthB = 10` | nº 2 |
-| C-U4 | `_BpopT = 5`, `_TilesDugB = 10` | texto padrão da janela |
-| C-U5 | `_BpopT = 5`, `_TilesDugB = 0`, `_MeNestStarted = 0` | nº 3; com `_MeNestStarted = 1`, nº 4 |
-| C-U6 opção desligada | `_OptionStates[4] = 0` | nenhum |
-| C-U7 tutor | Tutorial, `_TutLesson = 1`, `_TutGiven = 0`, `_TutorCnt = 7` | mensagem 11000; `_TutGiven = 1`; `_TutHowLong = 0` |
-| C-U8 tutor | lição 1 dada, 8 chamadas depois | `_TutLesson = 2`, `_TutGiven = 0`; mais 8 → mensagem 11002 |
-| C-U9 lição 5 | `_MePlane = 2` | não termina; `_MePlane = 1` termina |
-| C-U10 lição 0x2B | dar a lição 0x2B | mensagem 11086 e `_TutLesson = 0x2C` |
+| C-U1 advice | `_OptionStates[4] = 1`, `_MeMode = 0`, `_MeHealth = 5` | advice no. 0, important |
+| C-U2 | health 20 (< 30) | no. 1 |
+| C-U3 | health 80, `_HealthB = 10` | no. 2 |
+| C-U4 | `_BpopT = 5`, `_TilesDugB = 10` | default window text |
+| C-U5 | `_BpopT = 5`, `_TilesDugB = 0`, `_MeNestStarted = 0` | no. 3; with `_MeNestStarted = 1`, no. 4 |
+| C-U6 option off | `_OptionStates[4] = 0` | none |
+| C-U7 tutor | Tutorial, `_TutLesson = 1`, `_TutGiven = 0`, `_TutorCnt = 7` | message 11000; `_TutGiven = 1`; `_TutHowLong = 0` |
+| C-U8 tutor | lesson 1 given, 8 calls later | `_TutLesson = 2`, `_TutGiven = 0`; 8 more → message 11002 |
+| C-U9 lesson 5 | `_MePlane = 2` | does not end; `_MePlane = 1` ends |
+| C-U10 lesson 0x2B | give lesson 0x2B | message 11086 and `_TutLesson = 0x2C` |
 
-## Implementação no port
+## Implementation in the port
 
-- `engine/src/rules/conselhos.rs`: `conselho(&Estado, &TabelasConselhos) -> Conselho` (a mensagem da faixa como **estado derivado**: a interface a consulta depois de cada tick; não vira evento, porque o original a refaz em todo tick), `executar_tutor(e, tabelas, tabelas_amarela, memoria, interface, relogio)` e `impl RegrasConselhos for RegrasOriginais`.
-- Os quadros das lições saem como `Evento::Mensagem(texto)`; a interface acha a imagem pela lição que usa aquele texto (`imagem_do_texto` em `engine/src/core/avisos.rs`, com `data/quintal.json` → `conselhos.licoes[].imagem`; os outros textos usam `mensagens.json` → `quadro.imagens`).
-- Prazo das lições 7, 9 e 0x1A (§3.1): `dar_licao` põe `tempo_limite` = relógio do tick + espera e guarda a espera em `MemoriaTutor::espera_depois_da_caixa`; `Partida::fechar_modal` chama `MemoriaTutor::caixa_fechada(relógio agora)`, que refaz `tempo_limite` = relógio + espera (como o original, que lê `_MacTickCount` depois do `_PictStrnDialog`). Sem interface (vetor sem a leitura, avanço sem caixas), fica o prazo do tick. Nos vetores, `vetor_tick::depois_do_tick` faz o mesmo com `MacTickCount_depois_da_caixa`.
-- `_TimeTemp` não está no save nem no `Estado`: fica em `MemoriaTutor`. Relógio: o mesmo do quintal (`_GameTime × mac_por_tick`, [quintal.md](quintal.md), "Implementação no port"). Janelas na frente: trait `InterfaceTutor`; `RegrasOriginais` guarda `memoria_tutor` (`MemoriaTutor`, vale de um tick para o outro, como a global do original) e `interface_tutor` (`JanelasNaFrente`: a interface grava ali as janelas que estão na frente; vazio = nenhuma). A lição que muda a vida da amarela usa o `_SetMyHealth` de `amarela.rs`, com `data/amarela.json`.
-- Dados (`data/quintal.json`, bloco `conselhos`): lista 4/1020, limiar 10 da vida crítica, os 16 ciclos de espera e a tabela de lições acima (texto, imagem, ação, condição), editável por mods.
+- `engine/src/rules/conselhos.rs`: `conselho(&Estado, &TabelasConselhos) -> Conselho` (the ribbon message as **derived state**: the interface queries it after each tick; it does not become an event, because the original redoes it every tick), `executar_tutor(e, tabelas, tabelas_amarela, memoria, interface, relogio)` and `impl RegrasConselhos for RegrasOriginais`.
+- The lesson boxes come out as `Evento::Mensagem(texto)`; the interface finds the image through the lesson that uses that text (`imagem_do_texto` in `engine/src/core/avisos.rs`, with `data/quintal.json` → `conselhos.licoes[].imagem`; the other texts use `mensagens.json` → `quadro.imagens`).
+- Deadline of lessons 7, 9 and 0x1A (§3.1): `dar_licao` sets `tempo_limite` = tick clock + wait and stores the wait in `MemoriaTutor::espera_depois_da_caixa`; `Partida::fechar_modal` calls `MemoriaTutor::caixa_fechada(clock now)`, which resets `tempo_limite` = clock + wait (like the original, which reads `_MacTickCount` after `_PictStrnDialog`). Without an interface (vector without the reading, advancing without boxes), the tick deadline stays. In the vectors, `vetor_tick::depois_do_tick` does the same with `MacTickCount_depois_da_caixa`.
+- `_TimeTemp` is not in the save nor in `Estado`: it lives in `MemoriaTutor`. Clock: the same as the yard's (`_GameTime × mac_por_tick`, [quintal.md](quintal.md), "Implementation in the port"). Windows in front: trait `InterfaceTutor`; `RegrasOriginais` keeps `memoria_tutor` (`MemoriaTutor`, persists from one tick to the next, like the original's global) and `interface_tutor` (`JanelasNaFrente`: the interface writes there the windows that are in front; empty = none). The lesson that changes the yellow ant's health uses the `_SetMyHealth` of `amarela.rs`, with `data/amarela.json`.
+- Data (`data/quintal.json`, `conselhos` block): list 4/1020, the critical-health threshold of 10, the 16 waiting cycles and the lesson table above (text, image, action, condition), editable by mods.
 
-## Lacunas
+## Gaps
 
-- A interface grava `RegrasOriginais::interface_tutor` a cada quadro com a janela de cima, no formato de `_win_IsWinInFront` (número da janela << 8; `simant/src/sessao.rs`, desde que existem as janelas de controle, do mapa e do quintal). As condições de janela das lições 0xA, 0xC, 0x20, 0x27, 0x2A, 0x2F e 0x31 foram conferidas no original (§3.1) com a janela anotada pela bancada; não se conferiu se a `JanelasNaFrente` gravada pela interface do port coincide com a do original em cada situação (ex.: Ctrl+M com o quintal aberto traz o quintal). `_TimeTemp` não vai para o save (como no original): carregar um jogo zera a memória.
-- `_SetDefaultWindPrompt` e o texto padrão da faixa por ferramenta: interface, não especificados aqui.
-- Casos do original: os vetores `tests/referencias/ticks/tutorial/` (snapshot `tut`, lições 1–3: lição 1 concluída e lição 2 pedida no tick 15, lição 3 dada no 23 e esperando o marco de escavação nos 46–47, com `_TimeTemp` em `extras.json`) e o Load de `Tutorial.Ant` (`tests/referencias/load_tutorial/`) batem com o port; o tutorial inteiro foi conferido em 2026-10-18 (§3.1, `tests/referencias/ticks/tutorial_completo/`). Os casos de conselho C-U1..C-U6 (faixa de mensagem) continuam conferidos só pelo código; C-U8..C-U10 aconteceram no original durante a gravação (a C-U7, lição 1, já tinha sido dada no snapshot). Caixa da lição comparada com o port numa captura só (lição 14, tick 622): o texto e a imagem saem iguais (máscara do texto azul 99,6%, diferença sob o cursor), e, desde 2026-10-18, também a moldura (azul-escura com 1 pixel preto, `mensagens.json` → `quadro.cor_borda`; antes o port a fazia azul-clara) e a posição (centrada na área abaixo da faixa nos dois) — telas/mensagens.md §3.3.
+- The interface writes `RegrasOriginais::interface_tutor` every frame with the top window, in the `_win_IsWinInFront` format (window number << 8; `simant/src/sessao.rs`, ever since the control, map and yard windows exist). The window conditions of lessons 0xA, 0xC, 0x20, 0x27, 0x2A, 0x2F and 0x31 were checked against the original (§3.1) with the window noted by the bench; it was not checked whether the `JanelasNaFrente` written by the port's interface matches the original's in every situation (e.g.: Ctrl+M with the yard open brings the yard). `_TimeTemp` does not go into the save (as in the original): loading a game clears the memory.
+- `_SetDefaultWindPrompt` and the default ribbon text per tool: interface, not specified here.
+- Cases from the original: the vectors `tests/referencias/ticks/tutorial/` (snapshot `tut`, lessons 1–3: lesson 1 completed and lesson 2 requested at tick 15, lesson 3 given at 23 and waiting for the digging milestone at 46–47, with `_TimeTemp` in `extras.json`) and the Load of `Tutorial.Ant` (`tests/referencias/load_tutorial/`) match the port; the whole tutorial was checked on 2026-10-18 (§3.1, `tests/referencias/ticks/tutorial_completo/`). The advice cases C-U1..C-U6 (message ribbon) are still checked only against the code; C-U8..C-U10 happened in the original during the recording (C-U7, lesson 1, had already been given in the snapshot). The lesson box was compared with the port in a single capture (lesson 14, tick 622): the text and the image come out the same (blue text mask 99.6%, difference under the cursor), and, since 2026-10-18, also the frame (dark blue with 1 black pixel, `mensagens.json` → `quadro.cor_borda`; before, the port made it light blue) and the position (centered in the area below the ribbon in both) — telas/mensagens.md §3.3.

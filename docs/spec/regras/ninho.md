@@ -1,729 +1,731 @@
-# Regras do ninho (preto e vermelho)
+*Leia em português: [ninho.md](../../pt-BR/spec/regras/ninho.md)*
 
-Este documento especifica, para reimplementação 1:1, o que as formigas fazem **dentro** dos ninhos: o laço `_DoAntSimB`/`_DoAntSimR`, o despacho por modo (M) e grupo (T), movimento, luta, comida guardada, escavação, mapa de saídas e água. Ovos, rainha e castas estão em [ciclo-de-vida.md](ciclo-de-vida.md). Listas, codificação de T, tabelas de modo e luta estão em [formigas.md](formigas.md); o tick, em [simulacao-visao-geral.md](simulacao-visao-geral.md); os geradores, em [rng.md](rng.md); os valores dos mapas, em [tiles-valores.md](tiles-valores.md).
+# Nest rules (black and red)
 
-## Convenções
+This document specifies, for a 1:1 reimplementation, what the ants do **inside** the nests: the `_DoAntSimB`/`_DoAntSimR` loop, dispatch by mode (M) and group (T), movement, fighting, stored food, digging, the exit map and water. Eggs, queen and castes are in [ciclo-de-vida.md](ciclo-de-vida.md). Lists, T encoding, mode and fight tables are in [formigas.md](formigas.md); the tick, in [simulacao-visao-geral.md](simulacao-visao-geral.md); the generators, in [rng.md](rng.md); map values, in [tiles-valores.md](tiles-valores.md).
 
-- **Evidência:** igual à de [simulacao-visao-geral.md](simulacao-visao-geral.md#convenção-de-evidência). Salvo aviso, tudo aqui é **fato visto no código** (pseudocódigo do Ghidra em `re_trabalho/decomp/Code5.c`/`Code6.c`/`Code7.c`), com os trechos ambíguos conferidos na desmontagem do `SIMANTW.EXE` (capstone, modo 16 bits). O pseudocódigo abaixo é próprio, não é cópia do decompilado.
-- **Endereços:** funções em `seletor:offset` com o nome do `.SYM`; variáveis em `segmento:offset` do `symbols.tsv` (8 = seletor `1038`, 9 = `1040`, 10 = DGROUP `1048`).
-- **Sorteios** (gerador S, LFSR, salvo aviso): `S(n)` = `_SRand1(n)`; `Sk(K)` = `_SRandK()` (máscara, um passo); `SG(n)` = `_SGRand(n)` (dois passos). `RR(n)` = `_RRand(n)` (gerador R, `rand` do C). **A ordem das chamadas é parte da regra**: cada pseudocódigo lista os sorteios na ordem em que acontecem, e um sorteio só acontece se o ramo em que está for executado.
-- **Notação:** `D8[d]` = (`_Dx8[d]`, `_Dy8[d]`) (`8:0000`/`8:0008`): 0 = cima (y−1), 2 = direita, 4 = baixo, 6 = esquerda. `inv(d)` = `d XOR 4` (direção oposta). Para a formiga em processamento, de índice `i = _Tindex` (`9:9b6a`): X, Y, M, T, S são os campos da lista do ninho (`_Blist*` `8:3736…8:3f0e`, `_Rlist*` `8:4104…8:48dc`), `pos` = (X, Y), `dir` = T & 7, `grupo` = (T & 0x78) >> 3. `Mapa` e `Vida` são `_MapB`/`_LifeB` no ninho preto e `_MapR`/`_LifeR` no vermelho; `Saída` é `_ExitMapB` (`8:03a4`) ou `_ExitMapR` (`8:13a4`). Todas as matrizes têm índice `x × 64 + y`, com y = 0 na linha da superfície.
-- "Ninho B" e "rotina B" são do ninho preto; a versão R é igual salvo o que a seção 11 lista.
+## Conventions
 
-## 1. Estado usado pelo ninho
+- **Evidence:** same as in [simulacao-visao-geral.md](simulacao-visao-geral.md#evidence-convention). Unless noted, everything here is **fact seen in the code** (Ghidra pseudocode in `re_trabalho/decomp/Code5.c`/`Code6.c`/`Code7.c`), with ambiguous passages checked against the disassembly of `SIMANTW.EXE` (capstone, 16-bit mode). The pseudocode below is our own, not a copy of the decompiled output.
+- **Addresses:** functions as `selector:offset` with the `.SYM` name; variables as `segment:offset` from `symbols.tsv` (8 = selector `1038`, 9 = `1040`, 10 = DGROUP `1048`).
+- **Random draws** (S generator, LFSR, unless noted): `S(n)` = `_SRand1(n)`; `Sk(K)` = `_SRandK()` (mask, one step); `SG(n)` = `_SGRand(n)` (two steps). `RR(n)` = `_RRand(n)` (R generator, C `rand`). **The order of the calls is part of the rule**: each pseudocode lists the random draws in the order they happen, and a draw only happens if the branch it is in is executed.
+- **Notation:** `D8[d]` = (`_Dx8[d]`, `_Dy8[d]`) (`8:0000`/`8:0008`): 0 = up (y−1), 2 = right, 4 = down, 6 = left. `inv(d)` = `d XOR 4` (opposite direction). For the ant being processed, with index `i = _Tindex` (`9:9b6a`): X, Y, M, T, S are the fields of the nest list (`_Blist*` `8:3736…8:3f0e`, `_Rlist*` `8:4104…8:48dc`), `pos` = (X, Y), `dir` = T & 7, `group` = (T & 0x78) >> 3. `Map` and `Life` are `_MapB`/`_LifeB` in the black nest and `_MapR`/`_LifeR` in the red one; `Exit` is `_ExitMapB` (`8:03a4`) or `_ExitMapR` (`8:13a4`). All matrices are indexed `x × 64 + y`, with y = 0 on the surface row.
+- "Nest B" and "routine B" refer to the black nest; the R version is the same except for what section 11 lists.
 
-| Variável | Endereço | No save | Papel |
+## 1. State used by the nest
+
+| Variable | Address | In save | Role |
 |---|---|---|---|
-| `_MapB` / `_MapR` | `10:48e8` / `10:58e8` | sim | terreno do ninho (valores em [tiles-valores.md](tiles-valores.md#ninhos-_mapb-_mapr)) |
-| `_LifeB` / `_LifeR` | `10:88e8` / `10:98e8` | não | quem ocupa cada célula (byte T); refeito no load (seção 13.1) |
-| `_ExitMapB` / `_ExitMapR` | `8:03a4` / `8:13a4` | sim | "mapa de saída": gradiente que cresce em direção à superfície (seção 7.4) |
-| `_HoleMapB` / `_HoleMapR` | `8:82d2` / `8:8312` | sim | para cada coluna x do ninho, a coluna do buraco na superfície (0 = nenhum) |
-| `_LastNewHoleB/R`, `_LastNewExitB/R` | `8:835a`/`835e`, `8:8352`/`8356` | sim | último buraco criado: (x, y) na superfície e (coluna, 0) no ninho |
-| `_TileTotXB/YB`, `_TilesDugB`, `_TileMassXB/YB` | `9:8104`, `9:811a`, `9:72c8`, `9:7c48`, `9:7c90` | sim | somas de x e y das escavações, contagem e centro de massa (alvo da rainha) |
-| idem R | `9:9ddc`, `9:9de2`, `9:7a56`, `9:9fba`, `9:9fd2` | sim | idem |
-| `_FoodB` / `_FoodR` | `9:9ea4` / `9:72de` | sim | unidades de comida guardadas (contador, não recalculado do mapa) |
-| `_EatCountB` / `_EatCountR` | `9:7402` / `9:7c8e` | sim | "reserva" de alimentação: comer soma 5, cada ovo posto tira 1 |
-| `_HealthB` / `_HealthR` | `10:ac86` / `10:ac88` | sim | saúde da colônia, 0..100 |
-| `_WaterTable` | `9:99d8` | sim | linha y mais alta já inundada; 64 = nada inundado |
-| `_TemBModePop` / `_TemRModePop` | `9:786a` / `9:7be4` | não | contagem de modos do tick (20 palavras cada) |
-| `_MeColor` | `10:ce98` | sim (bloco 188) | cor da formiga amarela: 0 preta, ≠ 0 vermelha (o pseudocódigo do Ghidra mostra `_grndTile+2`) |
-| `_MeWantFood` | `9:9af2` | sim | a amarela quer ser alimentada (trofalaxia) |
-| `_OptionStates[5]` | `8:85fc` | sim | balões de fala; só desenho, sem sorteio |
+| `_MapB` / `_MapR` | `10:48e8` / `10:58e8` | yes | nest terrain (values in [tiles-valores.md](tiles-valores.md#nests-_mapb-_mapr)) |
+| `_LifeB` / `_LifeR` | `10:88e8` / `10:98e8` | no | who occupies each cell (byte T); rebuilt on load (section 13.1) |
+| `_ExitMapB` / `_ExitMapR` | `8:03a4` / `8:13a4` | yes | "exit map": gradient that grows toward the surface (section 7.4) |
+| `_HoleMapB` / `_HoleMapR` | `8:82d2` / `8:8312` | yes | for each nest column x, the column of the hole on the surface (0 = none) |
+| `_LastNewHoleB/R`, `_LastNewExitB/R` | `8:835a`/`835e`, `8:8352`/`8356` | yes | last hole created: (x, y) on the surface and (column, 0) in the nest |
+| `_TileTotXB/YB`, `_TilesDugB`, `_TileMassXB/YB` | `9:8104`, `9:811a`, `9:72c8`, `9:7c48`, `9:7c90` | yes | sums of x and y of the digs, count and center of mass (the queen's target) |
+| same for R | `9:9ddc`, `9:9de2`, `9:7a56`, `9:9fba`, `9:9fd2` | yes | same |
+| `_FoodB` / `_FoodR` | `9:9ea4` / `9:72de` | yes | stored food units (a counter, not recomputed from the map) |
+| `_EatCountB` / `_EatCountR` | `9:7402` / `9:7c8e` | yes | feeding "reserve": eating adds 5, each egg laid subtracts 1 |
+| `_HealthB` / `_HealthR` | `10:ac86` / `10:ac88` | yes | colony health, 0..100 |
+| `_WaterTable` | `9:99d8` | yes | highest y row already flooded; 64 = nothing flooded |
+| `_TemBModePop` / `_TemRModePop` | `9:786a` / `9:7be4` | no | mode count for the tick (20 words each) |
+| `_MeColor` | `10:ce98` | yes (block 188) | color of the yellow ant: 0 black, ≠ 0 red (Ghidra pseudocode shows `_grndTile+2`) |
+| `_MeWantFood` | `9:9af2` | yes | the yellow ant wants to be fed (trophallaxis) |
+| `_OptionStates[5]` | `8:85fc` | yes | speech balloons; drawing only, no random draw |
 
-## 2. O laço: `_DoAntSimB` (`1028:2d4e`) e `_DoAntSimR` (`1028:5344`)
+## 2. The loop: `_DoAntSimB` (`1028:2d4e`) and `_DoAntSimR` (`1028:5344`)
 
 ```
-n = _ListIndexB                       (lido uma vez, no início)
-para i = n−1 até 0 (decrescente):     (_Tindex = i)
-    se T[i] ≠ 0: _DoNestAntB(X[i], Y[i], T[i])
+n = _ListIndexB                       (read once, at the start)
+for i = n−1 down to 0 (decreasing):   (_Tindex = i)
+    if T[i] ≠ 0: _DoNestAntB(X[i], Y[i], T[i])
 ```
 
-- Entradas acrescentadas durante o laço (ovos postos, formigas vindas do ninho vermelho pela passagem 0x14) ficam em índices ≥ n e só são processadas no tick seguinte.
-- Vagas com T = 0 são puladas **sem sorteio** (diferente de `_DoAntSimA`, que sorteia para toda vaga).
-- `_DoAntSimB` roda depois de `_DoAntSimA` e antes de `_DoAntSimR` (ordem do tick em [simulacao-visao-geral.md](simulacao-visao-geral.md#5-um-tick-_doantsim-10280000)).
+- Entries added during the loop (eggs laid, ants coming from the red nest through passage 0x14) are at indices ≥ n and are only processed in the next tick.
+- Slots with T = 0 are skipped **without a random draw** (unlike `_DoAntSimA`, which draws for every slot).
+- `_DoAntSimB` runs after `_DoAntSimA` and before `_DoAntSimR` (tick order in [simulacao-visao-geral.md](simulacao-visao-geral.md#5-one-tick-_doantsim-10280000)).
 
-## 3. Despacho: `_DoNestAntB` (`1028:2dae`) e `_DoNestAntR` (`1028:53a4`)
+## 3. Dispatch: `_DoNestAntB` (`1028:2dae`) and `_DoNestAntR` (`1028:53a4`)
 
-Há dois ramos, pela cor da formiga em relação ao ninho: **dona** (preta no B, vermelha no R) e **invasora** (vermelha no B, preta no R).
+There are two branches, by the ant's color relative to the nest: **owner** (black in B, red in R) and **invader** (red in B, black in R).
 
-### 3.1 Formiga dona
+### 3.1 Owner ant
 
 ```
 _TemBModePop[M] += 1                                   (R: _TemRModePop)
-a = Sk(256)                                             ← sempre
-se a == 0 e M ≠ 9:
+a = Sk(256)                                             ← always
+if a == 0 and M ≠ 9:
     b = Sk(32)
-    se _HealthB < b:                                    (R: _HealthR)
-        T = 0; Vida[pos] = 0; _BAntsExpired += 1       (R: _RAntsExpired); FIM
-escolher por M (tabela 3.3)
+    if _HealthB < b:                                    (R: _HealthR)
+        T = 0; Life[pos] = 0; _BAntsExpired += 1       (R: _RAntsExpired); END
+choose by M (table 3.3)
 ```
 
-Morte natural: só quando `Sk(256) = 0`, e então com chance (31 − saúde)/32 (b vai de 0 a 31 e precisa ser maior que a saúde). Saúde ≥ 31 impede a morte ([formigas.md](formigas.md#6-luta-morte-e-saúde) diz "≥ 32"; pela comparação estrita, 31 já basta). Ovos (M = 8) e nuvens de luta da cor do ninho (M = 10) também podem morrer assim; só a rainha (M = 9) escapa.
+Natural death: only when `Sk(256) = 0`, and then with chance (31 − health)/32 (b goes from 0 to 31 and must be greater than health). Health ≥ 31 prevents death ([formigas.md](formigas.md#6-fighting-death-and-health) says "≥ 32"; with the strict comparison, 31 is already enough). Eggs (M = 8) and fight clouds of the nest's color (M = 10) can also die this way; only the queen (M = 9) escapes.
 
-### 3.2 Formiga invasora
+### 3.2 Invader ant
 
-Ninho B, formiga vermelha (`_TemRModePop[M] += 1`, sem sorteio de morte):
-
-```
-se T ≥ 0xF0 (nuvem de luta vermelha, grupos 14–15): _DoNestFightB; FIM
-v = Vida[pos]
-se v é a amarela (0xFF/0xFE) e _MeColor == 0: _YellowFight(2, i); FIM
-se 1 ≤ v ≤ 0x67 e j = _FindInBList(pos, v) ≥ 0:       (uma preta, ou ovo preto, na MESMA célula)
-    se v ≥ 0x60 (cabeça da rainha): T[j] = 0; Vida[X[j], Y[j]] = 0
-    se v > 7 (não é ovo):                               (luta; a invasora some)
-        w = _GetWinner(T[j], T)                         ← T[j] já é 0 se era a rainha
-        T = 0; S[j] = w; T[j] = 0x70 + (w & 0x80); Vida[pos] = T[j]; M[j] = 10; FIM
-    senão (roubo de ovo):
-        M = 3; T = T OR 8; Vida[pos] = T; T[j] = 0; _TotalEggsDiedB += 1; FIM
-se M == 7: _RaidInB (seção 9.1); FIM
-SAIR_DO_NINHO   (seção 9.2)
-```
-
-Ninho R, formiga preta (`_TemBModePop[M] += 1`, sem sorteio de morte):
+Nest B, red ant (`_TemRModePop[M] += 1`, no death draw):
 
 ```
-se T < 8 (ovo preto no ninho vermelho): T = 0; Vida[pos] = 0; FIM       ← o ovo some sem contagem
-se T ≥ 0x70 (nuvem de luta preta, grupos 14–15): _DoNestFightR; FIM
-v = Vida[pos]
-se 0x81 ≤ v ≤ 0xE7 e j = _FindInRList(pos, v) ≥ 0:
-    se v ≥ 0xE0 (cabeça da rainha vermelha): T[j] = 0; Vida[X[j], Y[j]] = 0
-    se v > 0x87: luta como acima (a invasora some); FIM
-    senão: roubo do ovo vermelho: M = 3; T = T OR 8; Vida[pos] = T; T[j] = 0; FIM   (sem contador)
-se M == 6:
-    se _MePlane == 3: _StayInR (seção 9.3); FIM
-    senão SAIR_DO_NINHO
-se M == 7: _RaidInR; FIM
-SAIR_DO_NINHO
+if T ≥ 0xF0 (red fight cloud, groups 14–15): _DoNestFightB; END
+v = Life[pos]
+if v is the yellow ant (0xFF/0xFE) and _MeColor == 0: _YellowFight(2, i); END
+if 1 ≤ v ≤ 0x67 and j = _FindInBList(pos, v) ≥ 0:     (a black ant, or black egg, in the SAME cell)
+    if v ≥ 0x60 (queen's head): T[j] = 0; Life[X[j], Y[j]] = 0
+    if v > 7 (not an egg):                              (fight; the invader disappears)
+        w = _GetWinner(T[j], T)                         ← T[j] is already 0 if it was the queen
+        T = 0; S[j] = w; T[j] = 0x70 + (w & 0x80); Life[pos] = T[j]; M[j] = 10; END
+    else (egg theft):
+        M = 3; T = T OR 8; Life[pos] = T; T[j] = 0; _TotalEggsDiedB += 1; END
+if M == 7: _RaidInB (section 9.1); END
+LEAVE_NEST   (section 9.2)
 ```
 
-Diferenças entre os dois ramos invasores: no R não há teste da formiga amarela na própria célula, há o "fique" do modo 6 (`_StayInR`) e os ovos pretos levados para o ninho vermelho são destruídos; no B não há contrapartida para ovos vermelhos (um ovo vermelho na lista B seria tratado como invasora comum).
+Nest R, black ant (`_TemBModePop[M] += 1`, no death draw):
 
-**Atenção — rainha atacada na própria célula.** Quando uma invasora está na célula da cabeça da rainha, a rainha é zerada **antes** de `_GetWinner`, que recebe 0 como tipo da ocupante (classe 0, operária). A nuvem resultante guarda S = 0 ou o T da invasora; se "vencer" a ocupante, a nuvem vira T = 0 ao terminar (seção 4.4). Em qualquer caso a cabeça da rainha deixa de existir, e a cauda é removida pelo teste de `_SimQueenB` ([ciclo-de-vida.md](ciclo-de-vida.md#5-rainha)). [hipótese: defeito do original]
+```
+if T < 8 (black egg in the red nest): T = 0; Life[pos] = 0; END        ← the egg disappears without being counted
+if T ≥ 0x70 (black fight cloud, groups 14–15): _DoNestFightR; END
+v = Life[pos]
+if 0x81 ≤ v ≤ 0xE7 and j = _FindInRList(pos, v) ≥ 0:
+    if v ≥ 0xE0 (red queen's head): T[j] = 0; Life[X[j], Y[j]] = 0
+    if v > 0x87: fight as above (the invader disappears); END
+    else: theft of the red egg: M = 3; T = T OR 8; Life[pos] = T; T[j] = 0; END   (no counter)
+if M == 6:
+    if _MePlane == 3: _StayInR (section 9.3); END
+    else LEAVE_NEST
+if M == 7: _RaidInR; END
+LEAVE_NEST
+```
 
-### 3.3 Tabela de despacho da formiga dona
+Differences between the two invader branches: in R there is no test for the yellow ant in the cell itself, there is the mode 6 "stay" (`_StayInR`), and black eggs carried into the red nest are destroyed; in B there is no counterpart for red eggs (a red egg in list B would be treated as an ordinary invader).
 
-| M | Nome (4/1102) | Ninho B | Ninho R |
+**Caution — queen attacked in her own cell.** When an invader is in the cell of the queen's head, the queen is zeroed **before** `_GetWinner`, which receives 0 as the occupant's type (class 0, worker). The resulting cloud stores S = 0 or the invader's T; if it "beats" the occupant, the cloud becomes T = 0 when it ends (section 4.4). In any case the queen's head ceases to exist, and the tail is removed by the `_SimQueenB` test ([ciclo-de-vida.md](ciclo-de-vida.md#5-queen)). [hypothesis: defect of the original]
+
+### 3.3 Owner ant dispatch table
+
+| M | Name (4/1102) | Nest B | Nest R |
 |---|---|---|---|
-| 0, 18, 19, ≥ 20 | Bored, ???, Avenger | PASSEIO (4.1) | PASSEIO (versão R) |
+| 0, 18, 19, ≥ 20 | Bored, ???, Avenger | WANDER (4.1) | WANDER (R version) |
 | 1 | Nesting | `_DoNestingB` (5) | `_DoNestingR` (5.4) |
 | 2, 5, 7, 11, 12, 15, 16 | Foraging, Dig Out, Attack, Alarmed, Defend Nest, Take off, Flying | `_DoDigOutB` (7.2) | `_DoDigOutR` |
 | 3 | Got Food | `_DoFoodInB` (6.2) | `_DoFoodInR` |
-| 4 | Dig In | `_DoDigInB` (7.1) | `_DoDigInR` (7.1 + passagem) |
-| 6 | Defense | se `_MePlane` ≠ 2: `_DoDigOutB`; senão PASSEIO SEM TROCA (4.2) | `_DoDigOutR` (sempre sai) |
+| 4 | Dig In | `_DoDigInB` (7.1) | `_DoDigInR` (7.1 + passage) |
+| 6 | Defense | if `_MePlane` ≠ 2: `_DoDigOutB`; else WANDER WITHOUT SWITCH (4.2) | `_DoDigOutR` (always leaves) |
 | 8 | Hatching | `_SimEggB` ([ciclo-de-vida.md](ciclo-de-vida.md)) | `_SimEggR` |
 | 9 | Egg Laying | `_SimQueenB` ([ciclo-de-vida.md](ciclo-de-vida.md)) | `_SimQueenR` |
 | 10 | Fighting | `_DoNestFightB` (4.4) | `_DoNestFightR` |
-| 13 | Resting | DESCANSO (10) | DESCANSO (versão R) |
-| 14 | Pre-Flight | PRÉ-VOO (10) | PRÉ-VOO com `_FlyAwayR` |
-| 17 | ??? | AFOGANDO (8.3) | AFOGANDO |
+| 13 | Resting | REST (10) | REST (R version) |
+| 14 | Pre-Flight | PRE-FLIGHT (10) | PRE-FLIGHT with `_FlyAwayR` |
+| 17 | ??? | DROWNING (8.3) | DROWNING |
 
-As funções `_DoRandB` (`1028:3876`), `_DoRecruitN` (`1028:396c`), `_DoRestB` (`1028:367e`), `_DoDrownB` (`1028:37a4`), `_RaidOutB` (`1028:3610`) e suas versões R existem, mas **não têm chamador**: o mesmo código está embutido no `switch` de `_DoNestAntB/R` (seção 12).
+The functions `_DoRandB` (`1028:3876`), `_DoRecruitN` (`1028:396c`), `_DoRestB` (`1028:367e`), `_DoDrownB` (`1028:37a4`), `_RaidOutB` (`1028:3610`) and their R versions exist, but **have no caller**: the same code is inlined in the `switch` of `_DoNestAntB/R` (section 12).
 
-## 4. Primitivas de movimento e luta
+## 4. Movement and fight primitives
 
-### 4.1 Andar: `_TryMoveDirB` (`1028:439e`) / `_TryMoveDirR` (`1028:6850`) e PASSEIO
+### 4.1 Walking: `_TryMoveDirB` (`1028:439e`) / `_TryMoveDirR` (`1028:6850`) and WANDER
 
-`MOVER(d)`, devolve sucesso:
+`MOVE(d)`, returns success:
 
 ```
-se d < 0: falha
+if d < 0: fail
 n = pos + D8[d]
-se n.x ∉ 0..63 ou n.y > 63: falha
-se n.y < 1: devolve _GetOutB(X)          (a formiga está em y = 1 e tenta subir; seção 4.6)
-se Mapa[n] ≥ 0x1C: falha                 (passáveis: 0x00–0x1B: túnel, comida 0x10–0x13, 0x14, abertura 0x18)
-[só B] se Vida[n] == 0xFF e _MeWantFood ≠ 0 e X < 0x80:
-        Vida[pos] = (T & 0xF8) | d; _DoTroph(X, Y, d)      (alimenta a amarela)
-Vida[n] = (T & 0xF8) | d; Vida[pos] = 0; pos = n; T = Vida[n]; sucesso
+if n.x ∉ 0..63 or n.y > 63: fail
+if n.y < 1: return _GetOutB(X)           (the ant is at y = 1 and tries to go up; section 4.6)
+if Map[n] ≥ 0x1C: fail                   (passable: 0x00–0x1B: tunnel, food 0x10–0x13, 0x14, opening 0x18)
+[B only] if Life[n] == 0xFF and _MeWantFood ≠ 0 and X < 0x80:
+        Life[pos] = (T & 0xF8) | d; _DoTroph(X, Y, d)      (feeds the yellow ant)
+Life[n] = (T & 0xF8) | d; Life[pos] = 0; pos = n; T = Life[n]; success
 ```
 
-- **Não há teste de ocupação.** A formiga entra numa célula ocupada e sobrescreve `Vida[n]`; a outra formiga continua na lista, na mesma posição. O mapa de vida é "o último que escreveu". É assim que as lutas e os roubos começam: a formiga que ficou embaixo vê, no seu próximo processamento, outro T na própria célula (seções 3.2 e 4.3).
-- O teste `X < 0x80` (desmontagem: `cmp byte [BlistX+i], 0x80`) é sempre verdadeiro; provavelmente o original queria testar a cor em T. Consequência: qualquer formiga no ninho B, inclusive invasora vermelha, alimenta a amarela. **Confirmado no original** (vetor `ninho_n15/1711`, 2026-10-18: uma invasora vermelha entrando na célula da amarela com fome dá `_MeHealth` = 100). [hipótese: defeito de programação, mas é o comportamento do jogo]
-- Só 0xFF (cabeça da amarela) dispara a trofalaxia, não 0xFE.
+- **There is no occupancy test.** The ant enters an occupied cell and overwrites `Life[n]`; the other ant stays in the list, at the same position. The life map is "last writer wins". This is how fights and thefts start: the ant left underneath sees, on its next processing, another T in its own cell (sections 3.2 and 4.3).
+- The `X < 0x80` test (disassembly: `cmp byte [BlistX+i], 0x80`) is always true; the original probably meant to test the color in T. Consequence: any ant in nest B, including a red invader, feeds the yellow ant. **Confirmed in the original** (vector `ninho_n15/1711`, 2026-10-18: a red invader entering the cell of the hungry yellow ant gives `_MeHealth` = 100). [hypothesis: programming defect, but it is the game's behavior]
+- Only 0xFF (the yellow ant's head) triggers trophallaxis, not 0xFE.
 
-`TENTA(d)` = `se não MOVER(d): MOVER(Sk(8))` — uma tentativa aleatória de reserva; se falhar também, a formiga fica parada.
+`TRY(d)` = `if not MOVE(d): MOVE(Sk(8))` — one random fallback attempt; if that also fails, the ant stays put.
 
-**PASSEIO** (M = 0, 18, 19 e outros; `_DoRandB`):
-
-```
-se Sk(32) == 0: M = _GetNewModeB(grupo)          (R: _GetNewModeR)
-se LUTA_PRÓPRIA_CÉLULA(): FIM                    (4.3)
-TENTA(dir)
-```
-
-### 4.2 PASSEIO SEM TROCA (M = 6 com a amarela no ninho preto; `_DoRecruitN`)
-
-Igual ao passeio, sem o `Sk(32)`: `se LUTA_PRÓPRIA_CÉLULA(): FIM; TENTA(dir)`. Os soldados de defesa ficam andando no ninho enquanto a amarela está lá; não a seguem.
-
-### 4.3 Checagem de luta: `_CheckNestFightB` (`1028:3ba2`) / `_CheckNestFightR` (`1028:61a2`)
-
-`LUTA(c, Tref)`, devolve verdadeiro se houve luta:
+**WANDER** (M = 0, 18, 19 and others; `_DoRandB`):
 
 ```
-v = Vida[c]
-B: se v é amarela e _MeColor ≠ 0: _YellowFight(2, i); verdadeiro
-   se 0x88 ≤ v ≤ 0xE7 e j = _FindInBList(c, v) ≥ 0: NUVEM(j, v, Tref); verdadeiro
-R: se 0x08 ≤ v ≤ 0x67: se j = _FindInRList(c, v) ≥ 0: NUVEM(j, v, Tref); verdadeiro
-   senão se v é amarela e _MeColor == 0: _YellowFight(3, i); verdadeiro
-falso
-
-NUVEM(j, v, Tref):  w = _GetWinner(v, Tref); S[j] = w; T[j] = 0x70 + (w & 0x80); Vida[c] = T[j]; M[j] = 10
+if Sk(32) == 0: M = _GetNewModeB(group)          (R: _GetNewModeR)
+if FIGHT_OWN_CELL(): END                         (4.3)
+TRY(dir)
 ```
 
-- `LUTA_PRÓPRIA_CÉLULA()` = `LUTA(pos, T)`: alguém da outra cor entrou na minha célula.
-- **A formiga que faz a checagem não some.** Quem vira nuvem é a inimiga encontrada (`j`); a formiga `i` continua na lista, na mesma posição. Se `_GetWinner` devolver `Tref` (o tipo de `i`), a nuvem termina como **uma segunda formiga** igual a `i` (seção 4.4). Isso difere da superfície, onde a formiga que se move desaparece ([formigas.md](formigas.md#6-luta-morte-e-saúde)). Fato visto no código e conferido na desmontagem (`1028:2eea`: nenhum acesso a `T[i]`). [hipótese: defeito do original]
-- `_GetWinner(ocupante, atacante)` (`1028:26f4`) usa **`RR(10)`** (gerador R), salvo com `_Invincible = 1` (sem sorteio; a preta vence). A matriz está em [formigas.md](formigas.md#6-luta-morte-e-saúde). `_YellowFight` também chama `_GetWinner` (documentado com a formiga amarela).
-- Os ovos da outra cor (0x81–0x87 no B; 0x01–0x07 no R) **não** disparam luta: a formiga passa por cima.
+### 4.2 WANDER WITHOUT SWITCH (M = 6 with the yellow ant in the black nest; `_DoRecruitN`)
 
-### 4.4 Nuvem de luta: `_DoNestFightB` (`1028:3a54`) / `_DoNestFightR` (`1028:6072`)
+Same as wander, without the `Sk(32)`: `if FIGHT_OWN_CELL(): END; TRY(dir)`. Defense soldiers keep walking around in the nest while the yellow ant is there; they do not follow it.
+
+### 4.3 Fight check: `_CheckNestFightB` (`1028:3ba2`) / `_CheckNestFightR` (`1028:61a2`)
+
+`FIGHT(c, Tref)`, returns true if there was a fight:
 
 ```
-r = S(7); T = (T & 0xF8) + r; Vida[pos] = T          (animação: direção 0..6)
-se Sk(16) ≠ 0: balão se _OptionStates[5] (B: == 1; R: ≠ 0); FIM
-T = S; Vida[pos] = T                                  (a luta acabou: vira o vencedor)
-se (T & 0x78) == 0x60 (cabeça de rainha, de qualquer cor):
-    acrescenta à lista do ninho a cauda: posição pos + D8[inv(T & 7)], tipo T + 8, M = 9, S = 0
-B: se T é vermelha: M = 7; senão M = _GetNewMode(grupo(T), T)
-R: se T é preta:    M = 7; senão M = VitóriaR[grupo(T)]
+v = Life[c]
+B: if v is yellow and _MeColor ≠ 0: _YellowFight(2, i); true
+   if 0x88 ≤ v ≤ 0xE7 and j = _FindInBList(c, v) ≥ 0: CLOUD(j, v, Tref); true
+R: if 0x08 ≤ v ≤ 0x67: if j = _FindInRList(c, v) ≥ 0: CLOUD(j, v, Tref); true
+   else if v is yellow and _MeColor == 0: _YellowFight(3, i); true
+false
+
+CLOUD(j, v, Tref):  w = _GetWinner(v, Tref); S[j] = w; T[j] = 0x70 + (w & 0x80); Life[c] = T[j]; M[j] = 10
 ```
 
-`VitóriaR` = DGROUP `0x22E6`, 16 bytes lidos do `SIMANTW.EXE` (sem nome no `.SYM`):
+- `FIGHT_OWN_CELL()` = `FIGHT(pos, T)`: someone of the other color entered my cell.
+- **The ant doing the check does not disappear.** The one that becomes a cloud is the enemy found (`j`); ant `i` stays in the list, at the same position. If `_GetWinner` returns `Tref` (the type of `i`), the cloud ends as **a second ant** identical to `i` (section 4.4). This differs from the surface, where the moving ant disappears ([formigas.md](formigas.md#6-fighting-death-and-health)). Fact seen in the code and checked in the disassembly (`1028:2eea`: no access to `T[i]`). [hypothesis: defect of the original]
+- `_GetWinner(occupant, attacker)` (`1028:26f4`) uses **`RR(10)`** (R generator), except with `_Invincible = 1` (no draw; the black ant wins). The matrix is in [formigas.md](formigas.md#6-fighting-death-and-health). `_YellowFight` also calls `_GetWinner` (documented with the yellow ant).
+- Eggs of the other color (0x81–0x87 in B; 0x01–0x07 in R) do **not** trigger a fight: the ant walks over them.
 
-| grupo | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+### 4.4 Fight cloud: `_DoNestFightB` (`1028:3a54`) / `_DoNestFightR` (`1028:6072`)
+
+```
+r = S(7); T = (T & 0xF8) + r; Life[pos] = T          (animation: direction 0..6)
+if Sk(16) ≠ 0: balloon if _OptionStates[5] (B: == 1; R: ≠ 0); END
+T = S; Life[pos] = T                                  (the fight is over: becomes the winner)
+if (T & 0x78) == 0x60 (queen's head, of either color):
+    adds the tail to the nest list: position pos + D8[inv(T & 7)], type T + 8, M = 9, S = 0
+B: if T is red:   M = 7; else M = _GetNewMode(group(T), T)
+R: if T is black: M = 7; else M = VitóriaR[group(T)]
+```
+
+`VitóriaR` = DGROUP `0x22E6`, 16 bytes read from `SIMANTW.EXE` (no name in the `.SYM`):
+
+| group | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | M | 1 | 1 | 1 | 3 | 0 | 5 | 2 | 3 | 0 | 5 | 0 | 0 | 9 | 9 | 10 | 0 |
 
-- Duração: a cada tick a nuvem termina com chance 1/16.
-- A nuvem da cor do ninho passa antes pelo sorteio de morte natural (3.1) e pode sumir sem vencedor.
-- Uma vermelha que vence no ninho preto passa a M = 7 e, como invasora, entra em `_RaidInB` (procura comida). Uma preta que vence no vermelho, idem.
-- A cauda recriada não mexe em `_BlkQueens`/`_RedQueens`.
+- Duration: each tick the cloud ends with chance 1/16.
+- A cloud of the nest's color first goes through the natural death draw (3.1) and can disappear with no winner.
+- A red ant that wins in the black nest switches to M = 7 and, as an invader, enters `_RaidInB` (looks for food). A black ant that wins in the red nest, likewise.
+- The recreated tail does not touch `_BlkQueens`/`_RedQueens`.
 
-### 4.5 Direções pelo mapa de saída
+### 4.5 Directions from the exit map
 
-**`_GetExitDirB(x, y, d)`** (`1020:119c`; R `1020:1240`), devolve direção + 1, ou 0:
-
-```
-se y == 1:
-    se Mapa[x][0] == 0x18: devolve 1                    (sobe: direção 0)
-    devolve Sk(2) × 4 + 3                               (3 ou 7: direção 2 ou 6, anda de lado)
-melhor = 0; res = 0
-para k = 0..7, se k ≠ inv(d):                           (com d = 8 nenhuma é excluída)
-    c = (x, y) + D8[k]; se c dentro do mapa (0..63, 0..63) e Saída[c] > melhor: melhor = Saída[c]; res = k + 1
-devolve res                                             (empate: vence a menor direção)
-```
-
-**`_GetEnterDirB(x, y, d)`** (`1020:12e4`; R `1020:137c`), devolve direção ou −1:
+**`_GetExitDirB(x, y, d)`** (`1020:119c`; R `1020:1240`), returns direction + 1, or 0:
 
 ```
-atual = Saída[x][y]; res = −1
-para k = 0..7, se k ≠ inv(d):
-    c = (x, y) + D8[k]; se c dentro do mapa e v = Saída[c] ≠ 0 e v ≤ atual:
-        se v == atual e Sk(2) == 0: ignora k              (sorteio SÓ em empate)
-        res = k; atual = v
-devolve res
+if y == 1:
+    if Map[x][0] == 0x18: return 1                      (goes up: direction 0)
+    return Sk(2) × 4 + 3                                (3 or 7: direction 2 or 6, walks sideways)
+best = 0; res = 0
+for k = 0..7, if k ≠ inv(d):                            (with d = 8 none is excluded)
+    c = (x, y) + D8[k]; if c inside the map (0..63, 0..63) and Exit[c] > best: best = Exit[c]; res = k + 1
+return res                                              (tie: the lowest direction wins)
 ```
 
-Leitura: `Saída` cresce em direção à superfície (0xFF na linha 0), então "sair" é subir o gradiente e "entrar" é descer até o menor valor não nulo. Células de terra têm `Saída` = 0 e nunca são escolhidas.
-
-**`_RandTurn(d)`** (`1028:2a22`): `_TurnTab[d][Sk(8)]` (tabela em [formigas.md](formigas.md#7-movimento-e-escolha-de-direção)).
-
-### 4.6 Sair do ninho: `_GetOutB` (`1028:520a`) / `_GetOutR` (`1028:74ba`)
-
-Chamada com a coluna x de uma formiga em y = 1 que tentou ir para y ≤ 0.
+**`_GetEnterDirB(x, y, d)`** (`1020:12e4`; R `1020:137c`), returns direction or −1:
 
 ```
-se Mapa[x][0] == 0x18:                                   (há abertura)
+current = Exit[x][y]; res = −1
+for k = 0..7, if k ≠ inv(d):
+    c = (x, y) + D8[k]; if c inside the map and v = Exit[c] ≠ 0 and v ≤ current:
+        if v == current and Sk(2) == 0: skip k            (random draw ONLY on a tie)
+        res = k; current = v
+return res
+```
+
+Reading: `Exit` grows toward the surface (0xFF on row 0), so "leaving" is climbing the gradient and "entering" is descending to the smallest non-zero value. Dirt cells have `Exit` = 0 and are never chosen.
+
+**`_RandTurn(d)`** (`1028:2a22`): `_TurnTab[d][Sk(8)]` (table in [formigas.md](formigas.md#7-movement-and-direction-choice)).
+
+### 4.6 Leaving the nest: `_GetOutB` (`1028:520a`) / `_GetOutR` (`1028:74ba`)
+
+Called with the column x of an ant at y = 1 that tried to go to y ≤ 0.
+
+```
+if Map[x][0] == 0x18:                                    (there is an opening)
     t = T; T = 0
-    se _HoleMapB[x] == 0: _MakeNewHoleB(x)               (sorteios: seção 7.5)
+    if _HoleMapB[x] == 0: _MakeNewHoleB(x)               (random draws: section 7.5)
     r = Sk(8)
     ok = _ExitHole(_HoleMapB[x], x, (t & 0xF8) + r, M, S)
-    se ok: Vida[x][1] = 0; devolve 1                     (a formiga foi para a lista A)
-    senão: T = t; M = 0; devolve 0
-senão:
-    se Saída[x][0] ≠ 0: Saída[x][0] −= 1
-    se Sk(2) == 0: se x ≤ 62 e terra(Mapa[x+1][1]): _DigTileThemB(x+1, 1)
-    senão:         se x ≥ 1  e terra(Mapa[x−1][1]): _DigTileThemB(x−1, 1)
-    MOVER(Sk(8)) a partir de (x, 1)                       (pode chamar _GetOutB de novo)
-    devolve 0
+    if ok: Life[x][1] = 0; return 1                      (the ant went to list A)
+    else: T = t; M = 0; return 0
+else:
+    if Exit[x][0] ≠ 0: Exit[x][0] −= 1
+    if Sk(2) == 0: if x ≤ 62 and dirt(Map[x+1][1]): _DigTileThemB(x+1, 1)
+    else:          if x ≥ 1  and dirt(Map[x−1][1]): _DigTileThemB(x−1, 1)
+    MOVE(Sk(8)) starting from (x, 1)                      (may call _GetOutB again)
+    return 0
 ```
 
-- `_ExitHole` (`1020:2db6`) põe a formiga no fim da lista A, na primeira vizinha 0..7 do buraco (`_HoleMapB[x]`, x) dentro do quintal com `_MapA` < 0x50; a direção é a sorteada `r` e M é mantido. **S só é mantido com M = 6**; com os outros modos S = 0, ou 120 se M ∉ {3, 7} e o buraco é do lado da cor (pretas: x ≤ 63; vermelhas: x ≥ 65) ([formigas.md](formigas.md#7-movimento-e-escolha-de-direção)). `_ExitHole` **não grava `_LifeA`** (a célula da superfície só é marcada quando a formiga anda lá). Falha se nenhuma vizinha servir. (Revisto no pseudocódigo em 2026-10-17; a versão anterior desta spec dizia "M e S são mantidos".)
-- **Lista A cheia** (`_ListIndexA` = 1000) [visto no código, `1020:2db6`; vetores `lista_a_cheia` e `lista_a_cheia_sem_vagas` 307/307, 2026-10-19]: a formiga é gravada na vaga `_ListIndexA` **antes** do teste de capacidade, ou seja, na vaga 1000. Cada vetor da lista A tem 1002 bytes na memória (`_AlistX` em `8:23a4`, `_AlistY` em `8:278e`: 0x3EA = 1002 de distância), então a vaga 1000 é uma folga dentro do vetor, fora do save (que guarda 1000) e de toda varredura (`0.._ListIndexA`). Em seguida a lista é compactada como em `_CompactListA` (só as vagas 0..999; o fim não é apagado) e, se a compactação abriu vagas, o contador ainda soma 1. Resultado: **a formiga que saiu se perde** e, havendo buracos, a lista passa a incluir a vaga seguinte às compactadas com o que havia nela — vazia (T = 0) se ali era um buraco, ou **a cópia de uma formiga** que foi deslizada para trás (a mesma formiga duas vezes na lista). `_ExitHole` devolve 1 (quem chamou tira a formiga do ninho). **Port** (2026-10-19): `comum::sair_pelo_buraco` faz o mesmo sem gravar a vaga 1000 (a folga não existe no port e nada a lê); teste `saida_com_a_lista_a_cheia_segue_o_original`. Antes o port compactava e gravava a formiga na primeira vaga livre.
-- Se `_MakeNewHoleB` não achar lugar, `_HoleMapB[x]` continua 0 e `_ExitHole` tenta em volta de (0, x). [comportamento resultante não testado]
-- No pseudocódigo do Ghidra os argumentos M e S aparecem por engano na chamada de `_SRand8`; a desmontagem mostra que são de `_ExitHole`.
-- `_LeaveNestB` (`1028:515e`) é a primeira metade desta rotina, sem chamador, e zera `Vida[x][y]` em vez de `Vida[x][1]`.
+- `_ExitHole` (`1020:2db6`) puts the ant at the end of list A, on the first neighbor 0..7 of the hole (`_HoleMapB[x]`, x) inside the yard with `_MapA` < 0x50; the direction is the drawn `r` and M is kept. **S is only kept with M = 6**; with the other modes S = 0, or 120 if M ∉ {3, 7} and the hole is on the color's side (black: x ≤ 63; red: x ≥ 65) ([formigas.md](formigas.md#7-movement-and-direction-choice)). `_ExitHole` **does not write `_LifeA`** (the surface cell is only marked when the ant walks there). Fails if no neighbor fits. (Revised against the pseudocode on 2026-10-17; the previous version of this spec said "M and S are kept".)
+- **List A full** (`_ListIndexA` = 1000) [seen in the code, `1020:2db6`; vectors `lista_a_cheia` and `lista_a_cheia_sem_vagas` 307/307, 2026-10-19]: the ant is written to slot `_ListIndexA` **before** the capacity test, that is, to slot 1000. Each list A array is 1002 bytes in memory (`_AlistX` at `8:23a4`, `_AlistY` at `8:278e`: 0x3EA = 1002 apart), so slot 1000 is slack inside the array, outside the save (which stores 1000) and outside every scan (`0.._ListIndexA`). Then the list is compacted as in `_CompactListA` (only slots 0..999; the end is not cleared) and, if compaction opened slots, the counter still adds 1. Result: **the ant that left is lost** and, if there were gaps, the list now includes the slot after the compacted ones with whatever was in it — empty (T = 0) if it was a gap, or **a copy of an ant** that was slid back (the same ant twice in the list). `_ExitHole` returns 1 (the caller removes the ant from the nest). **Port** (2026-10-19): `comum::sair_pelo_buraco` does the same without writing slot 1000 (the slack does not exist in the port and nothing reads it); test `saida_com_a_lista_a_cheia_segue_o_original`. Previously the port compacted and wrote the ant to the first free slot.
+- If `_MakeNewHoleB` finds no place, `_HoleMapB[x]` stays 0 and `_ExitHole` tries around (0, x). [resulting behavior not tested]
+- In the Ghidra pseudocode the M and S arguments mistakenly appear in the `_SRand8` call; the disassembly shows they belong to `_ExitHole`.
+- `_LeaveNestB` (`1028:515e`) is the first half of this routine, with no caller, and zeroes `Life[x][y]` instead of `Life[x][1]`.
 
-### 4.7 Entrar no ninho: `_GoInNest` (`1028:257a`)
+### 4.7 Entering the nest: `_GoInNest` (`1028:257a`)
 
-Da superfície, uma formiga sobre o buraco (x, y) vai para o ninho preto se x < 64, senão para o vermelho: se a lista está cheia (≥ 500), compacta; se continua cheia, nada acontece. Entra na posição (y, 1) com T = (T & 0xF8) + 4 (virada para baixo), mesmos M e S. Se `_HoleMapB[y]` ≠ 0, chama `_DigTileB(y, 1)` (escava se for terra, alisa, refaz `Saída`). Sai da lista A (T = 0, `_LifeA` = 0).
+From the surface, an ant on the hole (x, y) goes to the black nest if x < 64, otherwise to the red one: if the list is full (≥ 500), it compacts; if it is still full, nothing happens. It enters at position (y, 1) with T = (T & 0xF8) + 4 (facing down), same M and S. If `_HoleMapB[y]` ≠ 0, it calls `_DigTileB(y, 1)` (digs if it is dirt, smooths, rebuilds `Exit`). It leaves list A (T = 0, `_LifeA` = 0).
 
-## 5. Cuidar das crias (M = 1): `_DoNestingB` (`1028:44a8`)
+## 5. Tending the brood (M = 1): `_DoNestingB` (`1028:44a8`)
 
-O campo S guarda o ovo carregado: bits 0–2 = estágio do ovo, bit 3 = "já achou onde largar" (na operária carregando) ou "acabou de largar" (na operária livre).
+Field S stores the carried egg: bits 0–2 = egg stage, bit 3 = "already found where to drop it" (in the carrying worker) or "just dropped it" (in the free worker).
 
-### 5.1 Grupo 1 (operária carregando ovo, T 0x08–0x0F)
+### 5.1 Group 1 (worker carrying an egg, T 0x08–0x0F)
 
 ```
-se S >> 3 == 0:                                  (procurando o fundo)
-    d = _GetEnterDirB(pos, dir)                   (Sk(2) só em empate)
-    se d < 0: S = (S & 7) | 8                     (chegou a um mínimo do mapa de saída)
-    TENTA(d)                                      (d < 0 falha sem sorteio e cai no Sk(8))
-senão:
-    v = Vida[pos]
-    se v == 0 ou v > 8:                           (larga o ovo)
-        T = T + 8                                 (volta ao grupo 2)
-        _PlaceEggB(X, Y, S & 7)                   (seção 7.6; ovo com o MESMO estágio)
-        Vida[pos] = T; S = 8; M = _GetNewModeB(1) (= 1, sem sorteio)
+if S >> 3 == 0:                                  (looking for the bottom)
+    d = _GetEnterDirB(pos, dir)                   (Sk(2) only on a tie)
+    if d < 0: S = (S & 7) | 8                     (reached a minimum of the exit map)
+    TRY(d)                                        (d < 0 fails without a draw and falls to Sk(8))
+else:
+    v = Life[pos]
+    if v == 0 or v > 8:                           (drops the egg)
+        T = T + 8                                 (back to group 2)
+        _PlaceEggB(X, Y, S & 7)                   (section 7.6; egg with the SAME stage)
+        Life[pos] = T; S = 8; M = _GetNewModeB(1) (= 1, no random draw)
     e = _GetExitDirB(pos, dir)
-    TENTA(e − 1 se e ≠ 0, senão Sk(8))
+    TRY(e − 1 if e ≠ 0, else Sk(8))
 ```
 
-Detalhe: uma carregadora com T = 0x08 (direção 0) tem `Vida[pos]` = 8 e **não consegue largar** enquanto estiver virada para cima. [hipótese: defeito; efeito pequeno]
+Detail: a carrier with T = 0x08 (direction 0) has `Life[pos]` = 8 and **cannot drop** while it is facing up. [hypothesis: defect; small effect]
 
-### 5.2 Grupo 2 (operária livre)
+### 5.2 Group 2 (free worker)
 
 ```
-se S >> 3 == 0:
-    v = Vida[pos]
-    se v == 0 ou v > 7:
+if S >> 3 == 0:
+    v = Life[pos]
+    if v == 0 or v > 7:
         r = S(100)
-        se _HealthB < r: COMER(pos)                         (seção 6.1)
-        senão se Sk(16) == 0: M = _GetNewModeB(2)
-    senão (há um ovo na minha célula):
+        if _HealthB < r: EAT(pos)                           (section 6.1)
+        else if Sk(16) == 0: M = _GetNewModeB(2)
+    else (there is an egg in my cell):
         j = _FindInBList(pos, v)
-        se j ≥ 0: T[j] = 0; T = T − 8; S = v; FIM           (pega o ovo; não anda neste tick)
-    TENTA(dir)
-senão:                                                       (acabou de largar)
-    se Sk(8) == 0: S = 0
-    e = _GetExitDirB(pos, dir); TENTA(e − 1 se e ≠ 0, senão Sk(8))
+        if j ≥ 0: T[j] = 0; T = T − 8; S = v; END           (picks up the egg; does not walk this tick)
+    TRY(dir)
+else:                                                        (just dropped)
+    if Sk(8) == 0: S = 0
+    e = _GetExitDirB(pos, dir); TRY(e − 1 if e ≠ 0, else Sk(8))
 ```
 
-O ovo "aparece" em `Vida[pos]` porque a operária passou por cima dele e, no mesmo tick ou no seguinte, `_SimEggB` regravou o T do ovo na célula (seção 4.1).
+The egg "appears" in `Life[pos]` because the worker walked over it and, in the same tick or the next, `_SimEggB` rewrote the egg's T into the cell (section 4.1).
 
-### 5.3 Outros grupos com M = 1 (soldado, macho…)
-
-```
-r = S(100); se _HealthB < r: COMER(pos)
-se Sk(8) == 0: M = _GetNewModeB(grupo)
-TENTA(dir)
-```
-
-### 5.4 Versão vermelha: `_DoNestingR` (`1028:690a`) — regra diferente
+### 5.3 Other groups with M = 1 (soldier, male…)
 
 ```
-grupo 1:
-    se Sk(4) == 0 e Mapa[pos] < 0x10:
-        T = T + 8; Vida[pos] = T; _PlaceEggR(X, Y, 0x82); S = 0; M = _GetNewModeR(1) (= 1); FIM   (não anda)
-    se Sk(4) ≠ 0 e d = _GetEnterDirR(pos, dir) ≥ 0: TENTA(d)
-    senão TENTA(Sk(8))
-grupo 2:
-    se Sk(4) == 0:
-        v = Vida[pos]
-        se v == 0 ou (v & 0x7F) > 7:
-            r = S(100); se _HealthR < r: COMER_R(pos) senão M = _GetNewModeR(2)
-        senão se j = _FindInRList(pos, v) ≥ 0: T[j] = 0; T = T − 8; FIM
-    se Sk(4) ≠ 0: TENTA(dir) senão TENTA(Sk(8))
-outros: M = _GetNewModeR(grupo); TENTA(dir)
+r = S(100); if _HealthB < r: EAT(pos)
+if Sk(8) == 0: M = _GetNewModeB(group)
+TRY(dir)
 ```
 
-Diferenças de efeito: a vermelha larga o ovo ao acaso (1/4 por tick em célula sem comida), não leva ao fundo; **o estágio do ovo se perde** (S não guarda nada e o ovo largado volta ao estágio 2, T = 0x82); a vermelha pega também ovos pretos (`v & 0x7F`); e, sem fome, troca de modo na hora (sem o `Sk(16)`).
-
-## 6. Comida guardada
-
-### 6.1 Comer: `_TryEatFoodB` (`1028:47c6`), `_EatFoodB` (`1028:4844`)
-
-`COMER(c)`, embutido em várias rotinas:
+### 5.4 Red version: `_DoNestingR` (`1028:690a`) — a different rule
 
 ```
-v = Mapa[c]
-se 0x10 ≤ v ≤ 0x13:
-    Mapa[c] = (v == 0x10) ? Sk(8) : v − 1          (0x10 = 1 unidade; ao acabar vira túnel)
-    se _FoodB > 0: _FoodB −= 1
+group 1:
+    if Sk(4) == 0 and Map[pos] < 0x10:
+        T = T + 8; Life[pos] = T; _PlaceEggR(X, Y, 0x82); S = 0; M = _GetNewModeR(1) (= 1); END   (does not walk)
+    if Sk(4) ≠ 0 and d = _GetEnterDirR(pos, dir) ≥ 0: TRY(d)
+    else TRY(Sk(8))
+group 2:
+    if Sk(4) == 0:
+        v = Life[pos]
+        if v == 0 or (v & 0x7F) > 7:
+            r = S(100); if _HealthR < r: EAT_R(pos) else M = _GetNewModeR(2)
+        else if j = _FindInRList(pos, v) ≥ 0: T[j] = 0; T = T − 8; END
+    if Sk(4) ≠ 0: TRY(dir) else TRY(Sk(8))
+others: M = _GetNewModeR(group); TRY(dir)
+```
+
+Differences in effect: the red ant drops the egg at random (1/4 per tick on a cell without food), it does not carry it to the bottom; **the egg's stage is lost** (S stores nothing and the dropped egg goes back to stage 2, T = 0x82); the red ant also picks up black eggs (`v & 0x7F`); and, when not hungry, it switches mode right away (without the `Sk(16)`).
+
+## 6. Stored food
+
+### 6.1 Eating: `_TryEatFoodB` (`1028:47c6`), `_EatFoodB` (`1028:4844`)
+
+`EAT(c)`, inlined in several routines:
+
+```
+v = Map[c]
+if 0x10 ≤ v ≤ 0x13:
+    Map[c] = (v == 0x10) ? Sk(8) : v − 1           (0x10 = 1 unit; when it runs out it becomes tunnel)
+    if _FoodB > 0: _FoodB −= 1
     _EatCountB += 5
-    se _EatCountB > (_BpopT + _CastePopB[2]) >> 4:  (soldados contam duas vezes)
-        _EatCountB = 0; se _HealthB < 100: _HealthB += 1
+    if _EatCountB > (_BpopT + _CastePopB[2]) >> 4:  (soldiers count twice)
+        _EatCountB = 0; if _HealthB < 100: _HealthB += 1
 ```
 
-`_EatFoodB` é a mesma coisa sem o teste de faixa. R: `_FoodR`, `_EatCountR`, `_RpopT + _CastePopR[2]`, `_HealthR`.
+`_EatFoodB` is the same thing without the range test. R: `_FoodR`, `_EatCountR`, `_RpopT + _CastePopR[2]`, `_HealthR`.
 
-Quem come e quando (o sorteio acontece sempre que a linha é alcançada; `COMER` só age se houver comida na célula):
+Who eats and when (the random draw always happens when the line is reached; `EAT` only acts if there is food in the cell):
 
-| Onde | Condição | Célula |
+| Where | Condition | Cell |
 |---|---|---|
-| Nesting, grupo 2 e outros | `S(100)` > saúde | a própria |
-| Got Food, ao largar | `S(100)` > saúde | a própria (a recém-largada) |
-| Dig In, Dig Out, depois de andar | `Sk(64)` > saúde | a nova (preto); a antiga (vermelho) |
+| Nesting, group 2 and others | `S(100)` > health | its own |
+| Got Food, when dropping | `S(100)` > health | its own (the one just dropped) |
+| Dig In, Dig Out, after walking | `Sk(64)` > health | the new one (black); the old one (red) |
 
-Com saúde ≥ 63, Dig In/Dig Out nunca comem; com saúde 100, ninguém come.
+With health ≥ 63, Dig In/Dig Out never eat; with health 100, nobody eats.
 
-`_DecEatB` (`1028:48f8`), chamado por ovo posto pela formiga amarela (a rainha usa o mesmo código embutido): `_EatCountB −= 1`; se ficar < 0: `_EatCountB = _BpopT >> 5` e, se `_HealthB` > 0 e `_AlwaysHealthy` = 0, `_HealthB −= 1`. `_DecEatR` não testa `_AlwaysHealthy`.
+`_DecEatB` (`1028:48f8`), called for an egg laid by the yellow ant (the queen uses the same code inlined): `_EatCountB −= 1`; if it goes < 0: `_EatCountB = _BpopT >> 5` and, if `_HealthB` > 0 and `_AlwaysHealthy` = 0, `_HealthB −= 1`. `_DecEatR` does not test `_AlwaysHealthy`.
 
-### 6.2 Levar comida: `_DoFoodInB` (`1028:492a`) (M = 3)
-
-```
-d = _GetEnterDirB(pos, dir)                        (Sk(2) só em empate)
-se d < 0 ou Sk(16) == 0:                           (Sk(16) só se d ≥ 0)
-    LARGAR_COMIDA(pos)                              (6.3)
-    se T & 8: T = T − 8                             (grupo 3→2, 7→6)
-    r = S(100); se _HealthB < r: COMER_SEM_TESTE(pos)   (_EatFoodB embutido: sem o teste 0x10–0x13)
-    M = _GetNewModeB(grupo do T de ENTRADA)
-senão:
-    T = (T & 0xF8) | d; Vida[pos] = T
-    n = pos + D8[d]; fora do mapa: FIM; n.y < 1: _GetOutB(X); FIM
-    se Mapa[n] ≥ 0x30: FIM                          (fica parada)
-    PASSO(n, d)                                      (6.4)
-```
-
-`COMER_SEM_TESTE` não confere a faixa: se a célula era 0x13 (cheia) ou 0x14 (passagem), LARGAR não a muda e a mordida a faz cair para 0x12 ou 0x13 (a passagem vira comida). Visto no pseudocódigo (`1028:492a`), igual em `_DoFoodInR`. [hipótese: defeito]
-
-**Comida dobrada.** O novo modo é calculado com o grupo **antes** de tirar a comida (3 ou 7), e `_CasteModeTabB[3] = _CasteModeTabB[7] = 3`. A formiga fica em M = 3 sem carga; no próximo largar (fundo do túnel ou 1/16 por tick) ela credita mais uma unidade no mapa e em `_FoodB`, e só então troca de modo (agora com grupo 2 ou 6). Cada carga trazida rende **duas** unidades. Conferido na desmontagem (`1028:4bab`: o argumento é o T recebido, `[bp+0xa]`). [hipótese: defeito do original; confirmar na bancada, caso N-06]
-
-### 6.3 Largar: `_DropFoodB` (`1028:3c3c`)
-
-`LARGAR_COMIDA(c)`: se `Mapa[c]` < 0x10 (túnel), vira 0x10; senão, se < 0x13, soma 1; senão (0x13 cheia, ou 0x14 passagem) o mapa não muda. Em todos os casos `_FoodB += 1`, de modo que o contador pode ficar maior que a comida desenhada. A função separada (sem chamador) faz o mesmo, devolve 0 quando o mapa não mudou e tira o bit 8 de T.
-
-### 6.4 Passo com checagem de luta (embutido em Dig In, Dig Out e Got Food)
-
-`PASSO(n, d)`: `Vida[pos] = 0`; se `LUTA(n, (T & 0xF8) | d)`: FIM (a formiga fica, mas com `Vida[pos]` = 0); senão `T = (T & 0xF8) | d`, `Vida[n] = T`, `pos = n`. Não testa `Mapa[n]` < 0x1C: quem chama já exige `Mapa[n]` < 0x30 e (em Dig In/Out) "não é terra".
-
-### 6.5 Roubo e coleta
-
-- `_StealFoodB` (`1028:48b4`): tira uma unidade (0x10 → `Sk(8)`) e `_FoodB −= 1` se > 0, sem mexer na saúde. Embutido em `_RaidInB`/`_StayInR`.
-- `_PickupFoodB` (`1020:0f40`) / `_PickupFoodR` (`1020:0fa2`): igual, só se 0x10–0x13. Sem chamador no pseudocódigo.
-
-## 7. Escavação e mapa de saída
-
-### 7.1 Cavar para dentro: `_DoDigInB` (`1028:4bd0`) (M = 4)
+### 6.2 Carrying food: `_DoFoodInB` (`1028:492a`) (M = 3)
 
 ```
-se grupo ∉ {2, 6}: M = _GetNewModeB(grupo); FIM
-d = _GetEnterDirB(pos, dir); se d < 0: d = Sk(8)
-T = (T & 0xF8) | d; Vida[pos] = T
-se Y == 63: M = _GetNewModeB(grupo); FIM
-n = pos + D8[d]; fora do mapa: FIM; n.y < 1: _GetOutB(X); FIM
-se Mapa[n] ≥ 0x30: FIM
-se terra(Mapa[n]) (0x20–0x2E):
-    se não _DigTileThemB(n): M = _GetNewModeB(grupo); FIM       (R: M = 0)
-    T = T + 0x18 (carrega terra: grupo 2→5, 6→9); M = 5; som 0x11 (R: 0x12)
-PASSO(n, d); se houve luta: FIM                 (Tref da luta = (T de entrada & 0xF8) | d, SEM os 0x18 da terra)
-r = Sk(64); se _HealthB < r: COMER(n)          (R: COMER(pos ANTIGA))
-se Sk(4) == 0: _FixExitMapB(n)
-[só R] se Mapa[n] == 0x14: PASSAGEM (7.7)
+d = _GetEnterDirB(pos, dir)                        (Sk(2) only on a tie)
+if d < 0 or Sk(16) == 0:                           (Sk(16) only if d ≥ 0)
+    DROP_FOOD(pos)                                  (6.3)
+    if T & 8: T = T − 8                             (group 3→2, 7→6)
+    r = S(100); if _HealthB < r: EAT_NO_TEST(pos)   (_EatFoodB inlined: without the 0x10–0x13 test)
+    M = _GetNewModeB(group of the INCOMING T)
+else:
+    T = (T & 0xF8) | d; Life[pos] = T
+    n = pos + D8[d]; outside the map: END; n.y < 1: _GetOutB(X); END
+    if Map[n] ≥ 0x30: END                           (stays put)
+    STEP(n, d)                                       (6.4)
 ```
 
-A operária anda para dentro da célula que acabou de cavar, já carregando a terra (M = 5, que no ninho é "sair": seção 7.2).
+`EAT_NO_TEST` does not check the range: if the cell was 0x13 (full) or 0x14 (passage), DROP does not change it and the bite makes it drop to 0x12 or 0x13 (the passage becomes food). Seen in the pseudocode (`1028:492a`), same in `_DoFoodInR`. [hypothesis: defect]
 
-### 7.2 Sair carregando / sair: `_DoDigOutB` (`1028:4eb0`) (M = 2, 5, 7, 11, 12, 15, 16)
+**Doubled food.** The new mode is computed with the group **before** removing the food (3 or 7), and `_CasteModeTabB[3] = _CasteModeTabB[7] = 3`. The ant stays in M = 3 with no load; on the next drop (bottom of the tunnel or 1/16 per tick) it credits one more unit to the map and to `_FoodB`, and only then switches mode (now with group 2 or 6). Each load brought in yields **two** units. Checked in the disassembly (`1028:4bab`: the argument is the received T, `[bp+0xa]`). [hypothesis: defect of the original; confirm on the test bench, case N-06]
+
+### 6.3 Dropping: `_DropFoodB` (`1028:3c3c`)
+
+`DROP_FOOD(c)`: if `Map[c]` < 0x10 (tunnel), it becomes 0x10; else, if < 0x13, adds 1; else (0x13 full, or 0x14 passage) the map does not change. In all cases `_FoodB += 1`, so the counter can become larger than the food drawn. The separate function (with no caller) does the same, returns 0 when the map did not change and clears bit 8 of T.
+
+### 6.4 Step with fight check (inlined in Dig In, Dig Out and Got Food)
+
+`STEP(n, d)`: `Life[pos] = 0`; if `FIGHT(n, (T & 0xF8) | d)`: END (the ant stays, but with `Life[pos]` = 0); else `T = (T & 0xF8) | d`, `Life[n] = T`, `pos = n`. It does not test `Map[n]` < 0x1C: the caller already requires `Map[n]` < 0x30 and (in Dig In/Out) "is not dirt".
+
+### 6.5 Theft and pickup
+
+- `_StealFoodB` (`1028:48b4`): removes one unit (0x10 → `Sk(8)`) and `_FoodB −= 1` if > 0, without touching health. Inlined in `_RaidInB`/`_StayInR`.
+- `_PickupFoodB` (`1020:0f40`) / `_PickupFoodR` (`1020:0fa2`): same, only if 0x10–0x13. No caller in the pseudocode.
+
+## 7. Digging and exit map
+
+### 7.1 Digging in: `_DoDigInB` (`1028:4bd0`) (M = 4)
+
+```
+if group ∉ {2, 6}: M = _GetNewModeB(group); END
+d = _GetEnterDirB(pos, dir); if d < 0: d = Sk(8)
+T = (T & 0xF8) | d; Life[pos] = T
+if Y == 63: M = _GetNewModeB(group); END
+n = pos + D8[d]; outside the map: END; n.y < 1: _GetOutB(X); END
+if Map[n] ≥ 0x30: END
+if dirt(Map[n]) (0x20–0x2E):
+    if not _DigTileThemB(n): M = _GetNewModeB(group); END       (R: M = 0)
+    T = T + 0x18 (carries dirt: group 2→5, 6→9); M = 5; sound 0x11 (R: 0x12)
+STEP(n, d); if there was a fight: END           (fight Tref = (incoming T & 0xF8) | d, WITHOUT the dirt's 0x18)
+r = Sk(64); if _HealthB < r: EAT(n)            (R: EAT(OLD pos))
+if Sk(4) == 0: _FixExitMapB(n)
+[R only] if Map[n] == 0x14: PASSAGE (7.7)
+```
+
+The worker walks into the cell it has just dug, already carrying the dirt (M = 5, which in the nest means "go out": section 7.2).
+
+### 7.2 Going out carrying / going out: `_DoDigOutB` (`1028:4eb0`) (M = 2, 5, 7, 11, 12, 15, 16)
 
 ```
 e = _GetExitDirB(pos, dir)
-d = (e ≥ 1) ? e − 1 : _RandTurn(dir)                     (Sk(8) em _RandTurn)
-T = (T & 0xF8) | d; Vida[pos] = T
-n = pos + D8[d]; fora do mapa: FIM; n.y < 1: _GetOutB(X); FIM
-se Mapa[n] ≥ 0x30 (terra inundada, pedrinha…):
-    B: Saída[pos] −= 1 (byte; 0 vira 0xFF!)       R: só se Saída[pos] ≠ 0
-    se grupo ∈ {5, 9}: T = T − 0x18; M = 4          (a terra some; volta a cavar)
-    se grupo ∈ {2, 6}: M = 4
-    FIM
-se terra(Mapa[n]): FIM                               (parada, sem mudança)
-PASSO(n, d); se houve luta: FIM
-r = Sk(64); se _HealthB < r: COMER(n)          (R: COMER(pos ANTIGA))
+d = (e ≥ 1) ? e − 1 : _RandTurn(dir)                     (Sk(8) in _RandTurn)
+T = (T & 0xF8) | d; Life[pos] = T
+n = pos + D8[d]; outside the map: END; n.y < 1: _GetOutB(X); END
+if Map[n] ≥ 0x30 (flooded dirt, pebble…):
+    B: Exit[pos] −= 1 (byte; 0 becomes 0xFF!)      R: only if Exit[pos] ≠ 0
+    if group ∈ {5, 9}: T = T − 0x18; M = 4          (the dirt disappears; goes back to digging)
+    if group ∈ {2, 6}: M = 4
+    END
+if dirt(Map[n]): END                                 (stopped, no change)
+STEP(n, d); if there was a fight: END
+r = Sk(64); if _HealthB < r: EAT(n)            (R: EAT(OLD pos))
 ```
 
-- **No ninho vermelho, Dig In e Dig Out comem na célula de onde a formiga saiu**, não na nova (pseudocódigo de `_DoDigInR` `1028:6f0c` e `_DoDigOutR` `1028:722a`: o índice usado é o calculado antes de atualizar a posição). Visto no código em 2026-10-17.
-- A terra carregada (grupos 5 e 9) só é descarregada na superfície (`_DoDigOutAntA`); no ninho, se o caminho estiver bloqueado, ela simplesmente some.
-- No ninho preto, o decremento de `Saída` sem teste (conferido na desmontagem, `1028:4f83`) transforma uma célula com 0 em 0xFF, um falso "ponto de saída". [hipótese: defeito; a versão R testa]
+- **In the red nest, Dig In and Dig Out eat in the cell the ant left**, not in the new one (pseudocode of `_DoDigInR` `1028:6f0c` and `_DoDigOutR` `1028:722a`: the index used is the one computed before updating the position). Seen in the code on 2026-10-17.
+- Carried dirt (groups 5 and 9) is only unloaded on the surface (`_DoDigOutAntA`); in the nest, if the path is blocked, it simply disappears.
+- In the black nest, the untested decrement of `Exit` (checked in the disassembly, `1028:4f83`) turns a cell with 0 into 0xFF, a false "exit point". [hypothesis: defect; the R version tests]
 
-### 7.3 Funções de escavação
+### 7.3 Digging functions
 
-**`_DigTileB(x, y)`** (`1020:1fe4`), usada para cavar sem condição (ovo, entrada, geração):
+**`_DigTileB(x, y)`** (`1020:1fe4`), used to dig unconditionally (egg, entrance, generation):
 
 ```
-se terra(Mapa[x][y]):
-    Mapa[x][y] = Sk(8)
-    _TileTotXB += x; _TileTotYB += y; _TilesDugB += 1           (somas de 32 bits)
+if dirt(Map[x][y]):
+    Map[x][y] = Sk(8)
+    _TileTotXB += x; _TileTotYB += y; _TilesDugB += 1           (32-bit sums)
     _TileMassXB = _TileTotXB / _TilesDugB; _TileMassYB = _TileTotYB / _TilesDugB
-    se y > 53 e S(64) == 0:                                      (passagem entre ninhos)
-        Mapa[x][y] = 0x14
-        se terra(_MapR[x][y]): _MapR[x][y] = Sk(8); acumula nos totais R
-        ALISAR_R(x, y); _FixExitMapR(x, y); _MapR[x][y] = 0x14
-ALISAR_B(x, y); _FixExitMapB(x, y)                               (sempre, mesmo sem escavar)
+    if y > 53 and S(64) == 0:                                    (passage between nests)
+        Map[x][y] = 0x14
+        if dirt(_MapR[x][y]): _MapR[x][y] = Sk(8); accumulates into the R totals
+        SMOOTH_R(x, y); _FixExitMapR(x, y); _MapR[x][y] = 0x14
+SMOOTH_B(x, y); _FixExitMapB(x, y)                               (always, even without digging)
 ```
 
-`ALISAR(x, y)` = `_SmoothEdges(x, y−1)`, `(x+1, y)`, `(x, y+1)`, `(x−1, y)`, nessa ordem.
+`SMOOTH(x, y)` = `_SmoothEdges(x, y−1)`, `(x+1, y)`, `(x, y+1)`, `(x−1, y)`, in that order.
 
-**`_DigTileR(x, y)`** (`1020:21de`): igual, sem a passagem 0x14 (só o ninho preto cria passagens).
+**`_DigTileR(x, y)`** (`1020:21de`): same, without the 0x14 passage (only the black nest creates passages).
 
-**`_DigTileThemB(x, y)`** (`1020:22d4`), usada pela operária: só cava se `0 < x < 63`, se a célula de baixo for terra (ou y > 62) e a de cima for terra (ou y < 3); não exige que a própria seja terra. Em y = 0 grava 0x18 e chama `_MakeNewHoleB(x)`; senão grava `Sk(8)`. Acumula sempre nos totais (mesmo recavando), alisa e refaz `Saída`. Devolve 1 se cavou. A regra "terra em cima e embaixo" faz túneis de uma célula de altura.
+**`_DigTileThemB(x, y)`** (`1020:22d4`), used by the worker: only digs if `0 < x < 63`, if the cell below is dirt (or y > 62) and the cell above is dirt (or y < 3); it does not require the cell itself to be dirt. At y = 0 it writes 0x18 and calls `_MakeNewHoleB(x)`; otherwise it writes `Sk(8)`. It always accumulates into the totals (even when re-digging), smooths and rebuilds `Exit`. Returns 1 if it dug. The "dirt above and below" rule makes tunnels one cell high.
 
-**`_SmoothEdgesB/R`** (`1020:255a`/`26e4`): regra em [tiles-valores.md](tiles-valores.md#ninhos-_mapb-_mapr). Detalhes que importam para o 1:1:
+**`_SmoothEdgesB/R`** (`1020:255a`/`26e4`): rule in [tiles-valores.md](tiles-valores.md#nests-_mapb-_mapr). Details that matter for 1:1:
 
-- y > 63 ou x fora de 0..63: nada. y = 0: se `Mapa[x][0]` ≤ 0x2F, vira 0x18 (abre a superfície acima de qualquer escavação na linha 1). y < 0 (chamada com y−1 = −1) não é filtrado [só acontece se alguém cavar y = 0 com `_DigTileB`].
-- Em y = 1 o vizinho de cima conta sempre como sólido.
-- Só sorteia (`Sk(8)`) quando a célula de terra fica sem nenhum vizinho sólido e não está inundada.
+- y > 63 or x outside 0..63: nothing. y = 0: if `Map[x][0]` ≤ 0x2F, it becomes 0x18 (opens the surface above any dig on row 1). y < 0 (called with y−1 = −1) is not filtered [only happens if someone digs y = 0 with `_DigTileB`].
+- At y = 1 the upper neighbor always counts as solid.
+- It only draws (`Sk(8)`) when the dirt cell is left with no solid neighbor and is not flooded.
 
-### 7.4 Mapa de saída: `_FixExitMapB` (`1020:284e`) / `_FixExitMapR` (`1020:2914`)
-
-```
-se y < 2: Saída[x][y] = (Mapa[x][y] == 0x18) ? 0xFF : 0xFE
-senão: m = maior Saída entre as 8 vizinhas dentro do mapa; Saída[x][y] = (m == 0) ? 0 : m − 1
-```
-
-- Atualiza **uma** célula, sem propagar. Quem chama: toda escavação (`_DigTile*`, `_DigTileTheme*`), `_PlaceEggB` (via `_DigTileB`), e a operária em Dig In com chance 1/4 depois de cada passo. A linha 0 começa toda em 0xFF na geração.
-- **Verificado no `QUICK2.ANT`**: a câmara da rainha preta tem `_ExitMapB` (34, 9) = 0xF6, (35, 9) = 0xF5, (36, 9) = 0xF4; a vermelha tem (39, 11) = 0xF4, (40, 11) = 0xF3, mas (41, 11) = 0. A diferença é explicada pela regra: (41, 11) foi cavada primeiro, sem vizinho com valor, e nunca recalculada; (36, 9) recebeu ovos (`_PlaceEggB` → `_DigTileB` → `_FixExitMapB`), que a recalcularam (máximo vizinho 0xF5 − 1).
-
-### 7.5 Buracos na superfície
-
-- `_MakeNewHoleB(c)` (`1020:1b06`) e `_MakeNewHoleR(c)` (`1020:1d02`): regra completa em [geracao-mundo.md](geracao-mundo.md#3a-buracos-de-entrada-_makenewholebc-10201b06-e-_makenewholerc-10201d02). Em jogo, são chamadas por `_GetOutB/R` (primeira saída por uma abertura nova), `_DigTileThemB/R` em y = 0 e pela escavação da amarela (`_DigMyTile`). Sorteios: `S(31)` e nada mais no quintal; depois `_DigTileB(c, 1)` (B) ou a escavação embutida (R).
-- `_CreateNewHole(x, y)` (`1020:171a`), chamada por `_DigMyNewHole` (a amarela abre um buraco na superfície): exige 0 < x < 127 e 0 < y < 63. Quintal: `_MapA` = 0x50 com borda (tabela `DGROUP:0x230c`); casa: `_MapA` = 0x59. Se x < 64: `_HoleMapB[y] = x`, `_DigTileB(y, 1)`, `_LastNewHoleB = (x, y)`, `_LastNewExitB = (y, 0)`. Senão: `_HoleMapR[y] = x`; se `_MapR[y][1]` é terra, `Sk(8)` e totais R; alisa (y, 0), (y+1, 1), (y, 2), (y−1, 1); `_FixExitMapR(y, 1)`; `_LastNewHoleR`/`_LastNewExitR`.
-
-### 7.6 Pôr um ovo: `_PlaceEggB` (`1020:1004`) / `_PlaceEggR` (`1020:1068`)
-
-Se a lista tem < 500 entradas e 0 ≤ x ≤ 63, 1 ≤ y ≤ 63: `_DigTileB(x, y)` (cava se for terra; sorteios da seção 7.3), acrescenta (x, y, T = estágio, M = 8, S = 0) e grava `Vida[x][y]`. Não testa ocupação.
-
-### 7.7 Passagem entre ninhos (só vermelhas indo para o ninho preto)
-
-As células 0x14 existem nos dois mapas, na mesma (x, y) (7.3). Em `_DoDigInR`, se depois de andar a operária ou soldado vermelho estiver numa célula 0x14:
+### 7.4 Exit map: `_FixExitMapB` (`1020:284e`) / `_FixExitMapR` (`1020:2914`)
 
 ```
-T_R = 0; Vida_R[n] = 0
-novo T = ((T & 0x7F) < 0x30) ? 0x90 + Sk(8) : 0xB0 + Sk(8)    (operária ou soldado vermelho, direção sorteada; perde a carga)
-_AddAntToBList(n, novo T, M = 3, S = 0); _LifeB[n] = novo T
+if y < 2: Exit[x][y] = (Map[x][y] == 0x18) ? 0xFF : 0xFE
+else: m = largest Exit among the 8 neighbors inside the map; Exit[x][y] = (m == 0) ? 0 : m − 1
 ```
 
-(O M = 3 e o S = 0 vêm da desmontagem, `1028:71ef`.) No ninho preto, como invasora com M = 3, ela segue o mapa de saída até sair (3.2). Não há caminho inverso: pretas nunca usam a passagem.
+- Updates **one** cell, without propagating. Callers: every dig (`_DigTile*`, `_DigTileTheme*`), `_PlaceEggB` (via `_DigTileB`), and the worker in Dig In with chance 1/4 after each step. Row 0 starts entirely at 0xFF at generation.
+- **Verified in `QUICK2.ANT`**: the black queen's chamber has `_ExitMapB` (34, 9) = 0xF6, (35, 9) = 0xF5, (36, 9) = 0xF4; the red one has (39, 11) = 0xF4, (40, 11) = 0xF3, but (41, 11) = 0. The difference is explained by the rule: (41, 11) was dug first, with no neighbor having a value, and never recomputed; (36, 9) received eggs (`_PlaceEggB` → `_DigTileB` → `_FixExitMapB`), which recomputed it (largest neighbor 0xF5 − 1).
+
+### 7.5 Holes on the surface
+
+- `_MakeNewHoleB(c)` (`1020:1b06`) and `_MakeNewHoleR(c)` (`1020:1d02`): full rule in [geracao-mundo.md](geracao-mundo.md#3a-entrance-holes-_makenewholebc-10201b06-and-_makenewholerc-10201d02). In play, they are called by `_GetOutB/R` (first exit through a new opening), `_DigTileThemB/R` at y = 0 and by the yellow ant's digging (`_DigMyTile`). Random draws: `S(31)` and nothing else in the yard; then `_DigTileB(c, 1)` (B) or the inlined digging (R).
+- `_CreateNewHole(x, y)` (`1020:171a`), called by `_DigMyNewHole` (the yellow ant opens a hole on the surface): requires 0 < x < 127 and 0 < y < 63. Yard: `_MapA` = 0x50 with border (table `DGROUP:0x230c`); house: `_MapA` = 0x59. If x < 64: `_HoleMapB[y] = x`, `_DigTileB(y, 1)`, `_LastNewHoleB = (x, y)`, `_LastNewExitB = (y, 0)`. Else: `_HoleMapR[y] = x`; if `_MapR[y][1]` is dirt, `Sk(8)` and R totals; smooths (y, 0), (y+1, 1), (y, 2), (y−1, 1); `_FixExitMapR(y, 1)`; `_LastNewHoleR`/`_LastNewExitR`.
+
+### 7.6 Laying an egg: `_PlaceEggB` (`1020:1004`) / `_PlaceEggR` (`1020:1068`)
+
+If the list has < 500 entries and 0 ≤ x ≤ 63, 1 ≤ y ≤ 63: `_DigTileB(x, y)` (digs if it is dirt; random draws from section 7.3), appends (x, y, T = stage, M = 8, S = 0) and writes `Life[x][y]`. It does not test occupancy.
+
+### 7.7 Passage between nests (only red ants going to the black nest)
+
+The 0x14 cells exist in both maps, at the same (x, y) (7.3). In `_DoDigInR`, if after walking the red worker or soldier is on a 0x14 cell:
+
+```
+T_R = 0; Life_R[n] = 0
+new T = ((T & 0x7F) < 0x30) ? 0x90 + Sk(8) : 0xB0 + Sk(8)    (red worker or soldier, random direction; loses its load)
+_AddAntToBList(n, new T, M = 3, S = 0); _LifeB[n] = new T
+```
+
+(The M = 3 and S = 0 come from the disassembly, `1028:71ef`.) In the black nest, as an invader with M = 3, it follows the exit map until it leaves (3.2). There is no reverse path: black ants never use the passage.
 
 ### 7.8 `_FloodNestB` (`1020:29da`)
 
-Para todo x e y = 3..63: terra 0x20–0x2D soma 0x31; valor < 0x14 vira 0x50. **Sem chamador**; os valores (0x50, +0x31) não batem com a inundação real (seção 8). [hipótese: resto de versão antiga]
+For every x and y = 3..63: dirt 0x20–0x2D adds 0x31; a value < 0x14 becomes 0x50. **No caller**; the values (0x50, +0x31) do not match the real flooding (section 8). [hypothesis: leftover from an old version]
 
-## 8. Água
+## 8. Water
 
-### 8.1 `_DoWater` (`1020:07c6`), todo tick
+### 8.1 `_DoWater` (`1020:07c6`), every tick
 
 ```
-se _RainOn ≠ 0 e _TERRAINset == 0:                         (chovendo no quintal)
-    se S(50) == 0: som 0x29
+if _RainOn ≠ 0 and _TERRAINset == 0:                       (raining in the yard)
+    if S(50) == 0: sound 0x29
     _ClearRainFlag = 1
-    se S(10) == 0 e _WaterTable > 4:
+    if S(10) == 0 and _WaterTable > 4:
         _WaterTable −= 1; w = _WaterTable
         _DrownBList(w); _DrownRList(w)
-        para x = 0..63: _MapB[x][w] = (_MapB < 0x20) ? 0x4E : _MapB + 0x2F
-                        _MapR[x][w] = (_MapR < 0x20) ? 0x4E : _MapR + 0x2F
-    para i = 0..99: gotas na superfície (abaixo)
-senão se _TERRAINset == 0:                                  (seco, no quintal)
-    se _ClearRainFlag == 1: _ClearRainFlag = 0; para i = 0..99: se _MapA da gota i ∈ 0x74..0x77: = S(14)
-    se _WaterTable < 64 e S(10) == 0:                       (S(10) só se < 64)
+        for x = 0..63: _MapB[x][w] = (_MapB < 0x20) ? 0x4E : _MapB + 0x2F
+                       _MapR[x][w] = (_MapR < 0x20) ? 0x4E : _MapR + 0x2F
+    for i = 0..99: drops on the surface (below)
+else if _TERRAINset == 0:                                   (dry, in the yard)
+    if _ClearRainFlag == 1: _ClearRainFlag = 0; for i = 0..99: if _MapA of drop i ∈ 0x74..0x77: = S(14)
+    if _WaterTable < 64 and S(10) == 0:                     (S(10) only if < 64)
         w = _WaterTable
-        para x = 0..63: _MapB[x][w] = (_MapB == 0x4E) ? S(8) : _MapB − 0x2F
-                        _MapR[x][w] = (_MapR == 0x4E) ? S(8) : _MapR − 0x2F    (B e R alternados por coluna)
+        for x = 0..63: _MapB[x][w] = (_MapB == 0x4E) ? S(8) : _MapB − 0x2F
+                       _MapR[x][w] = (_MapR == 0x4E) ? S(8) : _MapR − 0x2F    (B and R alternating per column)
         _WaterTable += 1
-(na casa, nada)
+(in the house, nothing)
 ```
 
-Gotas (superfície; detalhe em `superficie.md`): para cada i, na célula (`_RxTab[i]`, `_RyTab[i]`) (`9:79e6`/`9:7a72`): se o valor é 0x74–0x76, soma 1 (a poça cresce); senão, se é 0x77 vira `S(14)`, e em seguida `_PlaceDrop(i)` sorteia nova posição com **`RR(128)` e depois `RR(64)`** (gerador R); se ali o valor for < 0x0E, vira 0x74 e o cheiro daquela célula 2×2 é lavado (`_PherMapA`, `_PherMapF`, `_PherMapBT`, `_PherMapRT` = 0; `_PherMapBN`, `_PherMapRN` −20, mínimo 0).
+Drops (surface; details in `superficie.md`): for each i, at cell (`_RxTab[i]`, `_RyTab[i]`) (`9:79e6`/`9:7a72`): if the value is 0x74–0x76, add 1 (the puddle grows); otherwise, if it is 0x77 it becomes `S(14)`, and then `_PlaceDrop(i)` draws a new position with **`RR(128)` and then `RR(64)`** (R generator); if the value there is < 0x0E, it becomes 0x74 and the scent of that 2×2 cell is washed away (`_PherMapA`, `_PherMapF`, `_PherMapBT`, `_PherMapRT` = 0; `_PherMapBN`, `_PherMapRN` −20, minimum 0).
 
-Consequências:
+Consequences:
 
-- A água sobe uma linha por vez, de baixo (y = 63) para cima, com chance 1/10 por tick de chuva, até y = 4. As linhas 0–3 nunca inundam. Ao secar, desce de cima para baixo, com chance 1/10 por tick seco.
-- Comida guardada (0x10–0x13) numa linha inundada vira 0x4E e, ao secar, túnel `S(8)`: **a comida se perde**, sem baixar `_FoodB`.
-- Túnel inundado (0x4E) é intransponível (`MOVER` exige < 0x1C; `PASSO` exige < 0x30). Ovos e rainha numa linha inundada não se afogam.
+- The water rises one row at a time, from the bottom (y = 63) upward, with chance 1/10 per rain tick, up to y = 4. Rows 0–3 never flood. When drying, it goes down from top to bottom, with chance 1/10 per dry tick.
+- Stored food (0x10–0x13) on a flooded row becomes 0x4E and, when drying, tunnel `S(8)`: **the food is lost**, without lowering `_FoodB`.
+- A flooded tunnel (0x4E) is impassable (`MOVE` requires < 0x1C; `STEP` requires < 0x30). Eggs and queen on a flooded row do not drown.
 
 ### 8.2 `_DrownBList(w)` (`1020:2d16`) / `_DrownRList` (`1020:2d66`)
 
-Para cada formiga da lista (de trás para frente) com Y = w, T ≠ 0 e grupo 1..11: M = 17. Ficam de fora ovos (grupo 0), rainha (12, 13) e nuvens (14, 15). Vale para donas e invasoras.
+For each ant in the list (back to front) with Y = w, T ≠ 0 and group 1..11: M = 17. Excluded are eggs (group 0), queen (12, 13) and clouds (14, 15). Applies to owners and invaders.
 
-### 8.3 AFOGANDO (M = 17; `_DoDrownB` embutido)
+### 8.3 DROWNING (M = 17; `_DoDrownB` inlined)
 
-Só a formiga dona chega aqui (a invasora ignora M = 17 e segue saindo):
-
-```
-se Mapa[pos] ≤ 0x13: M = _GetNewModeB(grupo); FIM               (já não está na água)
-r = S(3); T = (T & 0xF8) | ((T + r − 1) & 7); Vida[pos] = T      (gira −1, 0 ou +1)
-se S(100) == 0: Vida[pos] = 0; T = 0; conta morte: _RAntsExpired se T era vermelha, senão _BAntsExpired
-```
-
-Ela não anda (túnel inundado é intransponível) e morre com chance 1/100 por tick até a água baixar.
-
-`_AddWater(w)` (`1020:0b8a`) e `_DropWater(w)` (`1020:0c54`) são o mesmo código de inundar/secar uma linha, em função separada, **sem chamador**.
-
-### 8.4 Como a chuva se comporta no ninho e nos túneis (resumo para o jogador)
-
-Pergunta do usuário (2026-10-18): "Como a chuva deve se comportar no ninho? No momento ela acumula no fundo da terra e aparenta não ter efeito no ninho" e "Qual é o comportamento da chuva nos túneis?". Resposta, a partir de 8.1–8.3 (código) e das capturas abaixo:
-
-- **A água vem de baixo, como um lençol freático.** Enquanto chove, em cada tick há 1 chance em 10 de a água subir **uma linha inteira** dos dois ninhos (`_WaterTable` −1), começando na linha 63 (o fundo) e no máximo até a linha 4 (as linhas 0–3 nunca inundam). Uma chuva dura `S(150) + 150` ticks (150–299, quintal.md §2): em média a água sobe 15 a 30 linhas, isto é, **fica na metade de baixo do ninho**. Quando a chuva acaba, a água desce uma linha a cada ~10 ticks secos, de cima para baixo. Por isso o comportamento observado ("acumula no fundo") é o do original: na maior parte das chuvas a água não chega aos túneis, que costumam ficar perto da superfície. Só chuvas seguidas (a água não teve tempo de baixar) ou longas a levam até lá.
-- **Terra inundada quase não muda de cor.** A terra de uma linha inundada passa de 0x20–0x2D para 0x4F–0x5C (+0x2F), desenhada quase igual à terra seca (azul-escuro pontilhado); o que se vê de longe é **o túnel inundado, azul-claro** (0x4E). Sem túnel na linha, a subida da água praticamente não aparece.
-- **Túnel inundado (0x4E) vira parede de água:** nenhuma formiga entra nele (`MOVER` exige < 0x1C e `PASSO` < 0x30). A colônia perde a parte de baixo do ninho até a água descer; ao secar, o túnel volta como túnel comum (`S(8)`: um dos tiles de túnel vazio).
-- **Formigas:** no tick em que a linha delas inunda, as operárias, soldados e reprodutores (grupos 1–11) dessa linha entram em **AFOGANDO** (M = 17): não andam, giram no lugar (direção −1, 0 ou +1 por tick) e **morrem com chance 1/100 por tick**, contadas como mortas (`_BAntsExpired`/`_RAntsExpired`); se a água baixar antes, voltam ao trabalho. Formigas que entram em linha já inundada não se afogam (o tile as barra). Invasoras ignoram o afogamento e seguem saindo. Não há fuga: só a água descendo as salva.
-- **Ovos, larvas, pupas e rainha não se afogam** (grupos 0, 12, 13 ficam fora de `_DrownBList`), mesmo debaixo d'água; mas ficam ilhados (as operárias não chegam a eles pelo túnel inundado).
-- **Comida guardada** (0x10–0x13) numa linha que inunda vira água e, ao secar, túnel vazio: **a comida se perde**, sem baixar `_FoodB`.
-- **A amarela** numa célula inundada do ninho perde 1 de vida por tick; com vida 0 por mais de 99 ticks, morre **afogada** (código 7, formiga-amarela.md §3, §9).
-- **Na superfície**, as gotas viram poças (tiles 0x74–0x77) que crescem e somem e **lavam o cheiro** da célula 2×2 (trilhas, alarme, comida; o cheiro do ninho cai 20): as trilhas de comida se perdem na chuva (§8.1, quintal.md §9.2).
-
-**Verificado no original (bancada QEMU, 2026-10-18, `cenarios_tick.py gravar tela_chuva`, snapshot `rico`, `_RainCnt` = 2000):** com a água na linha 25, o ninho preto do `rico` (túneis nas linhas 0–12) aparece igual ao seco; com a água na linha 4 (depois de ~300 ticks de chuva), os túneis abaixo da linha 4 estão azul-claros e a terra continua azul-escura. O port desenha os mesmos estados (`chuva_ninho_preto_meio.ANT`, `chuva_ninho_preto.ANT` abertos com `--save`) igual: túneis inundados azul-claros a partir da mesma linha. Os efeitos de regra (linhas, afogamento, comida) já eram conferidos pelo caso Q-01 e pelos vetores de tick (quintal.md §9, Q-U8). Capturas em `re_trabalho/a51/chuva2/` (fora do git).
-
-## 9. Invasoras
-
-### 9.1 Atacar o ninho: `_RaidInB` (`1028:3524`) / `_RaidInR` (`1028:5b2a`) (invasora com M = 7)
+Only the owner ant gets here (the invader ignores M = 17 and keeps leaving):
 
 ```
-se Mapa[pos] ∈ 0x10..0x13:                                   (achou comida)
-    tira uma unidade (0x10 → Sk(8)); _FoodB −= 1 se > 0      (_FoodB do ninho invadido)
-    M = 3; T = T OR 8; Vida[pos] = T                          (passa a "com comida"; vai sair)
-senão:
+if Map[pos] ≤ 0x13: M = _GetNewModeB(group); END                 (no longer in the water)
+r = S(3); T = (T & 0xF8) | ((T + r − 1) & 7); Life[pos] = T      (turns −1, 0 or +1)
+if S(100) == 0: Life[pos] = 0; T = 0; counts death: _RAntsExpired if T was red, else _BAntsExpired
+```
+
+It does not walk (a flooded tunnel is impassable) and dies with chance 1/100 per tick until the water goes down.
+
+`_AddWater(w)` (`1020:0b8a`) and `_DropWater(w)` (`1020:0c54`) are the same row flood/dry code, in a separate function, **with no caller**.
+
+### 8.4 How rain behaves in the nest and in the tunnels (summary for the player)
+
+User's question (2026-10-18): "How should rain behave in the nest? Right now it accumulates at the bottom of the dirt and seems to have no effect on the nest" and "What is the behavior of rain in the tunnels?". Answer, based on 8.1–8.3 (code) and the captures below:
+
+- **Water comes from below, like a water table.** While it rains, each tick there is a 1 in 10 chance of the water rising **a whole row** of both nests (`_WaterTable` −1), starting at row 63 (the bottom) and at most up to row 4 (rows 0–3 never flood). A rain lasts `S(150) + 150` ticks (150–299, quintal.md §2): on average the water rises 15 to 30 rows, that is, **it stays in the lower half of the nest**. When the rain ends, the water goes down one row every ~10 dry ticks, from top to bottom. That is why the observed behavior ("accumulates at the bottom") is that of the original: in most rains the water does not reach the tunnels, which tend to be near the surface. Only back-to-back rains (the water had no time to go down) or long ones bring it there.
+- **Flooded dirt barely changes color.** The dirt of a flooded row goes from 0x20–0x2D to 0x4F–0x5C (+0x2F), drawn almost the same as dry dirt (dotted dark blue); what you see from afar is **the flooded tunnel, light blue** (0x4E). With no tunnel on the row, the rising water is practically invisible.
+- **A flooded tunnel (0x4E) becomes a wall of water:** no ant enters it (`MOVE` requires < 0x1C and `STEP` < 0x30). The colony loses the lower part of the nest until the water goes down; when it dries, the tunnel comes back as an ordinary tunnel (`S(8)`: one of the empty tunnel tiles).
+- **Ants:** on the tick their row floods, the workers, soldiers and breeders (groups 1–11) on that row enter **DROWNING** (M = 17): they do not walk, they turn in place (direction −1, 0 or +1 per tick) and **die with chance 1/100 per tick**, counted as dead (`_BAntsExpired`/`_RAntsExpired`); if the water goes down first, they go back to work. Ants that enter an already flooded row do not drown (the tile blocks them). Invaders ignore drowning and keep leaving. There is no escape: only the water going down saves them.
+- **Eggs, larvae, pupae and queen do not drown** (groups 0, 12, 13 are left out of `_DrownBList`), even under water; but they are stranded (the workers cannot reach them through the flooded tunnel).
+- **Stored food** (0x10–0x13) on a row that floods becomes water and, when drying, empty tunnel: **the food is lost**, without lowering `_FoodB`.
+- **The yellow ant** in a flooded nest cell loses 1 health per tick; with health 0 for more than 99 ticks, it dies **drowned** (code 7, formiga-amarela.md §3, §9).
+- **On the surface**, the drops become puddles (tiles 0x74–0x77) that grow and vanish and **wash away the scent** of the 2×2 cell (trails, alarm, food; the nest scent drops by 20): food trails are lost in the rain (§8.1, quintal.md §9.2).
+
+**Verified against the original (QEMU bench, 2026-10-18, `cenarios_tick.py gravar tela_chuva`, snapshot `rico`, `_RainCnt` = 2000):** with the water at row 25, the black nest of `rico` (tunnels on rows 0–12) looks the same as when dry; with the water at row 4 (after ~300 rain ticks), the tunnels below row 4 are light blue and the dirt stays dark blue. The port draws the same states (`chuva_ninho_preto_meio.ANT`, `chuva_ninho_preto.ANT` opened with `--save`) identically: flooded tunnels light blue from the same row. The rule effects (rows, drowning, food) were already checked by case Q-01 and by the tick vectors (quintal.md §9, Q-U8). Captures in `re_trabalho/a51/chuva2/` (outside git).
+
+## 9. Invaders
+
+### 9.1 Raiding the nest: `_RaidInB` (`1028:3524`) / `_RaidInR` (`1028:5b2a`) (invader with M = 7)
+
+```
+if Map[pos] ∈ 0x10..0x13:                                    (found food)
+    removes one unit (0x10 → Sk(8)); _FoodB −= 1 if > 0      (_FoodB of the invaded nest)
+    M = 3; T = T OR 8; Life[pos] = T                          (becomes "with food"; will leave)
+else:
     r = S(3)
-    se não MOVER((T + r − 2) & 7):                            (gira 0, −1 ou −2)
-        d = _GetEnterDirB(pos, dir); se d < 0: d = S(8)
-        se não MOVER(d): M = 1; Vida[pos] = T                 (desiste; com M ≠ 7 passa a sair)
+    if not MOVE((T + r − 2) & 7):                             (turns 0, −1 or −2)
+        d = _GetEnterDirB(pos, dir); if d < 0: d = S(8)
+        if not MOVE(d): M = 1; Life[pos] = T                  (gives up; with M ≠ 7 it starts leaving)
 ```
 
-Note `S(8)` (resto) e não `Sk(8)` aqui; os dois dão um passo do gerador.
+Note `S(8)` (remainder) and not `Sk(8)` here; both take one step of the generator.
 
-### 9.2 SAIR_DO_NINHO (invasora; `_RaidOutB` embutido)
-
-```
-e = _GetExitDirB(pos, 8)                                     (nenhuma direção excluída)
-se não MOVER(e ≠ 0 ? e − 1 : Sk(8)):
-    se não MOVER(Sk(8)): Vida[pos] = T
-```
-
-### 9.3 Ficar no ninho vermelho: `_StayInR` (`1028:5c16`)
-
-Preta em Defense (M = 6) no ninho vermelho, com a amarela também lá (`_MePlane` = 3):
+### 9.2 LEAVE_NEST (invader; `_RaidOutB` inlined)
 
 ```
-se Mapa[pos] ∈ 0x10..0x13: rouba uma unidade (_FoodR); M = 3; T = T OR 8
-senão:
+e = _GetExitDirB(pos, 8)                                     (no direction excluded)
+if not MOVE(e ≠ 0 ? e − 1 : Sk(8)):
+    if not MOVE(Sk(8)): Life[pos] = T
+```
+
+### 9.3 Staying in the red nest: `_StayInR` (`1028:5c16`)
+
+Black ant in Defense (M = 6) in the red nest, with the yellow ant also there (`_MePlane` = 3):
+
+```
+if Map[pos] ∈ 0x10..0x13: steals one unit (_FoodR); M = 3; T = T OR 8
+else:
     r = S(3); d = (T + r − 2) & 7; T = (T & 0xF8) | d
-    se MOVER(d): FIM
-    d2 = _GetEnterDirR(pos, dir); se d2 < 0: d2 = S(8)
-    se MOVER(d2): FIM
-Vida[pos] = T
+    if MOVE(d): END
+    d2 = _GetEnterDirR(pos, dir); if d2 < 0: d2 = S(8)
+    if MOVE(d2): END
+Life[pos] = T
 ```
 
-## 10. Pré-voo e descanso
+## 10. Pre-flight and rest
 
-**PRÉ-VOO** (M = 14):
-
-```
-se Sk(32) == 0: M = _GetNewModeB(grupo)
-se não LUTA_PRÓPRIA_CÉLULA(): TENTA(dir)
-se _FlyAwayB > 100: M = 15                                    (R: _FlyAwayR)
-```
-
-**DESCANSO** (M = 13; `_DoRestB`):
+**PRE-FLIGHT** (M = 14):
 
 ```
-se LUTA_PRÓPRIA_CÉLULA(): FIM
-Vida[pos] = T
-se S(20) ≠ 0: balão de descanso se _OptionStates[5] (B: == 1; R: ≠ 0); FIM
-M = _GetNewMode(grupo, T)
+if Sk(32) == 0: M = _GetNewModeB(group)
+if not FIGHT_OWN_CELL(): TRY(dir)
+if _FlyAwayB > 100: M = 15                                    (R: _FlyAwayR)
 ```
 
-A formiga descansando não anda e regrava a própria célula em `Vida` a cada tick.
+**REST** (M = 13; `_DoRestB`):
 
-## 11. Diferenças entre o ninho vermelho e o preto
+```
+if FIGHT_OWN_CELL(): END
+Life[pos] = T
+if S(20) ≠ 0: rest balloon if _OptionStates[5] (B: == 1; R: ≠ 0); END
+M = _GetNewMode(group, T)
+```
 
-| Ponto | Ninho preto (B) | Ninho vermelho (R) |
+The resting ant does not walk and rewrites its own cell in `Life` every tick.
+
+## 11. Differences between the red nest and the black nest
+
+| Point | Black nest (B) | Red nest (R) |
 |---|---|---|
-| Novo modo | `_GetNewModeB`: com `_ModeAuto` = 0, operária/soldado usam `_ModeMe` (triângulo do jogador) | `_GetNewModeR`: sempre `_ModeTabWB/SB[_StrategicModeR][Sk(8)]` |
-| Defense (6) | fica no ninho se a amarela está nele (4.2) | sempre sai |
-| Nesting (1) | leva o ovo ao fundo, guarda o estágio | larga ao acaso (1/4), estágio volta a 2 (5.4) |
-| Dig In, terra não cavável | `M = _GetNewModeB(grupo)` | `M = 0` |
-| Dig In, célula 0x14 | nada | vai para o ninho preto (7.7) |
-| Dig In/Dig Out, mordida no estoque | célula nova | célula antiga |
-| Dig Out bloqueado | `Saída[pos] −= 1` sem teste (0 → 0xFF) | só se ≠ 0 |
-| Trofalaxia em `MOVER` | sim | não |
-| Teste da amarela na checagem de luta | antes do teste de inimiga | depois |
-| Invasora na própria célula | teste da amarela preta; roubo de ovo conta `_TotalEggsDiedB` | sem teste da amarela; roubo sem contador; ovo preto (T < 8) é destruído |
-| Invasora em M = 6 | sai | `_StayInR` se a amarela está no ninho vermelho |
-| Fim da luta, vencedora da cor do ninho | `_GetNewMode(grupo, T)` | tabela `VitóriaR` (4.4) |
-| `_DecEat` | respeita `_AlwaysHealthy` | não |
-| Balões (descanso, luta) | `_OptionStates[5] == 1` | `≠ 0` |
-| Ovos, rainha | [ciclo-de-vida.md](ciclo-de-vida.md#9-diferenças-vermelho--preto) | |
+| New mode | `_GetNewModeB`: with `_ModeAuto` = 0, worker/soldier use `_ModeMe` (the player's triangle) | `_GetNewModeR`: always `_ModeTabWB/SB[_StrategicModeR][Sk(8)]` |
+| Defense (6) | stays in the nest if the yellow ant is in it (4.2) | always leaves |
+| Nesting (1) | carries the egg to the bottom, keeps the stage | drops at random (1/4), stage goes back to 2 (5.4) |
+| Dig In, undiggable dirt | `M = _GetNewModeB(group)` | `M = 0` |
+| Dig In, 0x14 cell | nothing | goes to the black nest (7.7) |
+| Dig In/Dig Out, bite from the store | new cell | old cell |
+| Dig Out blocked | `Exit[pos] −= 1` without test (0 → 0xFF) | only if ≠ 0 |
+| Trophallaxis in `MOVE` | yes | no |
+| Yellow ant test in the fight check | before the enemy test | after |
+| Invader in its own cell | black yellow-ant test; egg theft counts `_TotalEggsDiedB` | no yellow-ant test; theft without counter; black egg (T < 8) is destroyed |
+| Invader in M = 6 | leaves | `_StayInR` if the yellow ant is in the red nest |
+| End of fight, winner of the nest's color | `_GetNewMode(group, T)` | `VitóriaR` table (4.4) |
+| `_DecEat` | respects `_AlwaysHealthy` | no |
+| Balloons (rest, fight) | `_OptionStates[5] == 1` | `≠ 0` |
+| Eggs, queen | [ciclo-de-vida.md](ciclo-de-vida.md#9-red--black-differences) | |
 
-## 12. Funções presentes mas não chamadas
+## 12. Functions present but not called
 
-Sem chamador no pseudocódigo (o mesmo código está embutido em outra rotina): `_DoRestB/R`, `_DoDrownB/R`, `_DoRandB/R`, `_DoRecruitN`, `_RaidOutB/R`, `_LeaveNestB`, `_TryEatFoodB/R`, `_EatFoodB/R`, `_StealFoodB/R`, `_PickupFoodB/R`, `_MakeNewTailB/R`, `_KillTailB/R`, `_FloodNestB`, `_AddWater`, `_DropWater`, `_FoodFall`. `_CheckNestFightB/R`, `_DropFoodB/R`, `_LostHeadB/R` e `_LostTailB/R` aparecem só na própria definição. O port deve implementar o comportamento embutido descrito aqui (há diferenças pequenas entre as funções soltas e o código embutido, por exemplo `_LeaveNestB`).
+No caller in the pseudocode (the same code is inlined in another routine): `_DoRestB/R`, `_DoDrownB/R`, `_DoRandB/R`, `_DoRecruitN`, `_RaidOutB/R`, `_LeaveNestB`, `_TryEatFoodB/R`, `_EatFoodB/R`, `_StealFoodB/R`, `_PickupFoodB/R`, `_MakeNewTailB/R`, `_KillTailB/R`, `_FloodNestB`, `_AddWater`, `_DropWater`, `_FoodFall`. `_CheckNestFightB/R`, `_DropFoodB/R`, `_LostHeadB/R` and `_LostTailB/R` appear only in their own definition. The port must implement the inlined behavior described here (there are small differences between the standalone functions and the inlined code, for example `_LeaveNestB`).
 
-## 13. Casos de teste contra o original
+## 13. Test cases against the original
 
-Bancada: [../../bancada-qemu.md](../../bancada-qemu.md#casos-de-teste-injetar-um-save-e-rodar). Ela injeta e carrega saves editados, lê o estado inteiro da memória e escreve variáveis (`escrever_variavel`), mas o estado dos geradores **não** vai para o save (e é perdido no load; ver [rng.md](rng.md#a-semente-está-no-save)). Por isso os casos abaixo são de três tipos: **D** = determinístico (não depende do sorteio), **E** = estatístico (repetir e comparar proporções), **P** = comparação com o port rodando o mesmo `.ANT` com a mesma semente forçada.
+Test bench: [../../bancada-qemu.md](../../bancada-qemu.md#casos-de-teste-injetar-um-save-e-rodar). It injects and loads edited saves, reads the whole state from memory and writes variables (`escrever_variavel`), but the generators' state does **not** go into the save (and is lost on load; see [rng.md](rng.md#is-the-seed-in-the-save)). That is why the cases below are of three types: **D** = deterministic (does not depend on the random draw), **E** = statistical (repeat and compare proportions), **P** = comparison with the port running the same `.ANT` with the same forced seed.
 
-### 13.1 Como montar a entrada
+### 13.1 How to build the input
 
-- Partir de `tests/referencias/saves/QUICK2.ANT` (tick 78) e descrever a edição num caso JSON em `tests/referencias/casos/` (operações de `tools/ant_editar.py`: escalares, células, formigas com `ListIndex`). `tools/caso_ant.py rodar CASO.json` injeta o save num disquete, carrega pelo File > Load, tira a pausa, roda até o `GameTime` alvo, pausa, lê o estado da memória (sem precisar salvar) e confere.
-- O load deixa o jogo **pausado** (`_GamePaused` = 1) e **reconta** `_CastePopB/R`, `_BpopT/_RpopT` pelas listas [observado na bancada, 2026-10-16]: populações não podem ser forçadas pelo arquivo, só pelas listas.
-- **No load o original refaz `_LifeB/R` a partir das listas** (`_DoLoadInitializations` `1010:9dbe`), do índice `_ListIndexB` (inclusive: a vaga logo depois da última também é escrita) até 0. Quando duas formigas estão na mesma célula, a de **menor índice** fica em `Vida`. Zere a vaga `_ListIndexB` para não criar ocupante fantasma.
-- Compare por `_GameTime` (offset 45740), nunca por tempo de relógio.
+- Start from `tests/referencias/saves/QUICK2.ANT` (tick 78) and describe the edit in a JSON case in `tests/referencias/casos/` (operations of `tools/ant_editar.py`: scalars, cells, ants with `ListIndex`). `tools/caso_ant.py rodar CASO.json` injects the save into a floppy disk, loads it via File > Load, unpauses, runs until the target `GameTime`, pauses, reads the state from memory (without needing to save) and checks.
+- Loading leaves the game **paused** (`_GamePaused` = 1) and **recounts** `_CastePopB/R`, `_BpopT/_RpopT` from the lists [observed on the test bench, 2026-10-16]: populations cannot be forced through the file, only through the lists.
+- **On load the original rebuilds `_LifeB/R` from the lists** (`_DoLoadInitializations` `1010:9dbe`), from index `_ListIndexB` (inclusive: the slot right after the last one is also written) down to 0. When two ants are in the same cell, the one with the **lowest index** stays in `Life`. Zero slot `_ListIndexB` to avoid creating a phantom occupant.
+- Compare by `_GameTime` (offset 45740), never by wall-clock time.
 
-### 13.2 Casos
+### 13.2 Cases
 
-| Id | Regra | Entrada | Esperado | Tipo |
+| Id | Rule | Input | Expected | Type |
 |---|---|---|---|---|
-| N-01 | morte natural (3.1) | QUICK2 com `_HealthB` = 0 e 40 operárias pretas (T 0x12, M 13, descansando) no túnel | perda média de 40 × (1/256) × (31/32) ≈ 0,15 formiga/tick (≈ 19 em 128 ticks); `_BAntsExpired` sobe igual. Com `_HealthB` = 31: nenhuma morte | E (e D para saúde 31) |
-| N-02 | rainha imune (3.1) | `_HealthB` = 0 | a rainha não morre por 3.1, só por fome (ciclo-de-vida) | D |
-| N-03 | sair do ninho (4.5, 4.6, 7.2) | uma operária preta T 0x12, M 2, em (32, 3) no túnel do QUICK2 | sobe a coluna 32 (`Saída` 0xFC → 0xFD → 0xFE) e aparece na lista A ao lado do buraco (3, 32) no 3º tick, com M = 2 e S = 120 | D (exceto a direção na superfície) |
-| N-04 | levar ovo ao fundo (5.1) | operária T 0x0A (carregando), M 1, S 1 em (32, 2) | desce pelo gradiente (32,3) → (31,4) → (30,5) → (31,6) → (32,7) → (33,8) → (34,9) → (35,9) → (36,9), o mínimo (0xF4); ali liga o bit 3 de S, dá um passo `Sk(8)` e no tick seguinte larga um ovo T = 1 onde estiver; ela vira grupo 2 com S = 8 | D até a câmara, E depois |
-| N-05 | ninho vermelho larga ao acaso (5.4) | vermelha T 0x8A, M 1 no túnel vermelho | o ovo largado tem T = 0x82, em qualquer célula do caminho | D (estágio), E (lugar) |
-| N-06 | comida dobrada (6.2) | operária preta T 0x1A (com comida), M 3, em (32, 3); `_FoodB` = 0 | ao fim, `_FoodB` = 2 e o mapa tem 2 unidades (0x11 numa célula, ou 0x10 em duas) | D no total |
-| N-07 | comer e saúde (6.1) | `_HealthB` = 50, `_EatCountB` = 0, `_BpopT` = 3, soldados 0; um soldado (T 0x32) M 1 preso numa célula 0x13 cercada de terra | cada mordida soma 5 a `_EatCountB`; como 5 > 3 >> 4 = 0, a saúde sobe 1 por mordida e o contador volta a 0; mordida com chance 49/100 por tick (`S(100)` > 50); a célula vai 0x13 → 0x12 → 0x11 → 0x10 → túnel; `_FoodB` desce até 0 | E |
-| N-08 | cavar (7.1, 7.3) | operária T 0x12, M 4 em (36, 9) | túneis novos têm uma célula de altura; a operária vira T 0x2x, M 5, depois volta a M 4; `_TilesDugB` e `_TileMassXB/YB` mudam como na fórmula | D na forma, E no traçado |
-| N-09 | decremento sem teste (7.2) | no ninho preto, `_ExitMapB` = 0 numa célula de túnel cercada de terra inundada (0x4F+) com uma operária M 2 nela | `_ExitMapB` da célula passa a 0xFF; no ninho vermelho, nas mesmas condições, fica 0 | D |
-| N-10 | inundação (8.1, 8.2, 8.3) | `_RainOn` = 1, `_RainCnt` = 600, `_WaterTable` = 64 | `_WaterTable` cai cerca de 1 a cada 10 ticks até 4; cada linha y = `_WaterTable` mostra 0x4E nos túneis e +0x2F na terra; formigas nela ficam com M = 17 e morrem ≈ 1 %/tick; ovos e rainha não mudam de M | E (ritmo), D (valores) |
-| N-11 | seca (8.1) | depois de N-10, chuva parada | linhas voltam de cima para baixo; comida que estava numa linha inundada some do mapa, `_FoodB` não muda | D |
-| N-12 | luta não remove a checadora (4.3) | ninho preto, mesma célula: vermelha T 0x92 M 0 num índice **menor** (fica em `_LifeB` no load) e preta T 0x12 M 13 (descanso) num índice maior | no primeiro tick a vermelha vira nuvem (T 0x70 ou 0xF0, M 10, S = vencedor) e a preta continua; ao fim (≈ 16 ticks) há 2 pretas (a preta venceu) ou 1 preta e 1 vermelha | D na estrutura, E no vencedor (≈ 50 %) |
-| N-13 | rainha atacada (3.2) | vermelha T 0x92 M 7 acrescentada no fim da lista B (índice 5), na célula da cabeça da rainha preta (34, 9) | no primeiro tick a cabeça vira nuvem de luta e a cauda (índice 1) some no mesmo tick; `_BlkQueens` = 0; a nuvem nunca volta a ser rainha; no próximo `_CountAnts` (tick ≡ 0 ou 64 mod 128) o Quick Game termina com derrota | D |
-| N-14 | passagem (7.7) | célula 0x14 em `_MapB` e `_MapR` em (20, 60), operária vermelha M 4 vizinha a ela no ninho vermelho | ao entrar em (20, 60) ela some da lista R e aparece na lista B com T 0x90–0x97, M 3 | D (exceto direção) |
-| N-15 | trofalaxia (4.1) | amarela no ninho preto com `_MeWantFood` = 1; vermelha invasora andando para a célula dela | a vermelha alimenta a amarela (o mesmo efeito de uma preta) | D |
-| N-16 | port, tick a tick | QUICK2, semente S forçada (no port) | o port, rodando a partir do QUICK2 com qualquer semente, deve manter os invariantes: T ∈ tipos válidos, `Vida` coerente com as listas, `_FoodB` muda só nas rotinas da seção 6 | P |
+| N-01 | natural death (3.1) | QUICK2 with `_HealthB` = 0 and 40 black workers (T 0x12, M 13, resting) in the tunnel | average loss of 40 × (1/256) × (31/32) ≈ 0.15 ant/tick (≈ 19 in 128 ticks); `_BAntsExpired` rises the same. With `_HealthB` = 31: no deaths | E (and D for health 31) |
+| N-02 | immune queen (3.1) | `_HealthB` = 0 | the queen does not die by 3.1, only by starvation (ciclo-de-vida) | D |
+| N-03 | leaving the nest (4.5, 4.6, 7.2) | a black worker T 0x12, M 2, at (32, 3) in the QUICK2 tunnel | climbs column 32 (`Exit` 0xFC → 0xFD → 0xFE) and appears in list A next to the hole (3, 32) on the 3rd tick, with M = 2 and S = 120 | D (except the direction on the surface) |
+| N-04 | carrying an egg to the bottom (5.1) | worker T 0x0A (carrying), M 1, S 1 at (32, 2) | descends the gradient (32,3) → (31,4) → (30,5) → (31,6) → (32,7) → (33,8) → (34,9) → (35,9) → (36,9), the minimum (0xF4); there it sets bit 3 of S, takes an `Sk(8)` step and on the next tick drops an egg T = 1 wherever it is; it becomes group 2 with S = 8 | D up to the chamber, E afterwards |
+| N-05 | red nest drops at random (5.4) | red T 0x8A, M 1 in the red tunnel | the dropped egg has T = 0x82, in any cell along the path | D (stage), E (place) |
+| N-06 | doubled food (6.2) | black worker T 0x1A (with food), M 3, at (32, 3); `_FoodB` = 0 | at the end, `_FoodB` = 2 and the map has 2 units (0x11 in one cell, or 0x10 in two) | D in total |
+| N-07 | eating and health (6.1) | `_HealthB` = 50, `_EatCountB` = 0, `_BpopT` = 3, soldiers 0; a soldier (T 0x32) M 1 stuck in a 0x13 cell surrounded by dirt | each bite adds 5 to `_EatCountB`; since 5 > 3 >> 4 = 0, health rises 1 per bite and the counter goes back to 0; bite with chance 49/100 per tick (`S(100)` > 50); the cell goes 0x13 → 0x12 → 0x11 → 0x10 → tunnel; `_FoodB` goes down to 0 | E |
+| N-08 | digging (7.1, 7.3) | worker T 0x12, M 4 at (36, 9) | new tunnels are one cell high; the worker becomes T 0x2x, M 5, then goes back to M 4; `_TilesDugB` and `_TileMassXB/YB` change as in the formula | D in shape, E in layout |
+| N-09 | untested decrement (7.2) | in the black nest, `_ExitMapB` = 0 on a tunnel cell surrounded by flooded dirt (0x4F+) with a worker M 2 on it | the cell's `_ExitMapB` becomes 0xFF; in the red nest, under the same conditions, it stays 0 | D |
+| N-10 | flooding (8.1, 8.2, 8.3) | `_RainOn` = 1, `_RainCnt` = 600, `_WaterTable` = 64 | `_WaterTable` drops about 1 every 10 ticks down to 4; each row y = `_WaterTable` shows 0x4E in the tunnels and +0x2F in the dirt; ants on it get M = 17 and die ≈ 1 %/tick; eggs and queen do not change M | E (pace), D (values) |
+| N-11 | drying (8.1) | after N-10, rain stopped | rows return from top to bottom; food that was on a flooded row disappears from the map, `_FoodB` does not change | D |
+| N-12 | fight does not remove the checker (4.3) | black nest, same cell: red T 0x92 M 0 at a **lower** index (stays in `_LifeB` on load) and black T 0x12 M 13 (rest) at a higher index | on the first tick the red becomes a cloud (T 0x70 or 0xF0, M 10, S = winner) and the black continues; at the end (≈ 16 ticks) there are 2 black ants (the black won) or 1 black and 1 red | D in structure, E in winner (≈ 50 %) |
+| N-13 | queen attacked (3.2) | red T 0x92 M 7 appended at the end of list B (index 5), in the cell of the black queen's head (34, 9) | on the first tick the head becomes a fight cloud and the tail (index 1) disappears in the same tick; `_BlkQueens` = 0; the cloud never becomes a queen again; at the next `_CountAnts` (tick ≡ 0 or 64 mod 128) the Quick Game ends in defeat | D |
+| N-14 | passage (7.7) | 0x14 cell in `_MapB` and `_MapR` at (20, 60), red worker M 4 next to it in the red nest | on entering (20, 60) it disappears from list R and appears in list B with T 0x90–0x97, M 3 | D (except direction) |
+| N-15 | trophallaxis (4.1) | yellow ant in the black nest with `_MeWantFood` = 1; red invader walking into its cell | the red ant feeds the yellow ant (the same effect as a black ant) | D |
+| N-16 | port, tick by tick | QUICK2, forced S seed (in the port) | the port, running from QUICK2 with any seed, must keep the invariants: T ∈ valid types, `Life` consistent with the lists, `_FoodB` changes only in the routines of section 6 | P |
 
-### 13.3 Observado no original
+### 13.3 Observed in the original
 
-Bancada QEMU, `python tools/caso_ant.py rodar tests/referencias/casos/ID.json` (2026-10-17). A bancada só para ~5 ticks depois do load (o roteiro espera 1 s depois de tirar a pausa), então os casos de poucos ticks conferem o que continua valendo alguns ticks depois. Estados em `tests/referencias/saves/` (`ID_carregado.ANT` = logo depois do load; `ID_Tnnn.ANT` = final).
+QEMU bench, `python tools/caso_ant.py rodar tests/referencias/casos/ID.json` (2026-10-17). The test bench only stops ~5 ticks after the load (the script waits 1 s after unpausing), so the few-tick cases check what still holds a few ticks later. States in `tests/referencias/saves/` (`ID_carregado.ANT` = right after the load; `ID_Tnnn.ANT` = final).
 
-| Id | Entrada efetiva | Observado | Resultado |
+| Id | Effective input | Observed | Result |
 |---|---|---|---|
-| N-03 | QUICK2 + operária T 0x12, M 2 em (32, 3) (B[5]) | parado no tick 84: B[5].T = 0; `_ListIndexA` = 3; A[2] com T & 0xF8 = 0x10, M = 2, S = 117, em (6, 33): saiu no tick 81 pelo buraco (3, 32) com S = 120 e andou 3 passos (S −1 por passo) | **confirmado** (§4.5, §4.6, §7.2; S = 120 com M = 2 e buraco do lado preto) |
-| N-06 | QUICK2 sem A[0], `_HealthB` = 100, `_AlwaysHealthy` = 1, `_FoodB` = 0; operária T 0x1A, M 3 em (32, 3) | tick 100: `_FoodB` = 2; a operária com T 0x16 (grupo 2) | **confirmado**: uma carga rende duas unidades (§6.2, "comida dobrada") |
-| N-09 | célula 0x02 com saída 0 cercada de 0x5D em (10, 40) nos dois ninhos; operária M 2 em cada uma | tick 86: `_ExitMapB`(10, 40) = 0xFF, `_ExitMapR`(10, 40) = 0; as duas com M = 4, paradas | **confirmado**: decremento sem teste no preto, com teste no vermelho (§7.2) |
-| N-13 | QUICK2, amarela movida para (30, 5); vermelha T 0x92, M 7 em (34, 9) no fim da lista B | tick 128: B[1] (cauda) e B[5] (invasora) com T = 0, `_BlkQueens` = 0; B[0] (era a cabeça) com T = 0 e **M = 8**: a nuvem terminou com vencedor S = 0 (a "ocupante" 0 venceu) e o modo saiu de `_GetNewMode(0, 0)` = `_CasteModeTabB[0]` = 8; `_RAntsKilled` = 1. No tick 128 o `_CountAnts` recontou `_CastePopB[0..4]` e parou na mensagem 10010 (modal): `_CastePopB[5]` = 1 e `_IsGameOver` = 0 até alguém clicar | **confirmado** (§3.2, "rainha atacada": a rainha some e a cauda vai junto; o defeito de `_GetWinner(0, ...)` se confirma). O fim de jogo não é conferível sem clicar na mensagem |
+| N-03 | QUICK2 + worker T 0x12, M 2 at (32, 3) (B[5]) | stopped at tick 84: B[5].T = 0; `_ListIndexA` = 3; A[2] with T & 0xF8 = 0x10, M = 2, S = 117, at (6, 33): left at tick 81 through the hole (3, 32) with S = 120 and walked 3 steps (S −1 per step) | **confirmed** (§4.5, §4.6, §7.2; S = 120 with M = 2 and hole on the black side) |
+| N-06 | QUICK2 without A[0], `_HealthB` = 100, `_AlwaysHealthy` = 1, `_FoodB` = 0; worker T 0x1A, M 3 at (32, 3) | tick 100: `_FoodB` = 2; the worker with T 0x16 (group 2) | **confirmed**: one load yields two units (§6.2, "doubled food") |
+| N-09 | cell 0x02 with exit 0 surrounded by 0x5D at (10, 40) in both nests; worker M 2 on each | tick 86: `_ExitMapB`(10, 40) = 0xFF, `_ExitMapR`(10, 40) = 0; both with M = 4, stopped | **confirmed**: untested decrement in the black nest, tested in the red one (§7.2) |
+| N-13 | QUICK2, yellow ant moved to (30, 5); red T 0x92, M 7 at (34, 9) at the end of list B | tick 128: B[1] (tail) and B[5] (invader) with T = 0, `_BlkQueens` = 0; B[0] (was the head) with T = 0 and **M = 8**: the cloud ended with winner S = 0 (the "occupant" 0 won) and the mode came from `_GetNewMode(0, 0)` = `_CasteModeTabB[0]` = 8; `_RAntsKilled` = 1. At tick 128 `_CountAnts` recounted `_CastePopB[0..4]` and stopped at message 10010 (modal): `_CastePopB[5]` = 1 and `_IsGameOver` = 0 until someone clicks | **confirmed** (§3.2, "queen attacked": the queen disappears and the tail goes with it; the `_GetWinner(0, ...)` defect is confirmed). The game over cannot be checked without clicking the message |
 
-**Vetores de tick (2026-10-18, `tools/cenarios_regras.py`, snapshot `rico`).** Os casos estatísticos viraram vetores de tick: a preparação é escrita na memória na entrada de um tick e o original roda tick a tick; cada vetor confere a regra com a semente que o original tinha (o "estatístico" vira determinístico). Todos 307/307 com S, R e vida ([testes-tick.md](testes-tick.md#quinta-rodada-2026-10-18-regras-não-verificadas-da-revisão)):
+**Tick vectors (2026-10-18, `tools/cenarios_regras.py`, snapshot `rico`).** The statistical cases became tick vectors: the setup is written to memory at the entry of a tick and the original runs tick by tick; each vector checks the rule with the seed the original had (the "statistical" becomes deterministic). All 307/307 with S, R and health ([testes-tick.md](testes-tick.md#fifth-round-2026-10-18-unverified-rules-from-the-review)):
 
-| Id | Vetor | Preparação | Observado no original |
+| Id | Vector | Setup | Observed in the original |
 |---|---|---|---|
-| N-01 | `ninho_n01` (1714, 1720), `ninho_n01_saude31` (1711) | `_HealthB` = 0 e `_AlwaysHealthy` = 0 (o rico tem só ovos e a rainha no ninho preto) | um ovo morre no 1714 e outro no 1720 (`_BAntsExpired` +1: ovos também morrem por 3.1); com `_HealthB` = 31 nenhuma morte em 2 ticks — **confirmado** (3.1, inclusive "31 já basta") |
-| N-07 | `ninho_n07` (1712, 1713) | célula 0x13 cercada de terra, soldado preto T 0x32 M 1 acrescentado nela; `_HealthB` 50, `_EatCountB` 0 | mordidas em 1712 e 1713: `_FoodB` −1, célula −1, `_HealthB` +1 — **confirmado** (6.1) |
-| N-10 | `ninho_n10` (1711, 1713) | chuva (`_RainOn`, `_RainCnt` 600) com as linhas 50..63 inundadas à mão e `_WaterTable` = 50 | sobe uma linha em 1711 e em 1713 (`_WaterTable` 50 → 49 → 48, 0x4E nos túneis, +0x2F na terra) — **confirmado** (8.1, 8.2); nenhuma formiga adulta nas linhas (o rico só tem ovos ali), então a morte de 1/100 por tick (8.3) não foi exercitada |
-| N-12 | `ninho_n12` (1711, 1716) | dois ovos viram vermelha T 0x92 M 0 (índice 2) e preta T 0x12 M 13 (índice 14) na mesma célula (33, 4); `_LifeB` = 0x92 | no 1711 a vermelha vira nuvem (T 0x73, M 10, S 0x12 = preta vencedora) e a preta continua (a checadora não é removida); a nuvem dura até o 1716 e vira preta (0x12, M 1) — **confirmado** (4.3, 4.4) |
-| N-14 | `ninho_n14` (1713) | 0x14 em (20, 60) nos dois mapas; a única operária vermelha adulta do rico virada para a passagem, M 4, numa vizinha | no 1713 sai da lista R e entra na B com T 0x91 (0x90 + Sk(8)), M 3 — **confirmado** (7.7) |
-| N-15 | `ninho_n15` (1711) | amarela num túnel do ninho preto com `_MeHealth` 20 e `_MeWantFood` 1; invasora vermelha T 0x90 M 0 logo abaixo, no caminho da saída | no 1711 a invasora entra na célula 0xFF e `_DoTroph` dá `_MeHealth` = 100 — **confirmado**: o teste `X < 0x80` de MOVER não olha a cor (4.1). Só `_gameCycles` não é exigido: a caixa "You feel much better now!" (`_YellowDialog`) não para o temporizador |
+| N-01 | `ninho_n01` (1714, 1720), `ninho_n01_saude31` (1711) | `_HealthB` = 0 and `_AlwaysHealthy` = 0 (`rico` has only eggs and the queen in the black nest) | one egg dies at 1714 and another at 1720 (`_BAntsExpired` +1: eggs also die by 3.1); with `_HealthB` = 31 no deaths in 2 ticks — **confirmed** (3.1, including "31 is already enough") |
+| N-07 | `ninho_n07` (1712, 1713) | 0x13 cell surrounded by dirt, black soldier T 0x32 M 1 appended on it; `_HealthB` 50, `_EatCountB` 0 | bites at 1712 and 1713: `_FoodB` −1, cell −1, `_HealthB` +1 — **confirmed** (6.1) |
+| N-10 | `ninho_n10` (1711, 1713) | rain (`_RainOn`, `_RainCnt` 600) with rows 50..63 flooded by hand and `_WaterTable` = 50 | rises one row at 1711 and at 1713 (`_WaterTable` 50 → 49 → 48, 0x4E in the tunnels, +0x2F in the dirt) — **confirmed** (8.1, 8.2); no adult ant on the rows (`rico` only has eggs there), so the 1/100 per tick death (8.3) was not exercised |
+| N-12 | `ninho_n12` (1711, 1716) | two eggs become red T 0x92 M 0 (index 2) and black T 0x12 M 13 (index 14) in the same cell (33, 4); `_LifeB` = 0x92 | at 1711 the red becomes a cloud (T 0x73, M 10, S 0x12 = black winner) and the black continues (the checker is not removed); the cloud lasts until 1716 and becomes black (0x12, M 1) — **confirmed** (4.3, 4.4) |
+| N-14 | `ninho_n14` (1713) | 0x14 at (20, 60) in both maps; the only adult red worker of `rico` facing the passage, M 4, on a neighbor | at 1713 it leaves list R and enters B with T 0x91 (0x90 + Sk(8)), M 3 — **confirmed** (7.7) |
+| N-15 | `ninho_n15` (1711) | yellow ant in a black nest tunnel with `_MeHealth` 20 and `_MeWantFood` 1; red invader T 0x90 M 0 right below, on the exit path | at 1711 the invader enters cell 0xFF and `_DoTroph` gives `_MeHealth` = 100 — **confirmed**: MOVE's `X < 0x80` test does not look at the color (4.1). Only `_gameCycles` is not required: the "You feel much better now!" box (`_YellowDialog`) does not stop the timer |
 
-**Sétima rodada (2026-10-19, `tools/cenarios_raros.py`, [testes-tick.md](testes-tick.md#sétima-rodada-2026-10-19-ramos-raros)):** os casos que faltavam, também como vetores de tick 307/307:
+**Seventh round (2026-10-19, `tools/cenarios_raros.py`, [testes-tick.md](testes-tick.md#seventh-round-2026-10-19-rare-branches)):** the remaining cases, also as tick vectors 307/307:
 
-| Id | Vetor | Preparação | Observado no original |
+| Id | Vector | Setup | Observed in the original |
 |---|---|---|---|
-| N-02 | `ninho_n02` (1711) | `_HealthB` = 0 e a semente S = 0x00A5 na entrada (escolhida no port para que a cabeça da rainha sorteie `Sk(256)` = 0) | a rainha segue viva (T 0x60): **confirmado** (3.1, M = 9 excluído). Sem a semente, com `_HealthB` = 0, ela morre só de fome (`rainha_fome`, ciclo-de-vida.md 5.2) |
-| N-04 | `ninho_n04` (1719, 1721) | operária T 0x0A, M 1, S 1 acrescentada em (33, 3) | desce pelo mapa de saída até (38, 9), liga o bit 3 de S (1719: S = 9), dá o passo e no tick seguinte larga o ovo T = 1 em (37, 10) e vira T 0x17, S = 8 — **confirmado** (5.1, mesmo estágio) |
-| N-05 | `ninho_n05` (1711, 1714) | vermelhas T 0x8A e 0x8C, M 1, no alto do túnel vermelho | largam ovos sempre T = 0x82, em células diferentes do caminho, e voltam a pegar ovos — **confirmado** (5.4) |
-| N-08 | `ninho_n08` (1713, 1718) | operária T 0x12 e soldado T 0x34, M 4, no fundo do túnel preto | cavam: T + 0x18 (0x2B; 0x4A), M 5, `_TilesDugB` + 1, e sobem com a terra até sair — **confirmado** (7.1) |
-| N-11 e 8.3 | `ninho_n11` (1711, 1719, 1722, 1754) | linhas 6..63 inundadas como `_DoWater` faria, sem chuva; adultas pretas e vermelhas nas linhas, M = 17; comida 0x11 em duas células | afogadas morrem (macho vermelho no 1711, operária preta no 1722; nas 120 gravações também um soldado preto, uma operária e um soldado vermelhos: `_BAntsExpired`/`_RAntsExpired`), a água desce uma linha (1719) e a linha da comida seca em túnel `S(8)` com `_FoodB` igual (1754) — **confirmado** (8.1, 8.3) |
-| 4.6 | `lista_a_cheia`, `lista_a_cheia_sem_vagas` (1793) | `_ListIndexA` = 1000 (com vagas vazias; ou com elas preenchidas por operárias paradas) e uma operária saindo pela abertura | o original e o port dão o mesmo estado (a formiga se perde; a compactação abre as vagas das que morreram ou entraram no ninho no mesmo tick) |
+| N-02 | `ninho_n02` (1711) | `_HealthB` = 0 and seed S = 0x00A5 at entry (chosen in the port so that the queen's head draws `Sk(256)` = 0) | the queen stays alive (T 0x60): **confirmed** (3.1, M = 9 excluded). Without the seed, with `_HealthB` = 0, it dies only from starvation (`rainha_fome`, ciclo-de-vida.md 5.2) |
+| N-04 | `ninho_n04` (1719, 1721) | worker T 0x0A, M 1, S 1 appended at (33, 3) | descends the exit map to (38, 9), sets bit 3 of S (1719: S = 9), takes the step and on the next tick drops the egg T = 1 at (37, 10) and becomes T 0x17, S = 8 — **confirmed** (5.1, same stage) |
+| N-05 | `ninho_n05` (1711, 1714) | red T 0x8A and 0x8C, M 1, at the top of the red tunnel | always drop eggs T = 0x82, in different cells along the path, and pick up eggs again — **confirmed** (5.4) |
+| N-08 | `ninho_n08` (1713, 1718) | worker T 0x12 and soldier T 0x34, M 4, at the bottom of the black tunnel | they dig: T + 0x18 (0x2B; 0x4A), M 5, `_TilesDugB` + 1, and climb with the dirt until they leave — **confirmed** (7.1) |
+| N-11 and 8.3 | `ninho_n11` (1711, 1719, 1722, 1754) | rows 6..63 flooded as `_DoWater` would, without rain; black and red adults on the rows, M = 17; food 0x11 in two cells | drowning ants die (red male at 1711, black worker at 1722; in the 120 recordings also a black soldier, a red worker and a red soldier: `_BAntsExpired`/`_RAntsExpired`), the water goes down one row (1719) and the food row dries into tunnel `S(8)` with `_FoodB` unchanged (1754) — **confirmed** (8.1, 8.3) |
+| 4.6 | `lista_a_cheia`, `lista_a_cheia_sem_vagas` (1793) | `_ListIndexA` = 1000 (with empty slots; or with them filled by idle workers) and a worker leaving through the opening | the original and the port give the same state (the ant is lost; compaction opens the slots of those that died or entered the nest in the same tick) |
 
-Port: `engine/tests/regras_ninho.rs` parte de cada `ID_carregado.ANT`, roda o tick do port (só as regras do ninho ligadas) até o mesmo `GameTime` alvo, com 6 sementes S diferentes, e avalia as mesmas conferências do JSON: todas passam.
+Port: `engine/tests/regras_ninho.rs` starts from each `ID_carregado.ANT`, runs the port's tick (only the nest rules enabled) until the same target `GameTime`, with 6 different S seeds, and evaluates the same checks as the JSON: all pass.
 
-**Vetores de tick** (`tests/referencias/ticks/`, ticks 79–83 do snapshot `quick`, ver [testes-tick.md](testes-tick.md)): para cada tick, partindo do `estado_antes`, o port acha uma semente S de entrada do ninho tal que `_DoAntSimB` + `_DoAntSimR` reproduzem **exatamente** mapas, mapas de saída, `_LifeB/R`, listas e contadores das colônias do `estado_depois` **e** o gerador S termina no valor do `extras.json` (k sorteios: 13, 12, 12, 12, 12; a semente de entrada é a final andada k passos para trás). O tick 80 inclui uma postura da rainha preta. Isso confirma a ordem e a quantidade de sorteios do ninho nesses ticks (morte natural, rainha, cauda, ovos) e que nada depois de `_DoAntSimR` sorteia S nesses ticks. Também confirma que `_LifeB/R` reconstruídos das listas batem com a memória do original.
+**Tick vectors** (`tests/referencias/ticks/`, ticks 79–83 of the `quick` snapshot, see [testes-tick.md](testes-tick.md)): for each tick, starting from `estado_antes`, the port finds a nest entry S seed such that `_DoAntSimB` + `_DoAntSimR` reproduce **exactly** the maps, exit maps, `_LifeB/R`, lists and colony counters of `estado_depois` **and** the S generator ends at the value in `extras.json` (k random draws: 13, 12, 12, 12, 12; the entry seed is the final one walked k steps back). Tick 80 includes an egg laying by the black queen. This confirms the order and number of the nest's random draws in those ticks (natural death, queen, tail, eggs) and that nothing after `_DoAntSimR` draws from S in those ticks. It also confirms that `_LifeB/R` rebuilt from the lists match the original's memory.
 
-## Implementação no port
+## Implementation in the port
 
-- `engine/src/rules/ninho.rs`: `impl RegrasNinho for RegrasOriginais` chama `simular_ninho(e, cor, tabelas, tabelas_amarela)` (pública, para testes com outras tabelas). A formiga em processamento é um `Formigueiro` (índice = `_Tindex`, com T, X, Y, M de entrada, como os parâmetros do original); cada método cita a rotina do original e a seção desta spec.
-- Tabelas em `data/ninho.json` (`TabelasNinho`), geradas por `tools/extrair_ninho.py` (endereços no topo do script): `_Dx8/_Dy8`, `_TurnTab`, `_ModeTabWB/SB`, `_CasteModeTabB`, `_CasteTabC`, `VitóriaR`, classe e matriz de luta, borda do buraco. Guardadas em `RegrasOriginais::ninho` (com mods); `TabelasNinho::padrao` é a cópia embutida, para testes.
-- `_YellowFight` e `_DoTroph` são os de `rules/amarela.rs` (`lutar_com_amarela`, `trofalaxia`). Balões não estão implementados; o som da escavação (0x11/0x12) vira `Evento::Som` ([som.md](som.md)).
-- `_DigTile*`, `_SmoothEdges*`, `_FixExitMap*`, `_MakeNewHole*`, `_PlaceEgg*`, `_GetNewMode*`, `_GetWinner`, `_EatFood*`/`_StealFood*`, `_DecEat*`, `_GetBestDir` e `_ExitHole` estão em `engine/src/rules/comum.rs` (ver [../../decisoes.md](../../decisoes.md), "Módulo comum das regras"); `vencedor_da_luta` continua pública em `ninho.rs`, com as tabelas do ninho.
+- `engine/src/rules/ninho.rs`: `impl RegrasNinho for RegrasOriginais` calls `simular_ninho(e, cor, tabelas, tabelas_amarela)` (public, for tests with other tables). The ant being processed is a `Formigueiro` (index = `_Tindex`, with incoming T, X, Y, M, like the original's parameters); each method cites the original routine and the section of this spec.
+- Tables in `data/ninho.json` (`TabelasNinho`), generated by `tools/extrair_ninho.py` (addresses at the top of the script): `_Dx8/_Dy8`, `_TurnTab`, `_ModeTabWB/SB`, `_CasteModeTabB`, `_CasteTabC`, `VitóriaR`, fight class and matrix, hole border. Stored in `RegrasOriginais::ninho` (with mods); `TabelasNinho::padrao` is the embedded copy, for tests.
+- `_YellowFight` and `_DoTroph` are those of `rules/amarela.rs` (`lutar_com_amarela`, `trofalaxia`). Balloons are not implemented; the digging sound (0x11/0x12) becomes `Evento::Som` ([som.md](som.md)).
+- `_DigTile*`, `_SmoothEdges*`, `_FixExitMap*`, `_MakeNewHole*`, `_PlaceEgg*`, `_GetNewMode*`, `_GetWinner`, `_EatFood*`/`_StealFood*`, `_DecEat*`, `_GetBestDir` and `_ExitHole` are in `engine/src/rules/comum.rs` (see [../../decisoes.md](../../decisoes.md), "Common rules module"); `vencedor_da_luta` remains public in `ninho.rs`, with the nest tables.
 
-## Lacunas
+## Gaps
 
-- Gotas e poças da superfície (`_PlaceDrop`, `_InitWater`): só a ordem dos sorteios está aqui; regra completa em `superficie.md`.
-- ~~`_ExitHole` com a lista A cheia~~: resolvido em 2026-10-19 (§4.6, "Lista A cheia"); o port segue o original e os vetores `lista_a_cheia*` (§13.3) batem.
-- Testados na bancada: N-03, N-06, N-09, N-13 (casos, §13.3) e, como vetores de tick, N-01, N-07, N-10, N-12, N-14 e N-15 (2026-10-18) e N-02, N-04, N-05, N-08, N-11 e o afogamento de adultas (2026-10-19). Todos os casos de §13.2 estão conferidos.
-- Os "defeitos" marcados ([hipótese]) devem ser confirmados no original antes de decidir se o port os reproduz por padrão (o princípio do projeto é reproduzir; um mod pode corrigir).
+- Surface drops and puddles (`_PlaceDrop`, `_InitWater`): only the order of the random draws is here; full rule in `superficie.md`.
+- ~~`_ExitHole` with list A full~~: resolved on 2026-10-19 (§4.6, "List A full"); the port follows the original and the `lista_a_cheia*` vectors (§13.3) match.
+- Tested on the test bench: N-03, N-06, N-09, N-13 (cases, §13.3) and, as tick vectors, N-01, N-07, N-10, N-12, N-14 and N-15 (2026-10-18) and N-02, N-04, N-05, N-08, N-11 and the drowning of adults (2026-10-19). All cases of §13.2 are checked.
+- The "defects" marked ([hypothesis]) must be confirmed in the original before deciding whether the port reproduces them by default (the project's principle is to reproduce; a mod can fix them).

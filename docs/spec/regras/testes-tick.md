@@ -1,227 +1,229 @@
-# Testes tick a tick contra o original (determinismo e vetores)
+*Leia em português: [testes-tick.md](../../pt-BR/spec/regras/testes-tick.md)*
 
-Este documento descreve como comparar a simulação do port com o SimAnt original **um tick por vez**: os experimentos de determinismo feitos na bancada QEMU, o protocolo de captura de vetores "estado antes → estado depois" e o que um vetor precisa conter além do layout do save. Bancada: [../../bancada-qemu.md](../../bancada-qemu.md). Estrutura do tick: [simulacao-visao-geral.md](simulacao-visao-geral.md). Geradores aleatórios: [rng.md](rng.md).
+# Tick-by-tick tests against the original (determinism and vectors)
 
-Convenção de evidência como no resto de `docs/spec/`: **verificado** = medido na bancada (data e comando indicados); **visto no código** = pseudocódigo do Ghidra em `re_trabalho/decomp/`; **[hipótese]** = não medido.
+This document describes how to compare the port's simulation with the original SimAnt **one tick at a time**: the determinism experiments done on the QEMU bench, the protocol for capturing "state before → state after" vectors, and what a vector needs to contain beyond the save layout. Bench: [../../bancada-qemu.md](../../bancada-qemu.md). Tick structure: [simulacao-visao-geral.md](simulacao-visao-geral.md). Random generators: [rng.md](rng.md).
 
-## Resumo
+Evidence convention as in the rest of `docs/spec/`: **verified** = measured on the test bench (date and command given); **seen in the code** = Ghidra pseudocode in `re_trabalho/decomp/`; **[hypothesis]** = not measured.
 
-- **É possível parar exatamente no início e no fim de um tick e avançar um tick por vez** (verificado, 2026-10-16). Breakpoints do gdbstub do QEMU na entrada de `_DoAntSim` (`1028:0000`) e no endereço de retorno dele dentro do `MYTIMERFUNC` (`1000:2688`).
-- **O original é determinístico tick a tick na bancada** (verificado): partindo do snapshot `quick`, duas execuções chegam ao `GameTime` 300 com os 307 blocos do save idênticos, **exceto `_BirdDelay`**, com ou sem sementes forçadas, e mesmo quando a VM roda 20 s livre (sem breakpoints) no meio do caminho.
-- `_BirdDelay` diverge porque `_SimBird` o calcula a partir de `_gameCycles`, um contador do laço ocupado do `MYTIMERFUNC` que depende do relógio do host. É a única entrada não determinística encontrada dentro do tick.
-- Entre dois ticks (desenho, mensagens, laço do temporizador) **nada do save muda e os geradores S e R não andam** na configuração do snapshot `quick` (verificado em 139 intervalos). Só mudam `_gameCycles`, contadores de redesenho e a pilha.
-- Para reproduzir um tick, o port precisa, além dos 307 blocos do save: estado do gerador S, estado do gerador R, `_gameCycles`, `_LifeA/B/R` (ou reconstruí-los das listas) e `_GlobalKey`. Lista completa e justificativa na seção "Pergunta 3".
+## Summary
 
-## Ferramentas
+- **It is possible to stop exactly at the start and at the end of a tick and advance one tick at a time** (verified, 2026-10-16). QEMU gdbstub breakpoints at the entry of `_DoAntSim` (`1028:0000`) and at its return address inside `MYTIMERFUNC` (`1000:2688`).
+- **The original is deterministic tick by tick on the test bench** (verified): starting from the `quick` snapshot, two runs reach `GameTime` 300 with the 307 save blocks identical, **except `_BirdDelay`**, with or without forced seeds, and even when the VM runs free for 20 s (without breakpoints) midway.
+- `_BirdDelay` diverges because `_SimBird` computes it from `_gameCycles`, a counter of the `MYTIMERFUNC` busy loop that depends on the host clock. It is the only non-deterministic input found inside the tick.
+- Between two ticks (drawing, messages, timer loop) **nothing in the save changes and the S and R generators do not advance** in the `quick` snapshot configuration (verified over 139 intervals). Only `_gameCycles`, redraw counters and the stack change.
+- To reproduce a tick, the port needs, besides the 307 save blocks: the state of the S generator, the state of the R generator, `_gameCycles`, `_LifeA/B/R` (or rebuild them from the lists) and `_GlobalKey`. Full list and justification in the "Question 3" section.
 
-| Ferramenta | O que faz |
+## Tools
+
+| Tool | What it does |
 |---|---|
-| `tools/qemu_bancada.py`, comandos `tick_entrada`, `tick_saida`, `ate_gametime N`, `passo_tick DIR`, `extras ARQ`, `segmentos PREFIXO` | modo tick (ver [bancada-qemu.md](../../bancada-qemu.md#modo-tick-breakpoints-do-gdbstub)) |
-| `tools/gerar_vetores_tick.py` | grava N ticks consecutivos em `tick_NNNNNN/` (ver "Protocolo") e mapeia leituras fora do save (`--mapear-leituras`) |
-| `tools/comparar_ticks.py A B [--detalhe]` | compara dois diretórios de vetores, tick a tick |
-| `tools/comparar_ticks.py --continuidade DIR` | o que muda entre o retorno do tick N e a entrada do N+1 |
-| `tools/comparar_ticks.py --fora-do-save DIR...` | bytes dos segmentos 8, 9 e 10 que o tick escreve fora do layout do save (exige `--segmentos`) |
-| `tests/referencias/roteiros/qemu_tick_passos.txt` | 3 ticks com `passo_tick` |
-| `tests/referencias/roteiros/qemu_det_gametime.txt`, `qemu_det_livre.txt` | experimento da pergunta 1, por roteiro |
+| `tools/qemu_bancada.py`, commands `tick_entrada`, `tick_saida`, `ate_gametime N`, `passo_tick DIR`, `extras ARQ`, `segmentos PREFIXO` | tick mode (see [bancada-qemu.md](../../bancada-qemu.md#modo-tick-breakpoints-do-gdbstub)) |
+| `tools/gerar_vetores_tick.py` | records N consecutive ticks in `tick_NNNNNN/` (see "Protocol") and maps reads outside the save (`--mapear-leituras`) |
+| `tools/comparar_ticks.py A B [--detalhe]` | compares two vector directories, tick by tick |
+| `tools/comparar_ticks.py --continuidade DIR` | what changes between the return of tick N and the entry of N+1 |
+| `tools/comparar_ticks.py --fora-do-save DIR...` | bytes of segments 8, 9 and 10 that the tick writes outside the save layout (requires `--segmentos`) |
+| `tests/referencias/roteiros/qemu_tick_passos.txt` | 3 ticks with `passo_tick` |
+| `tests/referencias/roteiros/qemu_det_gametime.txt`, `qemu_det_livre.txt` | question 1 experiment, by script |
 
-Todos exigem `SIMANT_RAIZ` apontando para a raiz com `referencia/qemu` e `re_trabalho/qemu` (com o snapshot `quick` gravado no overlay).
+All of them require `SIMANT_RAIZ` pointing to the root with `referencia/qemu` and `re_trabalho/qemu` (with the `quick` snapshot saved in the overlay).
 
-## Pergunta 2: parar no início e no fim de um tick
+## Question 2: stopping at the start and at the end of a tick
 
-**Técnica (verificada).**
+**Technique (verified).**
 
-1. **Seletor do segmento de código.** Os segmentos de código não aparecem na tabela do save, então o método dos seletores de dados não serve. `Memoria.seletor_codigo(n)` lê a LDT inteira (base e limite de `info registers`), filtra os descritores de **código presentes** com limite compatível com o tamanho do segmento no cabeçalho NE (`SIMANTW.EXE`, segmento 6 = `1028`, 0x9AF4 bytes) e compara os primeiros 64 bytes da memória com os do arquivo (as relocações mudam poucos bytes). Observado (2026-10-16, `-m 16`): segmento 6 = seletor `0x1547`, base linear `0x80837500`, 58/64 bytes iguais. Todos os segmentos: 1 = `0x156f`, 2 = `0x1567`, 3 = `0x155f`, 4 = `0x1557`, 5 = `0x154f`, 6 = `0x1547`, 7 = `0x153f`, 8 = `0x1537`, 9 = `0x152f`, 10 = `0x1527` (decrescem de 8 em 8 na ordem do NE, mas o script sempre procura de novo).
-2. **Breakpoint em endereço linear.** O gdbstub do QEMU compara o breakpoint com o PC **linear** (base do CS + EIP). Entrada de `_DoAntSim` = base do seletor `0x1547` + 0. Confirmado: a cada parada o script confere em `info registers` que base do CS + EIP é o endereço pedido (senão, aborta), e as leituras atribuídas ao CS `0x1547` caem em offsets de funções do `1028` (ex.: `1028:04fa`, dentro de `_DoAntSimA`).
-3. **Fim do tick.** Na entrada, o topo da pilha (SS:SP) tem o retorno far (IP, CS) de `_DoAntSim`. Observado: `156f:2688` = `1000:2688`, dentro do `MYTIMERFUNC` (`1000:2440`), coerente com o código. Um breakpoint ali para a CPU logo depois do tick, **antes** de `_myServiceSong` e `_UpdateWindows`.
-4. **Sem passo por cima de breakpoint.** Cada breakpoint é ligado só durante a corrida até ele e desligado ao parar. Como os dois endereços se alternam, nunca se continua de um breakpoint ativo.
-5. **Sessão gdb persistente.** No modo tick a conexão com o gdbstub fica aberta. Com a VM rodando (depois de `continuar`), o gdbstub só aceita o byte de interrupção 0x03; o script o envia antes de qualquer comando. Paradas assíncronas (`T02`, geradas por um `stop` do QMP) são descartadas.
+1. **Code segment selector.** Code segments do not appear in the save table, so the data-selector method does not work. `Memoria.seletor_codigo(n)` reads the whole LDT (base and limit from `info registers`), filters the **present code** descriptors with a limit compatible with the segment size in the NE header (`SIMANTW.EXE`, segment 6 = `1028`, 0x9AF4 bytes) and compares the first 64 bytes of memory with those of the file (relocations change a few bytes). Observed (2026-10-16, `-m 16`): segment 6 = selector `0x1547`, linear base `0x80837500`, 58/64 bytes equal. All segments: 1 = `0x156f`, 2 = `0x1567`, 3 = `0x155f`, 4 = `0x1557`, 5 = `0x154f`, 6 = `0x1547`, 7 = `0x153f`, 8 = `0x1537`, 9 = `0x152f`, 10 = `0x1527` (they decrease by 8 in NE order, but the script always searches again).
+2. **Breakpoint at a linear address.** The QEMU gdbstub compares the breakpoint with the **linear** PC (CS base + EIP). Entry of `_DoAntSim` = base of selector `0x1547` + 0. Confirmed: at each stop the script checks in `info registers` that CS base + EIP is the requested address (otherwise, it aborts), and the reads attributed to CS `0x1547` fall at function offsets of `1028` (e.g. `1028:04fa`, inside `_DoAntSimA`).
+3. **End of the tick.** On entry, the top of the stack (SS:SP) holds the far return (IP, CS) of `_DoAntSim`. Observed: `156f:2688` = `1000:2688`, inside `MYTIMERFUNC` (`1000:2440`), consistent with the code. A breakpoint there stops the CPU right after the tick, **before** `_myServiceSong` and `_UpdateWindows`.
+4. **No stepping over a breakpoint.** Each breakpoint is enabled only during the run up to it and disabled when it stops. Since the two addresses alternate, execution never continues from an active breakpoint.
+5. **Persistent gdb session.** In tick mode the connection to the gdbstub stays open. With the VM running (after `continuar`), the gdbstub only accepts the interrupt byte 0x03; the script sends it before any command. Asynchronous stops (`T02`, generated by a QMP `stop`) are discarded.
 
-**Definições usadas nos vetores:**
+**Definitions used in the vectors:**
 
-- *estado antes* do tick N: CPU na 1ª instrução de `_DoAntSim`, com `_GameTime = N` (ainda não somado);
-- *estado depois*: CPU no retorno de `_DoAntSim`, com `_GameTime = N + 1`.
+- *state before* tick N: CPU at the 1st instruction of `_DoAntSim`, with `_GameTime = N` (not yet incremented);
+- *state after*: CPU at the return of `_DoAntSim`, with `_GameTime = N + 1`.
 
-**Custo medido:** `passo_tick` (estado + mapas de vida + extras, antes e depois) leva ~0,45 s por tick; `ate_gametime` avança ~3,1 ticks/s (221 ticks em 70 s), contra ~6 ticks/s da VM livre.
+**Measured cost:** `passo_tick` (state + life maps + extras, before and after) takes ~0.45 s per tick; `ate_gametime` advances ~3.1 ticks/s (221 ticks in 70 s), versus ~6 ticks/s for the free-running VM.
 
-## Pergunta 1: determinismo
+## Question 1: determinism
 
-### Experimentos (verificados em 2026-10-16)
+### Experiments (verified on 2026-10-16)
 
-Todos partem do snapshot `quick` (`loadvm` com a VM rodando) e param na **primeira** entrada de `_DoAntSim`.
+All of them start from the `quick` snapshot (`loadvm` with the VM running) and stop at the **first** entry of `_DoAntSim`.
 
-| Id | Procedimento | Resultado |
+| Id | Procedure | Result |
 |---|---|---|
-| E0 | primeira entrada em todas as execuções do dia (10 execuções de QEMU independentes) | sempre `GameTime = 79`, S = `0x6b1d`, R = `0x53c15255`, `_gameCycles` = 10379; entre E1a e E1b, o estado e os segmentos 8, 9, 10 inteiros são idênticos nesse ponto. O `loadvm` é reprodutível até o primeiro tick |
-| E1 | 2 × 3 ticks com `passo_tick`, sem forçar sementes (`gerar_vetores_tick.py --ticks 3 --segmentos`) | tick 79: tudo idêntico. Ticks 80 e 81: os 307 blocos iguais **exceto `_BirdDelay`**; fora do save, diferem só `_gameCycles` e a pilha |
-| E2 | 2 × (sementes forçadas S = `0x1234`, R = 1 na 1ª entrada; tick a tick com breakpoints até `GameTime = 300`; 2 ticks gravados) | iguais exceto `_BirdDelay` (61550 × 59642) e `_gameCycles`. S e R idênticos (`0x1879`, `0x99dad475` na entrada do tick 300) |
-| E3 | como E2, mas a VM roda **20 s livre** (sem breakpoints, ~120 ticks) antes do `ate_gametime 300` | iguais entre si exceto `_BirdDelay`/`_gameCycles`; e iguais a E2 também (exceto `_BirdDelay`) |
-| E4 | 140 ticks consecutivos (79 → 219) com `--segmentos`, `comparar_ticks.py --continuidade` | em todos os 139 intervalos entre ticks: save igual, S e R iguais. Fora do save mudam só `_gameCycles`, `_UDcntr`, `_UDMapFlip`, buffers de mapa (`_mapMapBuf`, `_mapOutBuf`), contadores do `MYTIMERFUNC` (DGROUP `0x02F0`) e a pilha |
+| E0 | first entry in all runs of the day (10 independent QEMU runs) | always `GameTime = 79`, S = `0x6b1d`, R = `0x53c15255`, `_gameCycles` = 10379; between E1a and E1b, the state and the whole segments 8, 9, 10 are identical at this point. The `loadvm` is reproducible up to the first tick |
+| E1 | 2 × 3 ticks with `passo_tick`, without forcing seeds (`gerar_vetores_tick.py --ticks 3 --segmentos`) | tick 79: everything identical. Ticks 80 and 81: the 307 blocks equal **except `_BirdDelay`**; outside the save, only `_gameCycles` and the stack differ |
+| E2 | 2 × (forced seeds S = `0x1234`, R = 1 at the 1st entry; tick by tick with breakpoints up to `GameTime = 300`; 2 ticks recorded) | equal except `_BirdDelay` (61550 × 59642) and `_gameCycles`. S and R identical (`0x1879`, `0x99dad475` at the entry of tick 300) |
+| E3 | like E2, but the VM runs **free for 20 s** (without breakpoints, ~120 ticks) before the `ate_gametime 300` | equal to each other except `_BirdDelay`/`_gameCycles`; and also equal to E2 (except `_BirdDelay`) |
+| E4 | 140 consecutive ticks (79 → 219) with `--segmentos`, `comparar_ticks.py --continuidade` | in all 139 intervals between ticks: save equal, S and R equal. Outside the save only `_gameCycles`, `_UDcntr`, `_UDMapFlip`, map buffers (`_mapMapBuf`, `_mapOutBuf`), `MYTIMERFUNC` counters (DGROUP `0x02F0`) and the stack change |
 
-Diretórios de trabalho (fora do git): `re_trabalho/det/{r1,r2,e2a,e2b,e3a,e3b,longo}`.
+Working directories (outside git): `re_trabalho/det/{r1,r2,e2a,e2b,e3a,e3b,longo}`.
 
-### Por que `_BirdDelay` diverge
+### Why `_BirdDelay` diverges
 
-Visto no código (`_SimBird`, `1030:28aa`), com o pássaro ausente (`_BirdOn = 0`):
+Seen in the code (`_SimBird`, `1030:28aa`), with the bird absent (`_BirdOn = 0`):
 
 ```
-se _gameCycles > _BirdDelay (32 bits):
+if _gameCycles > _BirdDelay (32 bits):
     _BirdDelay = _gameCycles + 20
-    se _CurYardPnt > 4: sorteia SRand2(); se 0 e houver revoada (_SwarmCntB > 0 ou 9:9c26 > 0): o pássaro aparece
+    if _CurYardPnt > 4: draws SRand2(); if 0 and there is a mating flight (_SwarmCntB > 0 or 9:9c26 > 0): the bird appears
 ```
 
-e, quando o pássaro sai da tela, `_BirdDelay = _gameCycles + 30`. `_gameCycles` (`9:9b2c`) **não é contador de ticks**: o `MYTIMERFUNC` soma 1 a cada volta do laço ocupado, que espera chegar `WM_TIMER` (ver [simulacao-visao-geral.md §2](simulacao-visao-geral.md#2-o-que-mytimerfunc-faz-a-cada-chamada)). Medido: entre dois ticks na velocidade normal, `_gameCycles` anda de ~450 a ~1100, conforme o relógio do host.
+and, when the bird leaves the screen, `_BirdDelay = _gameCycles + 30`. `_gameCycles` (`9:9b2c`) **is not a tick counter**: `MYTIMERFUNC` adds 1 on each turn of the busy loop, which waits for `WM_TIMER` to arrive (see [simulacao-visao-geral.md §2](simulacao-visao-geral.md#2-what-mytimerfunc-does-on-each-call)). Measured: between two ticks at normal speed, `_gameCycles` advances by ~450 to ~1100, depending on the host clock.
 
-Consequências:
+Consequences:
 
-- Em velocidade normal (e lenta), `_gameCycles` sempre passa de `_BirdDelay + 20` entre dois ticks, então o teste dá verdadeiro em **todo** tick: o sorteio `SRand2` (se `_CurYardPnt > 4`) acontece sempre e a sequência de S não depende do relógio. Só o **valor** de `_BirdDelay` muda.
-- [hipótese] Em "fast"/"ultra" (`_SpeedDelayVals` 0 e −1) há um tick por volta do laço, `_gameCycles` anda 1 por tick e o pássaro passa a ser testado só a cada ~21 ticks. Aí a sequência de S também depende do número de voltas sem tick, que depende do relógio. Não medido.
-- Para o port: `_gameCycles` é uma **entrada** do tick (vem em `extras.json`). Um port que use "ticks desde o início" no lugar dele reproduz o comportamento em velocidade normal, mas não o valor de `_BirdDelay`. Na comparação, `_BirdDelay` só bate se o port receber o `_gameCycles` do vetor.
+- At normal (and slow) speed, `_gameCycles` always exceeds `_BirdDelay + 20` between two ticks, so the test is true on **every** tick: the `SRand2` random draw (if `_CurYardPnt > 4`) always happens and the S sequence does not depend on the clock. Only the **value** of `_BirdDelay` changes.
+- [hypothesis] In "fast"/"ultra" (`_SpeedDelayVals` 0 and −1) there is one tick per loop turn, `_gameCycles` advances 1 per tick and the bird is then tested only every ~21 ticks. Then the S sequence also depends on the number of turns without a tick, which depends on the clock. Not measured.
+- For the port: `_gameCycles` is an **input** of the tick (it comes in `extras.json`). A port that uses "ticks since start" in its place reproduces the behavior at normal speed, but not the value of `_BirdDelay`. In the comparison, `_BirdDelay` only matches if the port receives the vector's `_gameCycles`.
 
-### Desenho, temporizador e mouse
+### Drawing, timer and mouse
 
-- **Desenho consumindo S:** não observado na configuração do snapshot `quick` (janelas abertas pelo Quick Game, sem mexer em nada): S não anda entre ticks em 139 intervalos. As rotinas que chamam `_SRand*` ao desenhar (`_DrawCurBalloons`, `_DrawSpider`, `_DrawSwarm`, `_Draw_SimYard`, `_DrawRain`, ver [rng.md](rng.md)) não consumiram S nesse período [hipótese: dependem de balões ligados, aranha/enxame/chuva visíveis ou de outras janelas abertas; não testado].
-- **Dentro do tick** há leituras de estado de interface (seção seguinte): `_win_IsWinOpen` (`_win_hwnd`), `_mapMessageRemoveTime`, `_editMessage`, fontes e DC de recorte. [hipótese] O tick decide desenhar ou não conforme as janelas abertas; se alguma dessas rotinas sortear S, a sequência dependerá das janelas. Por isso os vetores valem para a **configuração de janelas do snapshot** de onde saíram.
-- **Relógio:** nenhuma leitura de relógio dentro do tick foi encontrada além de `_gameCycles`. `_TickCount` só é chamado fora do tick (sementes, mensagens temporárias).
-- **Mouse e teclado:** a bancada não envia eventos nos experimentos. `_GlobalKey` (última tecla; 0xA8 liga a chuva em `_DoSimYard`) é lida em todo tick e valeu 0.
-- **Pausa e foco:** o jogo não pode estar minimizado (o `MYTIMERFUNC` minimizado chama `SRand1(7)` fora do tick) e não pode estar pausado (o breakpoint nunca chega; o script desiste depois de 120 s).
+- **Drawing consuming S:** not observed in the `quick` snapshot configuration (windows opened by the Quick Game, without touching anything): S does not advance between ticks over 139 intervals. The routines that call `_SRand*` while drawing (`_DrawCurBalloons`, `_DrawSpider`, `_DrawSwarm`, `_Draw_SimYard`, `_DrawRain`, see [rng.md](rng.md)) did not consume S in this period [hypothesis: they depend on balloons turned on, spider/swarm/rain visible or other open windows; not tested].
+- **Inside the tick** there are reads of interface state (next section): `_win_IsWinOpen` (`_win_hwnd`), `_mapMessageRemoveTime`, `_editMessage`, fonts and clipping DC. [hypothesis] The tick decides whether or not to draw according to the open windows; if any of these routines draws from S, the sequence will depend on the windows. That is why the vectors are valid for the **window configuration of the snapshot** they came from.
+- **Clock:** no clock read inside the tick was found other than `_gameCycles`. `_TickCount` is only called outside the tick (seeds, temporary messages).
+- **Mouse and keyboard:** the test bench does not send events in the experiments. `_GlobalKey` (last key; 0xA8 turns on the rain in `_DoSimYard`) is read on every tick and was 0.
+- **Pause and focus:** the game cannot be minimized (`MYTIMERFUNC` when minimized calls `SRand1(7)` outside the tick) and cannot be paused (the breakpoint is never reached; the script gives up after 120 s).
 
-Conclusão: o caminho por breakpoints é **suficiente para determinismo** na bancada. O modo `-icount` do QEMU (tempo virtual por contagem de instruções) não foi necessário e não foi testado.
+Conclusion: the breakpoint path is **sufficient for determinism** on the test bench. QEMU's `-icount` mode (virtual time by instruction counting) was not needed and was not tested.
 
-## Pergunta 3: o que capturar além do save
+## Question 3: what to capture besides the save
 
-### Método (verificado)
+### Method (verified)
 
-1. **Escritas:** com `--segmentos`, o gerador grava os segmentos de dados 8, 9 e 10 inteiros antes e depois de cada tick. `comparar_ticks.py --fora-do-save` lista os bytes alterados pelo tick fora dos 307 blocos do layout, com o símbolo mais próximo do `.SYM`. Rodado sobre 140 ticks (79 → 219, cobre as fases 0–3 de 128 ticks e as tarefas de 16, 32 e 64 ticks).
-2. **Leituras:** `gerar_vetores_tick.py --mapear-leituras` põe **watchpoints de leitura** do gdbstub em tudo o que está fora do save nos segmentos 8, 9 e 10 (141 faixas, 80.062 bytes; menos a pilha acima de `_end` e os mapas já conhecidos), cortados nas fronteiras dos símbolos e em pedaços de 64 bytes (o QEMU informa o início do watchpoint atingido, não o byte lido). Cada leitura registra o pedaço, o valor e o CS:IP de quem leu, traduzido para `10x0:offset`. Rodado sobre os mesmos 140 ticks (~3,7 s por tick).
+1. **Writes:** with `--segmentos`, the generator records the whole data segments 8, 9 and 10 before and after each tick. `comparar_ticks.py --fora-do-save` lists the bytes changed by the tick outside the 307 layout blocks, with the nearest symbol from the `.SYM`. Run over 140 ticks (79 → 219, covers phases 0–3 of 128 ticks and the 16-, 32- and 64-tick tasks).
+2. **Reads:** `gerar_vetores_tick.py --mapear-leituras` places gdbstub **read watchpoints** on everything outside the save in segments 8, 9 and 10 (141 ranges, 80,062 bytes; minus the stack above `_end` and the already known maps), cut at symbol boundaries and into 64-byte pieces (QEMU reports the start of the watchpoint hit, not the byte read). Each read records the piece, the value and the CS:IP of the reader, translated to `10x0:offset`. Run over the same 140 ticks (~3.7 s per tick).
 
-### Escritas do tick fora do save (140 ticks)
+### Tick writes outside the save (140 ticks)
 
-| Variável | Endereço | Natureza |
+| Variable | Address | Nature |
 |---|---|---|
-| estado de S | `10:cbf2` (2 bytes) | gerador; muda em todo tick |
-| estado de R | `10:ae34` (4 bytes) | gerador; muda em todo tick (`RRand(32)` da chuva em `_DoSimYard`) |
-| `_LifeA` / `_LifeB` / `_LifeR` | `10:68e8` (8 KB), `10:88e8`, `10:98e8` (4 KB cada) | mapas de ocupação; mudam quando formigas se movem |
-| `_TemBModePop`, `_TemRModePop` | `9:786a`, `9:7be4` | temporários: zerados e remontados em todo tick |
-| `_TemCensus` | `9:7c4e` | temporário da contagem (`_FullCount`) |
-| área acima de `_end` (`10:cf56`) | pilha (SS = DGROUP) | lixo de pilha, não é estado |
+| S state | `10:cbf2` (2 bytes) | generator; changes on every tick |
+| R state | `10:ae34` (4 bytes) | generator; changes on every tick (`RRand(32)` of the rain in `_DoSimYard`) |
+| `_LifeA` / `_LifeB` / `_LifeR` | `10:68e8` (8 KB), `10:88e8`, `10:98e8` (4 KB each) | occupancy maps; change when ants move |
+| `_TemBModePop`, `_TemRModePop` | `9:786a`, `9:7be4` | temporaries: zeroed and rebuilt on every tick |
+| `_TemCensus` | `9:7c4e` | count temporary (`_FullCount`) |
+| area above `_end` (`10:cf56`) | stack (SS = DGROUP) | stack garbage, not state |
 
-### Leituras do tick fora do save (140 ticks)
+### Tick reads outside the save (140 ticks)
 
-| Grupo | Variáveis | Valor = arquivo? | Para o port |
+| Group | Variables | Value = file? | For the port |
 |---|---|---|---|
-| **Estado de verdade** | `_gameCycles` (`9:9b2c`) | não | entrada do tick (ver `_BirdDelay`) |
-| | `_GlobalKey` (`9:7866`) | sim (0) | entrada do tick (tecla) |
-| | `_Tindex` (`9:9b6a`) | sim (0) | índice global de `_DoAntSimA/B/R`; lido em `1028:04fa`, no começo de `_DoAntSimA` [hipótese: escrito antes de usado; capturado por segurança] |
-| | estado de S e de R | não | entradas |
-| | `_LifeA/B/R` | não | não monitorados (já capturados à parte) |
-| **Tabelas constantes** | `_Dx8`, `_Dy8`, `_Dx9`, `_Dy9`, `_TurnTab`, `_SpX`, `_SpY`, `_CasteTabB`, `_ModeTabB`, `_BxTab`, `_ByTab`, `_SowTab`; trechos de `10:235a`/`10:259a` (depois de `_commandStr`) | sim | dados do executável; o port os carrega do `SIMANTW.EXE` ou de `data/` |
-| **Temporário** | `_TemDensity` (`8:4ad2`, 2 KB, lido em 2 dos 140 ticks por `1028:93e2`) | sim (zeros) | [hipótese] área de trabalho zerada antes do uso; o tick não deixou escrita nela |
-| **Interface (fora da regra)** | `_win_hwnd`, `_win_handles`, `_ribbonBarHeight` (seg. 7, `_win_IsWinOpen`); `_mapMessage`, `_mapMessageRemoveTime`, `_editMessage`, `_editWidth`, `_editHeight` (seg. 1, `_DrawRibbonMessage`/`_EditMessage`); `_bigFontH`, `_paletteH`, `_displayType`, `_clipWind`, `_clipDC` (seg. 2, `GR_MODULE`); `_pack_buf` | — | o tick chama rotinas de mensagem e desenho; só importa se mudar o estado (ver "Desenho") |
-| **Seletores de segmento** | ~18 palavras em `10:be6c..10:c6ac` com valores `0x152f`/`0x1537`/`0x1527` | não | constantes de seletor que o código usa para trocar de segmento (corrigidas pelo carregador); não são estado |
+| **Real state** | `_gameCycles` (`9:9b2c`) | no | tick input (see `_BirdDelay`) |
+| | `_GlobalKey` (`9:7866`) | yes (0) | tick input (key) |
+| | `_Tindex` (`9:9b6a`) | yes (0) | global index of `_DoAntSimA/B/R`; read at `1028:04fa`, at the start of `_DoAntSimA` [hypothesis: written before being used; captured for safety] |
+| | S and R state | no | inputs |
+| | `_LifeA/B/R` | no | not monitored (already captured separately) |
+| **Constant tables** | `_Dx8`, `_Dy8`, `_Dx9`, `_Dy9`, `_TurnTab`, `_SpX`, `_SpY`, `_CasteTabB`, `_ModeTabB`, `_BxTab`, `_ByTab`, `_SowTab`; stretches of `10:235a`/`10:259a` (after `_commandStr`) | yes | executable data; the port loads them from `SIMANTW.EXE` or from `data/` |
+| **Temporary** | `_TemDensity` (`8:4ad2`, 2 KB, read in 2 of the 140 ticks by `1028:93e2`) | yes (zeros) | [hypothesis] work area zeroed before use; the tick left no write in it |
+| **Interface (outside the rules)** | `_win_hwnd`, `_win_handles`, `_ribbonBarHeight` (seg. 7, `_win_IsWinOpen`); `_mapMessage`, `_mapMessageRemoveTime`, `_editMessage`, `_editWidth`, `_editHeight` (seg. 1, `_DrawRibbonMessage`/`_EditMessage`); `_bigFontH`, `_paletteH`, `_displayType`, `_clipWind`, `_clipDC` (seg. 2, `GR_MODULE`); `_pack_buf` | — | the tick calls message and drawing routines; it only matters if it changes the state (see "Drawing") |
+| **Segment selectors** | ~18 words in `10:be6c..10:c6ac` with values `0x152f`/`0x1537`/`0x1527` | no | selector constants the code uses to switch segments (fixed up by the loader); not state |
 
-### Lista de captura adotada
+### Adopted capture list
 
-`extras.json` (antes e depois), definido em `EXTRAS` de `tools/qemu_bancada.py`:
+`extras.json` (before and after), defined in `EXTRAS` of `tools/qemu_bancada.py`:
 
-| Campo | Endereço | Bytes |
+| Field | Address | Bytes |
 |---|---|---|
 | `SementeS` | `10:cbf2` | 2 |
 | `SementeR` | `10:ae34` | 4 |
 | `gameCycles` | `9:9b2c` | 4 |
 | `Tindex` | `9:9b6a` | 2 |
 | `GlobalKey` | `9:7866` | 2 |
-| `GameTime`, `Cycle` | (redundantes com o save, para conferência) | — |
-| `posicao` | `entrada` ou `saida` | — |
+| `GameTime`, `Cycle` | (redundant with the save, for checking) | — |
+| `posicao` | `entrada` or `saida` | — |
 
-Mais `vida_antes.bin` / `vida_depois.bin`: `_LifeA` (8.192) + `_LifeB` (4.096) + `_LifeR` (4.096) = 16.384 bytes. Pela [especificação do save](../formatos/save-ant.md), `_DoLoadInitializations` reconstrói esses mapas das listas ao carregar; o port pode reconstruí-los do mesmo jeito e usar o arquivo só para conferir (verificado nos 5 vetores versionados: a reconstrução dá o mesmo mapa no meio da simulação, antes e depois do tick; ver "Comparar o port").
+Plus `vida_antes.bin` / `vida_depois.bin`: `_LifeA` (8,192) + `_LifeB` (4,096) + `_LifeR` (4,096) = 16,384 bytes. Per the [save specification](../formatos/save-ant.md), `_DoLoadInitializations` rebuilds these maps from the lists on load; the port can rebuild them the same way and use the file only for checking (verified on the 5 versioned vectors: the rebuild gives the same map in the middle of the simulation, before and after the tick; see "Comparing the port").
 
-## Protocolo de teste
+## Test protocol
 
-### Gerar vetores (original)
+### Generating vectors (original)
 
 ```
 set SIMANT_RAIZ=C:\...\Simant recomp
 python tools/gerar_vetores_tick.py --ticks 5                       # tests/referencias/ticks/
 python tools/gerar_vetores_tick.py --ticks 3 --alvo 300 --semente-s 0x1234 --semente-r 1 --saida re_trabalho/v300
-python tools/gerar_vetores_tick.py --ticks 1 --alvos 127,159,191,223 --saida tests/referencias/ticks/fases          # vetores esparsos
-python tools/gerar_vetores_tick.py --ticks 5 --preparar tests/referencias/roteiros/tick_amarela_ordem.txt --saida ...  # roteiro (clique) antes
-python tools/gerar_vetores_tick.py --ticks 10 --livre 300 --saida tests/referencias/ticks/colonia_5min               # 300 s livre antes
+python tools/gerar_vetores_tick.py --ticks 1 --alvos 127,159,191,223 --saida tests/referencias/ticks/fases          # sparse vectors
+python tools/gerar_vetores_tick.py --ticks 5 --preparar tests/referencias/roteiros/tick_amarela_ordem.txt --saida ...  # script (click) beforehand
+python tools/gerar_vetores_tick.py --ticks 10 --livre 300 --saida tests/referencias/ticks/colonia_5min               # 300 s free-running beforehand
 ```
 
-`--alvos` grava `--ticks` ticks a partir de cada alvo, na mesma execução. `--preparar` executa um roteiro da bancada (`clicar_em`, `teclas`, `esperar`...) com a VM rodando, logo depois do `loadvm`. `--descricao` vai para o `indice.json`. Para não disputar o overlay com outra bancada, use `--overlay` com uma cópia de `re_trabalho/qemu/c_overlay.qcow2` (o snapshot `quick` vai junto).
+`--alvos` records `--ticks` ticks starting from each target, in the same run. `--preparar` runs a test bench script (`clicar_em`, `teclas`, `esperar`...) with the VM running, right after the `loadvm`. `--descricao` goes into `indice.json`. To avoid competing for the overlay with another bench, use `--overlay` with a copy of `re_trabalho/qemu/c_overlay.qcow2` (the `quick` snapshot goes along with it).
 
-**Cuidado com a fase:** o vetor `tick_NNNNNN` é nomeado pelo `GameTime` **antes** do tick, e o tick soma 1 a `_Cycle` antes de testar as condições periódicas. Para exercitar `_Cycle & 0x1F == 0` com `_Cycle` = 128, o vetor é o `tick_000127`.
+**Watch out for the phase:** the vector `tick_NNNNNN` is named after the `GameTime` **before** the tick, and the tick adds 1 to `_Cycle` before testing the periodic conditions. To exercise `_Cycle & 0x1F == 0` with `_Cycle` = 128, the vector is `tick_000127`.
 
 ```
 ```
 
-Saída por tick, em `tick_NNNNNN/` (NNNNNN = `GameTime` antes do tick):
+Output per tick, in `tick_NNNNNN/` (NNNNNN = `GameTime` before the tick):
 
-| Arquivo | Conteúdo |
+| File | Contents |
 |---|---|
-| `estado_antes.bin` | 307 blocos do save, formato `.ANT` (48.386 bytes), na entrada de `_DoAntSim` |
-| `estado_depois.bin` | idem, no retorno de `_DoAntSim` |
-| `vida_antes.bin`, `vida_depois.bin` | `_LifeA` + `_LifeB` + `_LifeR` (16.384 bytes) |
-| `extras.json` | `{"antes": {...}, "depois": {...}, "MacTickCount_lidos": [...]}` com os campos da tabela acima; `antes.MacTickCount` = primeiro valor devolvido por `_MacTickCount` dentro do tick (`null` se não houve chamada) e `MacTickCount_lidos` = todos, na ordem (desde 2026-10-17) |
+| `estado_antes.bin` | 307 save blocks, `.ANT` format (48,386 bytes), at the entry of `_DoAntSim` |
+| `estado_depois.bin` | same, at the return of `_DoAntSim` |
+| `vida_antes.bin`, `vida_depois.bin` | `_LifeA` + `_LifeB` + `_LifeR` (16,384 bytes) |
+| `extras.json` | `{"antes": {...}, "depois": {...}, "MacTickCount_lidos": [...]}` with the fields of the table above; `antes.MacTickCount` = first value returned by `_MacTickCount` inside the tick (`null` if there was no call) and `MacTickCount_lidos` = all of them, in order (since 2026-10-17) |
 
-`indice.json` guarda a origem: snapshot, sementes forçadas, alvo, a primeira entrada, os seletores e o endereço de retorno de `_DoAntSim`.
+`indice.json` stores the origin: snapshot, forced seeds, target, the first entry, the selectors and the return address of `_DoAntSim`.
 
-### Vetores no repositório
+### Vectors in the repository
 
-`tests/referencias/ticks/`: ticks 79 a 83 do snapshot `quick` (Quick Game, velocidade normal, janelas do início do jogo), sem forçar sementes. No tick 80 (`_Cycle` = 80, múltiplo de 16) a rainha preta põe um ovo (`TotalEggsLaidB` 3 → 4, lista B cresce). Repetibilidade conferida: os ticks 79–81 batem com os da execução E1 (exceto `_BirdDelay` a partir do tick 80, ver acima).
+`tests/referencias/ticks/`: ticks 79 to 83 of the `quick` snapshot (Quick Game, normal speed, start-of-game windows), without forcing seeds. On tick 80 (`_Cycle` = 80, a multiple of 16) the black queen lays an egg (`TotalEggsLaidB` 3 → 4, list B grows). Repeatability checked: ticks 79–81 match those of run E1 (except `_BirdDelay` from tick 80 on, see above).
 
-Cenários em subpastas (gerados em 2026-10-17, listados em `"cenarios"` do `indice.json` da raiz; cada um com o seu `indice.json`, que guarda o comando, a `descricao` e as exceções do teste):
+Scenarios in subfolders (generated on 2026-10-17, listed in `"cenarios"` of the root `indice.json`; each one with its own `indice.json`, which stores the command, the `descricao` and the test exceptions):
 
-| Subpasta | Ticks | Como foi gerado | O que exercita |
+| Subfolder | Ticks | How it was generated | What it exercises |
 |---|---|---|---|
-| `fases/` | 127, 159, 191, 223 (1 cada) | `--alvos 127,159,191,223` | `_Cycle` = 128, 160, 192, 224 depois da soma: fases 0, 1, 2 e 3 de `_DoSmells` (compactação A/B/R, `_FullCount`, `_HistUpdate`, `_SmoothAlarm`, `_FillHoles*`, `_ColonySmell*`); 128 e 192 também são múltiplos de 64 (`_FeedAnts`: `HealthB/R` −1, `MeHealth` −1). No 127 o original mudou 43 blocos, entre eles `HealthB/R`, `MeHealth`, `H_*`, `HistCnt`, `HistStart`, `CastePop*` |
-| `amarela_andando/` | 85–89 | `--preparar tests/referencias/roteiros/tick_amarela_ordem.txt`: clique simples na célula (32, 1) do ninho preto (tela (160, 182)) | a amarela anda de (35, 8) a (33, 3), um passo por tick, com `_MeMoveMe` = 1 e `_MeCmd` = 0, passando pelas células da rainha preta |
-| `colonia_5min/` | 1885–1894 | `--livre 285 --alvo 1885` (velocidade normal, sem intervenção) | 140 vagas na lista A, 59 na B, 75 na R (muitas mortas, T = 0), formigas em vários modos, gato fora de cena (relógio do Mac lido em todo tick), formiga-leão |
+| `fases/` | 127, 159, 191, 223 (1 each) | `--alvos 127,159,191,223` | `_Cycle` = 128, 160, 192, 224 after the increment: phases 0, 1, 2 and 3 of `_DoSmells` (A/B/R compaction, `_FullCount`, `_HistUpdate`, `_SmoothAlarm`, `_FillHoles*`, `_ColonySmell*`); 128 and 192 are also multiples of 64 (`_FeedAnts`: `HealthB/R` −1, `MeHealth` −1). On 127 the original changed 43 blocks, among them `HealthB/R`, `MeHealth`, `H_*`, `HistCnt`, `HistStart`, `CastePop*` |
+| `amarela_andando/` | 85–89 | `--preparar tests/referencias/roteiros/tick_amarela_ordem.txt`: single click on cell (32, 1) of the black nest (screen (160, 182)) | the yellow ant walks from (35, 8) to (33, 3), one step per tick, with `_MeMoveMe` = 1 and `_MeCmd` = 0, passing through the black queen's cells |
+| `colonia_5min/` | 1885–1894 | `--livre 285 --alvo 1885` (normal speed, no intervention) | 140 slots in list A, 59 in B, 75 in R (many dead, T = 0), ants in various modes, cat off-scene (Mac clock read on every tick), antlion |
 
-Cenários de eventos (2026-10-17, `tools/cenarios_tick.py` a partir do snapshot **rico** — `tests/referencias/roteiros/qemu_snapshot_rico.txt`: o `quick` rodando 285 s, ~1710 ticks, com chuva caindo, menino cortando grama, aranha na tela e dezenas de formigas). O script grava sequências longas em `re_trabalho/cen/` (fora do git), lista os eventos (`eventos`) e copia janelas escolhidas (`selecionar`); o `indice.json` de cada cenário guarda os `passos` (escritas na memória, cliques) e a `selecao`:
+Event scenarios (2026-10-17, `tools/cenarios_tick.py` from the **rico** snapshot — `tests/referencias/roteiros/qemu_snapshot_rico.txt`: `quick` running for 285 s, ~1710 ticks, with rain falling, the boy mowing the lawn, a spider on screen and dozens of ants). The script records long sequences in `re_trabalho/cen/` (outside git), lists the events (`eventos`) and copies chosen windows (`selecionar`); the `indice.json` of each scenario stores the `passos` (memory writes, clicks) and the `selecao`:
 
-| Subpasta | Ticks | Preparação | O que exercita |
+| Subfolder | Ticks | Preparation | What it exercises |
 |---|---|---|---|
-| `chuva/` | 1711–1712, 1747–1751 | `_GlobalKey = 0xA8` na entrada do 1711 | inundação dos ninhos (`_DoWater`, `WaterTable` 46→45, `MapB/MapR`); fim da chuva (1749) e recomeço com `_InitWater` (1750) |
-| `chuva_secando/` | 1769–1771 | nenhuma | água baixando (`WaterTable` 46→47, 0x4E volta a túnel com `S(8)`) |
-| `revoada/` | 1711–1718 | 18 formigas da superfície em M = 15 e `_FlyAwayB/R = 3` | modos 15 → 16 (`S1(F)`, depois F = 1) e saída do mapa no modo 16 (`S32`) |
-| `menino_cortador/` | 1711–1715 | menino cortando (`_BoyHere = 3`, `_BoyIsMowing = 1`) posto no patch atual (11, 8) | `_FootFall` e `_MowerFall` (38 de 56 formigas mortas no 1712), sob chuva |
-| `predadores/` | 1795–1797, 1812–1813 | nenhuma | aranha come uma preta (`_SMode` 2→3, `_BAntsEaten` +1, 1796); formiga-leão come (1813) |
-| `amarela_superficie/` | 1732–1734, 1790–1792, 1850–1852 | Ctrl+8 e cliques calculados (`_MapPnt` escrito para pôr a célula no centro) | sai do ninho (`_ExitNest`), pega comida (duplo clique, `_TryMyDropOrLift`) logo depois da compactação da lista A, entra no ninho vermelho (com troca da vista) |
-| `amarela_luta/` | 1860–1864 | duplo clique numa vermelha (ordem 3), logo depois de uma compactação | perseguição, `_YellowFight` com derrota, `_AnimYellowFight` (o relógio é lido ~1000 vezes no tick), renascimento como ovo (`_MeEgg` 1→7) |
-| `velocidade_rapida/`, `velocidade_ultra/` | 1899–1901, 1977–1979 | Shift+3 / Shift+4 | o tick é o mesmo; `_gameCycles` anda 1 por tick e o relógio do Mac fica parado (17427) enquanto a bancada avança tick a tick |
+| `chuva/` | 1711–1712, 1747–1751 | `_GlobalKey = 0xA8` at the entry of 1711 | flooding of the nests (`_DoWater`, `WaterTable` 46→45, `MapB/MapR`); end of the rain (1749) and restart with `_InitWater` (1750) |
+| `chuva_secando/` | 1769–1771 | none | water receding (`WaterTable` 46→47, 0x4E back to tunnel with `S(8)`) |
+| `revoada/` | 1711–1718 | 18 surface ants in M = 15 and `_FlyAwayB/R = 3` | modes 15 → 16 (`S1(F)`, then F = 1) and leaving the map in mode 16 (`S32`) |
+| `menino_cortador/` | 1711–1715 | boy mowing (`_BoyHere = 3`, `_BoyIsMowing = 1`) placed on the current patch (11, 8) | `_FootFall` and `_MowerFall` (38 of 56 ants dead on 1712), under rain |
+| `predadores/` | 1795–1797, 1812–1813 | none | spider eats a black ant (`_SMode` 2→3, `_BAntsEaten` +1, 1796); antlion eats (1813) |
+| `amarela_superficie/` | 1732–1734, 1790–1792, 1850–1852 | Ctrl+8 and calculated clicks (`_MapPnt` written to put the cell in the center) | leaves the nest (`_ExitNest`), picks up food (double click, `_TryMyDropOrLift`) right after the compaction of list A, enters the red nest (with a view change) |
+| `amarela_luta/` | 1860–1864 | double click on a red ant (order 3), right after a compaction | chase, `_YellowFight` with defeat, `_AnimYellowFight` (the clock is read ~1000 times in the tick), rebirth as an egg (`_MeEgg` 1→7) |
+| `velocidade_rapida/`, `velocidade_ultra/` | 1899–1901, 1977–1979 | Shift+3 / Shift+4 | the tick is the same; `_gameCycles` advances 1 per tick and the Mac clock stays still (17427) while the test bench advances tick by tick |
 
-Volume: 9,5 MB ao todo em `tests/referencias/ticks/` (~135 KB por tick).
+Volume: 9.5 MB in total in `tests/referencias/ticks/` (~135 KB per tick).
 
-### Comparar o port
+### Comparing the port
 
-Para cada `tick_NNNNNN`:
+For each `tick_NNNNNN`:
 
-1. carregar `estado_antes.bin` como um save, **sem** as inicializações de carga que mexem nos geradores (o `_LoadGame` do original chama `_RandYard`, que reinicia S; ver [rng.md](rng.md#a-semente-está-no-save));
-2. pôr S, R, `_gameCycles`, `_GlobalKey` (e `_Tindex`) com os valores de `extras.json["antes"]`; montar os mapas de vida (reconstruir ou ler `vida_antes.bin`);
-3. rodar **um** `_DoAntSim`;
-4. gravar o estado no formato `.ANT` e comparar com `estado_depois.bin` (`tools/estado_diff.py`); comparar S e R com `extras.json["depois"]` e a vida com `vida_depois.bin`.
+1. load `estado_antes.bin` as a save, **without** the load initializations that touch the generators (the original's `_LoadGame` calls `_RandYard`, which resets S; see [rng.md](rng.md#is-the-seed-in-the-save));
+2. set S, R, `_gameCycles`, `_GlobalKey` (and `_Tindex`) to the values from `extras.json["antes"]`; build the life maps (rebuild or read `vida_antes.bin`);
+3. run **one** `_DoAntSim`;
+4. write the state in `.ANT` format and compare with `estado_depois.bin` (`tools/estado_diff.py`); compare S and R with `extras.json["depois"]` and the life with `vida_depois.bin`.
 
-No port, os passos 1–4 estão em `engine/src/rules/vetor_tick.rs` (`VetorTick::ler`, `montar_entrada`, `comparar_tick`):
+In the port, steps 1–4 are in `engine/src/rules/vetor_tick.rs` (`VetorTick::ler`, `montar_entrada`, `comparar_tick`):
 
 ```
-cargo run -p engine --example comparar_tick -- tests/referencias/ticks/tick_000079   # um tick, relatório completo
-cargo run -p engine --example comparar_tick -- tests/referencias/ticks               # todos, mais o placar
+cargo run -p engine --example comparar_tick -- tests/referencias/ticks/tick_000079   # one tick, full report
+cargo run -p engine --example comparar_tick -- tests/referencias/ticks               # all of them, plus the scoreboard
 ```
 
-O relatório traz: blocos iguais/diferentes (com bytes diferentes e quem mudou o bloco: o original, o port ou os dois); as primeiras diferenças de cada bloco, por formiga e campo nas listas (`formiga 5 campo T`), por célula `(x, y)` nos mapas (`MapA/B/R`, `ExitMap*`, `PherMap*`, células do próprio mapa) e por elemento nos demais; S, R, `_gameCycles`, `_Tindex` e `_GlobalKey` depois do tick; a vida depois do tick; e duas conferências da reconstrução da vida (abaixo). O teste `engine/tests/ticks_originais.rs` roda todos os vetores de `indice.json`.
+The report includes: equal/different blocks (with the differing bytes and who changed the block: the original, the port or both); the first differences of each block, by ant and field in the lists (`formiga 5 campo T`), by cell `(x, y)` in the maps (`MapA/B/R`, `ExitMap*`, `PherMap*`, cells of the map itself) and by element in the others; S, R, `_gameCycles`, `_Tindex` and `_GlobalKey` after the tick; the life after the tick; and two checks of the life rebuild (below). The test `engine/tests/ticks_originais.rs` runs all vectors in `indice.json`.
 
-**Reconstrução da vida (verificado, 2026-10-17, nos 5 vetores):** os mapas `_LifeA/B/R` reconstruídos das listas como `_DoLoadInitializations` (`core/vida.rs`, o mesmo que `Estado::de_save` usa) são **idênticos** a `vida_antes.bin` e, reconstruídos do `estado_depois`, a `vida_depois.bin`. A hipótese da seção "Lista de captura adotada" fica confirmada para esses ticks (sem amarela rainha; a segunda célula dela continua sem reconstrução). O comparador usa a vida gravada mesmo assim, e o teste exige que a reconstrução continue batendo.
+**Life rebuild (verified, 2026-10-17, on the 5 vectors):** the `_LifeA/B/R` maps rebuilt from the lists like `_DoLoadInitializations` (`core/vida.rs`, the same one `Estado::de_save` uses) are **identical** to `vida_antes.bin` and, rebuilt from `estado_depois`, to `vida_depois.bin`. The hypothesis of the "Adopted capture list" section is confirmed for these ticks (without a yellow queen; her second cell still has no rebuild). The comparator uses the recorded life anyway, and the test requires the rebuild to keep matching.
 
-Os ticks consecutivos são encadeáveis: verificado que o `estado_depois` do tick N é igual ao `estado_antes` do N+1 (só `_gameCycles` muda no intervalo). Assim, um teste de N ticks pode partir do primeiro `estado_antes` e conferir cada `estado_depois`, desde que use o `_gameCycles` de cada `extras.json["antes"]`.
+Consecutive ticks can be chained: verified that the `estado_depois` of tick N equals the `estado_antes` of N+1 (only `_gameCycles` changes in the interval). Thus, an N-tick test can start from the first `estado_antes` and check each `estado_depois`, as long as it uses the `_gameCycles` of each `extras.json["antes"]`.
 
-## Placar do port
+## Port scoreboard
 
-Um tick do port (`RegrasOriginais` sem tabelas de geração) sobre cada vetor de `tests/referencias/ticks/`, comparado com o `estado_depois` do original. "Mudados" = blocos que o original alterou no tick; "extras" = S, R, `_gameCycles`, `_Tindex`, `_GlobalKey`.
+One port tick (`RegrasOriginais` without generation tables) over each vector of `tests/referencias/ticks/`, compared with the original's `estado_depois`. "Changed" = blocks that the original altered in the tick; "extras" = S, R, `_gameCycles`, `_Tindex`, `_GlobalKey`.
 
-**2026-10-17, depois de integrar quintal, inimigos, superfície, ninho, amarela e conselhos:** os 5 vetores batem **inteiros**.
+**2026-10-17, after integrating yard, enemies, surface, nest, yellow ant and advice:** the 5 vectors match **entirely**.
 
-| Tick | Blocos iguais | Mudados pelo original (todos iguais) | Extras iguais (S, R, `_gameCycles`, `_Tindex`, `_GlobalKey`) | Células de vida diferentes |
+| Tick | Equal blocks | Changed by the original (all equal) | Equal extras (S, R, `_gameCycles`, `_Tindex`, `_GlobalKey`) | Different life cells |
 |---|---|---|---|---|
 | 79 | 307/307 | 28 | 5/5 | 0 |
 | 80 | 307/307 | 22 | 5/5 | 0 |
@@ -229,220 +231,220 @@ Um tick do port (`RegrasOriginais` sem tabelas de geração) sobre cada vetor de
 | 82 | 307/307 | 21 | 5/5 | 0 |
 | 83 | 307/307 | 19 | 5/5 | 0 |
 
-O último ajuste foi o relógio do quintal: `_BirdDelay` e `_CatDelay` só batem usando o `_gameCycles` do vetor (`Estado::ciclos_jogo`) também como relógio do Mac [hipótese; ver quintal.md, "Implementação no port"]. Histórico: só o esqueleto dava 280–289/307; com inimigos, amarela e superfície, 284–293; com o ninho e o quintal, 287–305; com o relógio, 307.
+The last adjustment was the yard clock: `_BirdDelay` and `_CatDelay` only match by using the vector's `_gameCycles` (`Estado::ciclos_jogo`) also as the Mac clock [hypothesis; see quintal.md, "Implementation in the port"]. History: the skeleton alone gave 280–289/307; with enemies, yellow ant and surface, 284–293; with the nest and the yard, 287–305; with the clock, 307.
 
-**O teste exige igualdade total** (`engine/tests/ticks_originais.rs`): qualquer bloco, extra ou célula de vida diferente falha. Ele roda os vetores da raiz e os de cada cenário em `"cenarios"`. Exceções, sempre com o motivo, no `indice.json` do cenário: `"pendentes"` (o port ainda diverge; só se exige que o vetor rode e que a ida e volta do save funcione; quem corrigir a regra tira o tick da lista) e `"vida_nao_reconstruivel"` (a vida do original não sai das listas; não se confere a reconstrução, mas a vida depois do tick continua exigida).
+**The test requires total equality** (`engine/tests/ticks_originais.rs`): any different block, extra or life cell fails. It runs the root vectors and those of each scenario in `"cenarios"`. Exceptions, always with the reason, in the scenario's `indice.json`: `"pendentes"` (the port still diverges; it is only required that the vector runs and that the save round trip works; whoever fixes the rule removes the tick from the list) and `"vida_nao_reconstruivel"` (the original's life does not come out of the lists; the rebuild is not checked, but the life after the tick is still required).
 
-### Cenários (2026-10-17, depois de gravar o relógio do Mac)
+### Scenarios (2026-10-17, after recording the Mac clock)
 
-Todos os 24 vetores batem **inteiros** (307/307 blocos, extras 5/5, vida 0): raiz 79–83, `fases/127, 159, 191, 223`, `amarela_andando/85–89`, `colonia_5min/1885–1894`. Nenhum vetor em `"pendentes"`.
+All 24 vectors match **entirely** (307/307 blocks, extras 5/5, life 0): root 79–83, `fases/127, 159, 191, 223`, `amarela_andando/85–89`, `colonia_5min/1885–1894`. No vector in `"pendentes"`.
 
-| Cenário | Ticks | Mudados pelo original (todos iguais) | `MacTickCount` lido no tick |
+| Scenario | Ticks | Changed by the original (all equal) | `MacTickCount` read in the tick |
 |---|---|---|---|
-| raiz | 79–83 | 19–28 | nenhuma leitura (gato andando) |
-| `fases/` | 127, 159, 191, 223 | 43, 30, 32, 20 | 127: nenhuma; 159: 3333; 191: 3621; 223: 3909 |
-| `amarela_andando/` | 85–89 | 23–31 | nenhuma leitura |
-| `colonia_5min/` | 1885–1894 | 22–40 | 18906, 18915, …, 18987 (uma leitura por tick, +9 por tick) |
+| root | 79–83 | 19–28 | no read (cat walking) |
+| `fases/` | 127, 159, 191, 223 | 43, 30, 32, 20 | 127: none; 159: 3333; 191: 3621; 223: 3909 |
+| `amarela_andando/` | 85–89 | 23–31 | no read |
+| `colonia_5min/` | 1885–1894 | 22–40 | 18906, 18915, …, 18987 (one read per tick, +9 per tick) |
 
-**Correção:** `tools/qemu_bancada.py` (`Depurador.ir_saida(relogio=...)`) põe breakpoints alternados na entrada e no RETF (`1000:96a5`) de `_MacTickCount` durante o tick e anota DX:AX de cada chamada; `extras.json` ganhou `antes.MacTickCount` (primeiro valor lido, `null` se o tick não leu) e `MacTickCount_lidos` (todos). O comparador põe esse valor em `Estado::relogio_mac`, e `quintal::Relogios::do_port` o usa como relógio do Mac quando presente. Todos os vetores foram regravados (mesmos ticks). Os de `fases/191`, `fases/223` e `colonia_5min` saíram **diferentes** da primeira gravação: como os sorteios do gato e do latido dependem do tempo real, o original não é determinístico tick a tick a partir do snapshot quando o gato está fora de cena (S na entrada do tick 191: 0x6038 numa execução, 0x3353 na outra). Os vetores continuam válidos porque cada um traz o relógio que leu.
+**Fix:** `tools/qemu_bancada.py` (`Depurador.ir_saida(relogio=...)`) places alternating breakpoints at the entry and at the RETF (`1000:96a5`) of `_MacTickCount` during the tick and records DX:AX of each call; `extras.json` gained `antes.MacTickCount` (first value read, `null` if the tick did not read it) and `MacTickCount_lidos` (all of them). The comparator puts this value in `Estado::relogio_mac`, and `quintal::Relogios::do_port` uses it as the Mac clock when present. All vectors were re-recorded (same ticks). Those of `fases/191`, `fases/223` and `colonia_5min` came out **different** from the first recording: since the cat and bark random draws depend on real time, the original is not deterministic tick by tick from the snapshot when the cat is off-scene (S at the entry of tick 191: 0x6038 in one run, 0x3353 in the other). The vectors remain valid because each one carries the clock it read.
 
-**As duas pontas soltas (1891 e 1893 da primeira gravação):** também eram o relógio. Conferido injetando nos vetores antigos (fora do repositório) o relógio estimado (18903 + 9 por tick: 18903 no 1887, 18939 no 1891, 18957 no 1893): os três passam a bater 307/307, com extras 5/5. Mecanismo: com o relógio errado, o port fazia o sorteio extra do gato (`_CatDelay` 19503 vencido). Isso deslocava os sorteios seguintes (o cachorro no 1891, duas formigas da superfície no 1893), e o total de sorteios do tick coincidia por acaso, de modo que S e R batiam no fim. Não há erro de regra.
+**The two loose ends (1891 and 1893 of the first recording):** they were also the clock. Checked by injecting into the old vectors (outside the repository) the estimated clock (18903 + 9 per tick: 18903 on 1887, 18939 on 1891, 18957 on 1893): all three then match 307/307, with extras 5/5. Mechanism: with the wrong clock, the port made the cat's extra random draw (`_CatDelay` 19503 expired). This shifted the following random draws (the dog on 1891, two surface ants on 1893), and the total number of random draws in the tick coincided by chance, so that S and R matched at the end. There is no rule error.
 
-**Histórico — divergência da primeira gravação (resolvida): relógio do Mac do gato (quintal, `_SimCat`, [quintal.md](quintal.md) seção 6).** O port usava `Estado::ciclos_jogo` (o `_gameCycles` do vetor) como relógio do Mac; o original usa `GetTickCount() / 55 × 3`. Evidência:
-- `colonia_5min/1887`: o gato termina a fuga (estado 3) e grava `_CatDelay = relógio + 600`. Original: 19503, logo relógio ≈ 18903 (≈ 315 s em 1/60 s); port: 270585 = `_gameCycles` (269985) + 600. É o único bloco diferente nesse tick.
-- `fases/159`, `191`, `223`: com `_CatOn = 0`, o original não mexe em `_CatDelay` (3654, gravado no tick 127, e 4064), portanto o relógio dele ainda é ≤ esse valor; o port compara com `_gameCycles` (29579, 36125, 42381), acha o atraso vencido, grava `_gameCycles + 200` e sorteia `S16`. O gerador S diverge **antes** de `_DoAntSimA` (o quintal é o passo 6 do tick) e o resto vem em cascata: gato aparecendo só no port (`CatOn`/`CatX`/`CatDir`/`CatCycle`, tick 159), cachorro (`DogDir`/`DogFrame`/`DogTurnCnt`/`DogX`), uma formiga da superfície (`AlistX/Y/T`) e, no 223, a rainha preta que põe um ovo só no port (`Blist*[11]`, `ListIndexB`, `TotalEggsLaidB`, `HealthB`).
-- `colonia_5min/1888–1894`: o mesmo, partindo do `_CatDelay` = 19503 do original: S diverge e daí formigas da superfície e dos ninhos (`Alist*`, `Blist*`, `Rlist*`), feromônios (`PherMapBN/BT/RN/RT`), `MapA`, `SowDir`, `RedTask`, `LionListT` e a vida. No 1889 o port ainda mexe em 64 bytes de `MapB` e de `MapR`, em `WaterTable` e em `ListIndexR` [hipótese: também cascata]. No 1891 e no 1893 S e R batem no fim do tick mas o cachorro (1891) e duas formigas (1893) divergem: causa não isolada.
-- Nos ticks 79–83 e 127 o relógio não é lido (gato andando ou ainda em cena), por isso a hipótese "relógio do Mac = `_gameCycles`" passava.
+**History — divergence of the first recording (resolved): the cat's Mac clock (yard, `_SimCat`, [quintal.md](quintal.md) section 6).** The port used `Estado::ciclos_jogo` (the vector's `_gameCycles`) as the Mac clock; the original uses `GetTickCount() / 55 × 3`. Evidence:
+- `colonia_5min/1887`: the cat finishes its escape (state 3) and writes `_CatDelay = clock + 600`. Original: 19503, so clock ≈ 18903 (≈ 315 s in 1/60 s); port: 270585 = `_gameCycles` (269985) + 600. It is the only different block in this tick.
+- `fases/159`, `191`, `223`: with `_CatOn = 0`, the original does not touch `_CatDelay` (3654, written on tick 127, and 4064), so its clock is still ≤ that value; the port compares with `_gameCycles` (29579, 36125, 42381), finds the delay expired, writes `_gameCycles + 200` and draws `S16`. The S generator diverges **before** `_DoAntSimA` (the yard is step 6 of the tick) and the rest follows in cascade: cat appearing only in the port (`CatOn`/`CatX`/`CatDir`/`CatCycle`, tick 159), dog (`DogDir`/`DogFrame`/`DogTurnCnt`/`DogX`), a surface ant (`AlistX/Y/T`) and, on 223, the black queen laying an egg only in the port (`Blist*[11]`, `ListIndexB`, `TotalEggsLaidB`, `HealthB`).
+- `colonia_5min/1888–1894`: the same, starting from the original's `_CatDelay` = 19503: S diverges and from there surface and nest ants (`Alist*`, `Blist*`, `Rlist*`), pheromones (`PherMapBN/BT/RN/RT`), `MapA`, `SowDir`, `RedTask`, `LionListT` and the life. On 1889 the port also touches 64 bytes of `MapB` and of `MapR`, `WaterTable` and `ListIndexR` [hypothesis: also cascade]. On 1891 and 1893 S and R match at the end of the tick but the dog (1891) and two ants (1893) diverge: cause not isolated.
+- On ticks 79–83 and 127 the clock is not read (cat walking or still on scene), which is why the hypothesis "Mac clock = `_gameCycles`" passed.
 
-**Divergência 2 — vida não reconstruível das listas** (não é erro do port; o comparador usa a vida gravada). Casos vistos:
-- `amarela_andando/86–88`: a amarela passou pelas duas células da rainha preta (Blist 0 e 1, T 96 e 104, em (34, 6) e (34, 7)); ao sair de cada uma, o original zerou a célula e a marca da rainha sumiu de `_LifeB`.
-- `fases/159`, `191`: vários ovos e larvas em (34, 8); o ovo posto no tick (índice mais alto, T 1) fica em `_LifeB` porque foi escrito por último, e a reconstrução de `_DoLoadInitializations` deixa o de menor índice (T 2).
-- `colonia_5min` (todos): dezenas de vagas mortas (T = 0) paradas nas células dos buracos (ex.: lista A em (2, 32), lista R em (32, 1)) apagam, na reconstrução, a marca da formiga viva de índice maior que está na mesma célula.
-Consequência para o port: um save carregado no meio do jogo pode ter vida diferente da que o original tinha em memória; o original, ao carregar o mesmo save, faz a mesma reconstrução, então isso só importa para comparar com memória viva.
+**Divergence 2 — life not rebuildable from the lists** (not a port error; the comparator uses the recorded life). Cases seen:
+- `amarela_andando/86–88`: the yellow ant passed through the two cells of the black queen (Blist 0 and 1, T 96 and 104, at (34, 6) and (34, 7)); when leaving each one, the original zeroed the cell and the queen's mark disappeared from `_LifeB`.
+- `fases/159`, `191`: several eggs and larvae at (34, 8); the egg laid in the tick (highest index, T 1) stays in `_LifeB` because it was written last, and the `_DoLoadInitializations` rebuild leaves the one with the lowest index (T 2).
+- `colonia_5min` (all): dozens of dead slots (T = 0) parked on the hole cells (e.g. list A at (2, 32), list R at (32, 1)) erase, in the rebuild, the mark of the higher-index live ant that is on the same cell.
+Consequence for the port: a save loaded mid-game may have a life different from the one the original had in memory; the original, when loading the same save, does the same rebuild, so this only matters for comparing with live memory.
 
-### Cenários de eventos (2026-10-17, main em `317026e`)
+### Event scenarios (2026-10-17, main at `317026e`)
 
-Os **48 vetores novos batem inteiros** (307/307, extras 5/5, vida 0); nenhum fica em `"pendentes"`. Antes da seleção, as gravações brutas inteiras também foram comparadas: 552 ticks de `re_trabalho/cen/` (chuva 80, livre 250, amarela 122, luta 64, revoada 12, menino 12, fast 6, ultra 6), todos 307/307 depois das duas correções abaixo. Todos têm `vida_nao_reconstruivel: {"*": ...}` (vagas mortas nas células dos buracos, como em `colonia_5min`).
+The **48 new vectors match entirely** (307/307, extras 5/5, life 0); none stays in `"pendentes"`. Before the selection, the whole raw recordings were also compared: 552 ticks from `re_trabalho/cen/` (rain 80, free 250, yellow ant 122, fight 64, mating flight 12, boy 12, fast 6, ultra 6), all 307/307 after the two fixes below. All of them have `vida_nao_reconstruivel: {"*": ...}` (dead slots on the hole cells, as in `colonia_5min`).
 
-Duas divergências apareceram e foram corrigidas:
+Two divergences appeared and were fixed:
 
-1. **Regra — `_DoAntMoveY` depois de entrar no ninho** (`engine/src/rules/amarela.rs`, `passo_da_ordem`, bloco final). Com destino = a própria célula do buraco e o plano novo ≠ plano exibido, o original termina a ordem (r = −1 → `_ResetYellowVars` na posição nova: `MeGoal*` = (3, 32, 1), `MeLast*`, `MeMoveMe = 0`, `MeSteps = 0`); o port só centralizava e deixava a ordem andando. No pseudocódigo, depois do `_GotoMyAnt` o fluxo cai no rótulo `1028:7b6b` (`local_8 = −1`). Correção: `return (-1, alvo)` nesse caso (4 linhas). Vetor: `amarela_superficie/1852`. Spec: formiga-amarela.md §4.
-2. **Comparador — a vista anda dentro do tick.** `_GotoMyAnt` (`1000:a764`) chama `_CenterEdit`/`_SetMapPlaneLocation` no meio do tick e `_MapPnt`, `_MapPlane`, `_MapMode` estão no save; no port isso é da interface (`Evento::CentralizarNaAmarela`, tratado por `core::partida`). `vetor_tick.rs` (`aplicar_vista_da_bancada`) agora reproduz o efeito no save quando o tick pede a centralização: troca `_MapPlane`/`_MapMode` se a amarela está noutro plano e anda `_MapPnt` como `_CenterEdit` (Bresenham com truncamento, telas/jogo.md "Centralizar"), com a janela da bancada de 25 × 19 tiles. Conferido em `amarela_superficie/1852` ((97, 23) → (20, 0)) e `amarela_luta/1864` ((47, 9) → (25, 1): o eixo menor anda um passo a menos). [hipótese] `_editWidth` = 25 na bancada (as duas contas só fecham com meia largura 12, não 13).
+1. **Rule — `_DoAntMoveY` after entering the nest** (`engine/src/rules/amarela.rs`, `passo_da_ordem`, final block). With destination = the hole cell itself and the new plane ≠ displayed plane, the original ends the order (r = −1 → `_ResetYellowVars` at the new position: `MeGoal*` = (3, 32, 1), `MeLast*`, `MeMoveMe = 0`, `MeSteps = 0`); the port only centered and left the order running. In the pseudocode, after `_GotoMyAnt` the flow falls into label `1028:7b6b` (`local_8 = −1`). Fix: `return (-1, alvo)` in this case (4 lines). Vector: `amarela_superficie/1852`. Spec: formiga-amarela.md §4.
+2. **Comparator — the view moves inside the tick.** `_GotoMyAnt` (`1000:a764`) calls `_CenterEdit`/`_SetMapPlaneLocation` in the middle of the tick and `_MapPnt`, `_MapPlane`, `_MapMode` are in the save; in the port this belongs to the interface (`Evento::CentralizarNaAmarela`, handled by `core::partida`). `vetor_tick.rs` (`aplicar_vista_da_bancada`) now reproduces the effect on the save when the tick requests the centering: it switches `_MapPlane`/`_MapMode` if the yellow ant is on another plane and moves `_MapPnt` like `_CenterEdit` (Bresenham with truncation, telas/jogo.md "Centering"), with the test bench window of 25 × 19 tiles. Checked on `amarela_superficie/1852` ((97, 23) → (20, 0)) and `amarela_luta/1864` ((47, 9) → (25, 1): the minor axis moves one step less). [hypothesis] `_editWidth` = 25 on the test bench (both calculations only work out with half-width 12, not 13).
 
-**Lacunas:** inseticida, Jogo Completo e Experimental não gravados (o snapshot é do Quick Game; chegar a outro tipo de jogo exige navegar diálogos de File > New, não tentado); revoada só forçada (não a armada por `_GstrR`), sem `_QueenStorage`/`_SwarmCnt` (só sobem no Jogo Completo); a luta gravada é uma derrota — falta uma vitória; só um vetor por fase de `_DoSmells`; o port usa um valor de relógio por tick, e em `amarela_luta/1864` a lista lida tem ~1000 valores diferentes, que ainda assim bateu porque a animação só usa o relógio como espera (sem sorteio dependente dele) [hipótese a conferir em `_AnimYellowFight`].
+**Gaps:** insecticide, Full Game and Experimental not recorded (the snapshot is from the Quick Game; reaching another game type requires navigating File > New dialogs, not attempted); mating flight only forced (not the one armed by `_GstrR`), without `_QueenStorage`/`_SwarmCnt` (they only rise in the Full Game); the recorded fight is a defeat — a victory is missing; only one vector per `_DoSmells` phase; the port uses one clock value per tick, and in `amarela_luta/1864` the read list has ~1000 different values, which still matched because the animation only uses the clock as a wait (no random draw depending on it) [hypothesis to check in `_AnimYellowFight`].
 
-### Terceira rodada (2026-10-17, main em `c182a5d`): modos de jogo, inseticida, vitória, revoada armada e sequência longa
+### Third round (2026-10-17, main at `c182a5d`): game modes, insecticide, victory, armed mating flight and long sequence
 
-| Subpasta | Ticks | Preparação | O que exercita | Resultado |
+| Subfolder | Ticks | Preparation | What it exercises | Result |
 |---|---|---|---|---|
-| `jogo_completo/` | 31–35 | snapshot `full` (`roteiros/qemu_snapshot_full.txt`: boot, "Select a Game" → Full Game em (265, 300), `_CurGameType = 2`) | início do Jogo Completo (rainha alada amarela na superfície), fase 1 de `_DoSmells` | 5 batem |
-| `experimental/` | 31–34 | snapshot `exp` (`roteiros/qemu_snapshot_exp.txt`, como `qemu_experimental_e01.txt` do agente auxiliar) | Experimental sem ferramentas; ovo posto no 31 | 4 batem (31–32 com vida não reconstruível: ovo sobre larva) |
-| `inseticida/` | 1711–1714 | rico; menino dentro de casa parado no nó 32 ((45, 166) → patch (0, 12)) e `_CurYardPnt = (0, 12)` | pisada e inseticida em todo tick (`(_RpopT + _BpopT) × 8` sorteios de célula; uma formiga morta por tick) | 4 batem |
-| `inseticida_morte/` | 19–21 | `full`, a mesma preparação | a amarela (rainha alada) morre pelo inseticida (`_YellowDeath(9)`, 21) | 19–20 batem; **21 pendente** (abaixo) |
-| `amarela_vitoria/` | 1799–1801 | rico; amarela posta como soldado (vida 100) ao lado de uma operária vermelha parada (M = 17), duplo clique | `_YellowFight` com vitória (`RAntsKilled` 0→1, cadáver vermelho) | 3 batem |
-| `revoada_armada/` | 1726–1727, 1825–1826, 1924–1927 | rico; 21 vermelhas viram machos (T 0xA0, M = 14) | o jogo arma `_FlyAwayR = 200` (`_GstrR`, 1727), pré-voo 14 → 15 com F > 100, decolagens (16) e saídas até F = 0 | 8 batem |
+| `jogo_completo/` | 31–35 | `full` snapshot (`roteiros/qemu_snapshot_full.txt`: boot, "Select a Game" → Full Game at (265, 300), `_CurGameType = 2`) | start of the Full Game (winged yellow queen on the surface), phase 1 of `_DoSmells` | 5 match |
+| `experimental/` | 31–34 | `exp` snapshot (`roteiros/qemu_snapshot_exp.txt`, like `qemu_experimental_e01.txt` from the auxiliary agent) | Experimental without tools; egg laid on 31 | 4 match (31–32 with life not rebuildable: egg on top of larva) |
+| `inseticida/` | 1711–1714 | rico; boy inside the house standing at node 32 ((45, 166) → patch (0, 12)) and `_CurYardPnt = (0, 12)` | stomping and insecticide on every tick (`(_RpopT + _BpopT) × 8` cell random draws; one ant dead per tick) | 4 match |
+| `inseticida_morte/` | 19–21 | `full`, the same preparation | the yellow ant (winged queen) dies from the insecticide (`_YellowDeath(9)`, 21) | 19–20 match; **21 pending** (below) |
+| `amarela_vitoria/` | 1799–1801 | rico; yellow ant placed as a soldier (life 100) next to a stationary red worker (M = 17), double click | `_YellowFight` with victory (`RAntsKilled` 0→1, red corpse) | 3 match |
+| `revoada_armada/` | 1726–1727, 1825–1826, 1924–1927 | rico; 21 red ants become males (T 0xA0, M = 14) | the game arms `_FlyAwayR = 200` (`_GstrR`, 1727), pre-flight 14 → 15 with F > 100, take-offs (16) and exits until F = 0 | 8 match |
 
-Sequência longa (`tests/referencias/ticks_longos/rico_200/`, 392 KB): 200 ticks consecutivos do snapshot rico sem intervenção (GameTime 1711–1910), gravados por `cenarios_tick.py gravar longo`: `inicio/` (estado e vida na entrada do 1º tick), `extras.json` (os extras antes e depois de cada tick, com o relógio) e `depois_0050/`, `_0100/`, `_0150/`, `_0200/` (estado e vida). `vetor_tick::rodar_sequencia` roda os 200 ticks encadeados no port, pondo antes de cada um só o que muda fora do tick (`_gameCycles`, relógio do Mac, `_GlobalKey`), e confere S e R depois de cada tick e o save inteiro e a vida nos 4 pontos; `engine/tests/ticks_longos.rs` exige tudo igual. **Resultado: 200/200, S e R iguais em todos os ticks e os 4 pontos 307/307 com vida igual.**
+Long sequence (`tests/referencias/ticks_longos/rico_200/`, 392 KB): 200 consecutive ticks of the rico snapshot without intervention (GameTime 1711–1910), recorded by `cenarios_tick.py gravar longo`: `inicio/` (state and life at the entry of the 1st tick), `extras.json` (the extras before and after each tick, with the clock) and `depois_0050/`, `_0100/`, `_0150/`, `_0200/` (state and life). `vetor_tick::rodar_sequencia` runs the 200 chained ticks in the port, setting before each one only what changes outside the tick (`_gameCycles`, Mac clock, `_GlobalKey`), and checks S and R after each tick and the whole save and the life at the 4 points; `engine/tests/ticks_longos.rs` requires everything to be equal. **Result: 200/200, S and R equal on all ticks and the 4 points 307/307 with equal life.**
 
-**Placar da rodada:** 27 vetores novos, 26 batem inteiros e exigidos; 1 pendente; a sequência longa bate. Antes da seleção também foram comparadas as gravações brutas (Jogo Completo 40, Experimental 40, inseticida 13, vitória 30, revoada 31): só o `inseticida_morte/21` difere. Nenhuma correção de regra foi necessária nesta rodada.
+**Round scoreboard:** 27 new vectors, 26 match entirely and are required; 1 pending; the long sequence matches. Before the selection the raw recordings were also compared (Full Game 40, Experimental 40, insecticide 13, victory 30, mating flight 31): only `inseticida_morte/21` differs. No rule fix was needed in this round.
 
-**Resolvido (2026-10-18): `inseticida_morte/tick_000021` pela interface.** O tick do port termina com `_IsGameOver = 1` (o que a regra manda); a interface fecha as caixas 10042 e 10056 e o GAME OVER e, no "Select a Game", o Full Game começa com `carregar::jogo_novo_com_geradores`: `_RandYard` com o R e o S **da partida aberta** (o `_NewGame` não ressemeia) e, como no Load do tutorial, o que `_RandYard` não escreve fica como estava (lista em telas/arquivos.md), mais `_LessonTemp = 1` (`_GotoMyAnt`) e a lição só recomeçando no Tutorial. Resultado: **307/307 com S e R iguais** ao estado de depois do vetor (`engine/tests/fim_de_jogo_interface.rs`, `tick_21_volta_com_o_jogo_completo_novo_do_original`). No `indice.json` do cenário o tick saiu de `"pendentes"` e foi para a chave nova `"pela_interface"` (o teste de ticks só confere que ele roda). Texto anterior:
+**Resolved (2026-10-18): `inseticida_morte/tick_000021` through the interface.** The port's tick ends with `_IsGameOver = 1` (what the rule dictates); the interface closes boxes 10042 and 10056 and the GAME OVER and, in "Select a Game", the Full Game starts with `carregar::jogo_novo_com_geradores`: `_RandYard` with the R and S **of the open game** (`_NewGame` does not reseed) and, as in the tutorial's Load, whatever `_RandYard` does not write stays as it was (list in telas/arquivos.md), plus `_LessonTemp = 1` (`_GotoMyAnt`) and the lesson only restarting in the Tutorial. Result: **307/307 with S and R equal** to the vector's after state (`engine/tests/fim_de_jogo_interface.rs`, `tick_21_volta_com_o_jogo_completo_novo_do_original`). In the scenario's `indice.json` the tick left `"pendentes"` and went to the new key `"pela_interface"` (the tick test only checks that it runs). Previous text:
 
-**Pendente `inseticida_morte/tick_000021` — fim de jogo pela interface dentro do tick** (regravado em 2026-10-17 com o breakpoint do retorno armado antes de cada clique: dentro do mesmo `_DoAntSim` abrem-se a caixa 10042, a 10056, o GAME OVER e a tela "Select a Game" — capturas `dialogo_21_0..3.png` —, a bancada escolheu Full Game e o tick volta com um Jogo Completo novo com `GameTime` **0**; o 8 da 1ª gravação era artefato do script). Texto da 1ª gravação: Sem corpo (nenhum ovo ou adulto preto) e com `_ColonyTotalBlack = 1`, `_YellowDeath` põe `_IsGameOver = 1` e o passo 22 do tick (`_EndGameDialog`) abre a caixa "GAME OVER" (capturas `re_trabalho/cen/dialogo_21_*.png`: antes, "You are covered with insecticide!"). A bancada clicou para continuar e o original começou um Jogo Completo novo **dentro do mesmo tick** (mundo novo, `_CurYardPnt` (0, 12) → (11, 8), `GameTime` 8, `_IsGameOver` de volta a 0). O port termina com `_IsGameOver = 1` e o mundo intacto — o que a regra manda; o reinício é da interface (`simant/`, `core/`), não do tick. Não é erro de regra.
+**Pending `inseticida_morte/tick_000021` — game over through the interface inside the tick** (re-recorded on 2026-10-17 with the return breakpoint armed before each click: inside the same `_DoAntSim` box 10042, box 10056, the GAME OVER and the "Select a Game" screen open — captures `dialogo_21_0..3.png` —, the test bench chose Full Game and the tick returns with a new Full Game with `GameTime` **0**; the 8 of the 1st recording was a script artifact). Text of the 1st recording: With no body (no black egg or adult) and with `_ColonyTotalBlack = 1`, `_YellowDeath` sets `_IsGameOver = 1` and step 22 of the tick (`_EndGameDialog`) opens the "GAME OVER" box (captures `re_trabalho/cen/dialogo_21_*.png`: before, "You are covered with insecticide!"). The test bench clicked to continue and the original started a new Full Game **inside the same tick** (new world, `_CurYardPnt` (0, 12) → (11, 8), `GameTime` 8, `_IsGameOver` back to 0). The port ends with `_IsGameOver = 1` and the world intact — what the rule dictates; the restart belongs to the interface (`simant/`, `core/`), not to the tick. It is not a rule error.
 
-**Como virar teste de interface** (descrição; não implementado): partir de `inseticida_morte/tick_000021/estado_antes.bin` numa `core::partida::Partida` (com `relogio_mac`, `_gameCycles` e sementes de `extras.json`), rodar um tick e conferir que (1) o estado do port é o do original até o passo 22, com `_IsGameOver = 1` (o vetor de tick já confere isso, menos o mundo novo); (2) a fila tem `Evento::DialogoFimDeJogo` uma vez (o "GAME OVER" com pontuação 27572 e a classificação "Aardvark Fodder" da captura `dialogo_21_1.png`); (3) o "continuar" leva à tela "Select a Game" e, com Full Game, a `Mundo::novo_jogo(TipoJogo::Completo, ...)`. O original faz (3) dentro do tick: o `estado_depois.bin` do vetor é o começo de um Jogo Completo novo (patch (11, 8), `GameTime` 8 — [hipótese] ticks do jogo novo rodados antes de a bancada chegar ao retorno do `_DoAntSim` antigo), gerado com as sementes de R e S do instante do clique, que dependem do relógio; por isso o teste de interface deve conferir a forma do jogo novo (tipo, patch, rainha alada amarela na superfície, colônia vermelha), não os bytes.
+**How to turn it into an interface test** (description; not implemented): start from `inseticida_morte/tick_000021/estado_antes.bin` in a `core::partida::Partida` (with `relogio_mac`, `_gameCycles` and seeds from `extras.json`), run one tick and check that (1) the port's state is the original's up to step 22, with `_IsGameOver = 1` (the tick vector already checks this, except the new world); (2) the queue has `Evento::DialogoFimDeJogo` once (the "GAME OVER" with score 27572 and the rating "Aardvark Fodder" from capture `dialogo_21_1.png`); (3) "continue" leads to the "Select a Game" screen and, with Full Game, to `Mundo::novo_jogo(TipoJogo::Completo, ...)`. The original does (3) inside the tick: the vector's `estado_depois.bin` is the start of a new Full Game (patch (11, 8), `GameTime` 8 — [hypothesis] ticks of the new game run before the test bench reaches the return of the old `_DoAntSim`), generated with the R and S seeds of the moment of the click, which depend on the clock; that is why the interface test must check the shape of the new game (type, patch, winged yellow queen on the surface, red colony), not the bytes.
 
-Bancada (novidades de `tools/cenarios_tick.py` e `qemu_bancada.py`): um tick que abre uma caixa modal não volta sozinho — depois de 15 s sem chegar ao retorno de `_DoAntSim`, o script captura a tela, clica em (320, 330) e aperta Enter (até 5 vezes); as leituras do relógio por tick param em 200 (a lista termina com `null`), porque as animações (`_AnimYellowFight`, morte) leem o relógio milhares de vezes e cada parada custa ~0,1 s; um clique pode ser enviado com a VM indo da entrada de um tick à próxima (`clicar_celula(..., pausado=True)`), para gravar desde o tick em que o Windows o trata.
+Test bench (new features of `tools/cenarios_tick.py` and `qemu_bancada.py`): a tick that opens a modal box does not return by itself — after 15 s without reaching the return of `_DoAntSim`, the script captures the screen, clicks at (320, 330) and presses Enter (up to 5 times); the clock reads per tick stop at 200 (the list ends with `null`), because the animations (`_AnimYellowFight`, death) read the clock thousands of times and each stop costs ~0.1 s; a click can be sent with the VM going from the entry of one tick to the next (`clicar_celula(..., pausado=True)`), to record from the tick in which Windows handles it.
 
-**Lacunas:** revoada no Jogo Completo com `_QueenStorage`/`_SwarmCnt` (exige colônia vermelha com reprodutores no Jogo Completo; não tentado); `_FlyAwayB` (quem arma é o jogador, ciclo de vida); Experimental com ferramentas (as do agente auxiliar aplicam com o jogo pausado, fora do tick); `_SpecialXfer` (morte no Jogo Completo com mais de uma colônia preta, escolha no mapa do quintal).
+**Gaps:** mating flight in the Full Game with `_QueenStorage`/`_SwarmCnt` (requires a red colony with breeders in the Full Game; not attempted); `_FlyAwayB` (the player is the one who arms it, life cycle); Experimental with tools (those of the auxiliary agent apply with the game paused, outside the tick); `_SpecialXfer` (death in the Full Game with more than one black colony, choice on the yard map).
 
-### Quarta rodada (2026-10-17, main em `613a5b1`): sequência longa com interface, Tutorial, slow
+### Fourth round (2026-10-17, main at `613a5b1`): long sequence with interface, Tutorial, slow
 
-**Sequência longa com interface** (`tests/referencias/ticks_longos/full_600/`, 652 KB; `cenarios_tick.py gravar longo_full`): Jogo Completo do snapshot `full`, com chuva pedida (`_GlobalKey = 0xA8`) e enxames escritos na entrada (`_SwarmCntB/R` = 5/2, `_QueenStorageB/R` = 3/4) e a **Yard View na frente** (Ctrl+Y) durante 600 ticks (GameTime 31–631). Gravados: o estado inicial, os extras de cada tick (S, R, `_gameCycles`, relógio do Mac, `_GlobalKey`) e o estado e a vida a cada 100 ticks. Os passos de S do desenho entre os ticks são a diferença entre o S no fim de um tick e no começo do seguinte. `vetor_tick::rodar_sequencia` (com `indice.json["desenho_quintal"] = 0`) roda os 600 ticks no port, faz `desenho::desenhar_quintal` entre eles e confere S e R depois de cada tick e o S depois de cada desenho. **Resultado: 600/600, 17.650 passos de S do desenho iguais aos do original, os 6 pontos 307/307 com a vida igual.** Achado no caminho: o desenho do menino (`_DrawSimKid`, `1010:af14`) apaga o balão (`_BoyMessOn = 0`) quando o relógio passa de `_BoyMsgCnt` — sem isso o ponto de 600 ticks diferia só nesse bloco (`desenho::desenhar_menino`).
+**Long sequence with interface** (`tests/referencias/ticks_longos/full_600/`, 652 KB; `cenarios_tick.py gravar longo_full`): Full Game from the `full` snapshot, with rain requested (`_GlobalKey = 0xA8`) and swarms written at the entry (`_SwarmCntB/R` = 5/2, `_QueenStorageB/R` = 3/4) and the **Yard View in front** (Ctrl+Y) for 600 ticks (GameTime 31–631). Recorded: the initial state, the extras of each tick (S, R, `_gameCycles`, Mac clock, `_GlobalKey`) and the state and the life every 100 ticks. The S steps of the drawing between ticks are the difference between S at the end of one tick and at the start of the next. `vetor_tick::rodar_sequencia` (with `indice.json["desenho_quintal"] = 0`) runs the 600 ticks in the port, does `desenho::desenhar_quintal` between them and checks S and R after each tick and S after each drawing. **Result: 600/600, 17,650 S steps of the drawing equal to the original's, the 6 points 307/307 with equal life.** Found along the way: the drawing of the boy (`_DrawSimKid`, `1010:af14`) erases the balloon (`_BoyMessOn = 0`) when the clock passes `_BoyMsgCnt` — without this the 600-tick point differed only in that block (`desenho::desenhar_menino`).
 
-**Tutorial** (`ticks/tutorial/`, snapshot `tut`: boot e "Select a Game" → Tutorial Game em (180, 225)): lição 1 concluída e lição 2 pedida (15), lição 3 esperando o marco de escavação (`_TimeTemp` = 15, 46–47): 307/307, com `_TimeTemp` (`9:9b10`, fora do save) agora gravado nos extras (`TimeTemp`) e posto na memória do tutorial do port (`vetor_tick::regras_do_vetor`); o teste confere `_TimeTemp` depois do tick. Antes de gravá-lo, o port dava a lição 3 por concluída (`_TilesDugB > _TimeTemp` com `_TimeTemp` = 0).
-- **`tutorial/23` (regravado):** `_Feedback` → `_GiveLesson(3)` abre a caixa da lição com `_PictStrnDialog` dentro do tick (`dialogo_23_0.png`). A 1ª gravação dava `GameTime` 23 → 40 e parecia ter ticks aninhados; era **artefato do script** (ele fechava a caixa com a VM correndo sem o breakpoint do retorno: o tick terminava sem ser visto e os seguintes rodavam soltos). `capturar_tick` agora arma o breakpoint do retorno antes de clicar; regravado, o tick volta com `GameTime` 24 e bate 307/307 (a desmontagem também mostra que `_PictStrnDialog` para o temporizador). O mesmo valia para o `GameTime` 8 de `inseticida_morte/21`.
-- Também neste cenário: `_CatDelay` = 4712 vinha do arquivo do tutorial (outra sessão) com o relógio em ~3300, e o port o "normalizava" (atraso maior que agora + máximo = vencido). Com relógio real o original deixa como está: `quintal::normalizar_atrasos` agora só age com o relógio sintético (sem `relogio_mac` e sem `_gameCycles`).
+**Tutorial** (`ticks/tutorial/`, `tut` snapshot: boot and "Select a Game" → Tutorial Game at (180, 225)): lesson 1 completed and lesson 2 requested (15), lesson 3 waiting for the digging milestone (`_TimeTemp` = 15, 46–47): 307/307, with `_TimeTemp` (`9:9b10`, outside the save) now recorded in the extras (`TimeTemp`) and put in the port's tutorial memory (`vetor_tick::regras_do_vetor`); the test checks `_TimeTemp` after the tick. Before recording it, the port considered lesson 3 completed (`_TilesDugB > _TimeTemp` with `_TimeTemp` = 0).
+- **`tutorial/23` (re-recorded):** `_Feedback` → `_GiveLesson(3)` opens the lesson box with `_PictStrnDialog` inside the tick (`dialogo_23_0.png`). The 1st recording gave `GameTime` 23 → 40 and seemed to have nested ticks; it was a **script artifact** (it closed the box with the VM running without the return breakpoint: the tick ended unseen and the following ones ran loose). `capturar_tick` now arms the return breakpoint before clicking; re-recorded, the tick returns with `GameTime` 24 and matches 307/307 (the disassembly also shows that `_PictStrnDialog` stops the timer). The same applied to the `GameTime` 8 of `inseticida_morte/21`.
+- Also in this scenario: `_CatDelay` = 4712 came from the tutorial file (another session) with the clock at ~3300, and the port "normalized" it (delay greater than now + maximum = expired). With a real clock the original leaves it as is: `quintal::normalizar_atrasos` now only acts with the synthetic clock (without `relogio_mac` and without `_gameCycles`).
 
-**Velocidade slow** (`ticks/velocidade_lenta/`, Shift+1, `_GameSpeed` 0, 1719–1721): 307/307.
+**Slow speed** (`ticks/velocidade_lenta/`, Shift+1, `_GameSpeed` 0, 1719–1721): 307/307.
 
-**Placar da rodada:** 8 vetores novos, 7 batem e são exigidos, 1 pendente; a sequência longa com desenho bate inteira. Ações novas em `acoes/`: `exp_ninho`, `exp_cheiro` (telas/experimental.md §9), 307/307. Fim de jogo pela interface: `engine/tests/fim_de_jogo_interface.rs` (descrito acima, agora implementado): o tick do vetor numa `core::partida::Partida` com o relógio do original dá `_IsGameOver`, um só `DialogoFimDeJogo`, as três caixas na ordem do original (10042, 10056 de `_PictStrnDialog` em `_YellowDeath`, e o GAME OVER) e a **pontuação 27572** mostrada pelo original; o Jogo Completo novo tem a forma do que o original começou; a volta para "Select a Game" está em `simant/` (teste `#[ignore]` com o motivo).
+**Round scoreboard:** 8 new vectors, 7 match and are required, 1 pending; the long sequence with drawing matches entirely. New actions in `acoes/`: `exp_ninho`, `exp_cheiro` (telas/experimental.md §9), 307/307. Game over through the interface: `engine/tests/fim_de_jogo_interface.rs` (described above, now implemented): the vector's tick in a `core::partida::Partida` with the original's clock gives `_IsGameOver`, a single `DialogoFimDeJogo`, the three boxes in the original's order (10042, 10056 from `_PictStrnDialog` in `_YellowDeath`, and the GAME OVER) and the **score 27572** shown by the original; the new Full Game has the shape of the one the original started; the return to "Select a Game" is in `simant/` (`#[ignore]` test with the reason).
 
-### Quinta rodada (2026-10-18): regras não verificadas da revisão
+### Fifth round (2026-10-18): unverified rules from the review
 
-Itens da lista "Não verificado" de [../../estado-do-projeto.md](../../estado-do-projeto.md) §3, gravados por `tools/cenarios_regras.py` (cenários novos sobre a mesma `Sessao` de `cenarios_tick.py`; `gravar`, `eventos`, `selecionar`, mais `registrar` e `selecionar_lote`). A preparação escreve a memória do original na entrada de um tick (aranha, formigas da lista com a marca no mapa de vida, a amarela, células dos mapas); quando a regra passa pela interface, a preparação usa a interface do original: tecla X e clique na aranha para virar a aranha (`_DoLifeExchange`), tecla 1 e clique para o modo alvo, duplo clique para correr, troca de patch pela Yard View para chegar à casa. Snapshot `rico` (Quick Game com ~1710 ticks), salvo o choque (`full`).
+Items from the "Not verified" list of [../../estado-do-projeto.md](../../estado-do-projeto.md) §3, recorded by `tools/cenarios_regras.py` (new scenarios on the same `Sessao` as `cenarios_tick.py`; `gravar`, `eventos`, `selecionar`, plus `registrar` and `selecionar_lote`). The preparation writes the original's memory at the entry of a tick (spider, list ants with the mark on the life map, the yellow ant, map cells); when the rule goes through the interface, the preparation uses the original's interface: X key and click on the spider to become the spider (`_DoLifeExchange`), key 1 and click for target mode, double click to run, patch change through the Yard View to reach the house. `rico` snapshot (Quick Game with ~1710 ticks), except the electric shock (`full`).
 
-| Subpasta | Ticks | O que exercita |
+| Subfolder | Ticks | What it exercises |
 |---|---|---|
-| `aranha_cerco` | 1793 | 9 pretas no 3 × 3: estado 5, `_DeathCnt` 500, mensagem 10046, `_SpidRevenge` 2 → 3 e `_MeSMode` = 7 |
-| `aranha_foge` | 1793 | 6 pretas no 3 × 3: estado 4 e corrida |
-| `aranha_vinganca` | 1793 | cerco com `_SpidRevenge` 4 → 5: `_MeSMode` = 8 (laser) |
-| `aranha_faro` | 1793, 1805, 1816 | `_SFoundAnt` por faro, perseguição, comer com `_EatCnt` = 11, `_DeadAntHere` |
-| `aranha_laser` | 1794, 1796 | `_SpiderScan`: uma preta do leque morta em cada tick |
-| `leao_cerco` | 1793 | formiga-leão comendo com 7 vizinhas ocupadas: 10050, centro 0x3F, lista deslocada |
-| `aranha_jogador` | 1801, 1836, 1855, 1856 | aranha do jogador: anda, corre, persegue no modo alvo (`_MeSMode` 6) e come (`_EatCnt` 50) |
-| `aranha_jogador_cercada` | 1800 | a aranha do jogador perseguindo e cercada: `_YellowDeath(3)` |
-| `aranha_jogador_fora` | 1800 | a aranha do jogador sai do mapa correndo: `_YellowDeath(4)` |
-| `amarela_morte_leao` | 1711 | `_YellowDeath(2)` com `_AnimYellowFight` e duas centralizações no tick |
-| `amarela_morte_pisada` | 1712 | `_YellowDeath(5)` (o lugar do pé veio de uma execução de ensaio) |
+| `aranha_cerco` | 1793 | 9 black ants in the 3 × 3: state 5, `_DeathCnt` 500, message 10046, `_SpidRevenge` 2 → 3 and `_MeSMode` = 7 |
+| `aranha_foge` | 1793 | 6 black ants in the 3 × 3: state 4 and running |
+| `aranha_vinganca` | 1793 | siege with `_SpidRevenge` 4 → 5: `_MeSMode` = 8 (laser) |
+| `aranha_faro` | 1793, 1805, 1816 | `_SFoundAnt` by scent, chase, eating with `_EatCnt` = 11, `_DeadAntHere` |
+| `aranha_laser` | 1794, 1796 | `_SpiderScan`: one black ant in the fan killed on each tick |
+| `leao_cerco` | 1793 | antlion eating with 7 occupied neighbors: 10050, center 0x3F, shifted list |
+| `aranha_jogador` | 1801, 1836, 1855, 1856 | player's spider: walks, runs, chases in target mode (`_MeSMode` 6) and eats (`_EatCnt` 50) |
+| `aranha_jogador_cercada` | 1800 | the player's spider chasing and surrounded: `_YellowDeath(3)` |
+| `aranha_jogador_fora` | 1800 | the player's spider leaves the map running: `_YellowDeath(4)` |
+| `amarela_morte_leao` | 1711 | `_YellowDeath(2)` with `_AnimYellowFight` and two centerings in the tick |
+| `amarela_morte_pisada` | 1712 | `_YellowDeath(5)` (the foot position came from a rehearsal run) |
 | `amarela_morte_cortador` | 1712 | `_YellowDeath(6)` |
-| `amarela_morte_afogada` | 1711 | `_YellowDeath(7)` com `_AnimYellowInsane` |
-| `amarela_morte_fome` | 1711 | `_YellowDeath(8)` com `_AnimYellowInsane` |
-| `amarela_morte_choque` | 27 | `_YellowDeath(10)`: a ordem termina em cima da tomada 0x76 da casa (patch (1, 5) do Jogo Completo) |
-| `amarela_morte_aranha` | 1793 | `_YellowDeath(1)`: com o desenho dentro do tick (abaixo, achado 2), 307/307 desde 2026-10-18 |
-| `ninho_n01`, `ninho_n01_saude31` | 1714, 1720; 1711 | N-01: morte natural com `_HealthB` 0; nenhuma com 31 |
-| `ninho_n07` | 1712, 1713 | N-07: mordidas na comida guardada |
-| `ninho_n10` | 1711, 1713 | N-10: a água sobe uma linha |
-| `ninho_n12` | 1711, 1716 | N-12: a luta não remove a checadora; a nuvem termina |
-| `ninho_n14` | 1713 | N-14: passagem 0x14 do ninho vermelho para o preto |
-| `ninho_n15` | 1711 | N-15: trofalaxia pela invasora vermelha |
-| `ovos_c04_c05` | 1791 | C-04: morte na eclosão com `_ModeAuto` 0; C-05: casta vermelha com `_HealthR` 20 |
-| `ovos_c06`, `ovos_c07` | 1711; 1711 | C-06: postura com saúde 100; C-07: nenhuma com saúde 0 |
+| `amarela_morte_afogada` | 1711 | `_YellowDeath(7)` with `_AnimYellowInsane` |
+| `amarela_morte_fome` | 1711 | `_YellowDeath(8)` with `_AnimYellowInsane` |
+| `amarela_morte_choque` | 27 | `_YellowDeath(10)`: the order ends on top of the house's power outlet 0x76 (patch (1, 5) of the Full Game) |
+| `amarela_morte_aranha` | 1793 | `_YellowDeath(1)`: with the drawing inside the tick (below, finding 2), 307/307 since 2026-10-18 |
+| `ninho_n01`, `ninho_n01_saude31` | 1714, 1720; 1711 | N-01: natural death with `_HealthB` 0; none with 31 |
+| `ninho_n07` | 1712, 1713 | N-07: bites on the stored food |
+| `ninho_n10` | 1711, 1713 | N-10: the water rises one row |
+| `ninho_n12` | 1711, 1716 | N-12: the fight does not remove the checker; the cloud ends |
+| `ninho_n14` | 1713 | N-14: passage 0x14 from the red nest to the black one |
+| `ninho_n15` | 1711 | N-15: trophallaxis by the red intruder |
+| `ovos_c04_c05` | 1791 | C-04: death at hatching with `_ModeAuto` 0; C-05: red caste with `_HealthR` 20 |
+| `ovos_c06`, `ovos_c07` | 1711; 1711 | C-06: laying with health 100; C-07: none with health 0 |
 
-**Placar: 38 vetores novos em 25 cenários, 37 batem inteiros (307/307, S, R e vida) e são exigidos; 1 pendente com a causa isolada** (resolvido depois, achado 2: hoje os 38 são exigidos). Antes da seleção, as gravações brutas inteiras foram comparadas (≈ 230 ticks, inclusive 83 da aranha do jogador e 24 do faro): só os ticks abaixo diferiram, e todos por causa conhecida. Volume: 4,7 MB.
+**Scoreboard: 38 new vectors in 25 scenarios, 37 match entirely (307/307, S, R and life) and are required; 1 pending with the cause isolated** (resolved later, finding 2: today all 38 are required). Before the selection, the whole raw recordings were compared (≈ 230 ticks, including 83 of the player's spider and 24 of the scent): only the ticks below differed, and all for a known cause. Volume: 4.7 MB.
 
-Achados:
+Findings:
 
-1. **Duas centralizações no mesmo tick (port corrigido).** Em `amarela_morte_leao/1711` o original deixou `_MapPnt` em (21, 0) e o comparador em (22, 0). Na morte o original chama `_GotoMyAnt` com a amarela ainda no centro da formiga-leão (superfície) e, no renascimento, de novo com ela no ovo (ninho preto); cada `_CenterEdit` parte de onde o anterior deixou a vista: (24, 0) → (18, 16) → (21, 0), com o eixo menor um passo aquém. O port centralizava uma vez só, na posição final. Correção: `Evento::CentralizarNaAmarela` passou a levar `{plano, x, y}` do momento do pedido (`Estado::pedir_centralizar_na_amarela`); a interface (`core::partida::ir_para_amarela`) e o comparador (`vetor_tick::aplicar_vista_da_bancada`) aplicam cada pedido na ordem. Nos scripts de mods, o evento `centralizar_na_amarela` ganhou `plano`, `x`, `y` (api-mods.md).
-2. **Pendente `amarela_morte_aranha/1793` (294/307): desenho dentro do tick.** Isolado com `cenarios_regras.py gravar contar_aranha` (`contar_no_tick`: breakpoints na entrada de `_SRand1`, `_DrawPalps`, `_DrawSpider`, `_DoEditUpdateDraw`, `_GotoMyAnt`, `_SpiderDialog`, `_LionDialog`, `_AnimYellowFight`, `_mySongIsDone`, com o S e, para `_SRand1`, quem chamou; grava `contagem.json`): 4 passos de S a mais no original — `S1(4)` de `_DrawPalps` nos desenhos da janela de edição de `_GotoMyAnt`, de antes do laço de `_AnimYellowFight` e do 1º quadro (a aranha à vista, `_SMode` 3), e `S1(2)` de `_SpiderDialog` ([rng.md](rng.md)). O port não fazia os desenhos de dentro do tick. **Resolvido (2026-10-18):** o port passou a fazer os sorteios dos redesenhos de dentro do tick (`rules::desenho::EdicaoNoTick`, [rng.md](rng.md) "Desenho dentro do tick") e o `S1(2)` de `_SpiderDialog`; o vetor bate 307/307 com S, R e vida e saiu de `"pendentes"`. O comparador supõe a janela de edição aberta (como em todas as gravações da bancada); um vetor gravado com ela fechada leva `"EdicaoAberta": false` em `antes` do `extras.json`. A contagem de controle na morte pela formiga-leão (`contar_leao`) não tem `_DrawPalps` (aranha fora da vista) e bate. Com a música ligada e sem placa de som na bancada, `_mySongIsDone` encerra a animação no 1º quadro (as duas contagens).
-3. **`_gameCycles` com caixa que não para o temporizador.** Em `ninho_n15/1711` o `_DoTroph` abre "You feel much better now!" (`_YellowDialog`), e `_gameCycles` anda 647 dentro do tick enquanto a bancada fecha a caixa (as caixas de `_PictStrnDialog` param o temporizador e não mudam `_gameCycles`). Chave nova no `indice.json` do cenário, `"gamecycles_fora_do_tick"`: o teste deixa de exigir só esse extra.
-4. **Artefatos da bancada evitados:** (a) o clique em (320, 310) que fecha uma caixa pode chegar à janela de edição depois de a caixa sumir e virar uma ordem para a amarela (visto na 1ª gravação de `fome`: destino (40, 9) e um passo); `cenarios_regras.py` fecha as caixas com Enter; (b) o relógio do Mac lido depois de uma caixa modal não é gravado (a lista termina na caixa), e o `_CatDelay` gravado com ele não é reproduzível (vistos em `cortador` e `pisada`); nesses cenários o gato fica fora de jogo (`_CatDelay` enorme na preparação).
-5. **A aranha do jogador com `_SMode` 0 ou 1 não é cercada**: o controle do jogador substitui o resto de `_MoveSpider` (inimigos.md 2.2); a 1ª tentativa de `aranha_jogador_cercada` (aranha parada) não morreu em 4 ticks. Cercada perseguindo, morre.
+1. **Two centerings in the same tick (port fixed).** In `amarela_morte_leao/1711` the original left `_MapPnt` at (21, 0) and the comparator at (22, 0). On death the original calls `_GotoMyAnt` with the yellow ant still at the center of the antlion (surface) and, on rebirth, again with it in the egg (black nest); each `_CenterEdit` starts from where the previous one left the view: (24, 0) → (18, 16) → (21, 0), with the minor axis one step short. The port centered only once, at the final position. Fix: `Evento::CentralizarNaAmarela` now carries `{plano, x, y}` from the moment of the request (`Estado::pedir_centralizar_na_amarela`); the interface (`core::partida::ir_para_amarela`) and the comparator (`vetor_tick::aplicar_vista_da_bancada`) apply each request in order. In mod scripts, the `centralizar_na_amarela` event gained `plano`, `x`, `y` (api-mods.md).
+2. **Pending `amarela_morte_aranha/1793` (294/307): drawing inside the tick.** Isolated with `cenarios_regras.py gravar contar_aranha` (`contar_no_tick`: breakpoints at the entry of `_SRand1`, `_DrawPalps`, `_DrawSpider`, `_DoEditUpdateDraw`, `_GotoMyAnt`, `_SpiderDialog`, `_LionDialog`, `_AnimYellowFight`, `_mySongIsDone`, with S and, for `_SRand1`, the caller; writes `contagem.json`): 4 extra S steps in the original — `S1(4)` from `_DrawPalps` in the edit window drawings of `_GotoMyAnt`, from before the `_AnimYellowFight` loop and from the 1st frame (the spider in view, `_SMode` 3), and `S1(2)` from `_SpiderDialog` ([rng.md](rng.md)). The port did not do the drawings from inside the tick. **Resolved (2026-10-18):** the port now does the random draws of the redraws from inside the tick (`rules::desenho::EdicaoNoTick`, [rng.md](rng.md) "Drawing inside the tick") and the `S1(2)` of `_SpiderDialog`; the vector matches 307/307 with S, R and life and left `"pendentes"`. The comparator assumes the edit window is open (as in all test bench recordings); a vector recorded with it closed carries `"EdicaoAberta": false` in `antes` of `extras.json`. The control count on death by the antlion (`contar_leao`) has no `_DrawPalps` (spider out of view) and matches. With the music on and no sound card on the test bench, `_mySongIsDone` ends the animation on the 1st frame (both counts).
+3. **`_gameCycles` with a box that does not stop the timer.** In `ninho_n15/1711` `_DoTroph` opens "You feel much better now!" (`_YellowDialog`), and `_gameCycles` advances 647 inside the tick while the test bench closes the box (the `_PictStrnDialog` boxes stop the timer and do not change `_gameCycles`). New key in the scenario's `indice.json`, `"gamecycles_fora_do_tick"`: the test stops requiring only that extra.
+4. **Test bench artifacts avoided:** (a) the click at (320, 310) that closes a box can reach the edit window after the box disappears and become an order for the yellow ant (seen in the 1st recording of `fome`: destination (40, 9) and one step); `cenarios_regras.py` closes the boxes with Enter; (b) the Mac clock read after a modal box is not recorded (the list ends at the box), and the `_CatDelay` written with it is not reproducible (seen in `cortador` and `pisada`); in these scenarios the cat is kept out of play (huge `_CatDelay` in the preparation).
+5. **The player's spider with `_SMode` 0 or 1 is not surrounded**: the player's control replaces the rest of `_MoveSpider` (inimigos.md 2.2); the 1st attempt at `aranha_jogador_cercada` (spider standing still) did not die in 4 ticks. Surrounded while chasing, it dies.
 
-### Sexta rodada (2026-10-19): desenho dentro do tick que faltava
+### Sixth round (2026-10-19): the missing drawing inside the tick
 
-`tools/cenarios_regras.py` (cenários `aranha_autotrack`, `aranha_movey`, `morte_aranha_silly`), snapshot `rico`, com `capturar_tick_relogio`: além do vetor normal, as variáveis dos balões (`Baloes`, em `antes` e `depois`) e o valor de cada `_TickCount` lido pelo desenho (`TickCount_lidos`, breakpoints nos retornos dos `CALL _TickCount` do segmento 3; o relógio do Mac do vetor é a primeira leitura de `_MacTickCount`). Os 14 vetores batem 307/307 com S, R, vida e os extras dos balões (`ticks_originais`):
+`tools/cenarios_regras.py` (scenarios `aranha_autotrack`, `aranha_movey`, `morte_aranha_silly`), `rico` snapshot, with `capturar_tick_relogio`: besides the normal vector, the balloon variables (`Baloes`, in `antes` and `depois`) and the value of each `_TickCount` read by the drawing (`TickCount_lidos`, breakpoints at the returns of the `CALL _TickCount` of segment 3; the vector's Mac clock is the first read of `_MacTickCount`). The 14 vectors match 307/307 with S, R, life and the balloon extras (`ticks_originais`):
 
-| Subpasta | Ticks | O que exercita |
+| Subfolder | Ticks | What it exercises |
 |---|---|---|
-| `aranha_jogador_autotrack` | 1810, 1812, 1844–1852 | aranha do jogador com AutoTrack: anda (a vista segue, sem sorteio) e, no modo alvo, persegue (palpos `S1(4)` no `_GotoMyAnt` de cada passo) e come; inimigos.md 2.7 |
-| `desenho_aranha_movey` | 1800, 1811 | aranha à vista no redesenho de antes de entrar no buraco e no `_GotoMyAnt` depois de sair do ninho, com "Silly" (balão da aranha); rng.md |
-| `amarela_morte_aranha_silly` | 1793 | morte pela aranha com "Silly", sem música e sem Events: o `_TickCount` de cada quadro de `_AnimYellowFight` (+3 por quadro); rng.md |
+| `aranha_jogador_autotrack` | 1810, 1812, 1844–1852 | player's spider with AutoTrack: walks (the view follows, without random draw) and, in target mode, chases (palps `S1(4)` in the `_GotoMyAnt` of each step) and eats; inimigos.md 2.7 |
+| `desenho_aranha_movey` | 1800, 1811 | spider in view in the redraw before entering the hole and in the `_GotoMyAnt` after leaving the nest, with "Silly" (spider balloon); rng.md |
+| `amarela_morte_aranha_silly` | 1793 | death by the spider with "Silly", without music and without Events: the `_TickCount` of each frame of `_AnimYellowFight` (+3 per frame); rng.md |
 
-Achados: (1) o port não chamava `_GotoMyAnt` na aranha do jogador com AutoTrack (corrigido); (2) o relógio dos balões dentro do tick é o do momento do desenho: igual ao do começo fora das animações, +1 e depois +3 por quadro na luta (o port modela as esperas; o tempo de desenho e o das caixas modais, não); (3) `_AnimYellowInsane` espera 2 degraus por quadro (110 ms, não 55: `amarela.json`).
+Findings: (1) the port did not call `_GotoMyAnt` on the player's spider with AutoTrack (fixed); (2) the balloon clock inside the tick is the one at the moment of drawing: equal to the one at the start outside the animations, +1 and then +3 per frame in the fight (the port models the waits; the drawing time and that of the modal boxes, not); (3) `_AnimYellowInsane` waits 2 steps per frame (110 ms, not 55: `amarela.json`).
 
-### Oitava rodada (2026-10-19): estratégia, recrutamento e o que restava
+### Eighth round (2026-10-19): strategy, recruitment and what remained
 
-`tools/cenarios_raros.py` (cenários novos `estrategia_malvada`, `estrategia_vermelha_p`, `estrategia_vermelha_s`, `estrategia_preta_0`, `recrutar`, `revoada_limiar`, `queda_casa_celula`, `leao_pedrinha`, `volta_cycle`, `vista_xfer`), sobre **cópias** dos overlays (`re_trabalho/ag8/`). Onde a regra depende de sorteio, a semente S da entrada foi escolhida no port com o exemplo novo `engine/examples/buscar_semente.rs` (`buscar_semente DIR_TICK SIMBOLO[ou NOME[i]] [VALOR|nz]`: roda o tick do port sobre o vetor gravado sem a semente, para cada semente, até o bloco ter o valor pedido) e escrita na bancada antes do estado de antes. Os 17 vetores e as 5 ações batem 307/307 com S, R e vida e são exigidos por `ticks_originais.rs` e `acoes_originais.rs`. Ação nova no port: `{"comandos": [c...], "defesa_ultimo_tick": n}` (`vetor_tick::aplicar_acao`: `_YellowCommand(c)` com o jogo pausado; `n` = `_TemBModePop[6]` lido na bancada, que `_UnRecruit` usa e não está no save).
+`tools/cenarios_raros.py` (new scenarios `estrategia_malvada`, `estrategia_vermelha_p`, `estrategia_vermelha_s`, `estrategia_preta_0`, `recrutar`, `revoada_limiar`, `queda_casa_celula`, `leao_pedrinha`, `volta_cycle`, `vista_xfer`), on **copies** of the overlays (`re_trabalho/ag8/`). Where the rule depends on a random draw, the entry S seed was chosen in the port with the new example `engine/examples/buscar_semente.rs` (`buscar_semente DIR_TICK SIMBOLO[ou NOME[i]] [VALOR|nz]`: runs the port's tick over the vector recorded without the seed, for each seed, until the block has the requested value) and written on the test bench before the before state. The 17 vectors and the 5 actions match 307/307 with S, R and life and are required by `ticks_originais.rs` and `acoes_originais.rs`. New action in the port: `{"comandos": [c...], "defesa_ultimo_tick": n}` (`vetor_tick::aplicar_acao`: `_YellowCommand(c)` with the game paused; `n` = `_TemBModePop[6]` read on the test bench, which `_UnRecruit` uses and is not in the save).
 
-| Subpasta | Ticks | O que exercita |
+| Subfolder | Ticks | What it exercises |
 |---|---|---|
-| `estrategia_malvada` | 1711, 1712, 1767, 1768 | `_GstrR` pelo desespero: `_JustToBeMean` 0 → 56, modo 0, descendo; 1 → 0 e a volta à estratégia normal (modo 3) |
-| `estrategia_vermelha_populosa` | 1711 | MALVADO "não normal", sem sorteio (`_RpopT` 150, `_BpopT` 20) |
-| `estrategia_vermelha_sorteio` | 1711 | MALVADO pelos sorteios `S32()` = `S128()` = 0 (semente 0x009c) |
-| `estrategia_preta_desespero` | 1711 | escada preta no modo 0 |
-| `recrutadas` | 1726, 1727 | pretas recrutadas pelas teclas 1 e 2 em Defense (`_DoRecruitAnt`) com a amarela na superfície |
-| `revoada_limiar` | 1791, 1855 | contagem com 20 reprodutores vermelhos (não arma) e com 21 (arma 200 no tick da contagem, 199 no fim) |
-| `queda_casa_cozinha`, `queda_casa_ladrilhos`, `queda_casa_azulejo` | 34 | `_DROPdir` 2 e 0 (sobre um 0x3F escrito) e o azulejo 0x62 da cozinha, onde nada cai |
-| `leao_pedrinha` | 1711 | a formiga-leão cospe a pedrinha a 2 células (semente 0x02cd) |
-| `volta_cycle` | 1711, 1712 | `_Cycle` 4095 → 0x1000 → 0: duas fases 0 seguidas |
+| `estrategia_malvada` | 1711, 1712, 1767, 1768 | `_GstrR` by desperation: `_JustToBeMean` 0 → 56, mode 0, descending; 1 → 0 and the return to the normal strategy (mode 3) |
+| `estrategia_vermelha_populosa` | 1711 | MALVADO "not normal", without random draw (`_RpopT` 150, `_BpopT` 20) |
+| `estrategia_vermelha_sorteio` | 1711 | MALVADO by the random draws `S32()` = `S128()` = 0 (seed 0x009c) |
+| `estrategia_preta_desespero` | 1711 | black ladder in mode 0 |
+| `recrutadas` | 1726, 1727 | black ants recruited by keys 1 and 2 in Defense (`_DoRecruitAnt`) with the yellow ant on the surface |
+| `revoada_limiar` | 1791, 1855 | count with 20 red breeders (does not arm) and with 21 (arms 200 on the count tick, 199 at the end) |
+| `queda_casa_cozinha`, `queda_casa_ladrilhos`, `queda_casa_azulejo` | 34 | `_DROPdir` 2 and 0 (over a written 0x3F) and the kitchen tile 0x62, where nothing falls |
+| `leao_pedrinha` | 1711 | the antlion spits the pebble 2 cells away (seed 0x02cd) |
+| `volta_cycle` | 1711, 1712 | `_Cycle` 4095 → 0x1000 → 0: two phase 0s in a row |
 
-Ações (`tests/referencias/acoes/`): `amarela_recrutar_5`, `amarela_recrutar_10`, `amarela_liberar_metade`, `amarela_recrutar_todas`, `amarela_liberar_todas` (teclas 1, 2, 3, Ctrl+2, 4 com o jogo pausado; superficie.md 9.4, T11).
+Actions (`tests/referencias/acoes/`): `amarela_recrutar_5`, `amarela_recrutar_10`, `amarela_liberar_metade`, `amarela_recrutar_todas`, `amarela_liberar_todas` (keys 1, 2, 3, Ctrl+2, 4 with the game paused; superficie.md 9.4, T11).
 
-Gravações brutas inteiras comparadas antes da seleção (fora do git): `estrategia_malvada` 7, as outras estratégias 2 cada (e o sorteio sem semente, 2), recrutamento 5 ticks + 5 ações (duas vezes), limiar 5, queda 3 × 4, pedrinha 1 + 2, volta de `_Cycle` 3: **todas 307/307**.
+Whole raw recordings compared before the selection (outside git): `estrategia_malvada` 7, the other strategies 2 each (and the random draw without seed, 2), recruitment 5 ticks + 5 actions (twice), threshold 5, fall 3 × 4, pebble 1 + 2, `_Cycle` wraparound 3: **all 307/307**.
 
-Achados: nenhuma divergência de regra. A mensagem de `_GstrR` ("The red ants are attacking!") vai para a faixa, sem caixa modal (o tick não parou). Na cozinha e nos ladrilhos nenhum tile do patch faz a comida cair (superficie.md 8.2). Fora do tick (bancada, sem vetor): Cancel do "Load Ant Hill" e do "Select a Game" na abertura (menus.md §7, abertura.md), Status no Full Game e no Experimental (menus.md §6) e a vista depois de `_XferPatch` (divergencias.md; o port deixou de centralizar na amarela).
+Findings: no rule divergence. The `_GstrR` message ("The red ants are attacking!") goes to the ribbon, without a modal box (the tick did not stop). In the kitchen and on the tiles no tile of the patch makes the food fall (superficie.md 8.2). Outside the tick (test bench, no vector): Cancel of "Load Ant Hill" and of "Select a Game" at the opening (menus.md §7, abertura.md), Status in the Full Game and in the Experimental (menus.md §6) and the view after `_XferPatch` (divergencias.md; the port stopped centering on the yellow ant).
 
-### Nona rodada (2026-10-19): alimentação periódica (rodada de fechamento)
+### Ninth round (2026-10-19): periodic feeding (closing round)
 
-`tools/cenarios_fecha.py` (cenários `alimentacao` e `alimentacao_casa`), sobre cópias dos overlays `ov_r` (`rico`) e `ov_full` (`full`) em `re_trabalho/ag_fecha/`. Na entrada do tick: `_NextFeed` = 30000 (acima de qualquer `_FoodA`) e `_Cycle` levado ao fim de um período de 64; o tick chama `_AddFood(150, 1)` (superficie.md 8.3). A regra nunca tinha rodado num vetor (em todos os gravados `_FoodA` ≥ `_NextFeed` nos ticks ≡ 0 mod 64, inclusive em `volta_cycle`).
+`tools/cenarios_fecha.py` (scenarios `alimentacao` and `alimentacao_casa`), on copies of the overlays `ov_r` (`rico`) and `ov_full` (`full`) in `re_trabalho/ag_fecha/`. At the entry of the tick: `_NextFeed` = 30000 (above any `_FoodA`) and `_Cycle` brought to the end of a 64 period; the tick calls `_AddFood(150, 1)` (superficie.md 8.3). The rule had never run in a vector (in all recorded ones `_FoodA` ≥ `_NextFeed` on ticks ≡ 0 mod 64, including in `volta_cycle`).
 
-| Subpasta | Ticks | O que exercita |
+| Subfolder | Ticks | What it exercises |
 |---|---|---|
-| `alimentacao` | 1711 | `_AddFood(150, 1)` no quintal: centro (S128, S64) = (85, 31), raio S8 + 5, 0x48 nos chãos < 0x18 e +1 nas comidas 0x48–0x4A, `_FoodA` 122 → 237, `_NextFeed` = S1(50) + 1 = 50 |
-| `alimentacao_casa` | 31 | o mesmo depois de `_XferPatch` para o carpete esquerdo (0, 4) do Jogo Completo: a comida pela regra do chão da casa (geracao-mundo.md 3.E) |
+| `alimentacao` | 1711 | `_AddFood(150, 1)` in the yard: center (S128, S64) = (85, 31), radius S8 + 5, 0x48 on floors < 0x18 and +1 on foods 0x48–0x4A, `_FoodA` 122 → 237, `_NextFeed` = S1(50) + 1 = 50 |
+| `alimentacao_casa` | 31 | the same after `_XferPatch` to the left carpet (0, 4) of the Full Game: the food by the house floor rule (geracao-mundo.md 3.E) |
 
-Achado: sem as tabelas do banco (os testes rodam com `RegrasOriginais::default()`), o `adicionar_comida` do port **não fazia nada**: o tick dava 291/307 (sem a comida, com `_NextFeed` e S diferentes). Agora usa o seno calculado, igual ao objeto 9/1000 (como o laser), e os dois vetores dão 307/307 com S, R e vida (reconstrução da vida dispensada pelo motivo de `volta_cycle`: vagas mortas paradas nos buracos). Placar: 2 vetores novos, 2 exigidos.
+Finding: without the database tables (the tests run with `RegrasOriginais::default()`), the port's `adicionar_comida` **did nothing**: the tick gave 291/307 (without the food, with `_NextFeed` and S different). It now uses the computed sine, like object 9/1000 (like the laser), and both vectors give 307/307 with S, R and life (life rebuild waived for the reason of `volta_cycle`: dead slots parked in the holes). Scoreboard: 2 new vectors, 2 required.
 
-### Sétima rodada (2026-10-19): ramos raros
+### Seventh round (2026-10-19): rare branches
 
-`tools/cenarios_raros.py` (mesma interface de `cenarios_regras.py`; snapshots `rico`, `full` e `exp`). A preparação escreve a memória na entrada de um tick; onde a regra é rara demais para esperar, a semente S da entrada foi **escolhida no port** (busca sobre o vetor do mesmo tick sem a semente) e escrita na bancada antes do estado de antes. Os 31 vetores novos (16 cenários, 3,9 MB) batem 307/307 com S, R e vida e são exigidos por `ticks_originais.rs`; a ação nova (`acoes/exp_leao_m1`) por `acoes_originais.rs`.
+`tools/cenarios_raros.py` (same interface as `cenarios_regras.py`; snapshots `rico`, `full` and `exp`). The preparation writes the memory at the entry of a tick; where the rule is too rare to wait for, the entry S seed was **chosen in the port** (search over the vector of the same tick without the seed) and written on the test bench before the before state. The 31 new vectors (16 scenarios, 3.9 MB) match 307/307 with S, R and life and are required by `ticks_originais.rs`; the new action (`acoes/exp_leao_m1`) by `acoes_originais.rs`.
 
-| Subpasta | Ticks | O que exercita |
+| Subfolder | Ticks | What it exercises |
 |---|---|---|
-| `morte_natural` | 1761, 1763, 1772, 1796, 1811, 1842 | `_HealthB` = `_HealthR` = 1 (`_AlwaysHealthy` = 1): morte natural de soldado preto no ninho e na superfície, operária vermelha na superfície (conta em `_BAntsExpired`, superficie.md 6.5), macho preto, rainha nova preta no ninho e macho vermelho |
-| `rainha_fome` | 1775, 1776 | `_HealthB` = 0: a cabeça morre com `Sk(64)` = 0 (diálogo 10015 dentro do tick) e a cauda some no tick seguinte (`_BlkQueens` = 0) |
-| `rainha_vermelha_fome` | 1757, 1758 | o mesmo para a vermelha (10016), com `_HealthR` = 0 reposto na entrada de cada tick (as vermelhas comem e a saúde sobe) |
-| `ninho_n02` | 1711 | N-02: `_HealthB` = 0 e S = 0x00A5 na entrada: a cabeça da rainha sorteia `Sk(256)` = 0 e não morre |
-| `lutas_soldado`, `lutas_castas` | 1793 | tabuleiros de pretas e vermelhas em Bored: dezenas de `_GetWinner` por tick |
-| `ninho_n04`, `ninho_n05`, `ninho_n08` | 1719, 1721; 1711, 1714; 1713, 1718 | ovo levado ao fundo e largado com o mesmo estágio; vermelhas largando 0x82; operária e soldado cavando |
-| `ninho_n11` | 1711, 1719, 1722, 1754 | linhas 6..63 inundadas sem chuva: afogadas (macho vermelho, operária preta), a água descendo e a comida da linha seca sumindo |
-| `lista_a_cheia`, `lista_a_cheia_sem_vagas` | 1793 | `_ExitHole` com `_ListIndexA` = 1000 |
-| `revoada_natural` | 3722, 3842, 3843 | machos e rainhas novas feitos pela própria colônia vermelha (rico em ultra até `_GstrR` armar `_FlyAwayR`): voo, decolagem por `S1(F)` com F = 5 e saída do mapa |
-| `queda_casa_carpete_esq`, `queda_casa_carpete_dir` | 34 | aranha em agonia sobre um fiapo do carpete na casa: as 3 comidas caem para a direita (`_DROPdir` = 1) ou somem (`_DROPdir` = 3) |
-| `amarela_rainha` | 1733 | rainha amarela andando no ninho: 0xFF e 0xFE regravadas a cada passo |
+| `morte_natural` | 1761, 1763, 1772, 1796, 1811, 1842 | `_HealthB` = `_HealthR` = 1 (`_AlwaysHealthy` = 1): natural death of a black soldier in the nest and on the surface, red worker on the surface (counts in `_BAntsExpired`, superficie.md 6.5), black male, new black queen in the nest and red male |
+| `rainha_fome` | 1775, 1776 | `_HealthB` = 0: the head dies with `Sk(64)` = 0 (dialog 10015 inside the tick) and the tail disappears on the next tick (`_BlkQueens` = 0) |
+| `rainha_vermelha_fome` | 1757, 1758 | the same for the red one (10016), with `_HealthR` = 0 reset at the entry of each tick (the red ants eat and the health rises) |
+| `ninho_n02` | 1711 | N-02: `_HealthB` = 0 and S = 0x00A5 at the entry: the queen's head draws `Sk(256)` = 0 and does not die |
+| `lutas_soldado`, `lutas_castas` | 1793 | boards of black and red ants in Bored: dozens of `_GetWinner` per tick |
+| `ninho_n04`, `ninho_n05`, `ninho_n08` | 1719, 1721; 1711, 1714; 1713, 1718 | egg carried to the bottom and dropped with the same stage; red ants dropping 0x82; worker and soldier digging |
+| `ninho_n11` | 1711, 1719, 1722, 1754 | rows 6..63 flooded without rain: drowned (red male, black worker), the water going down and the food of the dry row disappearing |
+| `lista_a_cheia`, `lista_a_cheia_sem_vagas` | 1793 | `_ExitHole` with `_ListIndexA` = 1000 |
+| `revoada_natural` | 3722, 3842, 3843 | males and new queens made by the red colony itself (rico in ultra until `_GstrR` arms `_FlyAwayR`): flight, take-off by `S1(F)` with F = 5 and leaving the map |
+| `queda_casa_carpete_esq`, `queda_casa_carpete_dir` | 34 | spider in agony on a carpet strand in the house: the 3 foods fall to the right (`_DROPdir` = 1) or disappear (`_DROPdir` = 3) |
+| `amarela_rainha` | 1733 | yellow queen walking in the nest: 0xFF and 0xFE rewritten at each step |
 
-Gravações brutas inteiras comparadas antes da seleção (fora do git, `re_trabalho/raros/`): morte natural 150 ticks, rainhas 66 + 48, N-02 3, lutas 40 + 3 × 25, N-04/05/08 30 + 30 + 40, N-11 120, lista cheia 2, revoada natural 17 (mais 418 de uma tentativa em que `_FlyAwayR` não armou), rainha amarela 8, queda na casa 3 + 3 + 3 + 1, Load de um Jogo Completo sem vermelhas 40: **todas 307/307**, menos `ninho_n11/1797` (`_gameCycles`: a caixa de fome da amarela, `_YellowDialog`, não para o temporizador; como `ninho_n15`).
+Whole raw recordings compared before the selection (outside git, `re_trabalho/raros/`): natural death 150 ticks, queens 66 + 48, N-02 3, fights 40 + 3 × 25, N-04/05/08 30 + 30 + 40, N-11 120, full list 2, natural mating flight 17 (plus 418 from an attempt in which `_FlyAwayR` did not arm), yellow queen 8, fall in the house 3 + 3 + 3 + 1, Load of a Full Game without red ants 40: **all 307/307**, except `ninho_n11/1797` (`_gameCycles`: the yellow ant's hunger box, `_YellowDialog`, does not stop the timer; like `ninho_n15`).
 
-Achados:
+Findings:
 
-1. **`_KillAntLion(-1)` grava 0x3F onde estava a formiga-leão que saiu (port corrigido).** A ação `exp_leao_m1` (Experimental pausado, duas formigas-leão na lista, inseticida em jato num 0x38 sem entrada): o 1º jato grava 0x3F em (20, 0) (x = byte alto do seletor de `_EggStr` nesta sessão, y = byte alto de `_LastThemeSong`) e tira a formiga-leão 0; o 2º grava 0x3F no centro dela (o X e o Y da vaga −1 agora são os dela) e tira a seguinte; o 3º, no centro desta; os demais repetem. O port não fazia o `_SetMap`. Correção: `Estado::leao_x_vaga_menos_1` (fora do save; `None` enquanto é o seletor) e `inimigos::matar_formiga_leao_sem_entrada` grava `(X[−1], byte alto de _LastThemeSong)`; o seletor da bancada (20) vai na ação (`leao_x_vaga_menos_1`). Inimigos.md §1.4.
-2. **`_DROPdir` nos extras.** Fora do save; o comparador usava o 0 do port. `qemu_bancada.EXTRAS` passou a gravar `DROPdir` e `vetor_tick` põe `Estado::passo_queda` com ele. Lidos: 1 no patch (0, 4) (`_CarpetFloorL`) e 3 no (1, 5) (`_CarpetFloorR`), como em geracao-mundo.md §5.
-3. **Proporção de vitórias** (superficie.md 6.2): as 250 chamadas de `_GetWinner` das gravações de luta (lidas no port sobre os ticks que batem 307/307, isto é, as mesmas do original): classe 0 × 0, "a" venceu 45/106 (0,42; tabela 0,5); 0 × 1, 12/42 (0,29; 0,2); 1 × 0, 16/24 (0,67; 0,8); 0 × 2, 17/23 (0,74; 0,7); 2 × 0, 0/3; 1 × 2, 20/25 (0,80; 0,9); 2 × 1, 2/21 (0,10; 0,1); 1 × 1, 3/4; 2 × 2, 2/2. Pelos contadores do save (`_RedLost`/`_BlackLost`): operárias × operárias, a preta venceu 40/70 (0,57); soldados pretos × operárias vermelhas, 43/66 (0,65); machos pretos × soldados vermelhos, 10/60 (0,17). Tudo dentro do esperado para amostras desse tamanho com `RR(10)` < p (o soldado contra a operária fica ~2 desvios abaixo de 0,8); a regra em si está conferida pela igualdade tick a tick (R e os contadores batem).
-4. **Clique esquerdo no laço** (simulacao-visao-geral.md §2): `cenario_ritmo_clique`, em ultra, para na entrada do `MYTIMERFUNC` (`1000:2440`) a cada chamada (um passo de instrução antes de religar o breakpoint). Sem clique, 12–15 ticks por chamada (19 chamadas; uma de 8 e uma de 18). Com um clique na barra de título logo depois de soltar a VM, a chamada **seguinte** roda só 1–3 ticks (19 de 19), e a do clique 9–22: o evento chega ao Windows no fim da chamada em que foi enviado, e a seguinte sai na primeira volta em que testa `GetAsyncKeyState`. Confirma o curto-circuito do código e o que o port faz (`botao_esquerdo_apertado`).
-5. **`_LastColonyPopR` volta a 1 no Load** (quintal.md, "Implementação"): `cenario_ultima_vermelha` (Jogo Completo sem vermelhas) mostrou 10052 e 10055 na passada de `_SimColonies` do tick 32; salvo como `ULTVERM` e carregado pelo File → Load, a passada do tick 64 mostrou as duas de novo (capturas `re_trabalho/cen/dialogo_32_*.png`, `dialogo_64_*.png`). Os 40 ticks batem 307/307 (o comparador não confere as caixas; o port tem o teste `ultima_populacao_vermelha_comeca_em_1`).
+1. **`_KillAntLion(-1)` writes 0x3F where the antlion that left was (port fixed).** The action `exp_leao_m1` (Experimental paused, two antlions in the list, insecticide spray on a 0x38 without an entry): the 1st spray writes 0x3F at (20, 0) (x = high byte of the `_EggStr` selector in this session, y = high byte of `_LastThemeSong`) and removes antlion 0; the 2nd writes 0x3F at its center (the X and Y of slot −1 are now its own) and removes the next one; the 3rd, at the center of this one; the rest repeat. The port did not do the `_SetMap`. Fix: `Estado::leao_x_vaga_menos_1` (outside the save; `None` while it is the selector) and `inimigos::matar_formiga_leao_sem_entrada` writes `(X[−1], high byte of _LastThemeSong)`; the test bench selector (20) goes in the action (`leao_x_vaga_menos_1`). Inimigos.md §1.4.
+2. **`_DROPdir` in the extras.** Outside the save; the comparator used the port's 0. `qemu_bancada.EXTRAS` now records `DROPdir` and `vetor_tick` sets `Estado::passo_queda` with it. Read: 1 on patch (0, 4) (`_CarpetFloorL`) and 3 on (1, 5) (`_CarpetFloorR`), as in geracao-mundo.md §5.
+3. **Victory ratio** (superficie.md 6.2): the 250 `_GetWinner` calls of the fight recordings (read in the port over the ticks that match 307/307, that is, the same as the original's): class 0 × 0, "a" won 45/106 (0.42; table 0.5); 0 × 1, 12/42 (0.29; 0.2); 1 × 0, 16/24 (0.67; 0.8); 0 × 2, 17/23 (0.74; 0.7); 2 × 0, 0/3; 1 × 2, 20/25 (0.80; 0.9); 2 × 1, 2/21 (0.10; 0.1); 1 × 1, 3/4; 2 × 2, 2/2. By the save counters (`_RedLost`/`_BlackLost`): workers × workers, the black ant won 40/70 (0.57); black soldiers × red workers, 43/66 (0.65); black males × red soldiers, 10/60 (0.17). All within what is expected for samples of this size with `RR(10)` < p (the soldier against the worker is ~2 deviations below 0.8); the rule itself is checked by the tick-by-tick equality (R and the counters match).
+4. **Left click in the loop** (simulacao-visao-geral.md §2): `cenario_ritmo_clique`, in ultra, stops at the entry of `MYTIMERFUNC` (`1000:2440`) on each call (one instruction step before re-enabling the breakpoint). Without a click, 12–15 ticks per call (19 calls; one of 8 and one of 18). With a click on the title bar right after releasing the VM, the **next** call runs only 1–3 ticks (19 of 19), and the one with the click 9–22: the event reaches Windows at the end of the call in which it was sent, and the next one exits on the first turn in which it tests `GetAsyncKeyState`. Confirms the short-circuit in the code and what the port does (`botao_esquerdo_apertado`).
+5. **`_LastColonyPopR` goes back to 1 on Load** (quintal.md, "Implementation in the port"): `cenario_ultima_vermelha` (Full Game without red ants) showed 10052 and 10055 in the `_SimColonies` pass of tick 32; saved as `ULTVERM` and loaded via File → Load, the pass of tick 64 showed both again (captures `re_trabalho/cen/dialogo_32_*.png`, `dialogo_64_*.png`). The 40 ticks match 307/307 (the comparator does not check the boxes; the port has the test `ultima_populacao_vermelha_comeca_em_1`).
 
-### Quinta rodada, tutorial (2026-10-18): tutorial completo com as ações do jogador
+### Fifth round, tutorial (2026-10-18): full tutorial with the player's actions
 
-`tests/referencias/ticks/tutorial_completo/` (16 ticks, 2,1 MB; `cenarios_tick.py gravar tutorial_completo DIR --snapshot tut`, detalhes em [conselhos.md](conselhos.md) §3.1): o roteiro faz a ação que cada lição pede (cliques calculados, teclas, arrasto no Behavior, clique segurado no gráfico) e grava inteiros só os ticks em que `_TutorCnt` chega a múltiplo de 8; grava o snapshot `tutcur` a cada lição para retomar. Ações que dependem de coordenadas de outras janelas vêm do ambiente (`TUT_EXTRA`, JSON por lição). Duas gravações brutas (fora do git): 124 ticks das lições 1–26 (com o relógio lido depois da caixa) e 185 das lições 1–57.
+`tests/referencias/ticks/tutorial_completo/` (16 ticks, 2.1 MB; `cenarios_tick.py gravar tutorial_completo DIR --snapshot tut`, details in [conselhos.md](conselhos.md) §3.1): the script does the action each lesson asks for (calculated clicks, keys, drag in Behavior, held click on the graph) and records in full only the ticks in which `_TutorCnt` reaches a multiple of 8; it saves the `tutcur` snapshot at each lesson to resume. Actions that depend on coordinates of other windows come from the environment (`TUT_EXTRA`, JSON per lesson). Two raw recordings (outside git): 124 ticks of lessons 1–26 (with the clock read after the box) and 185 of lessons 1–57.
 
-**Resultado:** dos 309 ticks, todos 307/307 com extras 5/5 e vida 0, menos três casos com a causa isolada:
-- `tick_000575` da 1ª gravação: `_CatDelay` diferente. No tick de `_FullCount` (`_Cycle` múltiplo de 64) a caixa da lição abre **antes** de `_DoSimYard`, e o gato leu o relógio depois de a caixa fechar; a gravação só tinha as leituras de antes da caixa (nenhuma), e o port usou `_gameCycles`. Regravado com `MacTickCount_depois_da_caixa`: 307/307 (está no repositório).
-- `tick_001174`–`001229`: a bancada anotou a janela do mapa (0x100) na frente depois do botão Patch, mas o original não concluiu a lição 0x2A até o Ctrl+M (a janela não estava na frente). Erro de anotação, não do port; fora da seleção.
-- `tick_001340`: a caixa com imagem da lição 50 fez o Windows descartar o segmento de código 6 (`_DoAntSim`) e o tick não voltou ao retorno conhecido; o "depois" foi lido cem ticks adiante. Inválido, fora da seleção.
+**Result:** of the 309 ticks, all 307/307 with extras 5/5 and life 0, except three cases with the cause isolated:
+- `tick_000575` of the 1st recording: `_CatDelay` different. On the `_FullCount` tick (`_Cycle` multiple of 64) the lesson box opens **before** `_DoSimYard`, and the cat read the clock after the box closed; the recording only had the reads from before the box (none), and the port used `_gameCycles`. Re-recorded with `MacTickCount_depois_da_caixa`: 307/307 (it is in the repository).
+- `tick_001174`–`001229`: the test bench noted the map window (0x100) in front after the Patch button, but the original did not complete lesson 0x2A until Ctrl+M (the window was not in front). Annotation error, not a port error; outside the selection.
+- `tick_001340`: the lesson 50 box with an image made Windows discard code segment 6 (`_DoAntSim`) and the tick did not return to the known return; the "after" was read a hundred ticks later. Invalid, outside the selection.
 
-**Divergência achada e corrigida (regra, pequena):** `_TimeTemp` das lições 7, 9 e 0x1A. `_GiveLesson` mostra a caixa e só depois lê `_MacTickCount` (tick 291: relógio 10704 no tick, 12213 depois da caixa, `_TimeTemp` = 12813). O port usava o relógio do tick (`_TimeTemp` = 11304). Correção em `rules/conselhos.rs` (`MemoriaTutor::espera_depois_da_caixa` e `caixa_fechada`), chamada por `Partida::fechar_modal` e, nos vetores, por `vetor_tick::depois_do_tick` (o teste de ticks confere `_TimeTemp`). Teste de unidade `prazo_da_licao_7_conta_do_fechamento_da_caixa`.
+**Divergence found and fixed (rule, small):** `_TimeTemp` of lessons 7, 9 and 0x1A. `_GiveLesson` shows the box and only then reads `_MacTickCount` (tick 291: clock 10704 in the tick, 12213 after the box, `_TimeTemp` = 12813). The port used the tick's clock (`_TimeTemp` = 11304). Fix in `rules/conselhos.rs` (`MemoriaTutor::espera_depois_da_caixa` and `caixa_fechada`), called by `Partida::fechar_modal` and, in the vectors, by `vetor_tick::depois_do_tick` (the tick test checks `_TimeTemp`). Unit test `prazo_da_licao_7_conta_do_fechamento_da_caixa`.
 
-**Extras novos** (só em `antes`, todos opcionais): `JanelaNaFrente` (janela que a bancada pôs na frente, no formato de `_win_IsWinInFront`; vai para `RegrasOriginais::interface_tutor`), `VistaEdicao` (`[39, 21]`: a janela de edição do Tutorial é maior que a padrão de 25 × 19; usada por `aplicar_vista_da_bancada`) e, no nível de cima, `MacTickCount_depois_da_caixa`.
+**New extras** (only in `antes`, all optional): `JanelaNaFrente` (window the test bench put in front, in the `_win_IsWinInFront` format; goes to `RegrasOriginais::interface_tutor`), `VistaEdicao` (`[39, 21]`: the Tutorial's edit window is larger than the default 25 × 19; used by `aplicar_vista_da_bancada`) and, at the top level, `MacTickCount_depois_da_caixa`.
 
-**Bancada (`cenarios_tick.py`):** `fechar_caixa_ate_o_retorno` também para na entrada do tick seguinte (estado de depois = o da entrada seguinte) e não exige o segmento 6 presente; clica mais embaixo nas tentativas seguintes (caixas com imagem); com `relogio` anota as leituras do relógio depois de a caixa fechar (só no tick de `_FullCount` ou quando pedido: `anotar_relogio_caixa`). Observado: a caixa da lição sem imagem não chama `_MacTickCount`.
+**Test bench (`cenarios_tick.py`):** `fechar_caixa_ate_o_retorno` also stops at the entry of the next tick (after state = that of the next entry) and does not require segment 6 to be present; it clicks lower in subsequent attempts (boxes with an image); with `relogio` it records the clock reads after the box closes (only on the `_FullCount` tick or when requested: `anotar_relogio_caixa`). Observed: the lesson box without an image does not call `_MacTickCount`.
 
-## Limitações
+## Limitations
 
-- **Configurações cobertas.** Os primeiros vetores eram só do snapshot `quick` (Quick Game, velocidade normal, sem balões, chuva nem amarela em movimento). Hoje (2026-10-18) há 107 vetores em 21 grupos, de vários snapshots (`quick`, `rico`, `full`, `tut`, Experimental), com chuva, revoada, predadores, menino e cortador, inseticida, amarela andando e lutando, as quatro velocidades e o tutorial (lições 1–3 em `tutorial/` e o tutorial inteiro em `tutorial_completo/`), além das sequências longas `ticks_longos/rico_200` e `full_600` (esta com a Yard View na frente). Continuam sem vetor: balões ligados, a janela de edição atrás nas animações da amarela, e os ramos listados em [../../estado-do-projeto.md](../../estado-do-projeto.md) §3; nesses casos o desenho pode consumir S ou mudar o caminho do tick.
-- **Velocidades "fast"/"ultra"**: há vetores (`velocidade_rapida`, `velocidade_ultra`; `_gameCycles` anda 1 por tick), mas o ritmo em ticks por segundo depende da CPU no original e só foi medido na bancada QEMU (ver `_BirdDelay` e simulacao-visao-geral.md §3.1).
-- **Leituras:** o mapeamento cobre os segmentos de dados 8, 9 e 10 fora do save. Não cobre a memória do Windows (API chamada de dentro do tick) nem os mapas de vida (já capturados). Uma variável lida só em situações que não aconteceram nos 140 ticks não aparece.
-- **`_Tindex` e `_TemDensity`**: classificados por inferência, não por teste.
-- **Determinismo depende do snapshot**: o `loadvm` com a VM rodando chegou sempre ao mesmo primeiro tick nas execuções feitas, mas isso não é garantido pelo QEMU sem `icount` (o tempo até o primeiro `WM_TIMER` vem do relógio do host). Se uma execução parar num `GameTime` diferente de 79, compare por `GameTime`, não pela ordem.
-- **Seletores** valem para `-m 16` e para a sessão salva no snapshot; o script sempre procura de novo.
-- Tamanho: cada tick ocupa ~130 KB (2 × 48.386 + 2 × 16.384 + JSON). Versionados (2026-10-18): 107 ticks em `ticks/` (15 MB) e as duas sequências de `ticks_longos/` (1,1 MB, só os campos que mudam); outras sequências longas ficam em `re_trabalho/`.
+- **Covered configurations.** The first vectors were only from the `quick` snapshot (Quick Game, normal speed, no balloons, rain or yellow ant moving). Today (2026-10-18) there are 107 vectors in 21 groups, from several snapshots (`quick`, `rico`, `full`, `tut`, Experimental), with rain, mating flight, predators, boy and lawnmower, insecticide, yellow ant walking and fighting, the four speeds and the tutorial (lessons 1–3 in `tutorial/` and the whole tutorial in `tutorial_completo/`), in addition to the long sequences `ticks_longos/rico_200` and `full_600` (the latter with the Yard View in front). Still without a vector: balloons turned on, the edit window behind during the yellow ant's animations, and the branches listed in [../../estado-do-projeto.md](../../estado-do-projeto.md) §3; in these cases the drawing may consume S or change the path of the tick.
+- **"fast"/"ultra" speeds**: there are vectors (`velocidade_rapida`, `velocidade_ultra`; `_gameCycles` advances 1 per tick), but the pace in ticks per second depends on the CPU in the original and was only measured on the QEMU bench (see `_BirdDelay` and simulacao-visao-geral.md §3.1).
+- **Reads:** the mapping covers data segments 8, 9 and 10 outside the save. It does not cover Windows memory (API called from inside the tick) nor the life maps (already captured). A variable read only in situations that did not happen in the 140 ticks does not appear.
+- **`_Tindex` and `_TemDensity`**: classified by inference, not by test.
+- **Determinism depends on the snapshot**: `loadvm` with the VM running always reached the same first tick in the runs made, but this is not guaranteed by QEMU without `icount` (the time until the first `WM_TIMER` comes from the host clock). If a run stops at a `GameTime` other than 79, compare by `GameTime`, not by order.
+- **Selectors** are valid for `-m 16` and for the session saved in the snapshot; the script always searches again.
+- Size: each tick takes ~130 KB (2 × 48,386 + 2 × 16,384 + JSON). Versioned (2026-10-18): 107 ticks in `ticks/` (15 MB) and the two sequences of `ticks_longos/` (1.1 MB, only the fields that change); other long sequences stay in `re_trabalho/`.

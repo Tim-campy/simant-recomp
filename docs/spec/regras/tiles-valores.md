@@ -1,103 +1,105 @@
-# Valores das células dos mapas (`_MapA`, `_MapB`, `_MapR`)
+*Leia em português: [tiles-valores.md](../../pt-BR/spec/regras/tiles-valores.md)*
 
-Cada célula de mapa é um byte. O mesmo byte serve de **índice do tile** desenhado e de **tipo de terreno** para as regras. Este documento lista o que cada faixa de valores significa para as regras, a partir das funções de teste do código e da geração do mundo ([geracao-mundo.md](geracao-mundo.md)).
+# Map cell values (`_MapA`, `_MapB`, `_MapR`)
 
-Mapas (ver também [../formatos/save-ant.md](../formatos/save-ant.md)):
+Each map cell is one byte. The same byte serves as the **index of the tile** drawn and as the **terrain type** for the rules. This document lists what each range of values means for the rules, based on the test functions in the code and on world generation ([geracao-mundo.md](geracao-mundo.md)).
 
-| Mapa | Endereço | Tamanho | Índice | Plano (`_MePlane`/`_MapPlane`) |
+Maps (see also [../formatos/save-ant.md](../formatos/save-ant.md)):
+
+| Map | Address | Size | Index | Plane (`_MePlane`/`_MapPlane`) |
 |---|---|---|---|---|
-| `_MapA` | `1048:28e8` | 128 × 64 | `x * 64 + y` | 0 (quintal) e 1 (superfície do patch) |
-| `_MapB` | `1048:48e8` | 64 × 64 | `x * 64 + y`, `y = 0` = linha da superfície | 2 (ninho preto) |
-| `_MapR` | `1048:58e8` | 64 × 64 | idem | 3 (ninho vermelho) |
+| `_MapA` | `1048:28e8` | 128 × 64 | `x * 64 + y` | 0 (yard) and 1 (patch surface) |
+| `_MapB` | `1048:48e8` | 64 × 64 | `x * 64 + y`, `y = 0` = surface row | 2 (black nest) |
+| `_MapR` | `1048:58e8` | 64 × 64 | same | 3 (red nest) |
 
-Nas funções de teste, o plano `< 2` usa `_MapA`, 2 usa `_MapB` e 3 usa `_MapR` (fato visto no código, por exemplo `_IsClearTile` @ `1020:5b2c`, `_IsNotObstacle` @ `1020:94c6`). A superfície tem dois conjuntos de tiles, escolhidos por `_TERRAINset` (`1040:9b6e`): **0 = quintal** (objeto tipo 9 nº 10, `_Barrier = 0x50`) e **1 = casa** (objeto tipo 9 nº 9, `_Barrier = 0x90`), trocados por `_OverlayTileSet` (`1010:00f4`). Várias faixas mudam de sentido com `_TERRAINset`.
+In the test functions, plane `< 2` uses `_MapA`, 2 uses `_MapB` and 3 uses `_MapR` (fact seen in the code, for example `_IsClearTile` @ `1020:5b2c`, `_IsNotObstacle` @ `1020:94c6`). The surface has two tile sets, chosen by `_TERRAINset` (`1040:9b6e`): **0 = yard** (object type 9 no. 10, `_Barrier = 0x50`) and **1 = house** (object type 9 no. 9, `_Barrier = 0x90`), switched by `_OverlayTileSet` (`1010:00f4`). Several ranges change meaning with `_TERRAINset`.
 
-Sobre o desenho: `_DoCalcTile` desenha o valor da superfície como índice de tile e, nos ninhos, `valor − 0x70` (byte, com estouro) (registrado em save-ant.md). Por isso não existem valores ≥ 0x70 guardados nos ninhos: os valores do ninho vão de 0 a 0x5D, e é o tile desenhado que cai em 0x90 e acima.
+About drawing: `_DoCalcTile` draws the surface value as the tile index and, in the nests, `value − 0x70` (byte, with overflow) (recorded in save-ant.md). That is why no values ≥ 0x70 are stored in the nests: nest values go from 0 to 0x5D, and it is the drawn tile that falls at 0x90 and above.
 
-## Superfície, quintal (`_TERRAINset = 0`)
+## Surface, yard (`_TERRAINset = 0`)
 
-| Valor | Significado | Fonte |
+| Value | Meaning | Source |
 |---|---|---|
-| 0x00–0x0F | chão (16 variações de terra/grama, sorteadas com `Sk(16)` na geração) | fato visto no código (`_MakeYardPatch`); `_IsClearTile` considera "livre" só `< 0x10` |
-| 0x18–0x1F | borda do buraco do ninho, por direção: 0x18 canto sup. esq., 0x19 cima, 0x1A canto sup. dir., 0x1B esquerda, 0x1C direita, 0x1D canto inf. esq., 0x1E baixo, 0x1F canto inf. dir. | fato visto no código: tabela `DGROUP:0x230c` indexada pela direção em `_MakeNewHoleB/R`; orientação deduzida de `_Dx8/_Dy8` |
-| 0x20–0x23 | objeto 2 × 2: 0x20 sup. esq., 0x21 sup. dir., 0x22 inf. esq., 0x23 inf. dir. | fato visto no código (`_MakeYardPatch`); o que é [hipótese: tufo de grama/planta, a confirmar no tile] |
-| 0x24/0x25, 0x26/0x27 | objetos 2 × 1 (esquerda/direita), duas variantes | fato visto no código; o que é [hipótese: a confirmar no tile] |
-| 0x28 | objeto de uma célula, 100 tentativas por patch | fato visto no código; o que é [hipótese] |
-| 0x30–0x37 | borda da armadilha da formiga-leão, por direção (0x30 sup. esq., 0x31 cima, 0x32 sup. dir., 0x33 esq., 0x34 dir., 0x35 inf. esq., 0x36 baixo, 0x37 inf. dir.) | fato visto no código (`_InitAntLions`, tabela `DGROUP:0x25e8`) |
-| 0x38 | centro da armadilha da formiga-leão | fato visto no código |
-| 0x48–0x4B | comida, 1 a 4 unidades (`_AddFood` cria 0x48 e soma 1 até 0x4B) | fato visto no código (`_IsItFood` @ `1028:2d1a`, `_AddFood`) |
-| 0x50 | buraco (entrada de ninho) | fato visto no código (`_IsItHole` @ `1028:2cc0`: no quintal, buraco é exatamente 0x50) |
-| 0x51–0x53 | pedrinha que se pode carregar (a geração só cria 0x51) | fato visto no código (`_IsThisPebble` @ `1020:5f32`, só no plano 1; `_IsLiftable` @ `1020:97ca`) |
-| 0x54–0x5F | pedra grande (formas 5 × 5 e 3 × 3): 0x5B canto sup. esq., 0x54 borda de cima, 0x55 canto sup. dir., 0x56 borda dir., 0x57 canto inf. dir., 0x58 borda de baixo, 0x59 canto inf. esq., 0x5A borda esq., 0x5C miolo, 0x5D–0x5F cantos internos | fato visto no código (tabelas de `_AddRock5/3`); nomes das peças deduzidos da posição nas formas |
-| 0x60–0x67 | parede (ferramenta do modo Experimental) | fato visto no código (`_IsItWall` @ `1010:86fe`); uso [hipótese] |
-| 0x69–0x6B | lagarta (segmentos) | [hipótese]: aparecem no `QUICK2.ANT` em linha (x 3–7, y 58), não são criados pela geração |
-| 0x70–0x73 | bicho-de-conta, um valor por direção (`_SowTab` = `72 73 71 70 72 73 71 70`) | fato visto no código (`_InitPillar`) |
-| 0x74–0x77 | poça de chuva (`_InitWater` cria 0x74; `_DoWater` faz crescer) | fato visto no código |
+| 0x00–0x0F | ground (16 dirt/grass variations, drawn with `Sk(16)` during generation) | fact seen in the code (`_MakeYardPatch`); `_IsClearTile` considers only `< 0x10` "clear" |
+| 0x18–0x1F | nest hole border, by direction: 0x18 top-left corner, 0x19 top, 0x1A top-right corner, 0x1B left, 0x1C right, 0x1D bottom-left corner, 0x1E bottom, 0x1F bottom-right corner | fact seen in the code: table `DGROUP:0x230c` indexed by direction in `_MakeNewHoleB/R`; orientation deduced from `_Dx8/_Dy8` |
+| 0x20–0x23 | 2 × 2 object: 0x20 top-left, 0x21 top-right, 0x22 bottom-left, 0x23 bottom-right | fact seen in the code (`_MakeYardPatch`); what it is [hypothesis: tuft of grass/plant, to be confirmed on the tile] |
+| 0x24/0x25, 0x26/0x27 | 2 × 1 objects (left/right), two variants | fact seen in the code; what it is [hypothesis: to be confirmed on the tile] |
+| 0x28 | single-cell object, 100 attempts per patch | fact seen in the code; what it is [hypothesis] |
+| 0x30–0x37 | antlion trap border, by direction (0x30 top-left, 0x31 top, 0x32 top-right, 0x33 left, 0x34 right, 0x35 bottom-left, 0x36 bottom, 0x37 bottom-right) | fact seen in the code (`_InitAntLions`, table `DGROUP:0x25e8`) |
+| 0x38 | center of the antlion trap | fact seen in the code |
+| 0x48–0x4B | food, 1 to 4 units (`_AddFood` creates 0x48 and adds 1 up to 0x4B) | fact seen in the code (`_IsItFood` @ `1028:2d1a`, `_AddFood`) |
+| 0x50 | hole (nest entrance) | fact seen in the code (`_IsItHole` @ `1028:2cc0`: in the yard, a hole is exactly 0x50) |
+| 0x51–0x53 | small pebble that can be carried (generation only creates 0x51) | fact seen in the code (`_IsThisPebble` @ `1020:5f32`, only on plane 1; `_IsLiftable` @ `1020:97ca`) |
+| 0x54–0x5F | large rock (5 × 5 and 3 × 3 shapes): 0x5B top-left corner, 0x54 top edge, 0x55 top-right corner, 0x56 right edge, 0x57 bottom-right corner, 0x58 bottom edge, 0x59 bottom-left corner, 0x5A left edge, 0x5C core, 0x5D–0x5F inner corners | fact seen in the code (tables of `_AddRock5/3`); piece names deduced from their position in the shapes |
+| 0x60–0x67 | wall (Experimental mode tool) | fact seen in the code (`_IsItWall` @ `1010:86fe`); use [hypothesis] |
+| 0x69–0x6B | caterpillar (segments) | [hypothesis]: they appear in `QUICK2.ANT` in a row (x 3–7, y 58), they are not created by generation |
+| 0x70–0x73 | pill bug, one value per direction (`_SowTab` = `72 73 71 70 72 73 71 70`) | fact seen in the code (`_InitPillar`) |
+| 0x74–0x77 | rain puddle (`_InitWater` creates 0x74; `_DoWater` makes it grow) | fact seen in the code |
 
-Faixas sem uso visto na geração do quintal: 0x10–0x17, 0x29–0x2F, 0x39–0x47, 0x4C–0x4F, 0x68, 0x6C–0x6F, ≥ 0x78 [em aberto].
+Ranges with no use seen in yard generation: 0x10–0x17, 0x29–0x2F, 0x39–0x47, 0x4C–0x4F, 0x68, 0x6C–0x6F, ≥ 0x78 [open].
 
-## Superfície, casa (`_TERRAINset = 1`)
+## Surface, house (`_TERRAINset = 1`)
 
-Só o que as funções de teste dizem (o conteúdo de cada patch está em aberto, ver [geracao-mundo.md](geracao-mundo.md) §5):
+Only what the test functions say (the content of each patch is open, see [geracao-mundo.md](geracao-mundo.md) §5):
 
-| Valor | Significado | Fonte |
+| Value | Meaning | Source |
 |---|---|---|
-| 0x00–0x0F | chão livre (`_IsClearTile`) | fato visto no código |
-| 0x18–0x27 | comida (`_IsItFood` na casa); `_AddFood` converte chão em comida e soma 1 enquanto `valor & 3 < 3` | fato visto no código |
-| 0x3E/0x3F | fiapos no carpete (`_CarpetFloorL/R`, `_MakeLint2`) | fato visto no código; nome [hipótese] |
-| 0x5C–0x5F, 0x60/0x61 | ladrilhos (`_FloorTiles` grava 0x5C–0x5F nas juntas e 0x60/0x61 em faixas) | fato visto no código |
-| 0x64, 0x7A, 0x7B, 0x03 | preenchimentos do carpete esquerdo (`_CarpetFloorL`) | fato visto no código; nomes [hipótese] |
-| 0x80–0x8F | buraco na casa (`_IsItHole`); `_CanBeHouseHole` cria 0x84, 0x85, 0x86, 0x8A e 0x80–0x83 | fato visto no código |
+| 0x00–0x0F | clear ground (`_IsClearTile`) | fact seen in the code |
+| 0x18–0x27 | food (`_IsItFood` in the house); `_AddFood` converts ground into food and adds 1 while `value & 3 < 3` | fact seen in the code |
+| 0x3E/0x3F | lint on the carpet (`_CarpetFloorL/R`, `_MakeLint2`) | fact seen in the code; name [hypothesis] |
+| 0x5C–0x5F, 0x60/0x61 | floor tiles (`_FloorTiles` writes 0x5C–0x5F at the joints and 0x60/0x61 in strips) | fact seen in the code |
+| 0x64, 0x7A, 0x7B, 0x03 | fills of the left carpet (`_CarpetFloorL`) | fact seen in the code; names [hypothesis] |
+| 0x80–0x8F | hole in the house (`_IsItHole`); `_CanBeHouseHole` creates 0x84, 0x85, 0x86, 0x8A and 0x80–0x83 | fact seen in the code |
 
-## Ninhos (`_MapB`, `_MapR`)
+## Nests (`_MapB`, `_MapR`)
 
-| Valor | Significado | Fonte |
+| Value | Meaning | Source |
 |---|---|---|
-| 0x00–0x07 | túnel (chão escavado, 8 variações `Sk(8)`) | fato visto no código (`_DigTileB/R`, `_SmoothEdges*`) |
-| 0x08–0x0F | [em aberto] (passáveis: `< 0x19`) | |
-| 0x10–0x13 | comida guardada no ninho | fato visto no código (`_IsItNFood` @ `1020:5f64`, `_IsThisFood`, `_IsItFoodAt`) |
-| 0x14 | criado por `_DigTileB` nos dois ninhos ao mesmo tempo, abaixo de y = 53 | fato visto no código; [hipótese: passagem entre os ninhos] |
-| 0x18 | abertura para a superfície na linha y = 0 | fato visto no código (`_IsItAHole` @ `1020:9b4a`, `_SmoothEdges*`, `_GetExitDirB`) |
-| 0x1C–0x1F | linha da superfície ainda fechada (grama vista de lado) | fato visto no código (`_IsThisGrass` @ `1020:5ee4`; geração em `_RandWorld`) |
-| 0x20–0x2E | terra; os 4 bits baixos de `valor − 0x1F` dizem quais vizinhas também são terra (bit 1 = cima, 2 = direita, 4 = baixo, 8 = esquerda; borda do mapa conta como terra). 0x2E = cercada (terra maciça, o valor inicial) | fato visto no código (`_SmoothEdgesB` @ `1020:255a`, `_IsItDirt` @ `1020:1182`) |
-| 0x30–0x31 | pedrinha dentro do ninho (carregável, passável) | fato visto no código (`_IsThisPebble`, `_TileCanBeMovedOn`) |
-| 0x4E | túnel inundado | fato visto no código (`_AddWater` @ `1020:0b8a`: túnel `< 0x20` vira 0x4E) |
-| 0x4F–0x5D | terra inundada (`terra + 0x2F`) | fato visto no código (`_AddWater`, `_RIsItDirt` @ `1020:26c4` aceita 0x20–0x2F e ≥ 0x4F) |
+| 0x00–0x07 | tunnel (dug ground, 8 variations `Sk(8)`) | fact seen in the code (`_DigTileB/R`, `_SmoothEdges*`) |
+| 0x08–0x0F | [open] (passable: `< 0x19`) | |
+| 0x10–0x13 | food stored in the nest | fact seen in the code (`_IsItNFood` @ `1020:5f64`, `_IsThisFood`, `_IsItFoodAt`) |
+| 0x14 | created by `_DigTileB` in both nests at the same time, below y = 53 | fact seen in the code; [hypothesis: passage between the nests] |
+| 0x18 | opening to the surface on row y = 0 | fact seen in the code (`_IsItAHole` @ `1020:9b4a`, `_SmoothEdges*`, `_GetExitDirB`) |
+| 0x1C–0x1F | surface row still closed (grass seen from the side) | fact seen in the code (`_IsThisGrass` @ `1020:5ee4`; generation in `_RandWorld`) |
+| 0x20–0x2E | dirt; the 4 low bits of `value − 0x1F` say which neighbors are also dirt (bit 1 = up, 2 = right, 4 = down, 8 = left; the map border counts as dirt). 0x2E = surrounded (solid dirt, the initial value) | fact seen in the code (`_SmoothEdgesB` @ `1020:255a`, `_IsItDirt` @ `1020:1182`) |
+| 0x30–0x31 | pebble inside the nest (carriable, passable) | fact seen in the code (`_IsThisPebble`, `_TileCanBeMovedOn`) |
+| 0x4E | flooded tunnel | fact seen in the code (`_AddWater` @ `1020:0b8a`: tunnel `< 0x20` becomes 0x4E) |
+| 0x4F–0x5D | flooded dirt (`dirt + 0x2F`) | fact seen in the code (`_AddWater`, `_RIsItDirt` @ `1020:26c4` accepts 0x20–0x2F and ≥ 0x4F) |
 
-Regra de alisamento (`_SmoothEdgesB/R`, fato visto no código): ao escavar (x, y), o jogo reavalia as quatro vizinhas. Para cada uma que seja terra (≥ 0x20, fora de 0x30–0x4E): calcula a máscara de vizinhas sólidas (sólida = ≥ 0x20 e fora de 0x30–0x4E); se a máscara não é zero, grava `0x1F + máscara` (+ 0x2F se a célula estava inundada); se é zero (terra isolada), a célula vira túnel `Sk(8)` (ou 0x4E se inundada). Na linha y = 0, uma célula ≤ 0x2F vira 0x18 (abertura). Fato verificado indiretamente: a reimplementação reproduz `_MapB`/`_MapR` do `QUICK2.ANT` byte a byte.
+Smoothing rule (`_SmoothEdgesB/R`, fact seen in the code): when digging (x, y), the game re-evaluates the four neighbors. For each one that is dirt (≥ 0x20, outside 0x30–0x4E): it computes the mask of solid neighbors (solid = ≥ 0x20 and outside 0x30–0x4E); if the mask is not zero, it writes `0x1F + mask` (+ 0x2F if the cell was flooded); if it is zero (isolated dirt), the cell becomes tunnel `Sk(8)` (or 0x4E if flooded). On row y = 0, a cell ≤ 0x2F becomes 0x18 (opening). Fact verified indirectly: the reimplementation reproduces `_MapB`/`_MapR` of `QUICK2.ANT` byte for byte.
 
-## Funções de teste (resumo)
+## Test functions (summary)
 
-Fato visto no código. "Superfície" = plano < 2.
+Fact seen in the code. "Surface" = plane < 2.
 
-| Função | Endereço | Regra |
+| Function | Address | Rule |
 |---|---|---|
 | `_IsItDirt(v)` | `1020:1182` | 0x20 ≤ v ≤ 0x2E |
-| `_RIsItDirt(v)` | `1020:26c4` | v ≥ 0x20 e (v < 0x30 ou v > 0x4E) |
-| `_IsThisFood(p, v)` | `1020:5f04` | superfície: `_IsItFood(v)`; ninho: 0x10 ≤ v ≤ 0x13 |
-| `_IsItFood(v)` | `1028:2d1a` | quintal: 0x48–0x4B; casa: 0x18–0x27 |
-| `_IsThisPebble(p, v)` | `1020:5f32` | plano 1: 0x51–0x53; plano 0: nunca; ninho: 0x30–0x31 |
-| `_IsThisGrass(p, v)` | `1020:5ee4` | ninho e 0x1C ≤ v ≤ 0x1F |
-| `_IsThisEgg(T)` | `1020:5ec8` | (T & 0x7F) de 1 a 7 (testa o tipo da formiga, não o mapa) |
-| `_IsItDigable(p, x, y)` | `1020:95c6` | só ninho, dentro do mapa, e v terra (0x20–0x2E) ou superfície fechada (0x1C–0x1F) |
-| `_IsNotBarrier(v)` | `1020:94a0` | quintal: v ≤ 0x50; casa: v ≤ 0x5F |
-| `_IsNotObstacle(p, x, y)` | `1020:94c6` | superfície: dentro do mapa e v ≤ 0x53 (quintal) ou ≤ 0x5F (casa); ninho: v < 0x19 ou 0x30–0x31 |
-| `_IsLessThanHole(v)` | `1020:9784` | quintal: v ≤ 0x4F; casa: v ≤ 0x58 |
-| `_IsItHole(x, y)` | `1028:2cc0` | quintal: v = 0x50; casa: 0x80 ≤ v ≤ 0x8F |
-| `_IsItAHole(p, x, y)` | `1020:9b4a` | superfície: `_IsItHole`; ninho: só em y = 0 e v = 0x18 |
+| `_RIsItDirt(v)` | `1020:26c4` | v ≥ 0x20 and (v < 0x30 or v > 0x4E) |
+| `_IsThisFood(p, v)` | `1020:5f04` | surface: `_IsItFood(v)`; nest: 0x10 ≤ v ≤ 0x13 |
+| `_IsItFood(v)` | `1028:2d1a` | yard: 0x48–0x4B; house: 0x18–0x27 |
+| `_IsThisPebble(p, v)` | `1020:5f32` | plane 1: 0x51–0x53; plane 0: never; nest: 0x30–0x31 |
+| `_IsThisGrass(p, v)` | `1020:5ee4` | nest and 0x1C ≤ v ≤ 0x1F |
+| `_IsThisEgg(T)` | `1020:5ec8` | (T & 0x7F) from 1 to 7 (tests the ant type, not the map) |
+| `_IsItDigable(p, x, y)` | `1020:95c6` | nest only, inside the map, and v dirt (0x20–0x2E) or closed surface (0x1C–0x1F) |
+| `_IsNotBarrier(v)` | `1020:94a0` | yard: v ≤ 0x50; house: v ≤ 0x5F |
+| `_IsNotObstacle(p, x, y)` | `1020:94c6` | surface: inside the map and v ≤ 0x53 (yard) or ≤ 0x5F (house); nest: v < 0x19 or 0x30–0x31 |
+| `_IsLessThanHole(v)` | `1020:9784` | yard: v ≤ 0x4F; house: v ≤ 0x58 |
+| `_IsItHole(x, y)` | `1028:2cc0` | yard: v = 0x50; house: 0x80 ≤ v ≤ 0x8F |
+| `_IsItAHole(p, x, y)` | `1020:9b4a` | surface: `_IsItHole`; nest: only at y = 0 and v = 0x18 |
 | `_IsItWall(v)` | `1010:86fe` | 0x60 ≤ v ≤ 0x67 |
-| `_IsClearTile(p, x, y)` | `1020:5b2c` | dentro do mapa; sem formiga na célula de `_Life?` (0 ou 0xFF/0xFE, a formiga amarela, contam como livre); e v < 0x10 (superfície) ou v < 8 (ninho) |
-| `_IsClear3x3(p, x, y)` | `1020:5ad2` | `_IsClearTile` na célula e nas 8 vizinhas |
-| `_TileCanBeMovedOn(p, x, y, …, cavar)` | `1020:9342` | superfície: dentro do mapa e v ≤ 0x53 (quintal) ou ≤ 0x90 (casa). Ninho: v < 0x19 ou 0x30–0x31; se o último parâmetro for verdadeiro ([hipótese]: "pode cavar"), também 0x1C–0x1F e 0x20–0x2E. Nas linhas y ≤ 1 há regras extras sobre trocar de plano e sobre a célula de baixo [detalhe não especificado aqui] |
+| `_IsClearTile(p, x, y)` | `1020:5b2c` | inside the map; no ant in the `_Life?` cell (0 or 0xFF/0xFE, the yellow ant, count as clear); and v < 0x10 (surface) or v < 8 (nest) |
+| `_IsClear3x3(p, x, y)` | `1020:5ad2` | `_IsClearTile` on the cell and its 8 neighbors |
+| `_TileCanBeMovedOn(p, x, y, …, dig)` | `1020:9342` | surface: inside the map and v ≤ 0x53 (yard) or ≤ 0x90 (house). Nest: v < 0x19 or 0x30–0x31; if the last parameter is true ([hypothesis]: "can dig"), also 0x1C–0x1F and 0x20–0x2E. On rows y ≤ 1 there are extra rules about changing plane and about the cell below [detail not specified here] |
 
-Observação: em `_IsNotObstacle` o segundo teste de `_TERRAINset = 0` (limite 0x50) nunca é alcançado; o limite efetivo no quintal é 0x53 (fato visto no código, provável erro do original).
+Note: in `_IsNotObstacle` the second test for `_TERRAINset = 0` (limit 0x50) is never reached; the effective limit in the yard is 0x53 (fact seen in the code, probably a bug in the original).
 
-## Valores do `_LifeA/B/R` gravados na geração
+## `_LifeA/B/R` values written during generation
 
-Não são valores de mapa, mas a geração escreve neles: o byte T da formiga (bit 7 = vermelha; bits 3–6 = classe; bits 0–2 = direção nos adultos), 0xFF/0xFE para a formiga amarela. A geração usa T = 0x10, 0x20, 0x30, 0x40 (+ direção) na superfície, 0x62/0x6A (rainha preta e sua segunda metade) e 0xE2/0xEA (vermelha). Nomes das classes: ver [../formatos/save-ant.md](../formatos/save-ant.md) [hipótese lá registrada].
+They are not map values, but generation writes to them: the ant's T byte (bit 7 = red; bits 3–6 = class; bits 0–2 = direction in adults), 0xFF/0xFE for the yellow ant. Generation uses T = 0x10, 0x20, 0x30, 0x40 (+ direction) on the surface, 0x62/0x6A (black queen and her second half) and 0xE2/0xEA (red). Class names: see [../formatos/save-ant.md](../formatos/save-ant.md) [hypothesis recorded there].
 
-## Como testar contra o original
+## How to test against the original
 
-1. **Contagem por valor nos saves:** o `QUICK2.ANT` tem, no `_MapA`, 0x00–0x0F (7.415 células), 0x18–0x1F (2 de cada: dois buracos), 0x20–0x23 (18 de cada), 0x24/0x25 (10), 0x26/0x27 (18), 0x28 (96), 0x30–0x38 (2 de cada: duas formigas-leão), 0x48–0x4B (49 células de comida), 0x50 (2), 0x51 (117), 0x54–0x5F (pedras), 0x69–0x6B, 0x71/0x72; nos ninhos, só 0x00–0x07, 0x18, 0x1C–0x1F e 0x20–0x2E. Cada save novo deve continuar dentro destas faixas; um valor fora delas é sinal de faixa não documentada.
-2. **Identificação visual:** desenhar o `_MapA` do `QUICK2.ANT` com o conjunto de tiles do quintal (objeto tipo 9 nº 10; folha em `re_trabalho/png/tiles_9_10_fora.png`) e comparar com uma captura da janela de edição na bancada QEMU ([../../bancada-qemu.md](../../bancada-qemu.md)) centrada nos mesmos pontos. Isso confirma as [hipóteses] de nome (0x20–0x28, 0x69–0x6B) e a orientação x/y na tela.
-3. **Regras de passagem:** na bancada, com a formiga amarela, tentar andar sobre pedrinha (0x51), pedra (0x54–0x5F) e buraco, e cavar em 0x1C–0x1F; comparar com `_TileCanBeMovedOn`/`_IsItDigable`.
+1. **Count per value in the saves:** `QUICK2.ANT` has, in `_MapA`, 0x00–0x0F (7,415 cells), 0x18–0x1F (2 of each: two holes), 0x20–0x23 (18 of each), 0x24/0x25 (10), 0x26/0x27 (18), 0x28 (96), 0x30–0x38 (2 of each: two antlions), 0x48–0x4B (49 food cells), 0x50 (2), 0x51 (117), 0x54–0x5F (rocks), 0x69–0x6B, 0x71/0x72; in the nests, only 0x00–0x07, 0x18, 0x1C–0x1F and 0x20–0x2E. Each new save must stay within these ranges; a value outside them is a sign of an undocumented range.
+2. **Visual identification:** draw the `_MapA` of `QUICK2.ANT` with the yard tile set (object type 9 no. 10; sheet in `re_trabalho/png/tiles_9_10_fora.png`) and compare with a capture of the edit window on the QEMU bench ([../../bancada-qemu.md](../../bancada-qemu.md)) centered on the same points. This confirms the name [hypotheses] (0x20–0x28, 0x69–0x6B) and the x/y orientation on screen.
+3. **Passage rules:** on the test bench, with the yellow ant, try to walk over a pebble (0x51), a rock (0x54–0x5F) and a hole, and to dig into 0x1C–0x1F; compare with `_TileCanBeMovedOn`/`_IsItDigable`.
