@@ -1,3 +1,5 @@
+*Read in English: [estado-do-projeto.md](../estado-do-projeto.md)*
+
 # Estado do projeto (revisão geral, 2026-10-19)
 
 Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (perfil de driver, API 0.29) mais os resíduos desta rodada (lista A cheia, `_KillAntLion(-1)`, botão esquerdo no laço, `WIN.INI`, bitmaps empacotados, `_LastColonyPopR`, alinhamento do Examine e do mini mapa pelo perfil de driver; API 0.30). Fontes: o código (`engine/src`, `simant/src`, `data/`), as 46 specs de `docs/spec/`, `docs/divergencias.md`, `docs/api-mods.md`, `docs/spec/regras/testes-tick.md`, `tests/referencias/` e a tabela de símbolos `re_trabalho/symbols.tsv` (2.171 nomes do `SIMANTW.SYM`). A revisão anterior (2026-10-18, sobre `1ff4b82`) e os seus adendos "Feito depois desta revisão" foram absorvidos aqui; o que eles listavam como feito está em §2 e saiu de §4.

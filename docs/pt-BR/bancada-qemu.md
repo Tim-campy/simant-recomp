@@ -1,3 +1,5 @@
+*Read in English: [bancada-qemu.md](../bancada-qemu.md)*
+
 # Bancada de testes automática (QEMU + SvarDOS)
 
 Roda o SimAnt original sem janela e sem usar o mouse/teclado do usuário, controlado só pelo protocolo QMP do QEMU (e pelo gdbstub para escrever na memória). Serve para gerar referências (capturas, jogos salvos, estados da memória) e para testes de regras contra o original.

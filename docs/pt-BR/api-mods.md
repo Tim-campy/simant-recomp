@@ -1,3 +1,5 @@
+*Read in English: [api-mods.md](../api-mods.md)*
+
 # API de mods
 
 Versão da API: **0.38**. Mods sobrescrevem dados (objetos do banco, `data/*.json` — desde a 0.26 **por chave** —, arquivos soltos) e, desde a 0.12, podem trazer **scripts Lua** em sandbox (seção "Scripts Lua"); desde a 0.17, os scripts podem ter menu, painel e ações sobre o jogo (para testes, como o mod de trapaças de `exemplos/mods/trapacas/`); desde a 0.26, ganchos dentro do tick, escritas de cheiro, castas, formigas e comida nos ninhos, e estado guardado ao lado do save; desde a 0.35, os textos do SimAnt original não vêm mais nos `data/*.json` do port, e sim da instalação do usuário (seção "Textos do original"); desde a 0.36, o mini mapa usa um ajuste medido na primeira abertura.

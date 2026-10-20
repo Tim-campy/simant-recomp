@@ -1,3 +1,5 @@
+*Read in English: [lancamento.md](../lancamento.md)*
+
 # Lançamento da versão 1.0 (preparação)
 
 Documento de trabalho para o lançamento da **1.0.0**, preparado em 2026-10-19 para revisão. **Nada foi
@@ -10,9 +12,10 @@ Arquivos preparados neste branch:
 |---|---|
 | `.github/workflows/release.yml` | build e pacote de Windows x64 e Linux x64, disparado **só** por tag `v*`; cria o release como **rascunho** |
 | `tools/gerar_avisos_terceiros.py` | gera o `AVISOS-TERCEIROS.txt` do pacote (licenças do que entra no executável) |
-| `CHANGELOG.md` | rascunho do histórico, com a seção `[1.0.0] — não lançado` |
+| `CHANGELOG.md` | rascunho do histórico, em inglês, com a seção `[1.0.0] — não lançado`; continua sendo a fonte das notas do release (vai no pacote como `CHANGELOG.txt`) |
+| `CHANGELOG.pt-BR.md` | versão em português do histórico (vai no pacote como `CHANGELOG.pt-BR.txt`) |
 | `LEIAME-usuario.md` | LEIAME de quem joga, em pt-BR (vai no pacote como `LEIAME.txt`) |
-| `README-user.md` | versão em inglês, opcional (vai como `README.txt` se existir) |
+| `README-user.md` | guia de quem joga, em inglês (vai no pacote como `README.txt`) |
 | `docs/lancamento.md` | este documento |
 | `simant/src/launcher/`, `config_launcher.rs`, `registro.rs`, `pastas.rs` | launcher, configuração, saída sem console e pastas ao lado do executável (seção 4, "Melhorias feitas") |
 
@@ -97,8 +100,13 @@ simant-recomp-1.0.0-windows-x64/          simant-recomp-1.0.0-linux-x64/
   exemplos/mods/ (exemplo-lua, trapacas)    exemplos/mods/
   mods/LEIAME.txt (pasta vazia para mods)   mods/LEIAME.txt
   LICENSE.txt, LEIAME.txt, README.txt,      LICENSE.txt, LEIAME.txt, README.txt,
-  CHANGELOG.txt, AVISOS-TERCEIROS.txt       CHANGELOG.txt, AVISOS-TERCEIROS.txt
+  CHANGELOG.txt, CHANGELOG.pt-BR.txt,       CHANGELOG.txt, CHANGELOG.pt-BR.txt,
+  AVISOS-TERCEIROS.txt                      AVISOS-TERCEIROS.txt
 ```
+
+O `README.txt` é o guia do usuário em inglês (`README-user.md`), o `LEIAME.txt` o em português
+(`LEIAME-usuario.md`); o `CHANGELOG.txt` é o `CHANGELOG.md` em inglês e o `CHANGELOG.pt-BR.txt` o
+`CHANGELOG.pt-BR.md` em português.
 
 **Nunca entram:** arquivos do jogo (`SimAnt-T/`, `*.DAT`, `*.NDX`, `*.HLP`, `*.FON`, `*.CFG`, `*.SYM`,
 `SIMANTW.EXE`, `WIN.INI`), saves `*.ANT` (nem os de `tests/referencias/saves/`), `re_trabalho/`, `.re/`,
@@ -194,7 +202,7 @@ procurados sem diferença de caixa, mas não há teste num sistema de arquivos q
       conferidos com o `docs/estado-do-projeto.md` da data).
 - [ ] Revisar `LEIAME-usuario.md` e `README-user.md` (tirar "rascunho"; conferir a tabela de arquivos do
       jogo com uma instalação limpa).
-- [ ] `README.md` do repositório: seção "Baixar" apontando para os releases, aviso legal (o mesmo do
+- [x] `README.md` do repositório: feito — agora tem a seção de download apontando para os releases, o aviso legal (o mesmo do
       LEIAME: sem afiliação com a Maxis/EA, não distribui arquivos do jogo) e a licença.
 - [ ] `cargo test --workspace` com e sem `SIMANT_DIR`; `cargo clippy --workspace --all-targets -- -D warnings`.
 - [ ] Testar o pacote de Linux numa máquina real com os arquivos do jogo (inclusive com nomes em

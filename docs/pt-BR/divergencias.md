@@ -1,3 +1,5 @@
+*Read in English: [divergencias.md](../divergencias.md)*
+
 # Divergências entre documentação e comportamento
 
 Registro de casos em que algo documentado (manual, nomes, especificação anterior) diverge do que o original faz, ou em que o port faz diferente do original. O original vence.

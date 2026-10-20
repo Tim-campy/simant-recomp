@@ -1,3 +1,5 @@
+*Read in English: [glossario.md](../glossario.md)*
+
 # Glossário de nomes internos
 
 Nomes tirados do `SIMANTW.SYM` e dos dados. Significados marcados com [hipótese] foram inferidos do nome e ainda não confirmados no código.

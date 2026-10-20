@@ -1,3 +1,5 @@
+*Read in English: [decisoes.md](../decisoes.md)*
+
 # Registro de decisões
 
 Formato: data, decisão, motivo, alternativas descartadas.
@@ -230,3 +232,9 @@ Formato: data, decisão, motivo, alternativas descartadas.
 - **Configuração:** `referencia/dosbox-x.conf` (S3 Trio64, SB16, 32 MB, `C:` = `SimAnt-T`). As capturas vão para `tests/referencias/capturas/`.
 - **Situação (2026-10-16):** DOSBox-X 2026.10.01 portátil (build `vsbuild-win64`, release oficial em github.com/joncampbell123/dosbox-x) extraído em `referencia/dosbox-x/` (fora do git). Para iniciar: `referencia/rodar-original.bat`. Testado: o Windows 3.1 inicia e o SimAnt abre direto na tela de título.
 - **Descartado:** 86Box/PCem (mais fiel, porém de configuração mais pesada).
+
+## 2026-10-20: Documentação no GitHub em inglês, com opção em português (decisão do usuário)
+
+- **Decisão (do usuário):** a documentação visível no GitHub fica em inglês, para melhor integração com a comunidade. O texto em português é preservado em `README.pt-BR.md`, `CHANGELOG.pt-BR.md`, `docs/pt-BR/` (mesmos caminhos relativos de `docs/`) e `tests/referencias/README.pt-BR.md`; cada arquivo começa com uma linha que liga à outra língua. Isso substitui, para a documentação publicada, a diretriz anterior do `CLAUDE.md` de manter os documentos em português.
+- **Motivo:** o inglês alcança mais colaboradores e jogadores; manter a versão em português preserva o texto original e a língua do usuário.
+- **Descartado:** só português (limita a comunidade); só inglês (perde o texto original e a língua do usuário); as duas línguas no mesmo arquivo (longo e difícil de manter).
