@@ -1,99 +1,101 @@
-# Banco de recursos `.NDX` / `.DAT`
+*Leia em português: [banco-dat-ndx.md](../../pt-BR/spec/formatos/banco-dat-ndx.md)*
 
-Os gráficos, textos, janelas, menus, sons e músicas do SimAnt para Windows ficam em pares `NOME.NDX` + `NOME.DAT` na pasta do jogo (`MAXIS\ANTWIN`).
+# `.NDX` / `.DAT` resource database
 
-| Banco | Conteúdo | Quando é aberto |
+SimAnt for Windows keeps its graphics, texts, windows, menus, sounds and music in `NAME.NDX` + `NAME.DAT` pairs in the game folder (`MAXIS\ANTWIN`).
+
+| Database | Contents | When it is opened |
 |---|---|---|
-| `SHARED` | janelas, menus, listas de strings, textos do sistema de informação, bitmaps mono comuns | sempre |
-| `WINGANT` | layouts de janela e bitmaps 4 bpp (16 cores) | modo de vídeo colorido (`_displayType` = 10) |
-| `MWINNT` | layouts de janela e bitmaps 1 bpp (monocromático) | modo monocromático (`_displayType` = 9) |
-| `SOUND` | instrumentos digitais, cabeçalhos de música, arquivos MIDI | sempre |
-| `LANGUAGE` | (não existe na cópia analisada) | tentativa de abrir `language.dat` [hipótese: banco de tradução opcional] |
+| `SHARED` | windows, menus, string lists, information system texts, common mono bitmaps | always |
+| `WINGANT` | window layouts and 4 bpp (16-color) bitmaps | color video mode (`_displayType` = 10) |
+| `MWINNT` | window layouts and 1 bpp (monochrome) bitmaps | monochrome mode (`_displayType` = 9) |
+| `SOUND` | digital instruments, music headers, MIDI files | always |
+| `LANGUAGE` | (does not exist in the analyzed copy) | attempt to open `language.dat` [hypothesis: optional translation database] |
 
-**Fonte:**
-- Nomes dos bancos: `_InitGraphics` (`1008:010c`) monta o nome com `"%s%s"` a partir de uma tabela de prefixos no DGROUP (`1048:b92b`…: `hcega`, `mono`, `tdyga`, `lcega`, `l256`, `mwin`, `winga`) indexada por `_displayType`, e chama `_db_SetDataBase`. O sufixo `nt` vem do chamador. Com `mwin`+`nt` e `winga`+`nt` chega-se aos arquivos existentes, mas a origem do sufixo ainda não foi confirmada no código [hipótese].
-- Strings `language.dat`, `language`, `shared` e `lrshare` em `SIMANTW.EXE`, offset de arquivo `0x2b9a0`.
-- Fato verificado com `tools/db_list.py`: os quatro pares existentes são lidos de ponta a ponta sem sobras.
+**Source:**
+- Database names: `_InitGraphics` (`1008:010c`) builds the name with `"%s%s"` from a prefix table in DGROUP (`1048:b92b`…: `hcega`, `mono`, `tdyga`, `lcega`, `l256`, `mwin`, `winga`) indexed by `_displayType`, and calls `_db_SetDataBase`. The `nt` suffix comes from the caller. With `mwin`+`nt` and `winga`+`nt` you get the existing files, but the origin of the suffix has not yet been confirmed in the code [hypothesis].
+- Strings `language.dat`, `language`, `shared` and `lrshare` in `SIMANTW.EXE`, file offset `0x2b9a0`.
+- Verified fact with `tools/db_list.py`: the four existing pairs are read end to end with nothing left over.
 
-## `.NDX`: índice
+## `.NDX`: index
 
-Inteiros em little-endian.
+Little-endian integers.
 
-| Offset | Tipo | Campo |
+| Offset | Type | Field |
 |---|---|---|
-| 0x00 | u32 | número de entradas `N` |
-| 0x04 | 16 bytes | zeros em todos os arquivos analisados (significado desconhecido) |
-| 0x14 | `N` × 8 bytes | entradas |
+| 0x00 | u32 | number of entries `N` |
+| 0x04 | 16 bytes | zeros in every analyzed file (meaning unknown) |
+| 0x14 | `N` × 8 bytes | entries |
 
-Entrada:
+Entry:
 
-| Offset | Tipo | Campo |
+| Offset | Type | Field |
 |---|---|---|
-| 0 | u32 | posição do registro no `.DAT`, relativa ao fim do cabeçalho de 14 bytes |
-| 4 | u16 | id do objeto |
-| 6 | u8 | tipo do objeto (ver tabela abaixo) |
-| 7 | u8 | flags de armazenamento (bit 0 = comprimido) |
+| 0 | u32 | position of the record in the `.DAT`, relative to the end of the 14-byte header |
+| 4 | u16 | object id |
+| 6 | u8 | object type (see table below) |
+| 7 | u8 | storage flags (bit 0 = compressed) |
 
-O par **(tipo, id)** identifica o objeto. O mesmo id se repete em tipos diferentes (exemplo: o id 1000 existe como bitmap e como lista de strings).
+The **(type, id)** pair identifies the object. The same id repeats across different types (example: id 1000 exists both as a bitmap and as a string list).
 
-**Fonte:** fato verificado. Os tamanhos dos arquivos batem com `0x14 + 8·N` nos quatro índices, e todas as posições caem exatamente sobre um registro do `.DAT`.
+**Source:** verified fact. File sizes match `0x14 + 8·N` in all four indexes, and every position lands exactly on a `.DAT` record.
 
-## `.DAT`: registros
+## `.DAT`: records
 
-Cabeçalho do arquivo (14 bytes):
+File header (14 bytes):
 
-| Offset | Tipo | Campo |
+| Offset | Type | Field |
 |---|---|---|
-| 0 | u32 | `0x12345678` (assinatura) |
-| 4 | u16 | sempre um pouco maior que o número de entradas do `.NDX` (exemplo: 0x19c contra 406) [significado desconhecido] |
-| 6 | u16 | desconhecido |
-| 8 | u32 | desconhecido (valores de 1 a 5) |
+| 0 | u32 | `0x12345678` (signature) |
+| 4 | u16 | always slightly larger than the number of `.NDX` entries (example: 0x19c versus 406) [meaning unknown] |
+| 6 | u16 | unknown |
+| 8 | u32 | unknown (values from 1 to 5) |
 | 12 | u16 | 0 |
 
-Depois vêm os registros, um após o outro:
+Then come the records, one after another:
 
-| Offset | Tipo | Campo |
+| Offset | Type | Field |
 |---|---|---|
 | 0 | u32 | `0x12345678` |
-| 4 | u16 | 0 em todos os registros |
-| 6 | u32 | tamanho `S` do conteúdo |
-| 10 | `S` bytes | conteúdo |
+| 4 | u16 | 0 in every record |
+| 6 | u32 | content size `S` |
+| 10 | `S` bytes | content |
 
-## Compressão (flag bit 0)
+## Compression (flag bit 0)
 
-Quando o bit 0 do byte de flags está ligado, o conteúdo é:
+When bit 0 of the flags byte is set, the content is:
 
-- u16: tamanho descomprimido;
-- fluxo **LZSS** no estilo Okumura: janela circular de 4096 bytes e posição inicial de escrita 4096−18. Cada byte de controle é lido do bit menos significativo para o mais significativo: bit 1 = literal de 1 byte, bit 0 = referência de 2 bytes `a b`, com posição = `a | (b & 0xF0) << 4` e comprimento = `(b & 0x0F) + 3`.
+- u16: uncompressed size;
+- an Okumura-style **LZSS** stream: 4096-byte circular window and initial write position 4096−18. Each control byte is read from the least significant bit to the most significant: bit 1 = 1-byte literal, bit 0 = 2-byte reference `a b`, with position = `a | (b & 0xF0) << 4` and length = `(b & 0x0F) + 3`.
 
-**Fonte:**
-- Fato verificado: com esse algoritmo, todos os 828 registros comprimidos dos quatro bancos descomprimem exatamente no tamanho declarado e consomem o conteúdo inteiro (`tools/lzss_probe.py`).
-- Os nomes `_InitTree`, `_InsertNode`, `_DeleteNode`, `_Encode` e `_Unpack` no `SIMANTW.SYM` (segmento `SIMTWO_MODULE`) correspondem ao codificador de árvore binária de Okumura.
-- Preenchimento inicial da janela: fato visto no código. `_UnpackInit` (`1030:a62a`) preenche as posições 0 a 0xFED com 0x20 (espaço) e começa a escrever em 0xFEE. `_Unpack` (`1030:a668`) lê os bits de controle do menos para o mais significativo e calcula o comprimento como `(b & 0x0F) + _pack_threshold + 1`, com `_pack_threshold` = 2 [o valor 2 foi deduzido da validação acima]. Isso importa: com zero no lugar de espaço, 67 bitmaps sairiam diferentes.
+**Source:**
+- Verified fact: with this algorithm, all 828 compressed records of the four databases decompress to exactly the declared size and consume the whole content (`tools/lzss_probe.py`).
+- The names `_InitTree`, `_InsertNode`, `_DeleteNode`, `_Encode` and `_Unpack` in `SIMANTW.SYM` (segment `SIMTWO_MODULE`) correspond to Okumura's binary-tree encoder.
+- Initial window fill: fact seen in the code. `_UnpackInit` (`1030:a62a`) fills positions 0 to 0xFED with 0x20 (space) and starts writing at 0xFEE. `_Unpack` (`1030:a668`) reads the control bits from least to most significant and computes the length as `(b & 0x0F) + _pack_threshold + 1`, with `_pack_threshold` = 2 [the value 2 was deduced from the validation above]. This matters: with zero instead of space, 67 bitmaps would come out different.
 
-Outros valores observados no byte de flags: 0, 1, 5 e 8. O bit 2 (valor 4) e o bit 3 (valor 8) aparecem em bitmaps e sons, mas ainda não têm significado conhecido [hipótese: indicam descarte/cache em `_mem_MakeDiscardable`].
+Other values observed in the flags byte: 0, 1, 5 and 8. Bit 2 (value 4) and bit 3 (value 8) appear in bitmaps and sounds, but have no known meaning yet [hypothesis: they indicate discard/cache in `_mem_MakeDiscardable`].
 
-## Tipos de objeto
+## Object types
 
-| Tipo | Uso | Evidência |
+| Type | Use | Evidence |
 |---|---|---|
-| 0 | layout binário de janela, por modo de vídeo (`WINGANT`/`MWINNT`, ids 0–129) | os ids casam com os do tipo 1; estrutura ainda não decodificada |
-| 1 | tabela de nomes dos objetos de uma janela: registros de 32 bytes com nome ASCIIZ (`editWin`, `editWinTitle`, …) | dump do `SHARED` 1/0 |
-| 2 | bitmap, ver [bitmap.md](bitmap.md) | `_db_LoadObject(id, 2, 1)` em `GR_MODULE`; imagens renderizadas corretamente |
-| 4 | lista de strings (u16 big-endian com a contagem, seguido de strings Pascal; `\n` literal marca quebra de linha) | dump do `SHARED` 4/1000 ("BackYard View", …); `_LoadStringAnt` (`1020:03f4`) lê só o byte baixo da contagem e faz de cada string uma linha (parser: `engine/src/formats/textos.rs`) |
-| 6 | menu da janela principal (títulos e itens, ver [menu.md](menu.md)) | `_db_LoadObject(param_1, 6, …)` seguido da mensagem "Couldn't load menu %d"; objeto 6/0 decodificado |
-| 9 | tilesets 16×16 a 4 bpp: chão (ids 9 e 10) e vida (ids 15–20), ver [tiles.md](tiles.md) | `_OverlayTileSet`, `_LoadTiles` |
-| 10 | texto corrido do sistema de informação (ASCII) | dump do `SHARED` 10/150 |
-| 17 | layout de cartão do sistema de informação (big-endian, itens `PICT`/`TEXT`) | dump do `SHARED` 17/127 |
-| 18 | cabeçalho de música (18 bytes, big-endian), ver [som.md](som.md) | `_db_LoadObject(x, 0x12, 1)` antes de tocar |
-| 19 | nome do cartão do sistema de informação (ASCIIZ, ex.: `Top_Card`) | dump |
-| 20, 50 | arquivo MIDI padrão (`MThd`…): 20 = Sound Blaster, 50 = alto-falante, ver [som.md](som.md) | assinatura; `_db_LoadObject(x, 0x14 / 0x32, 1)` |
-| 5 | efeito sonoro: amostras de 8 bits em deltas de 4 bits, 4096 Hz, ver [som.md](som.md) | `_UncompressDACInstrument`, `_myBeginSound` |
-| 51 | efeito sonoro em recurso `snd ` do Macintosh (só com `DSOUND.DLL`), ver [som.md](som.md) | dump; `_myBeginSound` |
-| 7, 8, 11, 15, 21, 22 | desconhecido | — |
+| 0 | binary window layout, per video mode (`WINGANT`/`MWINNT`, ids 0–129) | the ids match those of type 1; structure not yet decoded |
+| 1 | name table of a window's objects: 32-byte records with an ASCIIZ name (`editWin`, `editWinTitle`, …) | dump of `SHARED` 1/0 |
+| 2 | bitmap, see [bitmap.md](bitmap.md) | `_db_LoadObject(id, 2, 1)` in `GR_MODULE`; images rendered correctly |
+| 4 | string list (big-endian u16 with the count, followed by Pascal strings; a literal `\n` marks a line break) | dump of `SHARED` 4/1000 ("BackYard View", …); `_LoadStringAnt` (`1020:03f4`) reads only the low byte of the count and makes each string one line (parser: `engine/src/formats/textos.rs`) |
+| 6 | main window menu (titles and items, see [menu.md](menu.md)) | `_db_LoadObject(param_1, 6, …)` followed by the message "Couldn't load menu %d"; object 6/0 decoded |
+| 9 | 16×16 4 bpp tilesets: ground (ids 9 and 10) and life (ids 15–20), see [tiles.md](tiles.md) | `_OverlayTileSet`, `_LoadTiles` |
+| 10 | running text of the information system (ASCII) | dump of `SHARED` 10/150 |
+| 17 | information system card layout (big-endian, `PICT`/`TEXT` items) | dump of `SHARED` 17/127 |
+| 18 | music header (18 bytes, big-endian), see [som.md](som.md) | `_db_LoadObject(x, 0x12, 1)` before playing |
+| 19 | information system card name (ASCIIZ, e.g. `Top_Card`) | dump |
+| 20, 50 | standard MIDI file (`MThd`…): 20 = Sound Blaster, 50 = PC speaker, see [som.md](som.md) | signature; `_db_LoadObject(x, 0x14 / 0x32, 1)` |
+| 5 | sound effect: 8-bit samples as 4-bit deltas, 4096 Hz, see [som.md](som.md) | `_UncompressDACInstrument`, `_myBeginSound` |
+| 51 | sound effect in a Macintosh `snd ` resource (only with `DSOUND.DLL`), see [som.md](som.md) | dump; `_myBeginSound` |
+| 7, 8, 11, 15, 21, 22 | unknown | — |
 
-Os valores big-endian (contagens em listas de strings, cartões) indicam que esses dados vieram da versão Macintosh (o SYM também tem `_MacTickCount`). Já os cabeçalhos de bitmap e o próprio banco são little-endian.
+The big-endian values (counts in string lists, cards) indicate that this data came from the Macintosh version (the SYM also has `_MacTickCount`). The bitmap headers and the database itself, on the other hand, are little-endian.
 
-## Impacto nos mods
+## Impact on mods
 
-Como cada objeto é endereçado por (tipo, id), um mod pode sobrescrever, por exemplo, só a lista de strings 4/1220 ou só o bitmap 2/7000, sem mexer nos arquivos originais. O carregador do port deve consultar primeiro os mods e só depois o banco original.
+Since each object is addressed by (type, id), a mod can override, for example, just string list 4/1220 or just bitmap 2/7000, without touching the original files. The port's loader must check the mods first and only then the original database.

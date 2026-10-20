@@ -1,42 +1,44 @@
+*Leia em português: [simant-cfg.md](../../pt-BR/spec/formatos/simant-cfg.md)*
+
 # `SIMANT.CFG`
 
-Arquivo de texto na pasta do jogo. A cópia analisada contém:
+Text file in the game folder. The analyzed copy contains:
 
 ```
 Display Mode: ?
 Sound Mode: 6
 ```
 
-## Leitura
+## Reading
 
-**Fonte:** fato visto no código, `_ReadConfig` (`1008:08f4`).
+**Source:** fact seen in the code, `_ReadConfig` (`1008:08f4`).
 
-- Lê duas palavras separadas por espaço ("Display", "Mode:") e depois **um único caractere**, que é o modo de vídeo.
-- Lê mais duas palavras ("Sound", "Mode:") e um caractere. Se for dígito, `_musicDevice = dígito`.
-- Se o arquivo não existir, mostra "SimAnt configuration file missing" e encerra.
-- Um caractere de vídeo desconhecido mostra "Bad 'Display Mode' in configuration file" e encerra.
+- Reads two space-separated words ("Display", "Mode:") and then **a single character**, which is the video mode.
+- Reads two more words ("Sound", "Mode:") and a character. If it is a digit, `_musicDevice = digit`.
+- If the file does not exist, shows "SimAnt configuration file missing" and exits.
+- An unknown video character shows "Bad 'Display Mode' in configuration file" and exits.
 
-## Modo de vídeo → `_displayType` → banco gráfico
+## Video mode → `_displayType` → graphics database
 
-| Caractere | `_displayType` | Prefixo do banco | Banco resultante (com sufixo `nt`) | Na cópia analisada |
+| Character | `_displayType` | Database prefix | Resulting database (with `nt` suffix) | In the analyzed copy |
 |---|---|---|---|---|
-| `E` | 0 | `hcega` | `HCEGANT` | ausente |
-| `T` | 2 | `tdyga` | `TDYGANT` | ausente |
-| `H` | 3 | `mono` | `MONONT` | ausente |
-| `e` | 4 | `lcega` | `LCEGANT` | ausente |
-| `M` | 5 | `mono` | `MONONT` | ausente |
-| `m` | 7 | `mono` | `MONONT` | ausente |
-| `V` | 8 | `hcega` | `HCEGANT` | ausente |
-| `w` | 9 | `mwin` | `MWINNT` | presente |
-| `W` | 10 | `winga` | `WINGANT` | presente |
-| `?` | automático | — | 9 se o vídeo tiver 1 plano e 1 bit por pixel (`GetDeviceCaps` PLANES = BITSPIXEL = 1); senão 10 | — |
+| `E` | 0 | `hcega` | `HCEGANT` | absent |
+| `T` | 2 | `tdyga` | `TDYGANT` | absent |
+| `H` | 3 | `mono` | `MONONT` | absent |
+| `e` | 4 | `lcega` | `LCEGANT` | absent |
+| `M` | 5 | `mono` | `MONONT` | absent |
+| `m` | 7 | `mono` | `MONONT` | absent |
+| `V` | 8 | `hcega` | `HCEGANT` | absent |
+| `w` | 9 | `mwin` | `MWINNT` | present |
+| `W` | 10 | `winga` | `WINGANT` | present |
+| `?` | automatic | — | 9 if the video has 1 plane and 1 bit per pixel (`GetDeviceCaps` PLANES = BITSPIXEL = 1); otherwise 10 | — |
 
-Os prefixos vêm da tabela de ponteiros far em `1048:b92b` usada por `_InitGraphics` (`1008:010c`). O sufixo `nt` é uma [hipótese] apoiada pelos nomes dos arquivos existentes. Os modos sem arquivo correspondente parecem herança das versões DOS. O port só precisa suportar `W` (cor) e, opcionalmente, `w` (mono).
+The prefixes come from the far pointer table at `1048:b92b` used by `_InitGraphics` (`1008:010c`). The `nt` suffix is a [hypothesis] supported by the names of the existing files. The modes without a matching file look like a legacy of the DOS versions. The port only needs to support `W` (color) and, optionally, `w` (mono).
 
 ## `Sound Mode`
 
-O valor vai para `_musicDevice`, mas nenhuma função lê essa variável no pseudocódigo: a saída de áudio é escolhida por `_snd_Install`, que testa `MMSYSTEM.DLL`, `SNDBLST.DLL` e `DSOUND.DLL` (ver [som.md](som.md)). No Windows, o "Sound Mode" não tem efeito [visto no código; herança das versões DOS]. As opções Music e Sound Effects vêm do `WIN.INI` (seção `[SimAnt]`), ver [regras/som.md](../regras/som.md).
+The value goes into `_musicDevice`, but no function reads this variable in the pseudocode: audio output is chosen by `_snd_Install`, which tests `MMSYSTEM.DLL`, `SNDBLST.DLL` and `DSOUND.DLL` (see [som.md](som.md)). On Windows, "Sound Mode" has no effect [seen in the code; legacy of the DOS versions]. The Music and Sound Effects options come from `WIN.INI` (section `[SimAnt]`), see [regras/som.md](../regras/som.md).
 
 ## Port
 
-O port não precisa deste arquivo. A escolha de banco gráfico e de saída de áudio vai para a configuração própria do port. O `.CFG` original pode ser lido apenas como valor padrão.
+The port does not need this file. The choice of graphics database and audio output goes into the port's own configuration. The original `.CFG` may be read only as a default value.

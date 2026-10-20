@@ -1,50 +1,52 @@
-# Bitmap (objeto tipo 2 do banco)
+*Leia em português: [bitmap.md](../../pt-BR/spec/formatos/bitmap.md)*
 
-O conteúdo vem depois de descomprimir, se for o caso (ver [banco-dat-ndx.md](banco-dat-ndx.md)). Inteiros em little-endian.
+# Bitmap (database object type 2)
 
-| Offset | Tipo | Campo |
+The content comes after decompression, if applicable (see [banco-dat-ndx.md](banco-dat-ndx.md)). Integers are little-endian.
+
+| Offset | Type | Field |
 |---|---|---|
-| 0 | u16 | `kind`: 0 = opaco, 3 = com máscara (índice 13 transparente), 0xFFFF = empacotado (ver "Campo kind") [código] |
-| 2 | u8 | formato: bit 0x80 = 4 bpp compactado (`0x84` no `WINGANT`); sem ele, `0x04` = planar e `0x01`/`0x00` = 1 bpp (`MWINNT`/`SHARED`) |
-| 3 | u8 | varia de 0x00 a 0x0F (e 0x65 em 96 sprites do `MWINNT`); não é lido pelos caminhos de desenho analisados (ver "Byte 3") |
-| 4 | u32 | tamanho dos pixels em bytes (em alguns registros do `WINGANT` com flag 5 o valor é inconsistente; não é usado para ler) |
-| 8 | u16 | largura `w` |
-| 10 | u16 | altura `h` |
+| 0 | u16 | `kind`: 0 = opaque, 3 = masked (index 13 transparent), 0xFFFF = packed (see "kind field") [code] |
+| 2 | u8 | format: bit 0x80 = packed 4 bpp (`0x84` in `WINGANT`); without it, `0x04` = planar and `0x01`/`0x00` = 1 bpp (`MWINNT`/`SHARED`) |
+| 3 | u8 | ranges from 0x00 to 0x0F (and 0x65 in 96 sprites of `MWINNT`); not read by the drawing paths analyzed (see "Byte 3") |
+| 4 | u32 | pixel size in bytes (in some `WINGANT` records with flag 5 the value is inconsistent; not used for reading) |
+| 8 | u16 | width `w` |
+| 10 | u16 | height `h` |
 | 12 | … | pixels |
 
 ## Pixels
 
-- **4 bpp (formato 0x84):** dois pixels por byte, nibble alto primeiro. Cada linha ocupa `((w·4 + 31) / 32) · 4` bytes (alinhamento de 4 bytes, como num DIB do Windows). As linhas estão de **baixo para cima**.
-- **1 bpp (formato 0x01):** oito pixels por byte, bit mais significativo primeiro, com o mesmo alinhamento de 4 bytes. As linhas estão de **cima para baixo**. No `SHARED`, o campo de tamanho declara o tamanho já convertido para 4 bpp (por exemplo, 9632 bytes para um bitmap de 2408), o que indica que o jogo converte esses bitmaps mono para cor ao carregar (`_ConvertMonoBitmap`).
-- **Planar (formato 0x04):** no `WINGANT`, só o menu de ícones (2/7200, 187 × 166); no `MWINNT`, 2/7005 e 2/8905. Cada linha, de **cima para baixo**, tem os 4 planos de 1 bit em sequência, cada um com ⌈w/8⌉ bytes, **sem alinhamento** (`_ConvertBitmap`, `1008:246e`: planos em +0, +⌈w/8⌉, +2⌈w/8⌉, +3⌈w/8⌉ de cada linha); o plano k é o bit k do índice de cor [medido: bate com a captura do menu (janelas.md §4.4); o 2/8905 do `MWINNT`, 19 × 35, tem 420 bytes = 35 × 4 × 3, o que confirma a falta de alinhamento]. O 2/7005 do `MWINNT` (`kind` 3, 7 × 37) tem 185 bytes = 37 × 5: um quinto plano por linha [hipótese: a máscara de `_ConvertMaskBitmap2`]; o port lê os 4 primeiros.
+- **4 bpp (format 0x84):** two pixels per byte, high nibble first. Each row takes `((w·4 + 31) / 32) · 4` bytes (4-byte alignment, as in a Windows DIB). Rows are stored **bottom to top**.
+- **1 bpp (format 0x01):** eight pixels per byte, most significant bit first, with the same 4-byte alignment. Rows are stored **top to bottom**. In `SHARED`, the size field declares the size already converted to 4 bpp (for example, 9632 bytes for a 2408-byte bitmap), which indicates that the game converts these mono bitmaps to color on load (`_ConvertMonoBitmap`).
+- **Planar (format 0x04):** in `WINGANT`, only the icon menu (2/7200, 187 × 166); in `MWINNT`, 2/7005 and 2/8905. Each row, **top to bottom**, has the 4 1-bit planes in sequence, each with ⌈w/8⌉ bytes, **without alignment** (`_ConvertBitmap`, `1008:246e`: planes at +0, +⌈w/8⌉, +2⌈w/8⌉, +3⌈w/8⌉ of each row); plane k is bit k of the color index [measured: matches the menu capture (janelas.md §4.4); `MWINNT`'s 2/8905, 19 × 35, has 420 bytes = 35 × 4 × 3, which confirms the lack of alignment]. `MWINNT`'s 2/7005 (`kind` 3, 7 × 37) has 185 bytes = 37 × 5: a fifth plane per row [hypothesis: the mask of `_ConvertMaskBitmap2`]; the port reads the first 4.
 
-**Fonte:**
-- Fato verificado: `tools`/`re_trabalho/sheet.py` renderizou corretamente 352 bitmaps do `WINGANT` (telas "About", "Select a Game", controles de casta, quintal, sprites) e bitmaps do `MWINNT`. Cada um deles bate com o tamanho calculado.
-- `_DoBitmap` (`1008:332a`) aloca `((w·4+31)/32)·4·h` bytes e copia as linhas, o que confirma o alinhamento.
-- `_ConvertBitmap` (`1008:246e`) converte de 4 **planos** (linhas de `ceil(w/8)` bytes por plano, 4 planos seguidos) para 4 bpp compactado. É chamada quando o último parâmetro de `_DoBitmap` não é zero. Os bitmaps do `WINGANT` testados não precisaram dessa conversão. Fica em aberto quais objetos são planares.
-- `_GPutPic` (`1008:3c9a`) escolhe `_DoBitmap` ou `_DoMonoBitmap` pelo bit 0 de `_displayType`.
+**Source:**
+- Verified fact: `tools`/`re_trabalho/sheet.py` correctly rendered 352 `WINGANT` bitmaps ("About" and "Select a Game" screens, caste controls, yard, sprites) and `MWINNT` bitmaps. Each of them matches the computed size.
+- `_DoBitmap` (`1008:332a`) allocates `((w·4+31)/32)·4·h` bytes and copies the rows, which confirms the alignment.
+- `_ConvertBitmap` (`1008:246e`) converts from 4 **planes** (rows of `ceil(w/8)` bytes per plane, 4 planes in sequence) to packed 4 bpp. It is called when the last parameter of `_DoBitmap` is not zero. The `WINGANT` bitmaps tested did not need this conversion. Which objects are planar remains open.
+- `_GPutPic` (`1008:3c9a`) chooses `_DoBitmap` or `_DoMonoBitmap` by bit 0 of `_displayType`.
 
-## Paleta
+## Palette
 
-**Fato verificado (pixel a pixel contra o DOSBox-X, 2026-10-16):** os índices dos bitmaps 4 bpp seguem a paleta padrão de 16 cores do Windows, **nesta ordem**: 0 preto, 1–6 vermelho/verde/amarelo/azul/magenta/ciano escuros (0x80), **7 cinza escuro (0x808080)**, **8 cinza claro (0xC0C0C0)**, 9–14 as versões claras (0xFF), 15 branco. A primeira versão deste documento trocava 7 e 8; a captura mostrou o erro (ver `docs/divergencias.md`).
+**Verified fact (pixel-by-pixel comparison against DOSBox-X, 2026-10-16):** the indices of 4 bpp bitmaps follow the standard Windows 16-color palette, **in this order**: 0 black, 1–6 dark red/green/yellow/blue/magenta/cyan (0x80), **7 dark gray (0x808080)**, **8 light gray (0xC0C0C0)**, 9–14 the light versions (0xFF), 15 white. The first version of this document swapped 7 and 8; the capture showed the error (see `docs/divergencias.md`).
 
-Nas capturas, as cores aparecem expandidas pelo DAC VGA de 6 bits (0x80 vira 130 e 0xC0 vira 195). Isso é efeito do emulador, não do jogo. `tools/comparar_captura.py` aplica a mesma conversão. O jogo mexe na paleta em `_PatchColorArrays`, `_SetUpPalette` e `_InitPalette`, que ainda não foram analisadas. O magenta claro (índice 13) aparece como fundo de sprites, o que aponta para uma cor-chave de transparência [hipótese].
+In the captures, colors appear expanded by the 6-bit VGA DAC (0x80 becomes 130 and 0xC0 becomes 195). This is an emulator effect, not the game's. `tools/comparar_captura.py` applies the same conversion. The game changes the palette in `_PatchColorArrays`, `_SetUpPalette` and `_InitPalette`, which have not been analyzed yet. Light magenta (index 13) appears as the sprite background, which points to a transparency color key [hypothesis].
 
-## Campo kind
+## kind field
 
-**Fato visto no código** (`_DrawBitMapToBuffer`, `1008:418e`, que escolhe a rotina de cópia pelo cabeçalho; `_GPutPic`/`_DoBitmap` recebem só largura, altura e pixels):
+**Fact seen in the code** (`_DrawBitMapToBuffer`, `1008:418e`, which picks the copy routine from the header; `_GPutPic`/`_DoBitmap` receive only width, height and pixels):
 
-- **0**: opaco. Cor (`_displayType` par): bit 0x80 do formato ligado → `_CopyBitmap2` (4 bpp compactado), desligado → `_ConvertBitmap2` (planar); monocromático → `_CopyMonoBitmap`.
-- **3**: com máscara. `_CopyMaskBitmap2` (`1030:b110`) / `_ConvertMaskBitmap2` / `_CopyMonoMaskBitmap`. Na cópia 4 bpp, cada nibble igual a **0xD (13, magenta claro)** é pulado: a cor transparente é fixa, não vem do cabeçalho (confirma a [hipótese] da seção "Paleta"). No `WINGANT` são os sprites: formigas (1000–1107), bichos do quintal (1300…), gotas e enxame (7005–7007), balões (8020…, 8100…) etc. (105 objetos).
-- **0xFFFF (−1)**: empacotado. O u16 em +2 é o tamanho aberto (cabeçalho de 12 bytes + pixels) e um fluxo LZSS (o mesmo do banco) começa em +4; `_GUnpackPic` (`1008:40d4`) abre o cabeçalho de 12 bytes e `tamanho − 16` bytes de pixels (os 4 últimos bytes da imagem não são abertos e ficam com o que havia na memória) e segue pelo `kind` de dentro. Só 3 objetos, todos no `MWINNT`: 2/2000 (título, 455 × 320), 2/2500 (315 × 258) e 2/7002 (514 × 226), gravados no banco **sem** o bit de compressão do índice. Os de dentro têm formato 0x00 ou 0x01 e linhas de 1 bpp alinhadas a byte. Conferido abrindo o 2/2000 (o título do SimAnt) e o 2/7002 (a grade do quintal).
+- **0**: opaque. Color (even `_displayType`): format bit 0x80 set → `_CopyBitmap2` (packed 4 bpp), clear → `_ConvertBitmap2` (planar); monochrome → `_CopyMonoBitmap`.
+- **3**: masked. `_CopyMaskBitmap2` (`1030:b110`) / `_ConvertMaskBitmap2` / `_CopyMonoMaskBitmap`. In the 4 bpp copy, each nibble equal to **0xD (13, light magenta)** is skipped: the transparent color is fixed, it does not come from the header (confirms the [hypothesis] in the "Palette" section). In `WINGANT` these are the sprites: ants (1000–1107), yard critters (1300…), drops and swarm (7005–7007), balloons (8020…, 8100…) etc. (105 objects).
+- **0xFFFF (−1)**: packed. The u16 at +2 is the unpacked size (12-byte header + pixels) and an LZSS stream (the same as the database's) starts at +4; `_GUnpackPic` (`1008:40d4`) unpacks the 12-byte header and `size − 16` bytes of pixels (the last 4 bytes of the image are not unpacked and keep whatever was in memory) and proceeds by the inner `kind`. Only 3 objects, all in `MWINNT`: 2/2000 (title, 455 × 320), 2/2500 (315 × 258) and 2/7002 (514 × 226), stored in the database **without** the index compression bit. The inner ones have format 0x00 or 0x01 and byte-aligned 1 bpp rows. Checked by unpacking 2/2000 (the SimAnt title) and 2/7002 (the yard grid).
 
-**Port** (2026-10-19): `Bitmap::decodificar` abre o `kind` 0xFFFF (os 4 bytes não abertos ficam 0), lê o planar sem alinhamento e trata o formato 0x00 como 1 bpp; os três bancos decodificam inteiros (`todos_os_bitmaps_dos_bancos_decodificam`: 352 no `WINGANT`, 58 no `SHARED`, 343 no `MWINNT`). A transparência dos sprites é feita pelo desenho do port com o índice 13 (`kind` não é consultado). O modo monocromático (`MWINNT`) não é usado pelo port.
+**Port** (2026-10-19): `Bitmap::decodificar` unpacks `kind` 0xFFFF (the 4 unpacked bytes stay 0), reads planar without alignment and treats format 0x00 as 1 bpp; all three databases decode in full (`todos_os_bitmaps_dos_bancos_decodificam`: 352 in `WINGANT`, 58 in `SHARED`, 343 in `MWINNT`). Sprite transparency is done by the port's drawing with index 13 (`kind` is not consulted). Monochrome mode (`MWINNT`) is not used by the port.
 
 ## Byte 3
 
-Valores por banco (contagem dos objetos tipo 2): `WINGANT` kind 0: 0 (32), 5 (13, a série 17000), 9 (4, a série 12000), 12 (2), 13 (1, o planar 7200), 15 (193); kind 3: 0 (62), 2 (7), 4 (16), 14 (20). `MWINNT`: 0, 1, 2, 3, 4, 13, 15 e 0x65 (96 sprites). Nenhum dos caminhos acima lê o byte [código]; o valor não acompanha a cor transparente (fixa em 13) nem o formato. [hipótese: resto da conversão dos recursos do Mac, sem uso no Windows; outros leitores do cabeçalho não procurados].
+Values per database (count of type 2 objects): `WINGANT` kind 0: 0 (32), 5 (13, the 17000 series), 9 (4, the 12000 series), 12 (2), 13 (1, the planar 7200), 15 (193); kind 3: 0 (62), 2 (7), 4 (16), 14 (20). `MWINNT`: 0, 1, 2, 3, 4, 13, 15 and 0x65 (96 sprites). None of the paths above reads the byte [code]; the value does not track the transparent color (fixed at 13) nor the format. [hypothesis: leftover from the conversion of the Mac resources, unused on Windows; other readers of the header not searched for].
 
-## Em aberto
+## Open issues
 
-- ~~Um grupo de bitmaps estreitos e altos (ids próximos de 7100 no `WINGANT`) sai com faixas~~ (2026-10-19): não há bitmaps entre 7011 e 7199 no `WINGANT`; os estreitos e altos do grupo 7000 são as gotas da chuva (2/7005, 7 × 37, `kind` 3) e os pontos do enxame (7006/7007), que decodificam e são desenhados pelo port (chuva conferida na bancada, telas/quintal.md). Os que falhavam eram os empacotados e os planares do `MWINNT` (acima).
-- Byte 3 (acima) e o quinto plano dos planares com máscara do `MWINNT`.
+- ~~A group of narrow, tall bitmaps (ids near 7100 in `WINGANT`) comes out with stripes~~ (2026-10-19): there are no bitmaps between 7011 and 7199 in `WINGANT`; the narrow, tall ones of the 7000 group are the raindrops (2/7005, 7 × 37, `kind` 3) and the swarm dots (7006/7007), which decode and are drawn by the port (rain checked on the test bench, telas/quintal.md). The ones that failed were the packed and planar ones of `MWINNT` (above).
+- Byte 3 (above) and the fifth plane of `MWINNT`'s masked planar bitmaps.

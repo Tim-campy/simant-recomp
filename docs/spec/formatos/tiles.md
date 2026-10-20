@@ -1,102 +1,104 @@
-# Tiles (objetos tipo 9) e montagem da imagem dos mapas
+*Leia em português: [tiles.md](../../pt-BR/spec/formatos/tiles.md)*
 
-Este documento cobre os tilesets do banco gráfico colorido (`WINGANT`, modo `W`, `_displayType = 10`) e a forma como a janela de edição monta a imagem da superfície e dos ninhos a partir dos mapas.
+# Tiles (type 9 objects) and assembling the map image
 
-Implementação: `engine/src/formats/tiles.rs` (tilesets) e `engine/src/core/mapa.rs` (composição). Exemplo: `cargo run -p engine --example exportar_mapa -- <pasta do jogo> <save .ANT> <pasta de saída>`.
+This document covers the tilesets of the color graphics database (`WINGANT`, mode `W`, `_displayType = 10`) and how the edit window assembles the image of the surface and nests from the maps.
 
-**Fontes:** pseudocódigo do Ghidra (só consulta) das funções `_OverlayTileSet` (`1010:00f4`), `_LoadTiles` (`1010:01d8`), `FUN_1010_6250` (`1010:6250`, desenha uma célula da janela de edição), `FUN_1010_63fe` (`1010:63fe`, célula com vida), `_XferTileColor` (`1018:47dd`), `_XferLifeTileColor` (`1018:48fa`) e `_DoCalcTile` (`1018:4a6b`). Os nomes vêm do `SIMANTW.SYM`. Os dados e a imagem foram conferidos com o `QUICK2.ANT` e a captura `qi_14_salvo.png` da bancada QEMU (ver "Verificação").
+Implementation: `engine/src/formats/tiles.rs` (tilesets) and `engine/src/core/mapa.rs` (composition). Example: `cargo run -p engine --example exportar_mapa -- <game folder> <save .ANT> <output folder>`.
 
-## Objetos
+**Sources:** Ghidra pseudocode (reference only) of the functions `_OverlayTileSet` (`1010:00f4`), `_LoadTiles` (`1010:01d8`), `FUN_1010_6250` (`1010:6250`, draws one cell of the edit window), `FUN_1010_63fe` (`1010:63fe`, cell with life), `_XferTileColor` (`1018:47dd`), `_XferLifeTileColor` (`1018:48fa`) and `_DoCalcTile` (`1018:4a6b`). The names come from `SIMANTW.SYM`. The data and the image were checked against `QUICK2.ANT` and the capture `qi_14_salvo.png` from the QEMU bench (see "Verification").
 
-Todos são do tipo 9 no `WINGANT`. A chamada é `_db_LoadObject(id, 9, 1)`.
+## Objects
 
-| Objeto | Conteúdo | Tamanho | Quem carrega |
+All are type 9 in `WINGANT`. The call is `_db_LoadObject(id, 9, 1)`.
+
+| Object | Content | Size | Loaded by |
 |---|---|---|---|
-| 9/10 | chão do quintal (fora da casa) | 32.768 bytes = 256 tiles | `_OverlayTileSet(0, 1000)` e `_LoadTiles` |
-| 9/9 | chão de dentro da casa | 32.768 bytes = 256 tiles | `_OverlayTileSet(0, 1001)` |
-| 9/15, 9/16, 9/17 | vida na superfície (formigas, ovos etc.), buffer `tilebufover` | 16.384 bytes cada = 128 tiles | `_LoadTiles` |
-| 9/18, 9/19, 9/20 | vida nos ninhos, buffer `tilebufnest` | 16.384 bytes cada = 128 tiles | `_LoadTiles` |
+| 9/10 | yard ground (outside the house) | 32,768 bytes = 256 tiles | `_OverlayTileSet(0, 1000)` and `_LoadTiles` |
+| 9/9 | ground inside the house | 32,768 bytes = 256 tiles | `_OverlayTileSet(0, 1001)` |
+| 9/15, 9/16, 9/17 | life on the surface (ants, eggs etc.), buffer `tilebufover` | 16,384 bytes each = 128 tiles | `_LoadTiles` |
+| 9/18, 9/19, 9/20 | life in the nests, buffer `tilebufnest` | 16,384 bytes each = 128 tiles | `_LoadTiles` |
 
-- O chão ativo fica num único handle (`DS:9de0`). `_OverlayTileSet` troca 9/10 ↔ 9/9 e grava em `_TERRAINset` (`9:9b6e`, também em `DS:8df8`) 0 para o quintal e 1 para a casa. `_MakeYardPatch` e `_MakeHousePatch` chamam essa troca. `_TERRAINset` está no save (offset 48316, ver [save-ant.md](save-ant.md)). No `QUICK2.ANT` vale 0 (quintal). **Fato visto no código.**
-- `_OverlayTileSet` também grava em `DS:7604` 0x50 (quintal) ou 0x90 (casa). A simulação compara esse valor com os bytes de `_MapA` em várias funções de `Code6`. É o limite entre tiles passáveis e obstáculos [hipótese]. `_OverlayOutsideTiles` e `_OverlayInsideTiles` (`1030:78b2`/`78be`) só gravam esse valor.
-- Os buffers de vida são montados copiando cada objeto para o deslocamento 0, 0x4000 e 0x8000. Cada objeto ocupa, assim, 128 tiles, o que dá 384 tiles por buffer. Nos arquivos analisados cada objeto tem exatamente 16.384 bytes, então não sobram lacunas. **Fato verificado** (teste `tilesets_de_vida_tem_384_tiles_com_transparencia`).
-- Nos outros modos coloridos (`_displayType` par e diferente de 10), os objetos de vida passam por `_ConvertMaskBitmap` e cada tile ocupa 0xA0 bytes, com máscara. Esses modos não existem na cópia analisada e o port não os implementa.
+- The active ground is in a single handle (`DS:9de0`). `_OverlayTileSet` swaps 9/10 ↔ 9/9 and writes to `_TERRAINset` (`9:9b6e`, also at `DS:8df8`) 0 for the yard and 1 for the house. `_MakeYardPatch` and `_MakeHousePatch` call this swap. `_TERRAINset` is in the save (offset 48316, see [save-ant.md](save-ant.md)). In `QUICK2.ANT` it is 0 (yard). **Fact seen in the code.**
+- `_OverlayTileSet` also writes to `DS:7604` 0x50 (yard) or 0x90 (house). The simulation compares this value with the bytes of `_MapA` in several `Code6` functions. It is the boundary between passable tiles and obstacles [hypothesis]. `_OverlayOutsideTiles` and `_OverlayInsideTiles` (`1030:78b2`/`78be`) only write this value.
+- The life buffers are assembled by copying each object to offset 0, 0x4000 and 0x8000. Each object thus takes 128 tiles, which gives 384 tiles per buffer. In the files analyzed each object has exactly 16,384 bytes, so no gaps are left. **Verified fact** (test `tilesets_de_vida_tem_384_tiles_com_transparencia`).
+- In the other color modes (`_displayType` even and different from 10), the life objects go through `_ConvertMaskBitmap` and each tile takes 0xA0 bytes, with mask. These modes do not exist in the analyzed copy and the port does not implement them.
 
-## Formato de um tile
+## Tile format
 
-- São 16×16 pixels a 4 bpp, 8 bytes por linha, 128 bytes por tile. Os tiles ficam um atrás do outro, de modo que o tile *i* começa em *i* × 128 (`_XferTileColor` soma `índice * 0x80`). **Fato visto no código.**
-- No byte, o pixel da esquerda fica no nibble alto, como nos bitmaps 4 bpp ([bitmap.md](bitmap.md)).
-- **As linhas estão de baixo para cima.** `_XferTileColor` copia as 16 linhas, em ordem, para um DIB de baixo para cima (o destino começa na linha `(editHeight − linha − 1) × tileHeight` e sobe). Portanto a primeira linha guardada é a de baixo. **Fato visto no código.** Isso foi confirmado ao comparar com a captura (a grama do topo do ninho aparece certa só nessa orientação).
-- Os índices são os da paleta de 16 cores (`data/paleta.json`).
+- 16×16 pixels at 4 bpp, 8 bytes per row, 128 bytes per tile. Tiles are stored one after the other, so tile *i* starts at *i* × 128 (`_XferTileColor` adds `index * 0x80`). **Fact seen in the code.**
+- Within a byte, the left pixel is in the high nibble, as in 4 bpp bitmaps ([bitmap.md](bitmap.md)).
+- **Rows are stored bottom to top.** `_XferTileColor` copies the 16 rows, in order, into a bottom-up DIB (the destination starts at row `(editHeight − row − 1) × tileHeight` and goes up). Therefore the first stored row is the bottom one. **Fact seen in the code.** This was confirmed by comparing with the capture (the grass at the top of the nest only looks right in this orientation).
+- The indices are those of the 16-color palette (`data/paleta.json`).
 
-### Transparência dos tiles de vida
+### Transparency of life tiles
 
-`_XferLifeTileColor` percorre o tile byte a byte:
-- byte 0xDD (os dois pixels com índice 13): não escreve nada;
-- caso contrário, um nibble igual a 0xD mantém o pixel de destino e o outro nibble é escrito.
+`_XferLifeTileColor` walks the tile byte by byte:
+- byte 0xDD (both pixels with index 13): writes nothing;
+- otherwise, a nibble equal to 0xD keeps the destination pixel and the other nibble is written.
 
-Na prática, **o índice 13 (magenta) é transparente nos tiles de vida**. Nos tiles de chão, o 13 é desenhado normalmente. **Fato visto no código.** No port isso é `TRANSPARENTE = 13`, e o pixel é pulado ao desenhar (`desenhar_tile_de_vida`).
+In practice, **index 13 (magenta) is transparent in life tiles**. In ground tiles, 13 is drawn normally. **Fact seen in the code.** In the port this is `TRANSPARENTE = 13`, and the pixel is skipped when drawing (`desenhar_tile_de_vida`).
 
-O tile 0 de cada buffer de vida não é usado como vida, porque o valor 0 em `_LifeA/_LifeB/_LifeR` significa "célula sem vida" (ver abaixo). No `WINGANT` ele não tem pixels transparentes.
+Tile 0 of each life buffer is not used as life, because the value 0 in `_LifeA/_LifeB/_LifeR` means "cell without life" (see below). In `WINGANT` it has no transparent pixels.
 
-## Indexação dos mapas
+## Map indexing
 
-Os mapas são guardados **por colunas**: índice = x × 64 + y, em que y vai de 0 (topo) a 63. **Fato visto no código** (`_DoCalcTile`).
+Maps are stored **by columns**: index = x × 64 + y, where y goes from 0 (top) to 63. **Fact seen in the code** (`_DoCalcTile`).
 
-| `_MapPlane` | Mapa | Tamanho (tiles) | Índice no tileset de chão |
+| `_MapPlane` | Map | Size (tiles) | Index into the ground tileset |
 |---|---|---|---|
-| 0 ou 1 | `_MapA` (superfície), 8192 bytes | 128 × 64 (`x & 0x7f`) | o próprio byte |
-| 2 | `_MapB` (ninho preto), 4096 bytes | 64 × 64 (`x & 0x3f`) | `(byte − 0x70) & 0xff` |
-| 3 | `_MapR` (ninho vermelho), 4096 bytes | 64 × 64 | `(byte − 0x70) & 0xff` |
+| 0 or 1 | `_MapA` (surface), 8192 bytes | 128 × 64 (`x & 0x7f`) | the byte itself |
+| 2 | `_MapB` (black nest), 4096 bytes | 64 × 64 (`x & 0x3f`) | `(byte − 0x70) & 0xff` |
+| 3 | `_MapR` (red nest), 4096 bytes | 64 × 64 | `(byte − 0x70) & 0xff` |
 
-- Nos ninhos, a subtração estoura num byte. No `QUICK2.ANT` os ninhos só têm valores de 0x00 a 0x2E, que caem nos tiles 0x90 a 0xBE do tileset de chão: grama e céu na linha 0 (0x1C a 0x1F → 0xAC a 0xAF), entrada (0x18 → 0xA8), túnel e terra (0x2E → 0xBE). **Fato verificado.**
-- Os ninhos usam o mesmo handle de chão que a superfície (`DS:9de0`), ou seja, 9/10 ou 9/9 conforme `_TERRAINset`. Os tiles 0x90 a 0xBF dos dois tilesets parecem ser os mesmos [hipótese: não foi conferido byte a byte].
-- O valor 0x70 (quintal) vs. 0x90 (casa) de `DS:7604` lembra o deslocamento dos ninhos, mas a relação não foi estudada.
+- In the nests, the subtraction wraps around within a byte. In `QUICK2.ANT` the nests only have values from 0x00 to 0x2E, which fall on tiles 0x90 to 0xBE of the ground tileset: grass and sky in row 0 (0x1C to 0x1F → 0xAC to 0xAF), entrance (0x18 → 0xA8), tunnel and dirt (0x2E → 0xBE). **Verified fact.**
+- The nests use the same ground handle as the surface (`DS:9de0`), that is, 9/10 or 9/9 depending on `_TERRAINset`. Tiles 0x90 to 0xBF of both tilesets appear to be the same [hypothesis: not checked byte by byte].
+- The value 0x70 (yard) vs. 0x90 (house) at `DS:7604` resembles the nest offset, but the relationship has not been studied.
 
-### Camadas de feromônio (superfície)
+### Pheromone layers (surface)
 
-Na superfície, `_DoCalcTile` consulta antes uma camada de feromônio, conforme `_ELayerMode`:
+On the surface, `_DoCalcTile` first consults a pheromone layer, depending on `_ELayerMode`:
 
-| `_ELayerMode` | Camada |
+| `_ELayerMode` | Layer |
 |---|---|
 | 0 | `_PherMapA` |
 | 1 | `_PherMapBN` |
 | 2 | `_PherMapBT` |
 | 3 | `_PherMapRN` |
 | 4 | `_PherMapRT` |
-| outro (−1 = desligado, o padrão) | nenhuma |
+| other (−1 = off, the default) | none |
 
-Cada camada tem 2048 bytes (64 × 32), uma célula para cada 2×2 tiles, também por colunas: índice = (x / 2) × 32 + y / 2. Se o byte for maior que 0x10, o tile de chão vira `((byte >> 4) − 0x10) & 0xff`, isto é, de 0xF1 a 0xFF (a faixa de pontos amarelos a vermelhos no fim do tileset). Caso contrário, vale o `_MapA`. **Fato visto no código.** O significado de cada modo (N = ninho, T = trilha) é [hipótese] pelos nomes. `_ELayerMode` não está no save. O port aceita a camada opcionalmente (`MapaChao::com_feromonio`). No `QUICK2.ANT` a `_PherMapA` é toda zero, então essa parte não foi conferida contra o original.
+Each layer has 2048 bytes (64 × 32), one cell for each 2×2 tiles, also by columns: index = (x / 2) × 32 + y / 2. If the byte is greater than 0x10, the ground tile becomes `((byte >> 4) − 0x10) & 0xff`, that is, 0xF1 to 0xFF (the range of yellow to red dots at the end of the tileset). Otherwise, `_MapA` applies. **Fact seen in the code.** The meaning of each mode (N = nest, T = trail) is a [hypothesis] based on the names. `_ELayerMode` is not in the save. The port optionally accepts the layer (`MapaChao::com_feromonio`). In `QUICK2.ANT` `_PherMapA` is all zero, so this part was not checked against the original.
 
-## Camada de vida
+## Life layer
 
-`_DoCalcTile` também calcula `_lifeTile` a partir de `_LifeA` (superfície), `_LifeB` ou `_LifeR` (ninhos), com o mesmo índice da célula:
+`_DoCalcTile` also computes `_lifeTile` from `_LifeA` (surface), `_LifeB` or `_LifeR` (nests), with the same cell index:
 
-| Byte de vida | `_lifeTile` |
+| Life byte | `_lifeTile` |
 |---|---|
-| 0 | 0 (sem vida: só o chão é desenhado) |
-| 0xFF (formiga amarela) | ninho: `0x300 + _MeBase + _MeType + (_MeType < 8 ? _MeEgg : _MeDir)`; superfície: o mesmo com `0x380` |
-| 0xFE | ninho: `0x308 + _MeBase + _MeType + _MeDir`; superfície: `0x388 + …` |
-| outro *v* | superfície: `v + 0x100`; ninho: `v + 0x200` |
+| 0 | 0 (no life: only the ground is drawn) |
+| 0xFF (yellow ant) | nest: `0x300 + _MeBase + _MeType + (_MeType < 8 ? _MeEgg : _MeDir)`; surface: the same with `0x380` |
+| 0xFE | nest: `0x308 + _MeBase + _MeType + _MeDir`; surface: `0x388 + …` |
+| other *v* | surface: `v + 0x100`; nest: `v + 0x200` |
 
-`FUN_1010_63fe` desconta o deslocamento antes de indexar: −0x100 se `_lifeTile` < 0x200 (buffer `tilebufover`), −0x200 se estiver entre 0x200 e 0x37F (buffer `tilebufnest`) e −0x280 se for ≥ 0x380 (buffer `tilebufover`). A formiga amarela cai, assim, na terceira parte (índices 0x100 a 0x17F) de cada buffer, que na folha de contato é justamente a das formigas amarelas. A célula é desenhada com o chão (`_XferTileColor`) e, por cima, o tile de vida com transparência (`_XferLifeTileColor`). **Fato visto no código.**
+`FUN_1010_63fe` subtracts the offset before indexing: −0x100 if `_lifeTile` < 0x200 (buffer `tilebufover`), −0x200 if it is between 0x200 and 0x37F (buffer `tilebufnest`) and −0x280 if it is ≥ 0x380 (buffer `tilebufover`). The yellow ant thus falls in the third part (indices 0x100 to 0x17F) of each buffer, which on the contact sheet is precisely that of the yellow ants. The cell is drawn with the ground (`_XferTileColor`) and, on top, the life tile with transparency (`_XferLifeTileColor`). **Fact seen in the code.**
 
-`_LifeA`, `_LifeB` e `_LifeR` não estão no save. `_DoLoadInitializations` os reconstrói a partir das listas de formigas e da formiga amarela: ver [telas/jogo.md](../telas/jogo.md), "Camada de vida" [código]. O port desenha a vida na tela de jogo (`core/edicao.rs`), conferida contra a captura.
+`_LifeA`, `_LifeB` and `_LifeR` are not in the save. `_DoLoadInitializations` rebuilds them from the ant lists and the yellow ant: see [telas/jogo.md](../telas/jogo.md), "Life layer" [code]. The port draws life on the game screen (`core/edicao.rs`), checked against the capture.
 
-## Montagem da imagem (janela de edição)
+## Assembling the image (edit window)
 
-`FUN_1010_6250(col, lin)` desenha a célula visível (col, lin) da janela de edição:
-1. a célula do mapa é `x = _MapPnt + col` e `y = DAT_1040_7d30 + lin`. Se y passar de 63, soma 0x40 a x e faz `y &= 0x3f`. O efeito na rolagem ainda não foi estudado [hipótese: a vista do ninho não rola além do fundo];
-2. `_DoCalcTile(x, y)` calcula `_grndTile` e `_lifeTile`;
-3. se nada mudou desde o último desenho (cache por célula em `DAT_1048_143e`/`1442`) e `_editForce` = 0, não redesenha;
-4. sem vida, copia o tile de chão; com vida, chama `FUN_1010_63fe` (chão e vida por cima);
-5. invalida o retângulo `(col × tileWidth + DS:9b08, lin × tileHeight + DS:9b0a)` com `tileWidth × tileHeight` (16 × 16).
+`FUN_1010_6250(col, row)` draws the visible cell (col, row) of the edit window:
+1. the map cell is `x = _MapPnt + col` and `y = DAT_1040_7d30 + row`. If y goes past 63, it adds 0x40 to x and does `y &= 0x3f`. The effect on scrolling has not been studied yet [hypothesis: the nest view does not scroll beyond the bottom];
+2. `_DoCalcTile(x, y)` computes `_grndTile` and `_lifeTile`;
+3. if nothing changed since the last drawing (per-cell cache at `DAT_1048_143e`/`1442`) and `_editForce` = 0, it does not redraw;
+4. without life, it copies the ground tile; with life, it calls `FUN_1010_63fe` (ground and life on top);
+5. it invalidates the rectangle `(col × tileWidth + DS:9b08, row × tileHeight + DS:9b0a)` with `tileWidth × tileHeight` (16 × 16).
 
-O port monta qualquer retângulo de células (`MapaChao::desenhar`) num `Quadro`. Cada célula vira um tile de 16×16, com a célula (x0, y0) no ponto de destino.
+The port assembles any rectangle of cells (`MapaChao::desenhar`) into a `Quadro`. Each cell becomes a 16×16 tile, with cell (x0, y0) at the destination point.
 
-## Verificação
+## Verification
 
-- **Ninho preto do `QUICK2.ANT` contra `qi_14_salvo.png`** (capturado na mesma sessão em que o save foi gravado, vista do ninho de um Quick Game). A área cliente da janela de edição começa em (24, 158) na captura. O melhor encaixe é com a vista começando na célula (22, 0). Fora do diálogo "Saved correctly", 99,9% dos pixels batem com um mapeamento de cores 1:1 entre as duas imagens. A linha de grama e céu bate pixel a pixel. As poucas diferenças restantes estão nas bordas do diálogo e nas formigas (camada de vida, que não é desenhada). O túnel aparece na mesma posição e com a mesma forma onde não está coberto. Ferramenta: script de alinhamento ad hoc em Python com `tools/png_simples.py`.
-- A QEMU mostra algumas cores com valores RGB diferentes dos da paleta padrão: o índice 3 sai como (168,168,87), o índice 7 como (135,136,143) e o verde 2 como (0,168,87). O mapeamento continua 1:1 e por isso não muda a conclusão. É uma diferença do driver de vídeo da bancada, não do jogo [hipótese].
-- O teste `ninho_preto_do_quick2_bate_com_a_referencia` guarda o SHA-256 dos índices do mapa inteiro do ninho preto (1024 × 1024), gerado depois dessa conferência.
-- A superfície e o ninho vermelho do `QUICK2.ANT` foram renderizados e parecem coerentes: pedras, folhas, entradas dos ninhos, montes nas bordas e túnel do ninho vermelho. Não há, porém, captura da superfície nessa sessão para comparar. **Não verificado contra o original.**
+- **`QUICK2.ANT` black nest against `qi_14_salvo.png`** (captured in the same session in which the save was written, nest view of a Quick Game). The client area of the edit window starts at (24, 158) in the capture. The best fit is with the view starting at cell (22, 0). Outside the "Saved correctly" dialog, 99.9% of the pixels match with a 1:1 color mapping between the two images. The grass and sky row matches pixel by pixel. The few remaining differences are at the edges of the dialog and on the ants (life layer, which is not drawn). The tunnel appears at the same position and with the same shape where it is not covered. Tool: ad hoc alignment script in Python with `tools/png_simples.py`.
+- QEMU shows some colors with RGB values different from the standard palette: index 3 comes out as (168,168,87), index 7 as (135,136,143) and green 2 as (0,168,87). The mapping is still 1:1 and so it does not change the conclusion. It is a difference of the test bench's video driver, not of the game [hypothesis].
+- The test `ninho_preto_do_quick2_bate_com_a_referencia` stores the SHA-256 of the indices of the whole black nest map (1024 × 1024), generated after this check.
+- The surface and the red nest of `QUICK2.ANT` were rendered and look consistent: rocks, leaves, nest entrances, mounds at the edges and the red nest's tunnel. There is, however, no capture of the surface in that session to compare with. **Not verified against the original.**

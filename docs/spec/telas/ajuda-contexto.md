@@ -1,76 +1,78 @@
-# Ajuda: botão direito, modo de ajuda, botões "?" e cursores
+*Leia em português: [ajuda-contexto.md](../../pt-BR/spec/telas/ajuda-contexto.md)*
 
-Como o SimAnt chega à ajuda (`SIMANT.HLP`, aberto pelo WinHelp no original). O visualizador do port (o que aparece depois) está em [ajuda.md](ajuda.md); o formato do arquivo em [../formatos/hlp.md](../formatos/hlp.md).
+# Help: right button, help mode, "?" buttons and cursors
 
-Implementação: `engine/src/core/ajuda_contexto.rs` (tabela de contextos e teclas), `simant/src/ajuda_ui.rs` (entrada e cursores), `engine/src/formats/ne.rs` (cursores do executável). Dados: `data/ajuda_contexto.json`.
+How SimAnt gets to the help (`SIMANT.HLP`, opened by WinHelp in the original). The port's viewer (what shows up afterward) is in [ajuda.md](ajuda.md); the file format in [../formatos/hlp.md](../formatos/hlp.md).
 
-## 1. O botão direito liga o modo de ajuda
+Implementation: `engine/src/core/ajuda_contexto.rs` (context and key table), `simant/src/ajuda_ui.rs` (input and cursors), `engine/src/formats/ne.rs` (cursors from the executable). Data: `data/ajuda_contexto.json`.
 
-Todas as janelas do jogo (edição, mapa, quintal, controles, faixa) usam o `MAINWNDPROC`. Nele, `WM_RBUTTONDOWN` (0x204) **não** vai para `_DoMouse`: inverte `_bHelp` (`DGROUP:0010`) e troca o cursor (ligado: `HELPCURSOR`; desligado: o cursor da classe) [código: `1000:330e`]. `WM_RBUTTONUP` vai a `_DoMouse`, que só atualiza `_mouse_state`; `WM_RBUTTONDBLCLK` (0x206) não é tratado (o segundo clique de um duplo não inverte de novo) [código]. Os ramos `0x204`/`0x206` de `_DoMouse` (estado 0x800/0x4000, "tratados como esquerdo" no `_processEdit`) não são alcançados pelo mouse.
+## 1. The right button turns help mode on
 
-**Bancada** (2026-10-18, `qemu_ui_barras_direito.txt` e `qemu_ui_ajuda.txt`, snapshot `quick` pausado):
+All game windows (edit, map, yard, controls, ribbon) use `MAINWNDPROC`. In it, `WM_RBUTTONDOWN` (0x204) does **not** go to `_DoMouse`: it toggles `_bHelp` (`DGROUP:0010`) and changes the cursor (on: `HELPCURSOR`; off: the class cursor) [code: `1000:330e`]. `WM_RBUTTONUP` goes to `_DoMouse`, which only updates `_mouse_state`; `WM_RBUTTONDBLCLK` (0x206) is not handled (the second click of a double click does not toggle again) [code]. The `0x204`/`0x206` branches of `_DoMouse` (state 0x800/0x4000, "treated as left" in `_processEdit`) are not reached by the mouse.
 
-- clique direito num ponto vazio da faixa: `_bHelp` 0 → 1 e o cursor vira a seta com "?" (`r01_direito_faixa.png`); outro clique direito: 1 → 0;
-- clique direito no mapa da janela de edição: `_bHelp` 0 → 1, o destino da amarela (`_MeGoalX`) **não** muda (`a01_direito_edicao.png`);
-- com o modo ligado, o clique esquerdo no mapa abre o WinHelp no tópico "Edit Window" e o modo desliga (`_bHelp` 0); a amarela não recebe ordem (`a02_ajuda_edicao.png`).
+**Test bench** (2026-10-18, `qemu_ui_barras_direito.txt` and `qemu_ui_ajuda.txt`, paused `quick` snapshot):
 
-Isso corrige a especificação anterior (jogo.md, experimental.md), que dizia que o clique direito valia como o esquerdo na edição e no Experimental: valia pelo pseudocódigo de `_DoMouse`, mas o `MAINWNDPROC` desvia o 0x204 antes.
+- right click on an empty spot of the ribbon: `_bHelp` 0 → 1 and the cursor becomes the arrow with "?" (`r01_direito_faixa.png`); another right click: 1 → 0;
+- right click on the edit window map: `_bHelp` 0 → 1, the yellow ant's destination (`_MeGoalX`) does **not** change (`a01_direito_edicao.png`);
+- with the mode on, a left click on the map opens WinHelp at the "Edit Window" topic and the mode turns off (`_bHelp` 0); the yellow ant gets no order (`a02_ajuda_edicao.png`).
 
-## 2. Teclas (`_HelpKeyDown`, `1000:0de6`)
+This corrects the earlier specification (jogo.md, experimental.md), which said the right click counted as the left one in the edit window and in Experimental: it did according to the pseudocode of `_DoMouse`, but `MAINWNDPROC` diverts 0x204 before that.
 
-Chamado por `_DoKeyDown` antes de `_YellowCommandKey` [código]:
+## 2. Keys (`_HelpKeyDown`, `1000:0de6`)
 
-| Tecla | Efeito |
+Called by `_DoKeyDown` before `_YellowCommandKey` [code]:
+
+| Key | Effect |
 |---|---|
-| F1 | `WinHelp(HELP_INDEX)`: o índice (tópico "SimAnt", contexto 0x100) (`a06_f1.png`) |
-| Shift+F1 | inverte `_bHelp` |
-| Delete | inverte `_bHelp` (e segue para `_YellowCommandKey`) |
-| Esc | com `_bHelp` ligado, desliga |
+| F1 | `WinHelp(HELP_INDEX)`: the index (topic "SimAnt", context 0x100) (`a06_f1.png`) |
+| Shift+F1 | toggles `_bHelp` |
+| Delete | toggles `_bHelp` (and continues to `_YellowCommandKey`) |
+| Esc | with `_bHelp` on, turns it off |
 
-Espaço e Insert continuam imitando o clique esquerdo na posição do cursor; o ramo de `_DoKeyDown` que trataria Delete como clique direito só é alcançado com Espaço/Insert [código]. O port tirou Delete de `teclas_clique` (`data/partida.json`).
+Space and Insert still imitate the left click at the cursor position; the `_DoKeyDown` branch that would treat Delete as a right click is only reached with Space/Insert [code]. The port removed Delete from `teclas_clique` (`data/partida.json`).
 
-## 3. O clique com o modo ligado (`_DoEvent`, `1000:0bc2`)
+## 3. Clicking with the mode on (`_DoEvent`, `1000:0bc2`)
 
-Com `_bHelp` ligado, o evento do objeto clicado não vai para a rotina da janela: `_bHelp = 0` e `WinHelp(HELP_CONTEXT, contexto)` [código]. O contexto, pelo id do objeto (byte alto = janela):
+With `_bHelp` on, the event of the clicked object does not go to the window's routine: `_bHelp = 0` and `WinHelp(HELP_CONTEXT, context)` [code]. The context, by object id (high byte = window):
 
-| Objeto | Contexto |
+| Object | Context |
 |---|---|
-| janela 0 (edição), qualquer objeto | 4 "Edit Window" |
-| janela 1 (mapa) e 0x19 (quintal) | 0x102 "Map Window" |
-| janelas 5, 0x12, 0x13 | janela × 0x100 (Information, Behavior Control, Caste Control) |
-| History 0x1503–0x150D | o próprio id (Black Population … Help); o resto da 0x15: 0x1500 |
-| faixa 0x2202–0x2209, 0x220B–0x220D, 0x2302–0x2305, 0x2308 | o próprio id (Yard View Button … Status Window Button, Patch … Graphic, Help Button) |
-| 0x220E, 0x220F (ninho e trilha vermelhos) | id − 3 (os tópicos dos pretos) |
-| marcadores 0x2218–0x221E e 0x2313–0x2319 | 0xFD48 "Bookmarks" |
-| botões configuráveis 0x2210–0x2217 e 0x230B–0x2312 | contexto da **função** do botão: tabela `DS:8AE6` do segmento 8 (4 bytes por função; lida na bancada: 0x23F Behavior, 0x23E Caste, 0x23D History, 0x23C Info, 0x237 Trail, 0x23A Pause, 0x239 Speed, 0xFD32, 0x238 Mystery, 0xFD33, 0xFD36, 0xFD31, 0xFD35, 0xFD34, 0x23B Save, 0xFD47 Goto Yellow Ant) |
-| outros objetos das faixas (fundo, `ribTools`, mensagem, barras…) | 0x2200 / 0x2300 |
-| outras janelas | nenhum: só desliga o modo |
+| window 0 (edit), any object | 4 "Edit Window" |
+| window 1 (map) and 0x19 (yard) | 0x102 "Map Window" |
+| windows 5, 0x12, 0x13 | window × 0x100 (Information, Behavior Control, Caste Control) |
+| History 0x1503–0x150D | the id itself (Black Population … Help); the rest of 0x15: 0x1500 |
+| ribbon 0x2202–0x2209, 0x220B–0x220D, 0x2302–0x2305, 0x2308 | the id itself (Yard View Button … Status Window Button, Patch … Graphic, Help Button) |
+| 0x220E, 0x220F (red nest and trail) | id − 3 (the black ones' topics) |
+| bookmarks 0x2218–0x221E and 0x2313–0x2319 | 0xFD48 "Bookmarks" |
+| configurable buttons 0x2210–0x2217 and 0x230B–0x2312 | context of the button's **function**: table `DS:8AE6` of segment 8 (4 bytes per function; read on the test bench: 0x23F Behavior, 0x23E Caste, 0x23D History, 0x23C Info, 0x237 Trail, 0x23A Pause, 0x239 Speed, 0xFD32, 0x238 Mystery, 0xFD33, 0xFD36, 0xFD31, 0xFD35, 0xFD34, 0x23B Save, 0xFD47 Goto Yellow Ant) |
+| other ribbon objects (background, `ribTools`, message, bars…) | 0x2200 / 0x2300 |
+| other windows | none: only turns the mode off |
 
-**Bancada:** mapa da edição → "Edit Window" (a02); `ribStats` → "Status Window Button" (a05); `ribUserDef1A` (função 15) → "Goto Yellow Ant Button" (a10). Os nomes dos tópicos vêm do `|CTXOMAP` do `SIMANT.HLP` ([../formatos/hlp.md](../formatos/hlp.md)).
+**Test bench:** edit window map → "Edit Window" (a02); `ribStats` → "Status Window Button" (a05); `ribUserDef1A` (function 15) → "Goto Yellow Ant Button" (a10). The topic names come from the `|CTXOMAP` of `SIMANT.HLP` ([../formatos/hlp.md](../formatos/hlp.md)).
 
-O port acha o objeto como `_win_FindObject`: a janela da frente sob o cursor (o último objeto do layout que contém o ponto) ou a faixa; um clique fora de qualquer objeto não faz nada e o modo continua [hipótese: no original o clique no fundo da janela principal não gera evento].
+The port finds the object like `_win_FindObject`: the front window under the cursor (the last layout object that contains the point) or the ribbon; a click outside any object does nothing and the mode stays on [hypothesis: in the original a click on the main window's background generates no event].
 
-## 4. Botões "?"
+## 4. "?" buttons
 
-| Botão | Rotina | Contexto (`_DoWinHelp` usa `id & 0xFF00`) |
+| Button | Routine | Context (`_DoWinHelp` uses `id & 0xFF00`) |
 |---|---|---|
-| `ribHelp` (0x2208, faixa 34, embaixo da área de mensagens) | `_ProcMapRibbonEvent`: `_LessonTemp = 1`, `_DoWinHelp(0x2208)` | 0x2200 "Patch Ribbon Bar" (`a04_ribhelp.png`) |
-| `ribHelp2` (0x2308, faixa 35) | `_ProcYardRibbonEvent`: `_DoWinHelp(0x2308)` | 0x2300 "Yard Ribbon Bar" |
+| `ribHelp` (0x2208, ribbon 34, below the message area) | `_ProcMapRibbonEvent`: `_LessonTemp = 1`, `_DoWinHelp(0x2208)` | 0x2200 "Patch Ribbon Bar" (`a04_ribhelp.png`) |
+| `ribHelp2` (0x2308, ribbon 35) | `_ProcYardRibbonEvent`: `_DoWinHelp(0x2308)` | 0x2300 "Yard Ribbon Bar" |
 | Caste 0x1303 / Behavior 0x1203 / History 0x150D | `_DoWinHelp` | 0x1300 / 0x1200 / 0x1500 |
-| `yardHelpBut` (0x1911, quintal) | `_DoWinHelp(0x1906)` | 0x1900 (não existe no `|CTXOMAP`) |
-| `editHelpBut` (0x0006) e `mapHelpBut` (0x0116) | `_DoWinHelp(2)` / `_LessonTemp = 1`, `_DoWinHelp(0x103)` | invisíveis no layout de 640×480 (flags 0) |
+| `yardHelpBut` (0x1911, yard) | `_DoWinHelp(0x1906)` | 0x1900 (does not exist in `|CTXOMAP`) |
+| `editHelpBut` (0x0006) and `mapHelpBut` (0x0116) | `_DoWinHelp(2)` / `_LessonTemp = 1`, `_DoWinHelp(0x103)` | invisible in the 640×480 layout (flags 0) |
 
-O "?" logo abaixo da área de mensagens da faixa, que o usuário relatou, é o `ribHelp`. O "Mystery" é outro botão (função 8 dos configuráveis).
+The "?" right below the ribbon's message area, which the user reported, is `ribHelp`. "Mystery" is another button (function 8 of the configurable ones).
 
-## 5. Cursores (`WM_SETCURSOR` em `MAINWNDPROC`)
+## 5. Cursors (`WM_SETCURSOR` in `MAINWNDPROC`)
 
-Com `_bHelp` ligado, sempre `HELPCURSOR`. Senão, no Experimental, sobre a área cliente da janela de edição quando ela é a da frente (ou da janela do mapa da frente com Shift), o cursor da ferramenta: 0 `MAGCURSOR`, 1 `ROCKCURSOR`, 2 `DIGCURSOR`, 3 `ANTCURSOR`, 4 `FOODCURSOR`, 5 `DROPCURSOR`, 6 `SPRAYCURSOR`; a ferramenta 7 e o resto ficam com o cursor da classe (seta) [código]. Os cursores são recursos `GROUP_CURSOR`/`CURSOR` do `SIMANTW.EXE` (32×32, monocromáticos; o `HELPCURSOR` tem o ponto quente na ponta da seta, como na captura r01) — ver [../formatos/ne-recursos.md](../formatos/ne-recursos.md).
+With `_bHelp` on, always `HELPCURSOR`. Otherwise, in Experimental, over the client area of the edit window when it is the front one (or of the front map window with Shift), the tool's cursor: 0 `MAGCURSOR`, 1 `ROCKCURSOR`, 2 `DIGCURSOR`, 3 `ANTCURSOR`, 4 `FOODCURSOR`, 5 `DROPCURSOR`, 6 `SPRAYCURSOR`; tool 7 and the rest keep the class cursor (arrow) [code]. The cursors are `GROUP_CURSOR`/`CURSOR` resources of `SIMANTW.EXE` (32×32, monochrome; `HELPCURSOR` has the hotspot at the tip of the arrow, as in capture r01) — see [../formatos/ne-recursos.md](../formatos/ne-recursos.md).
 
-O port cria cursores do SDL com eles (AND 1 + XOR 1, "inverter", vira preto) e escolhe a cada quadro (`ajuda_ui::cursor_em`). Não faz o caso da janela do mapa com Shift.
+The port creates SDL cursors from them (AND 1 + XOR 1, "invert", becomes black) and chooses one every frame (`ajuda_ui::cursor_em`). It does not handle the map window with Shift case.
 
-## 6. O que o port faz e o que falta
+## 6. What the port does and what is missing
 
-- Clique direito em qualquer lugar (exceto com o "Select a Game" ou o menu de ferramentas abertos): a janela sob o cursor vem para a frente e o modo de ajuda alterna; o segundo clique de um duplo é ignorado. No Experimental, o direito não aplica mais a ferramenta.
-- Teclas F1, Shift+F1, Delete, Esc; clique no modo; botões "?" das faixas e das janelas de controle.
-- Testes: `ajuda_por_contexto_como_no_original` (simant), `contextos_do_original` (engine), `cursores_do_simantw` (engine).
-- **Não verificado na bancada:** o clique direito no Experimental e nas janelas de controle (só no Quick Game, na edição e na faixa), F1 com uma janela de controle na frente, Shift+F1, Delete, o `yardHelpBut`, o cursor das ferramentas.
+- Right click anywhere (except with "Select a Game" or the tools menu open): the window under the cursor comes to the front and help mode toggles; the second click of a double click is ignored. In Experimental, the right button no longer applies the tool.
+- Keys F1, Shift+F1, Delete, Esc; click in help mode; "?" buttons of the ribbons and of the control windows.
+- Tests: `ajuda_por_contexto_como_no_original` (simant), `contextos_do_original` (engine), `cursores_do_simantw` (engine).
+- **Not verified on the test bench:** right click in Experimental and in the control windows (only in Quick Game, in the edit window and in the ribbon), F1 with a control window in front, Shift+F1, Delete, `yardHelpBut`, the tool cursors.
