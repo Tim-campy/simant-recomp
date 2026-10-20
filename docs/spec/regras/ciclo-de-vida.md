@@ -146,7 +146,7 @@ Details and order of random draws in [ninho.md](ninho.md#5-tending-the-brood-m--
 
 ### 5.2 Head, every tick (`_SimQueenB`, group 12)
 
-**Verified (2026-10-19, vectors `rainha_fome` and `rainha_vermelha_fome`, testes-tick.md "Sétima rodada"):** with `_HealthB` = 0 the black head dies at 1775 with dialog 10015 opened inside the tick and the tail disappears on the next tick, when `_BlkQueens` goes to 0; the same for the red one (10016) with `_HealthR` = 0. The immunity to natural death (M = 9) is in vector `ninho_n02`.
+**Verified (2026-10-19, vectors `rainha_fome` and `rainha_vermelha_fome`, testes-tick.md "Seventh round"):** with `_HealthB` = 0 the black head dies at 1775 with dialog 10015 opened inside the tick and the tail disappears on the next tick, when `_BlkQueens` goes to 0; the same for the red one (10016) with `_HealthR` = 0. The immunity to natural death (M = 9) is in vector `ninho_n02`.
 
 ```
 if Sk(64) == 0:
@@ -277,7 +277,7 @@ Same test bench and same method as [ninho.md](ninho.md#13-test-cases-against-the
 
 ### Observed in the original
 
-QEMU bench, `tools/caso_ant.py rodar tests/referencias/casos/ID.json` (versioned cases; injection, load and pacing in [../../bancada-qemu.md](../../bancada-qemu.md#casos-de-teste-injetar-um-save-e-rodar)). Final states in `tests/referencias/saves/`.
+QEMU bench, `tools/caso_ant.py rodar tests/referencias/casos/ID.json` (versioned cases; injection, load and pacing in [../../bancada-qemu.md](../../bancada-qemu.md#test-cases-inject-a-save-and-run)). Final states in `tests/referencias/saves/`.
 
 | Id | Date | Effective input | Observed | Result |
 |---|---|---|---|---|

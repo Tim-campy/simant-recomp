@@ -75,7 +75,7 @@ The port does not change the monitor's resolution: it draws a Windows 3.1 **virt
 
 ## 5. Verification
 
-References from the original: the old DOSBox-X capture (800×600, `S3TRIO.DRV`, 256 colors), the default QEMU bench (640×480, `VGA.DRV`, 16 colors) and the **SVGA bench** (QEMU with the `vbesvga.drv` driver, 256 colors, at 640×480, 800×600 and 1024×768; [bancada-qemu.md](../../bancada-qemu.md), "Bancada SVGA"). SVGA captures in `re_trabalho/svga/` (outside git).
+References from the original: the old DOSBox-X capture (800×600, `S3TRIO.DRV`, 256 colors), the default QEMU bench (640×480, `VGA.DRV`, 16 colors) and the **SVGA bench** (QEMU with the `vbesvga.drv` driver, 256 colors, at 640×480, 800×600 and 1024×768; [bancada-qemu.md](../../bancada-qemu.md), "SVGA bench"). SVGA captures in `re_trabalho/svga/` (outside git).
 
 **Verified facts (2026-10-19):**
 

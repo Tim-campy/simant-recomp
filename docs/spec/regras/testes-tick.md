@@ -18,8 +18,8 @@ Evidence convention as in the rest of `docs/spec/`: **verified** = measured on t
 
 | Tool | What it does |
 |---|---|
-| `tools/qemu_bancada.py`, commands `tick_entrada`, `tick_saida`, `ate_gametime N`, `passo_tick DIR`, `extras ARQ`, `segmentos PREFIXO` | tick mode (see [bancada-qemu.md](../../bancada-qemu.md#modo-tick-breakpoints-do-gdbstub)) |
-| `tools/gerar_vetores_tick.py` | records N consecutive ticks in `tick_NNNNNN/` (see "Protocol") and maps reads outside the save (`--mapear-leituras`) |
+| `tools/qemu_bancada.py`, commands `tick_entrada`, `tick_saida`, `ate_gametime N`, `passo_tick DIR`, `extras ARQ`, `segmentos PREFIXO` | tick mode (see [bancada-qemu.md](../../bancada-qemu.md#tick-mode-gdbstub-breakpoints)) |
+| `tools/gerar_vetores_tick.py` | records N consecutive ticks in `tick_NNNNNN/` (see "Test protocol") and maps reads outside the save (`--mapear-leituras`) |
 | `tools/comparar_ticks.py A B [--detalhe]` | compares two vector directories, tick by tick |
 | `tools/comparar_ticks.py --continuidade DIR` | what changes between the return of tick N and the entry of N+1 |
 | `tools/comparar_ticks.py --fora-do-save DIR...` | bytes of segments 8, 9 and 10 that the tick writes outside the save layout (requires `--segmentos`) |

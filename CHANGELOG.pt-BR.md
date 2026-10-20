@@ -37,9 +37,10 @@ arquivo do jogo é distribuído; os textos do jogo também são lidos da instala
 - **Salvar e carregar** no formato `.ANT` do original (o arquivo gravado pelo port abre no SimAnt).
 - **Ajuda:** visor do `SIMANT.HLP` (WinHelp 3.0) e ajuda contextual (Shift+F1, botões *?*).
 - **Códigos de trapaça** do original (`heal`, `just`, `qeen`, `eggs`...).
-- **Som e música:** os efeitos e as 28 músicas do original. Sintetizador FM próprio no estilo do OPL
-  da Sound Blaster (padrão), com o banco de timbres ajustado contra gravações do original; opção de
-  SoundFont General MIDI (`--soundfont`) e de um sintetizador simples. Os efeitos soam como na Sound
+- **Som e música:** os efeitos e as 28 músicas do original. As músicas tocam por padrão num
+  sintetizador simples; opcionais: sintetizador FM próprio no estilo do OPL da Sound Blaster
+  (`--sintetizador fm`), com o banco de timbres ajustado contra gravações do original, e SoundFont
+  General MIDI (`--soundfont`). Os efeitos soam como na Sound
   Blaster 16 do original (5000 Hz, nos blocos do driver), medidos numa partida gravada.
 - **Ritmo do original:** relógio de 55 ms do Windows 3.1, velocidades lenta/normal medidas no original
   (3 e 6 ticks/s), rápida e ultra.
@@ -76,7 +77,7 @@ arquivo do jogo é distribuído; os textos do jogo também são lidos da instala
 
 ### Mods
 
-- **API de mods 1.0** (era 0.35 durante o desenvolvimento; ver `docs/pt-BR/api-mods.md`): substituição de
+- **API de mods**, congelada em 1.0 no lançamento (versões 0.x durante o desenvolvimento; ver `docs/pt-BR/api-mods.md`): substituição de
   objetos do banco original, dos arquivos soltos do jogo e de 42 arquivos `data/*.json` do port,
   mesclados por chave; scripts **Lua 5.4** em sandbox, com ganchos fora e dentro do tick, leitura e
   escritas validadas do estado (comida, cheiros, castas, formigas nos ninhos), menu e painel próprios e
@@ -111,8 +112,8 @@ Resumo do histórico do repositório (338 commits, 16 a 19 de outubro de 2026); 
   balões "Silly", menu de ferramentas, quadros da janela 26, desenho da aranha; API 0.17–0.25 com o
   mod de trapaças.
 - **2026-10-19:** API 0.26 (mesclagem por chave, ganchos dentro do tick, estado no save); tela virtual
-  640/800/1024 e perfil de driver; `WIN.INI` como origem das preferências; sintetizador FM como padrão
-  e banco ajustado às 28 músicas do original; barra de título do Windows 3.1 opcional; sétima e oitava
+  640/800/1024 e perfil de driver; `WIN.INI` como origem das preferências; sintetizador FM (padrão
+  por um tempo; no lançamento o padrão é o simples) e banco ajustado às 28 músicas do original; barra de título do Windows 3.1 opcional; sétima e oitava
   rodadas de vetores (ramos raros, estratégia vermelha, recrutamento, revoada) e geração conferida;
   API 0.34. Textos do SimAnt fora do repositório: os `data/*.json` guardam só a referência (banco,
   executável, layout de janela, `.HLP`) e o port lê o texto da instalação do usuário; API 0.35.

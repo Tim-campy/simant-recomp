@@ -161,7 +161,7 @@ Para limitar a faixa plausível numa máquina real, a velocidade da CPU emulada 
 | 15 | `_DoAntSimB` (`1028:2d4e`): ninho preto | todo tick |
 | 16 | `_DoAntSimR` (`1028:5344`): ninho vermelho | todo tick |
 | 17 | `_DoAntSimY` (`1028:7cf6`): estado da formiga amarela (vida, ovos se for rainha) | todo tick |
-| 18 | resumo de modos (corpo de `_TallyModePop`): monta `_ModePopB`/`_ModePopR` a partir de `_TemBModePop`/`_TemRModePop` (ver [formigas.md](formigas.md#modos)) | todo tick |
+| 18 | resumo de modos (corpo de `_TallyModePop`): monta `_ModePopB`/`_ModePopR` a partir de `_TemBModePop`/`_TemRModePop` (ver [formigas.md](formigas.md#5-modos)) | todo tick |
 | 19 | se nenhuma formiga vermelha está no modo 19 ("Avenger"; `_TemRModePop[19]`, `9:7c0a`, < 1): `_MakeRedInitiator` | todo tick |
 | 20 | `_DoAntMoveY` (`1028:75f4`): movimento da formiga amarela | todo tick; só age com `_MeMoveMe` ≠ 0 |
 | 21 | `_Feedback` (`1030:78ca`): tutorial e mensagens de conselho | todo tick |
@@ -236,7 +236,7 @@ A contagem vai só até `_ListIndex − 1`; a reconstrução da vida no load lê
 
   Leitura [hipótese]: 5/4 = fome, 3/2 = falta escavar, 1 = normal, 0 = atacar com folga.
 - `_StrategicModeR` (`9:7690`) = `_GstrR()`: mesma escada para os vermelhos, com duas diferenças. Primeiro, um gatilho de **revoada** vermelha: se `_FlyAwayR` = 0 e machos + rainhas novas vermelhos > 20, então `_FlyAwayR = 200`. Segundo, um modo "malvado" (`_JustToBeMean`, `9:78dc`): quando a saúde vermelha está muito baixa e os vermelhos estão bem mais numerosos, ou por sorteio raro (`SRand32` e `SRand128`), ele força o modo 0 por `SRand1(100) + 30` chamadas, toca música e mostra a mensagem 4/1020 nº 6 ("The red ants are attacking!").
-- Em seguida, `_SetCasteProd` e `_SetModeProd` escolhem a casta do próximo ovo e o modo das próximas operárias (ver [formigas.md](formigas.md#controle-de-castas-e-modos)).
+- Em seguida, `_SetCasteProd` e `_SetModeProd` escolhem a casta do próximo ovo e o modo das próximas operárias (ver [formigas.md](formigas.md#4-castas-e-o-triângulo-de-castas)).
 
 ## 8. Fim de jogo e pontuação
 
