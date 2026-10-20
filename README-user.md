@@ -2,7 +2,7 @@
 
 # SimAnt recomp — README
 
-Version 1.0.0 (draft). A modern reimplementation of **SimAnt: The Electronic Ant Colony** (Maxis, 1991,
+Version 1.0.0 (2026-10-20). A modern reimplementation of **SimAnt: The Electronic Ant Colony** (Maxis, 1991,
 Windows 3.x version) for current Windows and Linux. The game logic is rewritten from scratch; graphics,
 sounds, music and help come from **your own copy** of the original SimAnt, which this package does not
 contain.

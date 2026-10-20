@@ -1,10 +1,12 @@
 *Leia em português: [pt-BR/lancamento.md](pt-BR/lancamento.md)*
 
-# Release of version 1.0 (preparation)
+# Release of version 1.0
 
-Working document for the **1.0.0** release, prepared on 2026-10-19 for review. **Nothing has been
-published:** there is no tag, nothing has been pushed, the `Cargo.toml` files are still at `0.1.0` and the mod API is still
-0.35 (it was 0.34; 0.35 removed the original's texts from `data/`, section 6). What needs a decision from the user is marked with **[DECIDE]**.
+Working document for the **1.0.0** release, prepared on 2026-10-19 and **approved by the user on
+2026-10-20**. The commit "Release 1.0.0" on `main` sets the version to `1.0.0` in `Cargo.toml`, freezes the
+mod API at **1.0** (it was 0.43) and dates the changelog (`[1.0.0] — 2026-10-20`). **Not published yet:** no tag
+was created and nothing was pushed; the remaining steps are in section 4, "Release". Decisions taken along
+the way are marked **decided**; the remaining optional ones, **[DECIDE, optional]**.
 
 Files prepared in this branch:
 
@@ -12,7 +14,7 @@ Files prepared in this branch:
 |---|---|
 | `.github/workflows/release.yml` | build and package for Windows x64 and Linux x64, triggered **only** by a `v*` tag; creates the release as a **draft** |
 | `tools/gerar_avisos_terceiros.py` | generates the package's `AVISOS-TERCEIROS.txt` (licenses of what goes into the executable) |
-| `CHANGELOG.md` | draft of the history, in English, with the section `[1.0.0] — unreleased`; still the source of the release notes (goes in the package as `CHANGELOG.txt`) |
+| `CHANGELOG.md` | the history, in English, with the section `[1.0.0] — 2026-10-20`; the source of the release notes (goes in the package as `CHANGELOG.txt`) |
 | `CHANGELOG.pt-BR.md` | Portuguese version of the history (goes in the package as `CHANGELOG.pt-BR.txt`) |
 | `LEIAME-usuario.md` | player's guide in Portuguese (goes in the package as `LEIAME.txt`) |
 | `README-user.md` | player's guide in English (goes in the package as `README.txt`) |
@@ -23,7 +25,7 @@ Files prepared in this branch:
 
 The user chose the recommended option. Files: `LICENSE` (notice of the dual license and of the exclusion of the original SimAnt files), `LICENSE-MIT`, `LICENSE-APACHE` (official text from apache.org); `license = "MIT OR Apache-2.0"` in the workspace `Cargo.toml`; the package carries all three. The analysis that led to the choice follows below.
 
-The repository **has no `LICENSE`** (checked: no `LICENSE*`, no `COPYING*`, no `license` field in the
+*Analysis made before the decision (kept for the record):* the repository **had no `LICENSE`** (checked: no `LICENSE*`, no `COPYING*`, no `license` field in the
 `Cargo.toml` files). Without a license, public code on GitHub is "all rights reserved": it can be read,
 but no one can legally redistribute, modify or package it. The choice is the author's; the release
 workflow **fails on purpose** as long as there is no `LICENSE` at the root.
@@ -96,10 +98,12 @@ simant-recomp-1.0.0-windows-x64/          simant-recomp-1.0.0-linux-x64/
   simant.exe   (launcher built in)          simant      (launcher built in)
   simant-console.bat (console output)       simant.sh   (shortcut; no longer needed)
   SDL2.dll, README-SDL.txt
-  data/          (44 JSON, 353 KB)          data/
+  data/          (44 JSON + idiomas/)       data/
   exemplos/mods/ (exemplo-lua, trapacas)    exemplos/mods/
   mods/LEIAME.txt (empty folder for mods)   mods/LEIAME.txt
-  LICENSE.txt, LEIAME.txt, README.txt,      LICENSE.txt, LEIAME.txt, README.txt,
+  LICENSE.txt, LICENSE-MIT.txt,             LICENSE.txt, LICENSE-MIT.txt,
+  LICENSE-APACHE.txt,                       LICENSE-APACHE.txt,
+  LEIAME.txt, README.txt,                   LEIAME.txt, README.txt,
   CHANGELOG.txt, CHANGELOG.pt-BR.txt,       CHANGELOG.txt, CHANGELOG.pt-BR.txt,
   AVISOS-TERCEIROS.txt                      AVISOS-TERCEIROS.txt
 ```
@@ -173,40 +177,31 @@ looked up case-insensitively, but there is no test on a case-sensitive file syst
 
 ### Before the tag
 
-- [ ] **[DECIDE]** License (section 1); create `LICENSE`; `license`/`repository` in the `Cargo.toml` files.
+- [x] License (section 1): **decided (2026-10-19), "MIT OR Apache-2.0"**; `LICENSE`, `LICENSE-MIT`,
+      `LICENSE-APACHE` and `license` in the workspace `Cargo.toml`.
 - [x] Original phrases in `data/`: decided (2026-10-19) and done — read from the user's installation (section 6).
-- [ ] **Version 1.0.0 in the `Cargo.toml` files** — proposed, **not applied**. One line, because both crates
-      inherit from the workspace (`version.workspace = true`):
-      ```diff
-       [workspace.package]
-       edition = "2021"
-      -version = "0.1.0"
-      +version = "1.0.0"
-      ```
-      and `cargo build` to update `Cargo.lock` (the `engine` and `simant` packages). The workflow
-      checks that the `vX.Y.Z` tag equals this version and fails if it does not.
-- [ ] **Freeze the mod API at 1.0** — proposed, **not applied**. In `docs/api-mods.md`:
-      - top: "API version: **1.0** (stable)";
-      - new line in the history: `| 1.0 | Freeze: API 0.35 becomes 1.0, with no change in
-        format or function. | Compatible with 0.35. From 1.0 on, changes follow semantic
-        versioning: 1.x only adds (optional keys, files, functions, hooks); removing or changing the
-        meaning of something requires 2.0, with a warning in an earlier 1.x. |`;
-      - under "Planned", replace "Remove acceptance of the old copies of the common tables (0.20) in a future
-        version" with "... in 2.0" (it is the only pending removal and would break the 1.x rule);
-      - the scripts' `API_VERSAO` becomes `"1.0"`: **warn** that scripts comparing against `"0.35"` as
-        text need to accept `"1.0"` (the value is in `engine/src/scripts.rs`,
-        the only place with `"0.35"`; the example mods only print the version);
-      - record it in `docs/decisoes.md` (date, decision, reason, alternatives: keep 0.x; number the API
-        together with the port).
-- [ ] Review and date `CHANGELOG.md` (replace "unreleased" with the date; test and vector counts
-      checked against the `docs/estado-do-projeto.md` of that date).
-- [ ] Review `LEIAME-usuario.md` and `README-user.md` (remove "draft"; check the table of game
-      files against a clean installation).
-- [x] Repository `README.md`: done — it now has a download section pointing to the releases, the legal notice (the same
-      as in the LEIAME: no affiliation with Maxis/EA, does not distribute game files) and the license.
-- [ ] `cargo test --workspace` with and without `SIMANT_DIR`; `cargo clippy --workspace --all-targets -- -D warnings`.
+- [x] **Version 1.0.0 in the `Cargo.toml` files** (2026-10-20): `version = "1.0.0"` in `[workspace.package]`
+      (both crates inherit it) and `Cargo.lock` updated by `cargo build`. The workflow checks that the
+      `vX.Y.Z` tag equals this version and fails if it does not.
+- [x] **Mod API frozen at 1.0** (2026-10-20): `VERSAO_API = "1.0"` in `engine/src/scripts.rs` (it was
+      0.43); `docs/api-mods.md` with "API version: **1.0**", the summary of the current API at the top,
+      the `1.0` line in the history (0.43 frozen; 1.x only compatible additions, incompatible = 2.0) and
+      "Planned" reviewed (the removal of the old copies of the common tables only in 2.0). The example
+      mods only print `API_VERSAO` and the tests use the constant. Decision in `docs/decisoes.md`.
+- [x] `CHANGELOG.md` reviewed and dated (`[1.0.0] — 2026-10-20`, draft notice removed; numbers measured on
+      2026-10-20, also in the header of `docs/estado-do-projeto.md`).
+- [x] `LEIAME-usuario.md` and `README-user.md` reviewed ("draft" removed; version 1.0.0, simple
+      synthesizer by default, frame on by default, launcher in English and Portuguese).
+- [x] Repository `README.md`: download section pointing to the releases, the legal notice (the same
+      as in the LEIAME: no affiliation with Maxis/EA, does not distribute game files), the license and,
+      since 2026-10-20, the 1.0.0 status and the languages.
+- [x] `cargo test --workspace` with and without `SIMANT_DIR` (2026-10-20: 693 passed, 1 ignored, with the
+      game files; without them, the tests that need the files warn and pass); `cargo clippy --workspace
+      --all-targets -- -D warnings` with no warnings; `python tools/conferir_links_docs.py` with no
+      problems; package assembled locally as the workflow does, with no game file (section 3).
 - [ ] Test the Linux package on a real machine with the game files (including with lowercase
-      names, as they come off some CDs and copies).
+      names, as they come off some CDs and copies). **Not done:** a known limitation of 1.0.0
+      (`CHANGELOG.md`).
 - [ ] Optional: `cargo install cargo-deny` and a `deny.toml` with the list of accepted licenses
       (MIT, Apache-2.0, Zlib, 0BSD, Unlicense, Unicode-3.0), running in CI.
 
@@ -232,13 +227,19 @@ looked up case-insensitively, but there is no test on a case-sensitive file syst
 
 ### Release (done by the user)
 
-1. Merge this branch and the decisions above into `main`; wait for green CI.
-2. `git tag -a v1.0.0 -m "SimAnt recomp 1.0.0"` and `git push origin v1.0.0`.
-3. The "Lançamento" workflow runs: tests, build, package, content check and smoke test, and creates the
-   **v1.0.0 draft** release with both packages and the `.sha256` files, and with the notes taken from the
-   `[1.0.0]` section of `CHANGELOG.md` plus the legal notice.
-4. Download both packages from the draft, check the contents and run with the game files.
-5. Publish the draft on the GitHub releases page (the workflow never publishes on its own).
+`main` already has the commit "Release 1.0.0" (version, API 1.0, dated changelog). No tag was created and
+nothing was pushed. The final steps:
+
+1. **Push `main`** (`git push origin main`) and wait for the green CI (`ci.yml`: tests, clippy, docs
+   links).
+2. **Tag:** `git tag -a v1.0.0 -m "SimAnt recomp 1.0.0"` on that commit and `git push origin v1.0.0`.
+3. **Workflow:** the "Lançamento" workflow runs on the tag: version check (tag = `Cargo.toml`) and
+   `LICENSE`, tests, build, package, content check and smoke test on Windows and Linux, and creates the
+   **v1.0.0 draft** release with both packages and the `.sha256` files, and with the notes taken from
+   the `[1.0.0]` section of `CHANGELOG.md` plus the legal notice.
+4. **Draft:** download both packages from the draft, check the contents (no game file) and run them with
+   the game files; read the notes.
+5. **Publish** the draft on the GitHub releases page (the workflow never publishes on its own).
 
 If something fails after the tag: delete the draft and the tag (`git push --delete origin v1.0.0`,
 `git tag -d v1.0.0`), fix it and recreate the tag.

@@ -1,6 +1,23 @@
 *Leia em português: [pt-BR/estado-do-projeto.md](pt-BR/estado-do-projeto.md)*
 
-# Project status (general review, 2026-10-19)
+# Project status (general review, 2026-10-19; numbers updated for the 1.0.0 release, 2026-10-20)
+
+**Release 1.0.0 (2026-10-20), mod API 1.0.** The review below was not redone for the release; only the
+numbers in this block were measured again on 2026-10-20, on `main` with the release commit:
+
+- `cargo test --workspace` with `SIMANT_DIR` = `SimAnt-T/MAXIS/ANTWIN`: **693 tests passed, 0 failed, 1
+  ignored** (the Windows folder dialog test, ignored by default), in 41 test binaries; also passes
+  without the game files. `cargo clippy --workspace --all-targets -- -D warnings`: no warnings.
+- `tests/referencias/`: **223 tick vectors** (5 at the root of `ticks/` and 218 in 79 subfolders), **2
+  long sequences**, **21 interface actions**, **1 tutorial Load** (all 307/307), **21 rule cases** (20
+  confirmed in the original and equal in the port; C-10 not checkable) and 97 test bench scripts.
+- 46 specs in `docs/spec/` (with the Portuguese copies in `docs/pt-BR/spec/`), 37 integration test files
+  in `engine/tests/`, 53 tools in `tools/` (52 Python and 1 PowerShell).
+- Since this review: API 0.38–0.43 (proportional pace, slow without focus, simple synthesizer as the
+  default, the Windows 3.1 title bar as the window frame and on by default, ribbon 35 bars, help as a
+  Windows window, complete file dialogs, effects at 5000 Hz in 504-sample blocks, language frame and
+  launcher in English and Portuguese), frozen as **1.0**; documentation in English with Portuguese
+  copies. The release notes and known limitations are in [`CHANGELOG.md`](../CHANGELOG.md).
 
 Review redone in full on the branch that integrates `main` at `27543a9` (driver profile, API 0.29) plus the leftovers of this round (full list A, `_KillAntLion(-1)`, left button in the loop, `WIN.INI`, packed bitmaps, `_LastColonyPopR`, alignment of the Examine and of the mini map by the driver profile; API 0.30). Sources: the code (`engine/src`, `simant/src`, `data/`), the 46 specs in `docs/spec/`, `docs/divergencias.md`, `docs/api-mods.md`, `docs/spec/regras/testes-tick.md`, `tests/referencias/` and the symbol table `re_trabalho/symbols.tsv` (2,171 names from `SIMANTW.SYM`). The previous review (2026-10-18, on `1ff4b82`) and its "Done after this review" addenda were absorbed here; what they listed as done is in §2 and left §4.
 
@@ -38,7 +55,7 @@ Review redone in full on the branch that integrates `main` at `27543a9` (driver 
 | 7 | Sound and music | 91% (88%) | 82% (72%) | effects and music of rules, Experimental, dialogs and File → New wired; own FM (OPL) synthesizer, with the bank tuned against the original's 28 recorded songs (level −0.1 dB on average relative to the opening, was +3.4; velocity curve, harmonic profiles, percussion with the original's muted notes); in-game effects measured in a played session (2026-10-19): 5000 Hz, driver blocks of 504 samples, fight at 164.8 ms, level, antlion without waiting |
 | 8 | Modes (Quick, Full, Experimental, Tutorial) | 94% | 87% (86%) | all four have vectors and the new game of each checked before the 1st tick; tutorial checked from lesson 1 to the end; PLACE, live `_SpecialXfer` and Experimental warnings done |
 | 9 | Save/load | 98% (95%) | 90% | `.ANT` accepted by the original; Load with `_RandYard`; Load Game in "Select a Game"; preferences with the user's `WIN.INI` as source (2026-10-19) |
-| 10 | Mods (data + Lua) | 92% (90%) | n/a | API 0.37 (original texts read from the installation since 0.35, `lancamento.md` §6); data merged by key; hooks inside the tick; 42 overridable `data/*.json` (plus `save_layout.json`, which is not) |
+| 10 | Mods (data + Lua) | 92% (90%) | n/a | API 0.37 at this review, frozen as **1.0** at the 1.0.0 release (0.43 with the language frame; original texts read from the installation since 0.35, `lancamento.md` §6); data merged by key; hooks inside the tick; 43 overridable `data/*.json` (plus `save_layout.json`, which is not) and the language files in `data/idiomas/` |
 | 11 | Tools and tests | 92% (90%) | n/a | 48 tools in `tools/` (47 Python and 1 PowerShell), QEMU test bench with gdbstub (VGA and SVGA, `tick_chamada` for the new game), 622 tests |
 | 12 | Documentation | 92% (90%) | n/a | 46 specs (~8.8 thousand lines), divergences: 25 open rows, 3 extensions and 79 resolved (counted in the tables in the closing round) |
 

@@ -18,7 +18,8 @@ modificado por mods (dados JSON e scripts Lua em sandbox).
 
 ## Situação
 
-A versão **1.0.0** está em preparação (ver o [histórico de versões](CHANGELOG.pt-BR.md)). O que funciona hoje:
+A versão **1.0.0** foi lançada em 2026-10-20 (ver o [histórico de versões](CHANGELOG.pt-BR.md)), com a
+API de mods congelada em **1.0**. O que funciona:
 
 - Os quatro modos do original: Tutorial, Quick Game, Full Game (quintal e casa, com troca de patch) e
   Experimental.
@@ -27,8 +28,10 @@ A versão **1.0.0** está em preparação (ver o [histórico de versões](CHANGE
 - As telas e janelas do original, comparadas pixel a pixel com capturas do original; saves no formato
   `.ANT` do original (o save gravado pelo port abre no SimAnt); a ajuda, os códigos de trapaça, os
   efeitos sonoros e as músicas do original.
-- Conveniências de hoje: ampliação nítida por inteiros, launcher de inicialização, preferências
-  guardadas entre partidas, mods.
+- Conveniências de hoje: ampliação nítida por inteiros, tela virtual de 640×480, 800×600 ou 1024×768, a
+  barra de título do Windows 3.1 como moldura da janela (ligada por padrão), launcher de inicialização em
+  inglês e português, músicas por um sintetizador simples por padrão (FM e SoundFont opcionais),
+  preferências guardadas entre partidas, mods (dados e scripts Lua em sandbox).
 
 O que ainda falta ou difere está em [`docs/pt-BR/estado-do-projeto.md`](docs/pt-BR/estado-do-projeto.md)
 (situação do projeto) e [`docs/pt-BR/divergencias.md`](docs/pt-BR/divergencias.md) (divergências
@@ -36,7 +39,9 @@ conhecidas em relação ao original).
 
 ## Idiomas
 
-O launcher terá inglês e português; o jogo em si é em inglês, como o original. A documentação do
+O launcher tem inglês e português; o jogo em si é em inglês, como o original (os textos próprios do
+port passam pelo frame de idiomas em `data/idiomas/`, [`docs/pt-BR/i18n.md`](docs/pt-BR/i18n.md), para
+que outros idiomas possam ser acrescentados, inclusive por mods). A documentação do
 projeto é em inglês, com todos os documentos também em português (o link na primeira linha de cada
 arquivo).
 

@@ -2,7 +2,7 @@
 
 # SimAnt recomp — LEIAME
 
-Versão 1.0.0 (rascunho). Reimplementação moderna do **SimAnt: The Electronic Ant Colony** (Maxis, 1991,
+Versão 1.0.0 (2026-10-20). Reimplementação moderna do **SimAnt: The Electronic Ant Colony** (Maxis, 1991,
 versão Windows 3.x) para Windows e Linux atuais. O jogo é refeito do zero; os gráficos, os sons, as
 músicas e a ajuda vêm da **sua cópia** do SimAnt original, que este pacote não contém.
 

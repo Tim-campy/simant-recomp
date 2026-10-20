@@ -4,6 +4,13 @@
 
 Format: date, decision, reason, discarded alternatives.
 
+## 2026-10-20: Release 1.0.0 with the mod API frozen at 1.0 (user decision)
+
+- **Decision (user's):** release version **1.0.0** dated 2026-10-20 (`Cargo.toml`, `CHANGELOG.md`). The mod API 0.43 is frozen as **1.0** with no change in format or function (`VERSAO_API = "1.0"` in `engine/src/scripts.rs`; line `1.0` in the history of `docs/api-mods.md`). From 1.0 on, the API follows semantic versioning: 1.x versions only add compatible things (optional keys, files, functions, hooks); removing or changing the meaning of something requires 2.0, announced in an earlier 1.x. The only pending removal (the old copies of the common tables, 0.20) moves to 2.0.
+- **Reason:** players and modders need a stable reference for the first public version; a 1.0 number says that mods written now keep working in 1.x.
+- **Discarded:** keeping the API at 0.x after the release (gives no compatibility promise); numbering the API together with the port (they change at different paces: a port fix does not change the API).
+- **Compatibility:** a script that compares `API_VERSAO` with `"0.43"` as text needs to accept `"1.0"`; the example mods only print the value.
+
 ## 2026-10-19: Windows 3.1 frame on by default in 1.0; the window controls always work (user decision)
 
 - **Decision (user's):** "Yes, the Windows 3.1 frame comes on by default in 1.0". `data/video.json` → `moldura_windows31` becomes `true` (with `substituir_moldura_do_sistema` = `true`, already the default); a missing key also counts as `true` (`ConfigVideo`), and the launcher's "Moldura Win 3.1" checkbox comes checked (unchecked, it writes `--sem-moldura`). This revokes the evaluation in "Windows 3.1 title bar optional, off by default" and the item "Evaluation of leaving the frame on by default" of "Windows 3.1 frame in place of the system one", below.

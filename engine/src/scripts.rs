@@ -51,8 +51,9 @@ use crate::rules::inimigos::TabelasInimigos;
 use crate::rules::tick::{Regras, RegrasAmarela, RegrasConselhos, RegrasInimigos, RegrasNinho, RegrasQuintal, RegrasSuperficie};
 use crate::tr;
 
-/// Versão da API de mods que os scripts veem em `API_VERSAO`.
-pub const VERSAO_API: &str = "0.43";
+/// Versão da API de mods que os scripts veem em `API_VERSAO` (congelada em 1.0 no lançamento; 1.x só
+/// recebe acréscimos compatíveis).
+pub const VERSAO_API: &str = "1.0";
 
 /// Tamanho máximo do texto de `mostrar_mensagem` (caracteres).
 pub const MAX_TEXTO_MENSAGEM: usize = 120;

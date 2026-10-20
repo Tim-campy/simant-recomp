@@ -107,7 +107,7 @@ checksum = "0e9c71c2167ca323c882b99918929403426e2373ea17242ff5653e0d5e1058be"
 
 [[package]]
 name = "engine"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "mlua",
  "png",
@@ -441,7 +441,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "simant"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "engine",
  "png",

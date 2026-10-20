@@ -18,7 +18,8 @@ distribute. The port can be changed by mods (JSON data and sandboxed Lua scripts
 
 ## Status
 
-Version **1.0.0** is being prepared (see the [changelog](CHANGELOG.md)). What works today:
+Version **1.0.0** was released on 2026-10-20 (see the [changelog](CHANGELOG.md)), with the mod API
+frozen at **1.0**. What works:
 
 - The original's four modes: Tutorial, Quick Game, Full Game (yard and house, with patch switching)
   and Experimental.
@@ -27,7 +28,10 @@ Version **1.0.0** is being prepared (see the [changelog](CHANGELOG.md)). What wo
 - The original's screens and windows, compared pixel by pixel with captures of the original; saves in
   the original `.ANT` format (a save written by the port opens in SimAnt); the original's help, cheat
   codes, sound effects and music.
-- Modern conveniences: sharp integer scaling, a startup launcher, preferences kept between games, mods.
+- Modern conveniences: sharp integer scaling, 640×480, 800×600 or 1024×768 virtual screen, the Windows
+  3.1 title bar as the window frame (on by default), a startup launcher in English and Portuguese, music
+  through a simple synthesizer by default (FM and SoundFont optional), preferences kept between games,
+  mods (data and sandboxed Lua scripts).
 
 What is still missing or different is listed in [`docs/estado-do-projeto.md`](docs/estado-do-projeto.md)
 (project status) and [`docs/divergencias.md`](docs/divergencias.md) (known divergences from the
@@ -35,8 +39,9 @@ original).
 
 ## Languages
 
-The launcher will be available in English and Portuguese; the game itself is in English, like the
-original. The project documentation is in English, with every document also available in Portuguese
+The launcher is available in English and Portuguese; the game itself is in English, like the original
+(the port's own texts go through the language frame in `data/idiomas/`, [`docs/i18n.md`](docs/i18n.md),
+so other languages can be added, also by mods). The project documentation is in English, with every document also available in Portuguese
 (the link on the first line of each file).
 
 ## Playing

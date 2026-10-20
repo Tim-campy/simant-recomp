@@ -1,10 +1,12 @@
 *Read in English: [lancamento.md](../lancamento.md)*
 
-# Lançamento da versão 1.0 (preparação)
+# Lançamento da versão 1.0
 
-Documento de trabalho para o lançamento da **1.0.0**, preparado em 2026-10-19 para revisão. **Nada foi
-publicado:** não há tag, não houve push, os `Cargo.toml` continuam em `0.1.0` e a API de mods continua
-0.35 (era 0.34; a 0.35 tirou os textos do original de `data/`, seção 6). O que precisa de decisão do usuário está marcado com **[DECIDIR]**.
+Documento de trabalho para o lançamento da **1.0.0**, preparado em 2026-10-19 e **aprovado pelo usuário em
+2026-10-20**. O commit "Release 1.0.0" no `main` põe a versão `1.0.0` no `Cargo.toml`, congela a API de
+mods em **1.0** (era 0.43) e data o histórico (`[1.0.0] — 2026-10-20`). **Ainda não publicado:** nenhuma tag
+foi criada e não houve push; os passos que faltam estão na seção 4, "Lançar". As decisões tomadas pelo
+caminho estão marcadas como **decidido**; as opcionais que restam, **[DECIDIR, opcional]**.
 
 Arquivos preparados neste branch:
 
@@ -12,7 +14,7 @@ Arquivos preparados neste branch:
 |---|---|
 | `.github/workflows/release.yml` | build e pacote de Windows x64 e Linux x64, disparado **só** por tag `v*`; cria o release como **rascunho** |
 | `tools/gerar_avisos_terceiros.py` | gera o `AVISOS-TERCEIROS.txt` do pacote (licenças do que entra no executável) |
-| `CHANGELOG.md` | rascunho do histórico, em inglês, com a seção `[1.0.0] — não lançado`; continua sendo a fonte das notas do release (vai no pacote como `CHANGELOG.txt`) |
+| `CHANGELOG.md` | o histórico, em inglês, com a seção `[1.0.0] — 2026-10-20`; a fonte das notas do release (vai no pacote como `CHANGELOG.txt`) |
 | `CHANGELOG.pt-BR.md` | versão em português do histórico (vai no pacote como `CHANGELOG.pt-BR.txt`) |
 | `LEIAME-usuario.md` | LEIAME de quem joga, em pt-BR (vai no pacote como `LEIAME.txt`) |
 | `README-user.md` | guia de quem joga, em inglês (vai no pacote como `README.txt`) |
@@ -23,7 +25,7 @@ Arquivos preparados neste branch:
 
 O usuário escolheu a opção recomendada. Arquivos: `LICENSE` (aviso da licença dupla e da exclusão dos arquivos do SimAnt original), `LICENSE-MIT`, `LICENSE-APACHE` (texto oficial de apache.org); `license = "MIT OR Apache-2.0"` no `Cargo.toml` do workspace; o pacote leva os três. A análise que levou à escolha segue abaixo.
 
-O repositório **não tem `LICENSE`** (conferido: nem `LICENSE*`, nem `COPYING*`, nem campo `license` nos
+*Análise feita antes da decisão (mantida como registro):* o repositório **não tinha `LICENSE`** (conferido: nem `LICENSE*`, nem `COPYING*`, nem campo `license` nos
 `Cargo.toml`). Sem licença, o código público no GitHub é "todos os direitos reservados": dá para ler,
 mas ninguém pode legalmente redistribuir, modificar ou empacotar. A escolha é do autor; o workflow de
 lançamento **falha de propósito** enquanto não existir `LICENSE` na raiz.
@@ -96,10 +98,12 @@ simant-recomp-1.0.0-windows-x64/          simant-recomp-1.0.0-linux-x64/
   simant.exe   (com o launcher dentro)      simant      (com o launcher dentro)
   simant-console.bat (mensagens no console) simant.sh   (atalho; não é mais preciso)
   SDL2.dll, README-SDL.txt
-  data/          (44 JSON, 353 KB)          data/
+  data/          (44 JSON + idiomas/)       data/
   exemplos/mods/ (exemplo-lua, trapacas)    exemplos/mods/
   mods/LEIAME.txt (pasta vazia para mods)   mods/LEIAME.txt
-  LICENSE.txt, LEIAME.txt, README.txt,      LICENSE.txt, LEIAME.txt, README.txt,
+  LICENSE.txt, LICENSE-MIT.txt,             LICENSE.txt, LICENSE-MIT.txt,
+  LICENSE-APACHE.txt,                       LICENSE-APACHE.txt,
+  LEIAME.txt, README.txt,                   LEIAME.txt, README.txt,
   CHANGELOG.txt, CHANGELOG.pt-BR.txt,       CHANGELOG.txt, CHANGELOG.pt-BR.txt,
   AVISOS-TERCEIROS.txt                      AVISOS-TERCEIROS.txt
 ```
@@ -173,40 +177,31 @@ procurados sem diferença de caixa, mas não há teste num sistema de arquivos q
 
 ### Antes da tag
 
-- [ ] **[DECIDIR]** Licença (seção 1); criar `LICENSE`; `license`/`repository` nos `Cargo.toml`.
+- [x] Licença (seção 1): **decidido (2026-10-19), "MIT OR Apache-2.0"**; `LICENSE`, `LICENSE-MIT`,
+      `LICENSE-APACHE` e `license` no `Cargo.toml` do workspace.
 - [x] Frases do original em `data/`: decidido (2026-10-19) e feito — lidas da instalação do usuário (seção 6).
-- [ ] **Versão 1.0.0 nos `Cargo.toml`** — proposta, **não aplicada**. Uma linha, porque os dois crates
-      herdam do workspace (`version.workspace = true`):
-      ```diff
-       [workspace.package]
-       edition = "2021"
-      -version = "0.1.0"
-      +version = "1.0.0"
-      ```
-      e `cargo build` para atualizar o `Cargo.lock` (os pacotes `engine` e `simant`). O workflow
-      confere que a tag `vX.Y.Z` é igual a essa versão e falha se não for.
-- [ ] **Congelar a API de mods em 1.0** — proposta, **não aplicada**. Em `docs/api-mods.md`:
-      - topo: "Versão da API: **1.0** (estável)";
-      - linha nova no histórico: `| 1.0 | Congelamento: a API 0.35 passa a ser a 1.0, sem mudança de
-        formato nem de função. | Compatível com 0.35. A partir da 1.0, mudanças seguem o versionamento
-        semântico: 1.x só acrescenta (chaves opcionais, arquivos, funções, ganchos); remover ou mudar o
-        sentido de algo exige 2.0, com aviso numa 1.x anterior. |`;
-      - em "Planejado", trocar "Remover o aceite das cópias antigas das tabelas comuns (0.20) numa versão
-        futura" por "... na 2.0" (é a única remoção pendente e quebraria a regra da 1.x);
-      - `API_VERSAO` dos scripts passa a `"1.0"`: **avisar** que scripts que comparam com `"0.35"` como
-        texto precisam aceitar `"1.0"` (o valor está em `engine/src/scripts.rs`,
-        único lugar com `"0.35"`; os mods de exemplo só imprimem a versão);
-      - registrar em `docs/decisoes.md` (data, decisão, motivo, alternativas: manter 0.x; numerar a API
-        junto com o port).
-- [ ] Revisar e datar o `CHANGELOG.md` (trocar "não lançado" pela data; números de testes e vetores
-      conferidos com o `docs/estado-do-projeto.md` da data).
-- [ ] Revisar `LEIAME-usuario.md` e `README-user.md` (tirar "rascunho"; conferir a tabela de arquivos do
-      jogo com uma instalação limpa).
-- [x] `README.md` do repositório: feito — agora tem a seção de download apontando para os releases, o aviso legal (o mesmo do
-      LEIAME: sem afiliação com a Maxis/EA, não distribui arquivos do jogo) e a licença.
-- [ ] `cargo test --workspace` com e sem `SIMANT_DIR`; `cargo clippy --workspace --all-targets -- -D warnings`.
+- [x] **Versão 1.0.0 nos `Cargo.toml`** (2026-10-20): `version = "1.0.0"` em `[workspace.package]` (os
+      dois crates herdam) e `Cargo.lock` atualizado pelo `cargo build`. O workflow confere que a tag
+      `vX.Y.Z` é igual a essa versão e falha se não for.
+- [x] **API de mods congelada em 1.0** (2026-10-20): `VERSAO_API = "1.0"` em `engine/src/scripts.rs` (era
+      0.43); `docs/pt-BR/api-mods.md` com "Versão da API: **1.0**", o resumo da API atual no topo, a linha
+      `1.0` no histórico (0.43 congelada; 1.x só acréscimos compatíveis, incompatível = 2.0) e "Planejado"
+      revisto (a remoção das cópias antigas das tabelas comuns só na 2.0). Os mods de exemplo só imprimem
+      `API_VERSAO` e os testes usam a constante. Decisão em `docs/pt-BR/decisoes.md`.
+- [x] `CHANGELOG.md` revisto e datado (`[1.0.0] — 2026-10-20`, sem o aviso de rascunho; números medidos em
+      2026-10-20, também no cabeçalho do `docs/pt-BR/estado-do-projeto.md`).
+- [x] `LEIAME-usuario.md` e `README-user.md` revistos (sem "rascunho"; versão 1.0.0, sintetizador simples
+      por padrão, moldura ligada por padrão, launcher em inglês e português).
+- [x] `README.md` do repositório: seção de download apontando para os releases, o aviso legal (o mesmo do
+      LEIAME: sem afiliação com a Maxis/EA, não distribui arquivos do jogo), a licença e, desde
+      2026-10-20, a situação da 1.0.0 e os idiomas.
+- [x] `cargo test --workspace` com e sem `SIMANT_DIR` (2026-10-20: 693 passaram, 1 ignorado, com os
+      arquivos do jogo; sem eles, os testes que precisam dos arquivos avisam e passam); `cargo clippy
+      --workspace --all-targets -- -D warnings` sem avisos; `python tools/conferir_links_docs.py` sem
+      problemas; pacote montado localmente como o workflow faz, sem nenhum arquivo do jogo (seção 3).
 - [ ] Testar o pacote de Linux numa máquina real com os arquivos do jogo (inclusive com nomes em
-      minúsculas, como saem de alguns CDs e cópias).
+      minúsculas, como saem de alguns CDs e cópias). **Não feito:** limitação conhecida da 1.0.0
+      (`CHANGELOG.pt-BR.md`).
 - [ ] Opcional: `cargo install cargo-deny` e um `deny.toml` com a lista de licenças aceitas
       (MIT, Apache-2.0, Zlib, 0BSD, Unlicense, Unicode-3.0), rodando no CI.
 
@@ -232,13 +227,19 @@ procurados sem diferença de caixa, mas não há teste num sistema de arquivos q
 
 ### Lançar (feito pelo usuário)
 
-1. Fazer merge deste branch e das decisões acima no `main`; esperar o CI verde.
-2. `git tag -a v1.0.0 -m "SimAnt recomp 1.0.0"` e `git push origin v1.0.0`.
-3. O workflow "Lançamento" roda: testes, build, pacote, conferência de conteúdo e smoke test, e cria o
+O `main` já tem o commit "Release 1.0.0" (versão, API 1.0, histórico datado). Nenhuma tag foi criada e não
+houve push. Os passos finais:
+
+1. **Push do `main`** (`git push origin main`) e esperar o CI verde (`ci.yml`: testes, clippy, links da
+   documentação).
+2. **Tag:** `git tag -a v1.0.0 -m "SimAnt recomp 1.0.0"` nesse commit e `git push origin v1.0.0`.
+3. **Workflow:** o workflow "Lançamento" roda com a tag: conferência da versão (tag = `Cargo.toml`) e do
+   `LICENSE`, testes, build, pacote, conferência de conteúdo e smoke test no Windows e no Linux, e cria o
    release **v1.0.0 em rascunho** com os dois pacotes e os `.sha256`, e com as notas tiradas da seção
    `[1.0.0]` do `CHANGELOG.md` mais o aviso legal.
-4. Baixar os dois pacotes do rascunho, conferir o conteúdo e rodar com os arquivos do jogo.
-5. Publicar o rascunho na página de releases do GitHub (o workflow nunca publica sozinho).
+4. **Rascunho:** baixar os dois pacotes do rascunho, conferir o conteúdo (nenhum arquivo do jogo) e rodar
+   com os arquivos do jogo; ler as notas.
+5. **Publicar** o rascunho na página de releases do GitHub (o workflow nunca publica sozinho).
 
 Se algo falhar depois da tag: apagar o rascunho e a tag (`git push --delete origin v1.0.0`,
 `git tag -d v1.0.0`), corrigir e recriar a tag.

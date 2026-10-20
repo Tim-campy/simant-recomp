@@ -1,6 +1,25 @@
 *Read in English: [estado-do-projeto.md](../estado-do-projeto.md)*
 
-# Estado do projeto (revisão geral, 2026-10-19)
+# Estado do projeto (revisão geral, 2026-10-19; números atualizados para o lançamento 1.0.0, 2026-10-20)
+
+**Lançamento 1.0.0 (2026-10-20), API de mods 1.0.** A revisão abaixo não foi refeita para o lançamento;
+só os números deste bloco foram medidos de novo em 2026-10-20, no `main` com o commit do lançamento:
+
+- `cargo test --workspace` com `SIMANT_DIR` = `SimAnt-T/MAXIS/ANTWIN`: **693 testes passaram, 0
+  falharam, 1 ignorado** (o teste do diálogo de pastas do Windows, ignorado por padrão), em 41 binários de
+  teste; também passa sem os arquivos do jogo. `cargo clippy --workspace --all-targets -- -D warnings`:
+  sem avisos.
+- `tests/referencias/`: **223 vetores de tick** (5 na raiz de `ticks/` e 218 em 79 subpastas), **2
+  sequências longas**, **21 ações de interface**, **1 Load do tutorial** (todos 307/307), **21 casos de
+  regra** (20 confirmados no original e iguais no port; C-10 não conferível) e 97 roteiros da bancada.
+- 46 specs em `docs/spec/` (com as cópias em português em `docs/pt-BR/spec/`), 37 arquivos de teste de
+  integração em `engine/tests/`, 53 ferramentas em `tools/` (52 Python e 1 PowerShell).
+- Desde esta revisão: API 0.38–0.43 (ritmo proporcional, lenta sem foco, sintetizador simples como
+  padrão, a barra de título do Windows 3.1 como moldura da janela e ligada por padrão, barras da faixa
+  35, ajuda como janela do Windows, diálogos de arquivo completos, efeitos a 5000 Hz em blocos de 504
+  amostras, frame de idiomas e launcher em inglês e português), congelada como **1.0**; documentação em
+  inglês com cópias em português. As notas do lançamento e as limitações conhecidas estão em
+  [`CHANGELOG.pt-BR.md`](../../CHANGELOG.pt-BR.md).
 
 Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (perfil de driver, API 0.29) mais os resíduos desta rodada (lista A cheia, `_KillAntLion(-1)`, botão esquerdo no laço, `WIN.INI`, bitmaps empacotados, `_LastColonyPopR`, alinhamento do Examine e do mini mapa pelo perfil de driver; API 0.30). Fontes: o código (`engine/src`, `simant/src`, `data/`), as 46 specs de `docs/spec/`, `docs/divergencias.md`, `docs/api-mods.md`, `docs/spec/regras/testes-tick.md`, `tests/referencias/` e a tabela de símbolos `re_trabalho/symbols.tsv` (2.171 nomes do `SIMANTW.SYM`). A revisão anterior (2026-10-18, sobre `1ff4b82`) e os seus adendos "Feito depois desta revisão" foram absorvidos aqui; o que eles listavam como feito está em §2 e saiu de §4.
 
@@ -38,7 +57,7 @@ Revisão refeita por inteiro sobre o branch que integra o `main` em `27543a9` (p
 | 7 | Som e música | 91% (88%) | 82% (72%) | efeitos e músicas de regras, Experimental, diálogos e File → New ligados; sintetizador FM (OPL) próprio, com o banco ajustado contra as 28 músicas gravadas do original (nível −0,1 dB em média em relação à abertura, era +3,4; curva de velocidade, perfis harmônicos, percussão com as notas mudas do original); efeitos dentro do jogo medidos numa sessão jogada (2026-10-19): 5000 Hz, blocos de 504 amostras do driver, luta a 164,8 ms, nível, formiga-leão sem espera |
 | 8 | Modos (Quick, Completo, Experimental, Tutorial) | 94% | 87% (86%) | os quatro têm vetores e o jogo novo de cada um conferido antes do 1º tick; tutorial conferido da lição 1 ao fim; PLACE, `_SpecialXfer` ao vivo e avisos do Experimental feitos |
 | 9 | Salvar/carregar | 98% (95%) | 90% | `.ANT` aceito pelo original; Load com `_RandYard`; Load Game no "Select a Game"; preferências com o `WIN.INI` do usuário como origem (2026-10-19) |
-| 10 | Mods (dados + Lua) | 92% (90%) | n/a | API 0.37 (textos do original lidos da instalação desde a 0.35, `lancamento.md` §6); dados mesclados por chave; ganchos dentro do tick; 42 `data/*.json` sobrescrevíveis (mais o `save_layout.json`, que não é) |
+| 10 | Mods (dados + Lua) | 92% (90%) | n/a | API 0.37 nesta revisão, congelada como **1.0** no lançamento 1.0.0 (0.43 com o frame de idiomas; textos do original lidos da instalação desde a 0.35, `lancamento.md` §6); dados mesclados por chave; ganchos dentro do tick; 43 `data/*.json` sobrescrevíveis (mais o `save_layout.json`, que não é) e os arquivos de idioma de `data/idiomas/` |
 | 11 | Ferramentas e testes | 92% (90%) | n/a | 48 ferramentas em `tools/` (47 Python e 1 PowerShell), bancada QEMU com gdbstub (VGA e SVGA, `tick_chamada` para o jogo novo), 622 testes |
 | 12 | Documentação | 92% (90%) | n/a | 46 specs (~8,8 mil linhas), divergências: 25 linhas em aberto, 3 extensões e 79 resolvidas (contadas nas tabelas na rodada de fechamento) |
 

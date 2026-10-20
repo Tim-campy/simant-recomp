@@ -4,6 +4,13 @@
 
 Formato: data, decisão, motivo, alternativas descartadas.
 
+## 2026-10-20: Lançamento 1.0.0 com a API de mods congelada em 1.0 (decisão do usuário)
+
+- **Decisão (do usuário):** lançar a versão **1.0.0** com data de 2026-10-20 (`Cargo.toml`, `CHANGELOG.md`). A API de mods 0.43 é congelada como **1.0**, sem mudança de formato nem de função (`VERSAO_API = "1.0"` em `engine/src/scripts.rs`; linha `1.0` no histórico de `docs/pt-BR/api-mods.md`). A partir da 1.0, a API segue o versionamento semântico: as versões 1.x só acrescentam coisas compatíveis (chaves opcionais, arquivos, funções, ganchos); remover ou mudar o sentido de algo exige 2.0, anunciada numa 1.x anterior. A única remoção pendente (as cópias antigas das tabelas comuns, 0.20) passa para a 2.0.
+- **Motivo:** quem joga e quem faz mods precisa de uma referência estável para a primeira versão pública; o número 1.0 diz que os mods escritos agora continuam funcionando nas 1.x.
+- **Descartado:** manter a API em 0.x depois do lançamento (não promete compatibilidade); numerar a API junto com o port (mudam em ritmos diferentes: uma correção do port não muda a API).
+- **Compatibilidade:** um script que compare `API_VERSAO` com `"0.43"` como texto precisa aceitar `"1.0"`; os mods de exemplo só imprimem o valor.
+
 ## 2026-10-19: Moldura do Windows 3.1 ligada por padrão na 1.0; os controles da janela sempre funcionam (decisão do usuário)
 
 - **Decisão (do usuário):** "Sim, a moldura do Windows 3.1 vem ligada por padrão na 1.0". `data/video.json` → `moldura_windows31` passa a `true` (com `substituir_moldura_do_sistema` = `true`, já o padrão); a chave ausente também vale `true` (`ConfigVideo`), e a caixa "Moldura Win 3.1" do launcher vem marcada (desmarcada, grava `--sem-moldura`). Revoga a avaliação de "Barra de título do Windows 3.1 opcional, desligada por padrão" e o item "Avaliação de deixar a moldura ligada por padrão" de "Moldura do Windows 3.1 no lugar da do sistema", abaixo.
