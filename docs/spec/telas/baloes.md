@@ -71,7 +71,7 @@ With font 2, it walks the requests and **draws only the first** that is in view 
 
 - State: `Estado::baloes` (`rules::estado::Baloes`, outside the save): counts, last and current points, `_editWidth/_editHeight` (`vista`, set by the interface before the tick with `_MapPnt`), deadlines, lines on, indices, `_SMode` seen, the request list and the balloon drawn.
 - Tick: `baloes::anotar` in the places in the §1 table (`rules/superficie.rs`, `rules/ninho.rs`).
-- Redraw: `desenho::redesenho_do_timer` → `desenho::desenhar_edicao` (balloons, palps, spider balloon, choice), under the same conditions of the edit window redraw already modeled (rng.md, "Sorteios do desenho"); `_TickCount` = `ms_total / 55` of the game (`JanelasDesenho::tick_count`).
+- Redraw: `desenho::redesenho_do_timer` → `desenho::desenhar_edicao` (balloons, palps, spider balloon, choice), under the same conditions of the edit window redraw already modeled (rng.md, "Drawing random draws"); `_TickCount` = `ms_total / 55` of the game (`JanelasDesenho::tick_count`).
 - Drawing: `TelaDeJogo::desenhar_balao` draws `Baloes::desenhado` with the pieces and the font, if the cell is still in view.
 
 Gaps and hypotheses:

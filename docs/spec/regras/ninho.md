@@ -649,7 +649,7 @@ No caller in the pseudocode (the same code is inlined in another routine): `_DoR
 
 ## 13. Test cases against the original
 
-Test bench: [../../bancada-qemu.md](../../bancada-qemu.md#casos-de-teste-injetar-um-save-e-rodar). It injects and loads edited saves, reads the whole state from memory and writes variables (`escrever_variavel`), but the generators' state does **not** go into the save (and is lost on load; see [rng.md](rng.md#is-the-seed-in-the-save)). That is why the cases below are of three types: **D** = deterministic (does not depend on the random draw), **E** = statistical (repeat and compare proportions), **P** = comparison with the port running the same `.ANT` with the same forced seed.
+Test bench: [../../bancada-qemu.md](../../bancada-qemu.md#test-cases-inject-a-save-and-run). It injects and loads edited saves, reads the whole state from memory and writes variables (`escrever_variavel`), but the generators' state does **not** go into the save (and is lost on load; see [rng.md](rng.md#is-the-seed-in-the-save)). That is why the cases below are of three types: **D** = deterministic (does not depend on the random draw), **E** = statistical (repeat and compare proportions), **P** = comparison with the port running the same `.ANT` with the same forced seed.
 
 ### 13.1 How to build the input
 

@@ -19,7 +19,7 @@ Convenção de evidência como no resto de `docs/spec/`: **verificado** = medido
 | Ferramenta | O que faz |
 |---|---|
 | `tools/qemu_bancada.py`, comandos `tick_entrada`, `tick_saida`, `ate_gametime N`, `passo_tick DIR`, `extras ARQ`, `segmentos PREFIXO` | modo tick (ver [bancada-qemu.md](../../bancada-qemu.md#modo-tick-breakpoints-do-gdbstub)) |
-| `tools/gerar_vetores_tick.py` | grava N ticks consecutivos em `tick_NNNNNN/` (ver "Protocolo") e mapeia leituras fora do save (`--mapear-leituras`) |
+| `tools/gerar_vetores_tick.py` | grava N ticks consecutivos em `tick_NNNNNN/` (ver "Protocolo de teste") e mapeia leituras fora do save (`--mapear-leituras`) |
 | `tools/comparar_ticks.py A B [--detalhe]` | compara dois diretórios de vetores, tick a tick |
 | `tools/comparar_ticks.py --continuidade DIR` | o que muda entre o retorno do tick N e a entrada do N+1 |
 | `tools/comparar_ticks.py --fora-do-save DIR...` | bytes dos segmentos 8, 9 e 10 que o tick escreve fora do layout do save (exige `--segmentos`) |

@@ -2,7 +2,7 @@
 
 # Mod script menu and panel (port extension)
 
-**Does not exist in the original.** It is the screen part of mod API 0.17 (`docs/api-mods.md`, "Scripts Lua"): a script can have a menu opened by a key and a text panel. The example cheat mod (`exemplos/mods/trapacas/`) is the first use. The base game has no code specific to any mod.
+**Does not exist in the original.** It is the screen part of mod API 0.17 (`docs/api-mods.md`, "Lua scripts"): a script can have a menu opened by a key and a text panel. The example cheat mod (`exemplos/mods/trapacas/`) is the first use. The base game has no code specific to any mod.
 
 ## Behavior
 

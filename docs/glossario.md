@@ -10,7 +10,7 @@ Names taken from `SIMANTW.SYM` and from the data. Meanings marked with [hypothes
 | `B` (`_MapB`, `_BlistX`, `_DoAntSimB`) | **black** nest / colony (the player's) | SYM (`_PlaceBlackQueen`, `_BlkQueens`) |
 | `R` (`_MapR`, `_RlistX`, `_DoAntSimR`) | **red** nest / colony (the opponent) | SYM (`_PlaceRedQueen`) |
 | `Y` (`_DoAntSimY`, `_YellowBirth`) | the **yellow ant**, controlled by the player | SYM; "Yellow Health" bitmaps |
-| `Alist`/`Blist`/`Rlist` + `X`,`Y`,`M`,`T`,`S` | parallel lists of ants **per area** (surface, black nest, red nest), of any colony: X/Y position, M = mode/task, T = type (bit 7 = red, bits 3–6 = class, 12 = queen), S = mode auxiliary [hypothesis] | `_AddAntToAList`, `_CountAnts`, `_DoNestAntB`; [formatos/save-ant.md](spec/formatos/save-ant.md#estruturas-principais) |
+| `Alist`/`Blist`/`Rlist` + `X`,`Y`,`M`,`T`,`S` | parallel lists of ants **per area** (surface, black nest, red nest), of any colony: X/Y position, M = mode/task, T = type (bit 7 = red, bits 3–6 = class, 12 = queen), S = mode auxiliary [hypothesis] | `_AddAntToAList`, `_CountAnts`, `_DoNestAntB`; [formatos/save-ant.md](spec/formatos/save-ant.md#main-structures) |
 | `ListIndexA/B/R` | number of entries used in each list | `_AddAntToAList`, `_CompactListA` |
 | `LifeA/B/R` | occupancy map (T field per cell), rebuilt from the lists on load; not saved | `_DoLoadInitializations` |
 | `_gameCycles` | iterations of the `MYTIMERFUNC` loop (32 bits), not ticks; depends on the host clock; not in the save | `MYTIMERFUNC`; measured on the test bench ([testes-tick.md](spec/regras/testes-tick.md)) |
@@ -36,7 +36,7 @@ Names taken from `SIMANTW.SYM` and from the data. Meanings marked with [hypothes
 | `_MapPlane` | map shown in the edit window: 0 yard (draws `_MapA`), 1 surface, 2 black nest, 3 red nest | `_DoCalcTile`, `_SetMapPlane`; [telas/jogo.md](spec/telas/jogo.md) |
 | `_MapPnt` | map cell at the top-left corner of the edit window (x, y pair at `DS:7d2e`/`7d30`) | `FUN_1010_6250`, `_CenterEdit` |
 | `_YMapPnt`, `_AMapPnt`, `_BMapPnt`, `_RMapPnt` | remembered center of the view in each plane (0 to 3) | `_SetMapPlane`, `_DoLoadInitializations` |
-| `_DoEditScroll` | handles `WM_HSCROLL`/`WM_VSCROLL` of the edit window (line, page, thumb); does not update the remembered point | `MAINWNDPROC`; [telas/jogo.md](spec/telas/jogo.md), "Navegação" |
+| `_DoEditScroll` | handles `WM_HSCROLL`/`WM_VSCROLL` of the edit window (line, page, thumb); does not update the remembered point | `MAINWNDPROC`; [telas/jogo.md](spec/telas/jogo.md), "Navigation" |
 | `_SetMapPlane`, `_SetMapPlaneLocation`, `_GotoMapPoint` | switch the displayed plane and center the view on the remembered point (or on a given point) | `_ProcMapRibbonEvent`, `_ProcMenu` |
 | `_goStep*` | move the view one step and update the remembered point; no calls in the pseudocode [hypothesis: leftover from the Mac version] | code |
 | `_GotoMyAnt` | takes the view to the yellow ant (`_CenterEdit` or `_SetMapPlaneLocation`); called by AutoTrack, Home, Backspace... | code (`1000:a764`) |
@@ -92,6 +92,6 @@ Names taken from `SIMANTW.SYM` and from the data. Meanings marked with [hypothes
 | `_SetMenuEntries` (`1000:4c24`) / `_SetMenuItemState` / `_SetMenuOptionText` | Speed and Options check marks and the Pause/Unpause text | pseudocode; telas/menus.md §2 |
 | `_MenuQuit` (`1000:d628`) | "SimAnt Quit" question (Yes = Save As and quit, No = quit, Cancel) | pseudocode, test bench m19/o03; telas/menus.md §4 |
 | `_AboutDialog` (`1000:cf3a`) | File → About: window 31, picture and scrolling credits (4/1700), game paused | pseudocode, test bench; telas/menus.md §5 |
-| `_GotoSpider` (`1000:a844`) | `ribToSpider` button of ribbon 34 (0x2207) and `editGoSpider`: the view goes to the spider on the surface; without `_SpidOn`, the error sound | pseudocode; telas/jogo.md "Faixa" |
+| `_GotoSpider` (`1000:a844`) | `ribToSpider` button of ribbon 34 (0x2207) and `editGoSpider`: the view goes to the spider on the surface; without `_SpidOn`, the error sound | pseudocode; telas/jogo.md "Ribbon" |
 | `_ScoreDialog` (`1000:5caa`) / `_win_DrawScoreWindow` (`1000:5aca`) | Window → Status (Ctrl+T) and `ribStats` button of ribbon 34 (0x2209): window 24 with the `_CalcScore` grades and the score; the game keeps running | pseudocode, test bench n02; telas/menus.md §6 |
 | `_win_Events` (`1030:d040`) | dispatches pending messages and reports whether there was a click or Space/Insert (closes the game's dialogs) | pseudocode |
