@@ -287,6 +287,7 @@ mod sistema {
             Some(f) => {
                 let padroes: Vec<String> = f.padroes.iter().flat_map(|p| [p.to_string(), p.to_lowercase()]).collect();
                 z.arg(format!("--file-filter={} | {}", f.nome, padroes.join(" ")));
+                z.arg(format!("--file-filter={} | *", f.todos));
             }
             None => {
                 z.arg("--directory");
