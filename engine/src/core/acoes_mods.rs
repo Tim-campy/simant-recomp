@@ -121,6 +121,11 @@ pub fn aplicar(p: &mut Partida, pedido: &PedidoMod) -> Result<(), String> {
             inimigos::aranha_entra(e);
         }
         PedidoMod::PorFormigaLeao { x, y } => {
+            // `_MakeHousePatch` → `_InitAntLions(0)`: a casa não tem formigas-leão, e os tiles delas
+            // são outros desenhos no conjunto da casa.
+            if e.ambiente.terreno == 1 {
+                return Err("não há formiga-leão dentro de casa".into());
+            }
             if !inimigos::nova_formiga_leao(e, &p.regras.inimigos, x, y) {
                 return Err(format!("sem lugar livre em ({x}, {y}) ou formigas-leão demais"));
             }

@@ -44,7 +44,7 @@ use crate::rules::inimigos::TabelasInimigos;
 use crate::rules::tick::{Regras, RegrasAmarela, RegrasConselhos, RegrasInimigos, RegrasNinho, RegrasQuintal, RegrasSuperficie};
 
 /// Versão da API de mods que os scripts veem em `API_VERSAO`.
-pub const VERSAO_API: &str = "0.40";
+pub const VERSAO_API: &str = "0.41";
 
 /// Tamanho máximo do texto de `mostrar_mensagem` (caracteres).
 pub const MAX_TEXTO_MENSAGEM: usize = 120;
@@ -1025,6 +1025,14 @@ fn registrar_api(reg: &mut mlua::UserDataRegistry<Estado>) {
         let (Some(v), Some(0)) = (p.mapa(e).em(x, y), p.vida(e).em(x, y)) else {
             return Ok(false);
         };
+        if p == Plano::Superficie && comum::em_casa(e) {
+            // A ferramenta do Experimental só conhece os tiles do quintal (o Experimental nunca entra
+            // na casa); na casa a comida segue a codificação de `_AddFood` da casa.
+            let Some(novo) = comum::comida_na_casa_mais_uma(v) else { return Ok(false) };
+            e.superficie.mapa.definir(x, y, novo);
+            e.ambiente.comida_superficie += 1;
+            return Ok(true);
+        }
         let r = &tabelas.regras;
         let limiar = if p == Plano::Superficie { r.comida_superficie } else { r.comida_ninho };
         let v = i32::from(v);
@@ -1040,6 +1048,10 @@ fn registrar_api(reg: &mut mlua::UserDataRegistry<Estado>) {
         let todas = tabelas_do_mod(lua)?;
         let tabelas = &todas.experimental;
         let r = &tabelas.regras;
+        if comum::em_casa(e) {
+            // O conjunto de tiles da casa não tem pedrinha (o valor do quintal é uma peça de moldura).
+            return Ok(false);
+        }
         match (e.superficie.mapa.em(x, y), e.superficie.vida.em(x, y)) {
             (Some(v), Some(0)) if v < r.barreira_abaixo_de => Ok(e.superficie.mapa.definir(x, y, r.pedrinha)),
             _ => Ok(false),
@@ -1280,6 +1292,18 @@ fn registrar_api_026(reg: &mut mlua::UserDataRegistry<Estado>) {
         let (x, y) = (coord(x), coord(y));
         if !experimental::posicao_valida(p.numero(), x, y) {
             return Ok(false);
+        }
+        if p == Plano::Superficie && comum::em_casa(e) {
+            // Na casa a célula volta ao chão guardado sob a comida (sem sorteio); a conta de
+            // `_FoodA`/`_FoodR` é a mesma da ferramenta.
+            let Some(chao) = e.superficie.mapa.em(x, y).and_then(comum::chao_sob_comida_na_casa) else { return Ok(false) };
+            e.superficie.mapa.definir(x, y, chao);
+            if e.ambiente.comida_superficie >= 1 {
+                e.ambiente.comida_superficie -= 1;
+            } else if e.vermelha.comida > 0 {
+                e.vermelha.comida -= 1;
+            }
+            return Ok(true);
         }
         let todas = tabelas_do_mod(lua)?;
         Ok(experimental::por_comida(e, todas.contexto(), p.numero(), x, y, true))
