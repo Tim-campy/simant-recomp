@@ -17,7 +17,8 @@ use engine::rules::geracao::{Mundo, TabelasGeracao, TipoJogo};
 use engine::rules::rng::{GeradorR, GeradorS};
 use engine::rules::tick::RegrasOriginais;
 use engine::rules::troca_patch::{self, ResultadoRainha};
-use engine::scripts::{Limites, Scripts};
+use engine::idiomas::Textos;
+use engine::scripts::{Limites, Scripts, TabelasScripts};
 
 fn raiz() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -28,13 +29,17 @@ fn ler(nome: &str) -> String {
     engine::recursos::marcar_referencias(&fs::read_to_string(raiz().join("data").join(nome)).unwrap())
 }
 
+/// O mod com os textos dele (`data/idiomas/` do mod por cima dos do port) no idioma `idioma`.
+fn mod_trapacas_em(idioma: &str) -> Scripts {
+    let dir = raiz().join("exemplos/mods/trapacas");
+    let codigo = fs::read_to_string(dir.join("trapacas.lua")).unwrap();
+    let mut tabelas = TabelasScripts::com_experimental(TabelasExperimental::padrao().clone());
+    tabelas.textos = std::sync::Arc::new(Textos::de_pastas(&raiz().join("data"), &[dir.as_path()], idioma));
+    Scripts::de_fontes_com(vec![("trapacas".to_string(), Ok(vec![("trapacas.lua".to_string(), codigo)]))], tabelas, Limites::default())
+}
+
 fn mod_trapacas() -> Scripts {
-    let codigo = fs::read_to_string(raiz().join("exemplos/mods/trapacas/trapacas.lua")).unwrap();
-    Scripts::de_fontes(
-        vec![("trapacas".to_string(), Ok(vec![("trapacas.lua".to_string(), codigo)]))],
-        TabelasExperimental::padrao().clone(),
-        Limites::default(),
-    )
+    mod_trapacas_em("en")
 }
 
 fn partida_sem_mod() -> Partida {
@@ -97,7 +102,29 @@ fn rodar(p: &mut Partida, n: u32) {
 }
 
 fn recusas(p: &mut Partida) -> Vec<String> {
-    p.retirar_registro_scripts().into_iter().filter(|l| l.contains("recusado")).collect()
+    p.retirar_registro_scripts().into_iter().filter(|l| l.contains("refused")).collect()
+}
+
+/// Os textos do mod vêm de `data/idiomas/` do próprio mod: em inglês por padrão e, com o jogo em
+/// pt-BR (a segunda tradução de exemplo), em português; nenhum item fica sem tradução.
+#[test]
+fn textos_do_mod_em_ingles_e_em_portugues() {
+    let menu = |s: Scripts| {
+        let mut p = partida_sem_mod();
+        p.ligar_scripts(s);
+        let menus = p.scripts.as_ref().unwrap().menus();
+        menus[0].1.clone()
+    };
+    let en = menu(mod_trapacas());
+    assert_eq!(en.titulo, "Cheats");
+    assert!(en.itens.iter().any(|i| i == "Start rain"));
+    let pt = menu(mod_trapacas_em("pt-BR"));
+    assert_eq!(pt.titulo, "Trapaças");
+    assert!(pt.itens.iter().any(|i| i == "Começar chuva"));
+    assert_eq!(en.itens.len(), pt.itens.len());
+    for i in en.itens.iter().chain(&pt.itens) {
+        assert!(!i.starts_with("mod.trapacas."), "item sem tradução: {i}");
+    }
 }
 
 #[test]
@@ -116,11 +143,11 @@ fn menu_em_f12_e_sem_usar_nada_muda() {
 fn chuva_e_agua_nos_ninhos() {
     let mut p = partida();
     let lencol = p.estado.ambiente.lencol;
-    usar(&mut p, "Começar chuva");
+    usar(&mut p, "Start rain");
     assert_eq!(p.estado.ambiente.chovendo, 1);
     rodar(&mut p, 120);
     assert!(p.estado.ambiente.lencol < lencol, "_WaterTable sobe");
-    usar(&mut p, "Parar chuva");
+    usar(&mut p, "Stop rain");
     rodar(&mut p, 1);
     assert_eq!(p.estado.ambiente.chovendo, 0);
     assert!(recusas(&mut p).is_empty());
@@ -129,10 +156,10 @@ fn chuva_e_agua_nos_ninhos() {
 #[test]
 fn trapaca_aparece_na_faixa() {
     let mut p = partida();
-    usar(&mut p, "Gato aparecer");
+    usar(&mut p, "Cat shows up");
     let agora = p.agora();
     let faixa = p.avisos.texto_da_faixa(agora).map(|t| format!("{t:?}")).unwrap_or_default();
-    assert!(faixa.contains("Trapaça: Gato aparecer"), "{faixa}");
+    assert!(faixa.contains("Cheat: Cat shows up"), "{faixa}");
 }
 
 #[test]
@@ -140,18 +167,18 @@ fn menino_gato_cachorro_aranha() {
     let mut p = partida();
     p.estado.bichos.gato_ligado = 0;
     p.estado.aranha.ligada = 0;
-    usar(&mut p, "Menino: cortar a grama");
+    usar(&mut p, "Boy: mow the lawn");
     assert_eq!((p.estado.menino.presente, p.estado.menino.cortando_grama), (3, 1));
     rodar(&mut p, 5);
     assert_eq!(p.estado.menino.cortando_grama, 1, "continua cortando no tick");
-    usar(&mut p, "Menino: inseticida");
+    usar(&mut p, "Boy: bug spray");
     assert_eq!(p.estado.menino.no_numero, 32);
-    usar(&mut p, "Gato aparecer");
+    usar(&mut p, "Cat shows up");
     assert_eq!(p.estado.bichos.gato_ligado, 1);
-    usar(&mut p, "Aranha aparecer");
+    usar(&mut p, "Spider shows up");
     assert_eq!(p.estado.aranha.ligada, 1);
     p.retirar_eventos();
-    usar(&mut p, "Cachorro latir");
+    usar(&mut p, "Dog barks");
     assert!(p.retirar_eventos().iter().any(|e| matches!(e, Evento::Som(_))));
 }
 
@@ -160,7 +187,7 @@ fn guardar_rainha_habilita_o_place() {
     let mut p = partida();
     let patch = p.estado.ambiente.patch;
     assert_eq!(troca_patch::colocar_rainha(&mut p.estado, patch.0, patch.1), ResultadoRainha::SemRainhas);
-    usar(&mut p, "Guardar 3 rainhas");
+    usar(&mut p, "Keep 3 black queens");
     assert_eq!(p.estado.preta.rainhas_guardadas, 3);
     assert_eq!(troca_patch::colocar_rainha(&mut p.estado, patch.0, patch.1), ResultadoRainha::Colocada { restam: 2 });
 }
@@ -168,7 +195,7 @@ fn guardar_rainha_habilita_o_place() {
 #[test]
 fn revoada_vermelha_decola() {
     let mut p = partida();
-    usar(&mut p, "Revoada vermelha");
+    usar(&mut p, "Red mating flight");
     assert_eq!(p.estado.vermelha.revoada, 200);
     let mut voando = false;
     for _ in 0..200 {
@@ -181,27 +208,27 @@ fn revoada_vermelha_decola() {
 #[test]
 fn amarela_tempo_fim_e_misterio() {
     let mut p = partida();
-    usar(&mut p, "Curar a amarela");
+    usar(&mut p, "Heal the yellow ant");
     assert_eq!(p.estado.amarela.saude, 100);
-    usar(&mut p, "Comida em volta da amarela");
+    usar(&mut p, "Food around the yellow ant");
     let t0 = p.estado.partida.tempo;
-    usar(&mut p, "Avançar 100 ticks");
+    usar(&mut p, "Advance 100 ticks");
     while p.ticks_de_mods_pendentes() > 0 {
         p.avancar(0);
     }
     assert_eq!(p.estado.partida.tempo, t0 + 100);
     usar(&mut p, "Mystery");
     assert!(p.ultimo_misterio.is_some());
-    usar(&mut p, "Tutorial: avançar lição");
-    assert!(recusas(&mut p).iter().any(|l| l.contains("só no tutorial")));
-    usar(&mut p, "Fim de jogo: derrota");
+    usar(&mut p, "Tutorial: next lesson");
+    assert!(recusas(&mut p).iter().any(|l| l.contains("only in the tutorial")));
+    usar(&mut p, "Game over: defeat");
     assert_eq!((p.estado.partida.fim_de_jogo, p.estado.partida.pretas_venceram), (1, 0));
 }
 
 #[test]
 fn pular_ate_o_proximo_evento_para_no_evento() {
     let mut p = partida();
-    usar(&mut p, "Pular até o próximo evento");
+    usar(&mut p, "Skip to the next event");
     assert_eq!(p.ticks_de_mods_pendentes(), 5000);
     let t0 = p.estado.partida.tempo;
     while p.ticks_de_mods_pendentes() > 0 {
@@ -214,12 +241,12 @@ fn pular_ate_o_proximo_evento_para_no_evento() {
 #[test]
 fn painel_de_depuracao() {
     let mut p = partida();
-    usar(&mut p, "Painel de depuração");
+    usar(&mut p, "Debug panel");
     let paineis = p.scripts.as_ref().unwrap().paineis();
     assert_eq!(paineis.len(), 1);
     assert!(paineis[0].1[0].starts_with("GameTime"));
     assert!(paineis[0].1.iter().any(|l| l.contains("_WaterTable")));
-    usar(&mut p, "Painel de depuração");
+    usar(&mut p, "Debug panel");
     assert!(p.scripts.as_ref().unwrap().paineis().is_empty());
 }
 
@@ -232,10 +259,10 @@ fn luta_e_formiga_leao_na_superficie() {
     p.estado.amarela.x = x;
     p.estado.amarela.y = y;
     let n0 = p.estado.superficie.lista.indice;
-    usar(&mut p, "Luta: soldado vermelho");
+    usar(&mut p, "Fight: red soldier");
     assert!(p.estado.superficie.lista.indice > n0, "soldados vermelhos ao lado da amarela");
     let leoes = p.estado.formigas_leao.quantidade;
-    usar(&mut p, "Formiga-leão perto");
+    usar(&mut p, "Antlion near");
     assert!(p.estado.formigas_leao.quantidade == leoes + 1 || !recusas(&mut p).is_empty());
 }
 
@@ -244,17 +271,17 @@ fn luta_e_formiga_leao_na_superficie() {
 #[test]
 fn colonia_e_estado_no_save() {
     let mut p = partida();
-    usar(&mut p, "Castas: só soldados");
+    usar(&mut p, "Castes: soldiers only");
     assert_eq!(p.estado.controles.castas, [0, 0, 65535]);
-    usar(&mut p, "Comportamento: só forragear");
+    usar(&mut p, "Behavior: forage only");
     assert_eq!(p.estado.controles.tarefas, [65535, 0, 0]);
     let n0 = p.estado.ninho_b.lista.ativas().count();
-    usar(&mut p, "5 soldados pretos");
+    usar(&mut p, "5 black soldiers");
     assert_eq!(p.estado.ninho_b.lista.ativas().count(), n0 + 5);
     p.estado.amarela.plano = 1;
     p.estado.amarela.x = 40;
     p.estado.amarela.y = 30;
-    usar(&mut p, "Alarme em volta");
+    usar(&mut p, "Alarm around");
     assert!(p.estado.feromonios.alarme.em(20, 15).is_some_and(|v| v > 0));
 
     let dir = std::env::temp_dir().join(format!("simant_trapacas_save_{}", std::process::id()));
@@ -267,7 +294,7 @@ fn colonia_e_estado_no_save() {
     q.ler_estado_dos_mods(&save);
     let agora = q.agora();
     let faixa = q.avisos.texto_da_faixa(agora).map(|t| format!("{t:?}")).unwrap_or_default();
-    assert!(faixa.contains("já teve 4 trapaça"), "{faixa}");
+    assert!(faixa.contains("already had 4 cheat"), "{faixa}");
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -275,33 +302,33 @@ fn colonia_e_estado_no_save() {
 fn patches_da_casa_no_jogo_completo() {
     let mut p = partida_completa();
     // No começo do Jogo Completo o próprio _XferPatch recusa (texto 10002: poucas formigas pretas).
-    usar(&mut p, "Ir para o patch da cozinha");
+    usar(&mut p, "Go to the kitchen patch");
     assert!(recusas(&mut p).iter().any(|l| l.contains("10002")));
     // Com uma colônia crescida (como o jogador terá ao testar), a troca acontece.
     p.estado.preta.populacao = 50;
-    usar(&mut p, "Ir para o patch da cozinha");
+    usar(&mut p, "Go to the kitchen patch");
     assert_eq!(recusas(&mut p), Vec::<String>::new());
     assert_eq!(p.estado.ambiente.patch, (0, 12));
     assert_ne!(p.estado.ambiente.terreno, 0, "patch da casa: outro conjunto de tiles");
-    usar(&mut p, "Ir para o próximo patch da casa");
+    usar(&mut p, "Go to the next house patch");
     assert_eq!(p.estado.ambiente.patch, (0, 1));
-    usar(&mut p, "Ir para o patch do quintal ao lado");
+    usar(&mut p, "Go to the next yard patch");
     assert_eq!(p.estado.ambiente.patch, (1, 1));
     // No Jogo Rápido o próprio _XferPatch recusa (texto 10000).
     let mut q = partida();
     q.regras.geracao = Some(tabelas_geracao());
-    usar(&mut q, "Ir para o patch da cozinha");
+    usar(&mut q, "Go to the kitchen patch");
     assert!(recusas(&mut q).iter().any(|l| l.contains("10000")));
 }
 
-/// Regressão (2026-10-19): dentro de casa, "Comida em volta da amarela" gravava a comida do quintal
+/// Regressão (2026-10-19): dentro de casa, "Food around the yellow ant" gravava a comida do quintal
 /// (0x48), desenhada com o conjunto de tiles da casa como uma peça do botão do fogão ("pedrinhas
 /// cortadas" no carpete); e "Formiga-leão perto da amarela" punha os tiles da formiga-leão do quintal.
 #[test]
 fn comida_e_formiga_leao_dentro_de_casa() {
     let mut p = partida_completa();
     p.estado.preta.populacao = 50;
-    usar(&mut p, "Ir para o patch da cozinha");
+    usar(&mut p, "Go to the kitchen patch");
     assert_eq!(p.estado.ambiente.terreno, 1);
     let quintal = |p: &Partida| p.estado.superficie.mapa.dados.iter().filter(|&&v| (0x48..=0x4B).contains(&v)).count();
     let antes = quintal(&p);
@@ -311,7 +338,7 @@ fn comida_e_formiga_leao_dentro_de_casa() {
     p.estado.amarela.x = x;
     p.estado.amarela.y = y;
     let comida = p.estado.ambiente.comida_superficie;
-    usar(&mut p, "Comida em volta da amarela");
+    usar(&mut p, "Food around the yellow ant");
     assert!(p.estado.ambiente.comida_superficie > comida, "comida posta");
     assert_eq!(quintal(&p), antes, "nenhum valor de comida do quintal no mapa da casa");
     let em_volta: Vec<u8> = (-1..=1)
@@ -321,7 +348,7 @@ fn comida_e_formiga_leao_dentro_de_casa() {
         .collect();
     assert!(em_volta.iter().any(|v| (0x18..=0x27).contains(v)), "comida da casa: {em_volta:x?}");
     let leoes = p.estado.formigas_leao.quantidade;
-    usar(&mut p, "Formiga-leão perto");
+    usar(&mut p, "Antlion near");
     assert_eq!(p.estado.formigas_leao.quantidade, leoes);
-    assert!(recusas(&mut p).iter().any(|l| l.contains("não há formiga-leão dentro de casa")));
+    assert!(recusas(&mut p).iter().any(|l| l.contains("there are no antlions inside the house")));
 }

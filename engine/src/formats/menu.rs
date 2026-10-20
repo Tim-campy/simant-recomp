@@ -22,7 +22,7 @@ pub fn comando(menu: usize, item: usize) -> u16 {
 }
 
 fn u32_le(d: &[u8], o: usize) -> Result<usize, String> {
-    d.get(o..o + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]]) as usize).ok_or_else(|| format!("menu: ponteiro fora do objeto em {o}"))
+    d.get(o..o + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]]) as usize).ok_or_else(|| format!("menu: pointer outside the object at {o}"))
 }
 
 /// Lista de ponteiros (deslocamentos de 32 bits a partir do início do objeto) terminada em 0.
@@ -39,8 +39,8 @@ fn ponteiros(d: &[u8], mut o: usize) -> Result<Vec<usize>, String> {
 }
 
 fn texto(d: &[u8], o: usize) -> Result<String, String> {
-    let resto = d.get(o..).ok_or("menu: texto fora do objeto")?;
-    let fim = resto.iter().position(|&b| b == 0).ok_or("menu: texto sem fim")?;
+    let resto = d.get(o..).ok_or("menu: text outside the object")?;
+    let fim = resto.iter().position(|&b| b == 0).ok_or("menu: unterminated text")?;
     Ok(resto[..fim].iter().map(|&b| b as char).collect())
 }
 
@@ -49,14 +49,14 @@ impl MenuBanco {
     /// os itens de cada menu), cada lista de ponteiros para textos ASCIIZ.
     pub fn decodificar(d: &[u8]) -> Result<MenuBanco, String> {
         let listas = ponteiros(d, 0)?;
-        let (&primeira, resto) = listas.split_first().ok_or("menu vazio")?;
+        let (&primeira, resto) = listas.split_first().ok_or("empty menu")?;
         let titulos = ponteiros(d, primeira)?.into_iter().map(|p| texto(d, p)).collect::<Result<Vec<_>, _>>()?;
         let mut itens = Vec::new();
         for &l in resto.iter().take(titulos.len()) {
             itens.push(ponteiros(d, l)?.into_iter().map(|p| texto(d, p)).collect::<Result<Vec<_>, _>>()?);
         }
         if itens.len() != titulos.len() {
-            return Err(format!("menu: {} títulos e {} listas de itens", titulos.len(), itens.len()));
+            return Err(format!("menu: {} titles and {} item lists", titulos.len(), itens.len()));
         }
         Ok(MenuBanco { titulos, itens })
     }

@@ -245,28 +245,28 @@ impl TabelasQuintal {
     pub fn padrao() -> &'static TabelasQuintal {
         static T: OnceLock<TabelasQuintal> = OnceLock::new();
         T.get_or_init(|| {
-            TabelasQuintal::de_json(include_str!("../../../data/quintal.json")).expect("data/quintal.json embutido")
+            TabelasQuintal::de_json(include_str!("../../../data/quintal.json")).expect("embedded data/quintal.json")
         })
     }
 
     fn validar(&self) -> Result<(), String> {
         let c = &self.casa;
         if c.proximo.len() != 3 || c.proximo.iter().any(|p| p.len() < c.duracao.len()) {
-            return Err(format!("{ARQUIVO_TABELAS}: casa.proximo deve ter 3 tabelas do tamanho de casa.duracao"));
+            return Err(format!("{ARQUIVO_TABELAS}: casa.proximo must have 3 tables the size of casa.duracao"));
         }
         for r in &c.roteiros {
             let n = c.duracao.get(r.no as usize).map(|&d| d as usize + 1).unwrap_or(0);
             if n == 0 || r.quadro.len() < n || r.x.len() < n || r.y.len() < n {
-                return Err(format!("{ARQUIVO_TABELAS}: roteiro do nó {} menor que a duração", r.no));
+                return Err(format!("{ARQUIVO_TABELAS}: script of node {} shorter than the duration", r.no));
             }
         }
         // `gato_chance` é o K de um `Sk(K)` (`SRand16`): potência de 2 entre 2 e 256.
         let k = self.regras.gato_chance;
         if !(k.is_power_of_two() && (2..=256).contains(&k)) {
-            return Err(format!("{ARQUIVO_TABELAS}: regras.gato_chance deve ser potência de 2 entre 2 e 256"));
+            return Err(format!("{ARQUIVO_TABELAS}: regras.gato_chance must be a power of 2 between 2 and 256"));
         }
         if c.nos_fixos.iter().any(|f| f.no < 30) {
-            return Err(format!("{ARQUIVO_TABELAS}: nós fixos começam em 30"));
+            return Err(format!("{ARQUIVO_TABELAS}: fixed nodes start at 30"));
         }
         Ok(())
     }

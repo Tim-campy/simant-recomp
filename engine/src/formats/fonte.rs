@@ -79,15 +79,15 @@ impl Fonte {
 }
 
 fn be16(d: &[u8], o: usize) -> Result<i16, String> {
-    d.get(o..o + 2).map(|s| i16::from_be_bytes([s[0], s[1]])).ok_or_else(|| "fonte truncada".into())
+    d.get(o..o + 2).map(|s| i16::from_be_bytes([s[0], s[1]])).ok_or_else(|| "truncated font".into())
 }
 
 fn le16(d: &[u8], o: usize) -> Result<u16, String> {
-    d.get(o..o + 2).map(|s| u16::from_le_bytes([s[0], s[1]])).ok_or_else(|| "fonte truncada".into())
+    d.get(o..o + 2).map(|s| u16::from_le_bytes([s[0], s[1]])).ok_or_else(|| "truncated font".into())
 }
 
 fn le32(d: &[u8], o: usize) -> Result<u32, String> {
-    d.get(o..o + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]])).ok_or_else(|| "fonte truncada".into())
+    d.get(o..o + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]])).ok_or_else(|| "truncated font".into())
 }
 
 /// FONT do Macintosh, como lido por `_font_ReadFont`.
@@ -106,7 +106,7 @@ impl FonteMac {
         let primeiro = be16(d, 2)? as usize;
         let ultimo = be16(d, 4)? as usize;
         if primeiro != 0 || ultimo < primeiro {
-            return Err(format!("FONT com caracteres {primeiro}..{ultimo} não suportada"));
+            return Err(format!("FONT with characters {primeiro}..{ultimo} not supported"));
         }
         let kern_max = be16(d, 8)?;
         let altura_retangulo = be16(d, 0x0E)? as usize;
@@ -116,7 +116,7 @@ impl FonteMac {
         let ini_loc = ini_faixa + bytes_por_linha * altura_retangulo;
         let ini_ow = ini_loc + 2 * n;
         if d.len() < ini_ow + 2 * n {
-            return Err("FONT truncada".into());
+            return Err("FONT truncated".into());
         }
         let tabela = |o: usize| (0..n).map(|i| u16::from_be_bytes([d[o + 2 * i], d[o + 2 * i + 1]])).collect();
         Ok(FonteMac {
@@ -206,7 +206,7 @@ impl Fnt {
     pub fn decodificar(d: &[u8]) -> Result<Fnt, String> {
         let versao = le16(d, 0)?;
         if versao != 0x200 {
-            return Err(format!(".FNT versão {versao:#x} não suportada"));
+            return Err(format!(".FNT version {versao:#x} not supported"));
         }
         let altura = le16(d, 88)? as usize;
         let ascendente = le16(d, 74)? as usize;
@@ -268,7 +268,7 @@ impl Fnt {
 pub fn fontes_de_fon(d: &[u8]) -> Result<Vec<Fnt>, String> {
     let ne = le16(d, 0x3C)? as usize;
     if d.get(ne..ne + 2) != Some(b"NE") {
-        return Err("arquivo .FON não é NE".into());
+        return Err(".FON file is not NE".into());
     }
     let tab = ne + le16(d, ne + 0x24)? as usize;
     let deslocamento = le16(d, tab)?;
@@ -285,7 +285,7 @@ pub fn fontes_de_fon(d: &[u8]) -> Result<Vec<Fnt>, String> {
             let inicio = (le16(d, o)? as usize) << deslocamento;
             let tamanho = (le16(d, o + 2)? as usize) << deslocamento;
             if tipo == 0x8008 {
-                let bloco = d.get(inicio..inicio + tamanho).ok_or("recurso FONT fora do arquivo")?;
+                let bloco = d.get(inicio..inicio + tamanho).ok_or("FONT resource outside the file")?;
                 fontes.push(Fnt::decodificar(bloco)?);
             }
             o += 12;

@@ -1,0 +1,6 @@
+{
+  "_comentario": "Texts of the food rain example (keys mod.exemplo-lua.*), merged by key with the port's data/idiomas/en.json (docs/i18n.md).",
+  "mod.exemplo-lua.ligada": "food rain on; API {api}, game {jogo}, language {idioma}",
+  "mod.exemplo-lua.choveu": "It rained food! ({n} pieces)",
+  "mod.exemplo-lua.registro": "tick {tick}: {n} pieces of food"
+}

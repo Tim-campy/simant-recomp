@@ -43,7 +43,7 @@ impl GeradorS {
 
     /// `_SRand1(n)`: resto **sem sinal** da divisão do passo por `n` (0…n−1). `n` deve ser > 0.
     pub fn rand1(&mut self, n: u16) -> i32 {
-        assert!(n > 0, "SRand1(0) dividiria por zero");
+        assert!(n > 0, "SRand1(0) would divide by zero");
         (self.passo() % n) as i32
     }
 
@@ -118,7 +118,7 @@ impl GeradorR {
 
     /// `_RRand(n)`: `rand() mod n` com divisão com sinal. `n` deve ser > 0.
     pub fn rrand(&mut self, n: i16) -> i32 {
-        assert!(n > 0, "RRand com n ≤ 0");
+        assert!(n > 0, "RRand with n ≤ 0");
         self.rand() % n as i32
     }
 

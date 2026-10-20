@@ -222,7 +222,7 @@ impl TabelasExperimental {
     /// A cópia de data/experimental.json embutida na compilação.
     pub fn padrao() -> &'static TabelasExperimental {
         static PADRAO: std::sync::OnceLock<TabelasExperimental> = std::sync::OnceLock::new();
-        PADRAO.get_or_init(|| TabelasExperimental::de_json(JSON_PADRAO).expect("data/experimental.json embutido"))
+        PADRAO.get_or_init(|| TabelasExperimental::de_json(JSON_PADRAO).expect("embedded data/experimental.json"))
     }
 
     fn validar(&self) -> Result<(), String> {
@@ -237,7 +237,7 @@ impl TabelasExperimental {
             r.formiga_tipo_sorteio,
         ];
         if sorteios.contains(&0) {
-            return Err(format!("{ARQUIVO_TABELAS}: sorteio com n = 0 (SRand1(0) divide por zero)"));
+            return Err(format!("{ARQUIVO_TABELAS}: sorteio with n = 0 (SRand1(0) divides by zero)"));
         }
         if r.muro > r.muro_ultimo {
             return Err(format!("{ARQUIVO_TABELAS}: muro > muro_ultimo"));

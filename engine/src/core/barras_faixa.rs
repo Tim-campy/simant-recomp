@@ -175,7 +175,7 @@ pub fn desenhar(
             continue;
         };
         let Some(f) = fonte else {
-            faltam.push(format!("fonte {}", cfg.fonte_numeros));
+            faltam.push(format!("font {}", cfg.fonte_numeros));
             continue;
         };
         let c = cor_de(c);

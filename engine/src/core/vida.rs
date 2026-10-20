@@ -144,12 +144,12 @@ pub fn reconstruir(jogo: &JogoSalvo) -> Result<Reconstrucao, String> {
         // no vetor seguinte da memória, o que o port não reproduz.
         let ultimo = (contador as usize).min(cap - 1);
         if contador as usize >= cap {
-            pendencias.push(format!("lista {}: ListIndex = {contador} na capacidade", lista.letra()));
+            pendencias.push(format!("list {}: ListIndex = {contador} at capacity", lista.letra()));
         }
         for i in (0..=ultimo).rev() {
             let f = jogo.formiga(lista, i)?;
             if !c.definir(plano, f.x as i32, f.y as i32, f.tipo) {
-                pendencias.push(format!("lista {} [{i}]: ({}, {}) fora do mapa", lista.letra(), f.x, f.y));
+                pendencias.push(format!("list {} [{i}]: ({}, {}) outside the map", lista.letra(), f.x, f.y));
             }
         }
     }
@@ -163,7 +163,7 @@ pub fn reconstruir(jogo: &JogoSalvo) -> Result<Reconstrucao, String> {
 /// `_SetMyLife(_MePlane, _MeLocX, _MeLocY, _MeType, _MeDir, 0xFF)`.
 fn definir_amarela(c: &mut CamadasVida, me: &FormigaAmarela, pendencias: &mut Vec<String>) {
     let Some(plano) = plano_de(me.plano) else {
-        pendencias.push(format!("formiga amarela no plano {} desconhecido", me.plano));
+        pendencias.push(format!("yellow ant on unknown plane {}", me.plano));
         return;
     };
     if !c.definir(plano, me.x as i32, me.y as i32, AMARELA) {
@@ -177,7 +177,7 @@ fn definir_amarela(c: &mut CamadasVida, me: &FormigaAmarela, pendencias: &mut Ve
         let d = ((me.dir as i32) ^ 4) as usize & 7;
         let (x, y) = (me.x as i32 + i32::from(t.dx8[d]), me.y as i32 + i32::from(t.dy8[d]));
         if !c.definir(plano, x, y, AMARELA_METADE) {
-            pendencias.push(format!("segunda metade da rainha amarela fora do mapa em ({x}, {y})"));
+            pendencias.push(format!("second half of the yellow queen outside the map at ({x}, {y})"));
         }
     }
 }

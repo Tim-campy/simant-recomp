@@ -289,11 +289,11 @@ impl ConfigQuintalMapa {
 
     fn validar(&self) -> Result<(), String> {
         if self.modos.len() != 4 || self.cursor.len() != 4 || self.botao_do_modo.len() != 4 {
-            return Err(format!("{ARQUIVO_CONFIG}: 'modos', 'cursor' e 'botao_do_modo' precisam de 4 itens (um por _YardMode)"));
+            return Err(format!("{ARQUIVO_CONFIG}: 'modos', 'cursor' and 'botao_do_modo' need 4 items (one per _YardMode)"));
         }
         let p = self.patch;
         if p.colunas <= 0 || p.linhas <= 0 || p.passo_x <= 0 || p.passo_y <= 0 {
-            return Err(format!("{ARQUIVO_CONFIG}: 'patch' precisa de colunas, linhas e passos positivos"));
+            return Err(format!("{ARQUIVO_CONFIG}: 'patch' needs positive columns, rows and steps"));
         }
         Ok(())
     }
@@ -499,13 +499,13 @@ fn clicar_sem_parada(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Par
             p.processar_eventos_do_estado();
             return Ok(RespostaQuintal::Colonia(r));
         }
-        let r = p.concluir_transferencia_especial(px, py).unwrap_or_else(|| Err("sem tick parado".into()))?;
+        let r = p.concluir_transferencia_especial(px, py).unwrap_or_else(|| Err("no stopped tick".into()))?;
         j.escolhendo_colonia = false;
         return Ok(RespostaQuintal::Colonia(troca_patch::ResultadoColonia::Trocou(r)));
     }
     if j.escolhendo_colonia {
         // Sem o tick guardado (pedido de fora do tick): a troca depois dele.
-        let geracao = p.regras.geracao.as_ref().ok_or("tabelas de geração não carregadas (troca de patch)")?;
+        let geracao = p.regras.geracao.as_ref().ok_or("generation tables not loaded (patch swap)")?;
         let r = troca_patch::escolher_colonia(&mut p.estado, geracao, &p.cfg_simulacao, px, py)?;
         if let troca_patch::ResultadoColonia::Trocou(t) = r {
             j.escolhendo_colonia = false;
@@ -529,7 +529,7 @@ fn clicar_sem_parada(j: &mut JanelaQuintal, cfg: &ConfigQuintalMapa, p: &mut Par
     if !duplo {
         return Ok(RespostaQuintal::Escolheu(px, py));
     }
-    let geracao = p.regras.geracao.as_ref().ok_or("tabelas de geração não carregadas (troca de patch)")?;
+    let geracao = p.regras.geracao.as_ref().ok_or("generation tables not loaded (patch swap)")?;
     let r = troca_patch::trocar_patch(&mut p.estado, geracao, &p.cfg_simulacao)?;
     if let ResultadoTroca::Trocou { .. } = r {
         // _RandWorld passo 18: os pontos lembrados; a vista da superfície fica em `_MapPnt` = (0x40,
@@ -564,7 +564,7 @@ impl DesenhoQuintal {
         // tabela para a janela 35, tudo sairia 1 pixel à direita da captura `full_yard.png`].
         let id34 = interface.moldura.faixa.janela;
         let j34 = carregar_janela(recursos, id34)?;
-        let origem_faixa = interface.posicionar(id34, &j34).ok_or(format!("janela {id34} sem posição"))?.origem;
+        let origem_faixa = interface.posicionar(id34, &j34).ok_or(format!("window {id34} has no position"))?.origem;
         let mut ids: Vec<u16> = cfg.modos.iter().flat_map(|m| m.bitmaps.iter().map(|b| b.id)).collect();
         ids.push(cfg.rodape.id);
         let s = &cfg.sprites;
@@ -581,7 +581,7 @@ impl DesenhoQuintal {
         }
         for b in cfg.modos.iter().flat_map(|m| m.bitmaps.iter()) {
             if !bitmaps.contains_key(&b.id) {
-                return Err(format!("{ARQUIVO_CONFIG}: bitmap {} não existe no banco", b.id));
+                return Err(format!("{ARQUIVO_CONFIG}: bitmap {} does not exist in the bank", b.id));
             }
         }
         let falas_menino = super::avisos::linhas_do_texto(recursos, cfg.balao_menino.lista);
@@ -589,7 +589,7 @@ impl DesenhoQuintal {
             Some(m) => {
                 let j = carregar_janela(recursos, m.janela)?;
                 let base = j.retangulo();
-                let o = j.objetos.iter().find(|o| o.nome == m.objeto).ok_or(format!("janela {}: objeto {} não existe", m.janela, m.objeto))?;
+                let o = j.objetos.iter().find(|o| o.nome == m.objeto).ok_or(format!("window {}: object {} does not exist", m.janela, m.objeto))?;
                 let r = o.retangulo;
                 let rel = Retangulo { esq: r.esq - base.esq, topo: r.topo - base.topo, dir: r.dir - base.esq, base: r.base - base.topo };
                 Some((rel, o.cor))

@@ -82,9 +82,9 @@ impl PerfilDriver {
     /// A paleta do port (`rgb`) com as cores do sistema deste driver.
     pub fn aplicar_cores(&self, rgb: &mut [[u8; 3]]) -> Result<(), String> {
         for (&i, c) in &self.cores_sistema {
-            let h = c.strip_prefix('#').filter(|h| h.len() == 6).ok_or(format!("{ARQUIVO}: cor inválida {c}"))?;
-            let v = u32::from_str_radix(h, 16).map_err(|_| format!("{ARQUIVO}: cor inválida {c}"))?;
-            let alvo = rgb.get_mut(i as usize).ok_or(format!("{ARQUIVO}: índice {i} fora da paleta"))?;
+            let h = c.strip_prefix('#').filter(|h| h.len() == 6).ok_or(format!("{ARQUIVO}: invalid color {c}"))?;
+            let v = u32::from_str_radix(h, 16).map_err(|_| format!("{ARQUIVO}: invalid color {c}"))?;
+            let alvo = rgb.get_mut(i as usize).ok_or(format!("{ARQUIVO}: index {i} outside the palette"))?;
             *alvo = [(v >> 16) as u8, (v >> 8) as u8, v as u8];
         }
         Ok(())
@@ -108,7 +108,7 @@ impl ConfigResolucao {
     pub fn perfil(&self, nome: Option<&str>) -> Result<PerfilDriver, String> {
         match nome.or(self.perfil_driver.as_deref()) {
             None => Ok(PerfilDriver::default()),
-            Some(n) => self.perfis_driver.get(n).cloned().ok_or(format!("{ARQUIVO}: perfil de driver '{n}' não existe")),
+            Some(n) => self.perfis_driver.get(n).cloned().ok_or(format!("{ARQUIVO}: driver profile '{n}' does not exist")),
         }
     }
 
@@ -116,15 +116,15 @@ impl ConfigResolucao {
     pub fn tela(&self, [l, a]: [u32; 2]) -> Result<TelaVirtual, String> {
         if !self.resolucoes.contains(&[l, a]) {
             let aceitas: Vec<String> = self.resolucoes.iter().map(|[l, a]| format!("{l}x{a}")).collect();
-            return Err(format!("resolução virtual {l}x{a} não suportada (aceitas: {})", aceitas.join(", ")));
+            return Err(format!("virtual resolution {l}x{a} not supported (accepted: {})", aceitas.join(", ")));
         }
-        let altura = a.checked_sub(self.linhas_acima_da_area_cliente).filter(|&h| h > 0).ok_or("resolução virtual baixa demais")?;
+        let altura = a.checked_sub(self.linhas_acima_da_area_cliente).filter(|&h| h > 0).ok_or("virtual resolution too low")?;
         let tabela = self
             .tabelas_posicoes
             .iter()
             .find(|f| f.ate_altura.is_none_or(|m| a <= m))
             .map(|f| f.tabela)
-            .ok_or(format!("{ARQUIVO}: nenhuma tabela de posições para {a} linhas"))?;
+            .ok_or(format!("{ARQUIVO}: no position table for {a} lines"))?;
         Ok(TelaVirtual { resolucao: [l, a], largura: l, altura, tabela_posicoes: tabela })
     }
 }

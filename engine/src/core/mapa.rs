@@ -58,14 +58,14 @@ pub struct MapaChao<'a> {
 impl<'a> MapaChao<'a> {
     pub fn new(plano: Plano, bytes: &'a [u8]) -> Result<MapaChao<'a>, String> {
         if bytes.len() != plano.bytes() {
-            return Err(format!("mapa {plano:?} com {} bytes, esperava {}", bytes.len(), plano.bytes()));
+            return Err(format!("map {plano:?} has {} bytes, expected {}", bytes.len(), plano.bytes()));
         }
         Ok(MapaChao { plano, bytes, feromonio: None })
     }
 
     pub fn com_feromonio(mut self, camada: &'a [u8]) -> Result<MapaChao<'a>, String> {
         if self.plano != Plano::Superficie || camada.len() != (self.plano.largura() / 2) * (ALTURA / 2) {
-            return Err("camada de feromônio só existe na superfície, com 2048 bytes".into());
+            return Err("the pheromone layer only exists on the surface, with 2048 bytes".into());
         }
         self.feromonio = Some(camada);
         Ok(self)
@@ -102,7 +102,7 @@ impl<'a> MapaChao<'a> {
         for x in x0..x1 {
             for y in y0..y1 {
                 let i = self.tile(x, y);
-                let t = tileset.tile(i as usize).ok_or_else(|| format!("tile {i} ausente em ({x}, {y})"))?;
+                let t = tileset.tile(i as usize).ok_or_else(|| format!("tile {i} missing at ({x}, {y})"))?;
                 let px = destino.0 + ((x - x0) * LADO) as i32;
                 let py = destino.1 + ((y - y0) * LADO) as i32;
                 desenhar_tile(q, t, px, py, None);

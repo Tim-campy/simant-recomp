@@ -18,11 +18,11 @@ pub struct Cursor {
 }
 
 fn u16_le(d: &[u8], o: usize) -> Result<u16, String> {
-    d.get(o..o + 2).map(|s| u16::from_le_bytes([s[0], s[1]])).ok_or_else(|| "NE truncado".into())
+    d.get(o..o + 2).map(|s| u16::from_le_bytes([s[0], s[1]])).ok_or_else(|| "NE truncated".into())
 }
 
 fn u32_le(d: &[u8], o: usize) -> Result<u32, String> {
-    d.get(o..o + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]])).ok_or_else(|| "NE truncado".into())
+    d.get(o..o + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]])).ok_or_else(|| "NE truncated".into())
 }
 
 /// Um recurso: tipo, id (número ou nome) e os bytes.
@@ -35,11 +35,11 @@ struct Recurso<'a> {
 
 fn recursos(exe: &[u8]) -> Result<Vec<Recurso<'_>>, String> {
     if exe.get(0..2) != Some(b"MZ") {
-        return Err("não é um executável MZ".into());
+        return Err("not an MZ executable".into());
     }
     let ne = u32_le(exe, 0x3C)? as usize;
     if exe.get(ne..ne + 2) != Some(b"NE") {
-        return Err("não é um executável NE".into());
+        return Err("not an NE executable".into());
     }
     let tabela = ne + u16_le(exe, ne + 0x24)? as usize;
     let deslocamento = u16_le(exe, tabela)?;
@@ -60,10 +60,10 @@ fn recursos(exe: &[u8]) -> Result<Vec<Recurso<'_>>, String> {
                 (Some(id & 0x7FFF), None)
             } else {
                 let p = tabela + id as usize;
-                let len = *exe.get(p).ok_or("NE: nome fora")? as usize;
-                (None, Some(String::from_utf8_lossy(exe.get(p + 1..p + 1 + len).ok_or("NE: nome fora")?).into_owned()))
+                let len = *exe.get(p).ok_or("NE: name outside the file")? as usize;
+                (None, Some(String::from_utf8_lossy(exe.get(p + 1..p + 1 + len).ok_or("NE: name outside the file")?).into_owned()))
             };
-            let dados = exe.get(off..off + tam).ok_or("NE: recurso fora do arquivo")?;
+            let dados = exe.get(off..off + tam).ok_or("NE: resource outside the file")?;
             saida.push(Recurso { tipo: tipo & 0x7FFF, numero, nome, dados });
             o += 12;
         }
@@ -86,13 +86,13 @@ fn mascara(d: &[u8], largura: usize, altura: usize) -> Vec<bool> {
 
 fn decodificar_cursor(d: &[u8]) -> Result<Cursor, String> {
     let quente = (u16_le(d, 0)?, u16_le(d, 2)?);
-    let bmp = d.get(4..).ok_or("cursor truncado")?;
+    let bmp = d.get(4..).ok_or("cursor truncated")?;
     let tam_cab = u32_le(bmp, 0)? as usize;
     let largura = u32_le(bmp, 4)? as usize;
     let altura = u32_le(bmp, 8)? as usize / 2;
     let bits = u16_le(bmp, 14)?;
     if bits != 1 {
-        return Err(format!("cursor com {bits} bits por pixel"));
+        return Err(format!("cursor with {bits} bits per pixel"));
     }
     let cores = match u32_le(bmp, 32)? {
         0 => 2,
@@ -100,8 +100,8 @@ fn decodificar_cursor(d: &[u8]) -> Result<Cursor, String> {
     };
     let inicio = tam_cab + cores * 4;
     let tam_mascara = largura.div_ceil(32) * 4 * altura;
-    let xor = bmp.get(inicio..inicio + tam_mascara).ok_or("cursor truncado")?;
-    let and = bmp.get(inicio + tam_mascara..inicio + 2 * tam_mascara).ok_or("cursor truncado")?;
+    let xor = bmp.get(inicio..inicio + tam_mascara).ok_or("cursor truncated")?;
+    let and = bmp.get(inicio + tam_mascara..inicio + 2 * tam_mascara).ok_or("cursor truncated")?;
     Ok(Cursor { largura, altura, quente, e: mascara(and, largura, altura), x: mascara(xor, largura, altura) })
 }
 
@@ -158,29 +158,29 @@ pub fn aceleradores(exe: &[u8]) -> Result<HashMap<String, Vec<Acelerador>>, Stri
 /// flags, alocação mínima; posição = setor << `ne + 0x32`). docs/spec/formatos/ne-recursos.md.
 pub fn segmento(exe: &[u8], n: u16) -> Result<&[u8], String> {
     if exe.get(0..2) != Some(b"MZ") {
-        return Err("não é um executável MZ".into());
+        return Err("not an MZ executable".into());
     }
     let ne = u32_le(exe, 0x3C)? as usize;
     if exe.get(ne..ne + 2) != Some(b"NE") {
-        return Err("não é um executável NE".into());
+        return Err("not an NE executable".into());
     }
     let quantos = u16_le(exe, ne + 0x1C)?;
     if n == 0 || n > quantos {
-        return Err(format!("segmento {n} não existe (o executável tem {quantos})"));
+        return Err(format!("segment {n} does not exist (the executable has {quantos})"));
     }
     let tabela = ne + u16_le(exe, ne + 0x22)? as usize;
     let deslocamento = u16_le(exe, ne + 0x32)?;
     let e = tabela + (n as usize - 1) * 8;
     let setor = u16_le(exe, e)? as usize;
     if setor == 0 {
-        return Err(format!("segmento {n} não tem dados no arquivo"));
+        return Err(format!("segment {n} has no data in the file"));
     }
     let tamanho = match u16_le(exe, e + 2)? {
         0 => 0x10000,
         t => t as usize,
     };
     let inicio = setor << deslocamento;
-    exe.get(inicio..inicio + tamanho).ok_or_else(|| format!("segmento {n} passa do fim do arquivo"))
+    exe.get(inicio..inicio + tamanho).ok_or_else(|| format!("segment {n} runs past the end of the file"))
 }
 
 #[cfg(test)]

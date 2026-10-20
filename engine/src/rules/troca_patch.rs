@@ -181,7 +181,7 @@ pub fn transferir_com_escolha(e: &mut Estado, t: &TransferenciaNoTick) -> Result
     let (x, y) = t.patch;
     match escolher_colonia(e, &t.geracao, &t.cfg, x, y)? {
         ResultadoColonia::Trocou(r) => Ok(r),
-        outro => Err(format!("patch ({x}, {y}) recusado na troca dentro do tick: {outro:?}")),
+        outro => Err(format!("patch ({x}, {y}) refused in the swap inside the tick: {outro:?}")),
     }
 }
 
@@ -213,7 +213,7 @@ pub fn trocar_patch(e: &mut Estado, tab: &TabelasGeracao, cfg: &ConfigSimulacao)
     if (tx, ty) == e.ambiente.patch {
         return Ok(ResultadoTroca::MesmoPatch);
     }
-    let i = indice_patch(tx, ty).ok_or(format!("patch ({tx}, {ty}) fora do quintal"))?;
+    let i = indice_patch(tx, ty).ok_or(format!("patch ({tx}, {ty}) outside the yard"))?;
     let recusa = |e: &mut Estado, id: u16| {
         e.eventos.push(Evento::Som(ids::SOM_ERRO));
         e.eventos.push(Evento::Mensagem(id));

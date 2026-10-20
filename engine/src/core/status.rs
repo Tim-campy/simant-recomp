@@ -169,7 +169,7 @@ pub fn desenhar(q: &mut Quadro, recursos: &Recursos, interface: &Interface, cfg:
     }
     let janela = carregar_janela(recursos, cfg.janela)?;
     let Some(fonte) = interface.fontes.get(cfg.fonte).and_then(|f| f.as_ref()) else {
-        pendentes.push(format!("fonte {}", cfg.fonte));
+        pendentes.push(format!("font {}", cfg.fonte));
         return Ok(pendentes);
     };
     for (nome, t) in textos {

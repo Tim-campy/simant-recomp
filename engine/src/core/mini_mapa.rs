@@ -97,7 +97,7 @@ impl MiniMapa {
     pub fn carregar(recursos: &Recursos) -> Result<MiniMapa, String> {
         let cfg: ConfigMiniMapa = recursos.dados(ARQUIVO_CONFIG)?;
         let j = carregar_janela(recursos, cfg.janela)?;
-        let r = j.objetos.first().ok_or("mini mapa: janela sem objetos")?.retangulo;
+        let r = j.objetos.first().ok_or("mini map: window has no objects")?.retangulo;
         Ok(MiniMapa::novo(cfg, (r.dir - r.esq, r.base - r.topo)))
     }
 

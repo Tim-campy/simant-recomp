@@ -201,7 +201,7 @@ impl MolduraJanela {
             sdl2::sys::SDL_SetWindowHitTest(canvas.window().raw(), Some(teste_de_clique), g as *const Mutex<Geometria> as *mut std::ffi::c_void)
         };
         if r != 0 {
-            eprintln!("moldura: o sistema não aceita o teste de clique ({}); a janela fica com a borda do sistema", sdl2::get_error());
+            eprintln!("{}", engine::tr!("jogo.moldura.sem_teste_de_clique", erro = sdl2::get_error()));
             canvas.window_mut().set_bordered(true);
             return m;
         }

@@ -120,7 +120,7 @@ impl TabelasNinho {
     pub fn padrao() -> &'static TabelasNinho {
         static PADRAO: OnceLock<TabelasNinho> = OnceLock::new();
         PADRAO.get_or_init(|| {
-            TabelasNinho::de_json(include_str!("../../../data/ninho.json")).expect("data/ninho.json inválido")
+            TabelasNinho::de_json(include_str!("../../../data/ninho.json")).expect("invalid data/ninho.json")
         })
     }
 
@@ -128,13 +128,13 @@ impl TabelasNinho {
         let erro = |m: &str| Err(format!("{ARQUIVO_TABELAS}: {m}"));
         comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx8, &self.dy8)?;
         if self.turn_tab.iter().flatten().any(|&d| d > 7) {
-            return erro("turn_tab com direção fora de 0..7");
+            return erro("turn_tab with direction out of 0..7");
         }
         if self.modos_operaria.is_empty() || self.modos_soldado.is_empty() || self.castas_vermelhas.is_empty() {
-            return erro("modos_operaria, modos_soldado e castas_vermelhas precisam de ao menos uma linha");
+            return erro("modos_operaria, modos_soldado and castas_vermelhas need at least one row");
         }
         if self.classe_luta.iter().any(|&c| c > 3) {
-            return erro("classe_luta fora de 0..3");
+            return erro("classe_luta out of 0..3");
         }
         Ok(())
     }

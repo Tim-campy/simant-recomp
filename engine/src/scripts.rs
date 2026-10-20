@@ -24,15 +24,22 @@
 //! guardam um [`PedidoMod`]; quem os executa, logo depois que o gancho termina e na ordem em que
 //! foram feitos, é `core::acoes_mods` (com as tabelas das regras). Cada ação chama a rotina do
 //! original correspondente; nenhuma sorteia além do que a rotina sorteia.
+//!
+//! Idiomas (API 0.43): `idioma()` e `traduzir(chave, params)` leem os textos do jogo
+//! (`data/idiomas/`, com os arquivos de idioma dos mods mesclados por chave; docs/i18n.md). As
+//! mensagens do hospedeiro (erros da API, avisos de desligamento) também vêm de lá (`lua.*`,
+//! `mods.*`).
 
 use std::cell::Cell;
 use std::path::{Component, Path};
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use mlua::{ChunkMode, Function, HookTriggers, Lua, LuaOptions, StdLib, Table, UserDataMethods, Value, Variadic, VmState};
 
 use crate::formats::save::{Formiga, Lista};
+use crate::idiomas::{self, Textos};
 use crate::recursos::{Mod, Recursos};
 use crate::rules::amarela::TabelasAmarela;
 use crate::rules::comum;
@@ -42,9 +49,10 @@ use crate::rules::experimental::{self, TabelasExperimental};
 use crate::rules::geracao::Cor;
 use crate::rules::inimigos::TabelasInimigos;
 use crate::rules::tick::{Regras, RegrasAmarela, RegrasConselhos, RegrasInimigos, RegrasNinho, RegrasQuintal, RegrasSuperficie};
+use crate::tr;
 
 /// Versão da API de mods que os scripts veem em `API_VERSAO`.
-pub const VERSAO_API: &str = "0.42";
+pub const VERSAO_API: &str = "0.43";
 
 /// Tamanho máximo do texto de `mostrar_mensagem` (caracteres).
 pub const MAX_TEXTO_MENSAGEM: usize = 120;
@@ -251,21 +259,21 @@ impl TeclaMod {
     /// tirar do jogo as letras e números (comandos da amarela e códigos de trapaça).
     pub fn de_texto(texto: &str) -> Result<TeclaMod, String> {
         let partes: Vec<&str> = texto.split('+').map(str::trim).collect();
-        let Some((nome, mods)) = partes.split_last() else { return Err("tecla vazia".into()) };
+        let Some((nome, mods)) = partes.split_last() else { return Err(tr!("lua.tecla.vazia")) };
         let mut t = TeclaMod { nome: nome.to_string(), ctrl: false, shift: false, alt: false };
         for m in mods {
             match m.to_ascii_lowercase().as_str() {
                 "ctrl" => t.ctrl = true,
                 "shift" => t.shift = true,
                 "alt" => t.alt = true,
-                outro => return Err(format!("modificador desconhecido: {outro} (use Ctrl, Shift ou Alt)")),
+                outro => return Err(tr!("lua.tecla.modificador", modificador = outro)),
             }
         }
         let funcao = nome.len() >= 2
             && nome.as_bytes()[0].eq_ignore_ascii_case(&b'F')
             && nome[1..].parse::<u8>().is_ok_and(|n| (1..=24).contains(&n));
         if nome.is_empty() || !(funcao || t.ctrl || t.alt) {
-            return Err(format!("tecla \"{texto}\": use uma tecla de função (F1–F24) ou uma combinação com Ctrl ou Alt"));
+            return Err(tr!("lua.tecla.invalida", tecla = texto));
         }
         Ok(t)
     }
@@ -351,21 +359,30 @@ pub struct TabelasScripts {
     pub experimental: TabelasExperimental,
     pub amarela: TabelasAmarela,
     pub inimigos: TabelasInimigos,
+    /// Textos do jogo para `idioma()` e `traduzir()` (API 0.43), com as chaves dos mods.
+    pub textos: Arc<Textos>,
 }
 
 impl TabelasScripts {
-    /// As tabelas pelos recursos (`data/` com mods).
+    /// As tabelas pelos recursos (`data/` com mods). Os textos são os do idioma do jogo
+    /// ([`idiomas::atual`]) lidos de novo pelos recursos, para incluir os arquivos de idioma dos mods.
     pub fn carregar(r: &Recursos) -> Result<TabelasScripts, String> {
         Ok(TabelasScripts {
             experimental: TabelasExperimental::carregar(r)?,
             amarela: TabelasAmarela::carregar(r)?,
             inimigos: TabelasInimigos::carregar(r)?,
+            textos: Arc::new(Textos::do_jogo(r, idiomas::atual().codigo())),
         })
     }
 
-    /// As do Experimental dadas e as outras embutidas (testes).
+    /// As do Experimental dadas e as outras embutidas (testes); os textos do jogo atuais.
     pub fn com_experimental(experimental: TabelasExperimental) -> TabelasScripts {
-        TabelasScripts { experimental, amarela: TabelasAmarela::padrao().clone(), inimigos: TabelasInimigos::padrao().clone() }
+        TabelasScripts {
+            experimental,
+            amarela: TabelasAmarela::padrao().clone(),
+            inimigos: TabelasInimigos::padrao().clone(),
+            textos: idiomas::atual(),
+        }
     }
 
     fn contexto(&self) -> experimental::Contexto<'_> {
@@ -490,8 +507,8 @@ impl Scripts {
     }
 
     fn avisar_desligado(&mut self, nome: &str, erro: &str) {
-        self.registro.push(format!("[{nome}] script desligado: {erro}"));
-        self.mensagens.push(MensagemScript { texto: format!("Mod {nome}: script desligado por erro"), duracao: None });
+        self.registro.push(format!("[{nome}] {}", tr!("mods.script_desligado_log", erro = erro)));
+        self.mensagens.push(MensagemScript { texto: tr!("mods.script_desligado", nome = nome), duracao: None });
     }
 
     /// Algum mod ativo define o gancho?
@@ -561,7 +578,7 @@ impl Scripts {
                 let j = lua_para_json(&v, 0)?;
                 let tamanho = serde_json::to_string(&j).map_or(usize::MAX, |t| t.len());
                 if tamanho > MAX_ESTADO_SALVO {
-                    return Err(erro(format!("ao_salvar: a tabela tem {tamanho} bytes em JSON (máximo {MAX_ESTADO_SALVO})")));
+                    return Err(erro(tr!("lua.salvar.grande", tamanho = tamanho, maximo = MAX_ESTADO_SALVO)));
                 }
                 dados = Some(j);
                 Ok(())
@@ -673,8 +690,8 @@ fn chamar_mod(m: &mut ScriptMod, g: Gancho, e: &mut Estado, saidas: Saidas, cham
     if let Err(err) = r {
         m.ativo = false;
         m.ganchos = [false; N_GANCHOS];
-        registro.push(format!("[{}] script desligado em {}: {err}", m.nome, g.nome()));
-        mensagens.push(MensagemScript { texto: format!("Mod {}: script desligado por erro", m.nome), duracao: None });
+        registro.push(format!("[{}] {}", m.nome, tr!("mods.script_desligado_em", gancho = g.nome(), erro = err)));
+        mensagens.push(MensagemScript { texto: tr!("mods.script_desligado", nome = m.nome), duracao: None });
     }
 }
 
@@ -697,7 +714,7 @@ pub fn ler_scripts_do_mod(m: &Mod) -> Result<ArquivosScript, String> {
             let p = Path::new(nome);
             let valido = nome.ends_with(".lua") && p.components().all(|c| matches!(c, Component::Normal(_)));
             if !valido {
-                return Err(format!("caminho de script inválido: {nome} (relativo ao mod, sem '..', terminando em .lua)"));
+                return Err(tr!("mods.caminho_de_script", arquivo = nome));
             }
             let caminho = m.dir.join(p);
             let codigo = std::fs::read_to_string(&caminho).map_err(|e| format!("{}: {e}", caminho.display()))?;
@@ -771,12 +788,12 @@ fn nova_maquina(nome: &str, tabelas: Rc<TabelasScripts>, limites: Limites) -> ml
         lua.create_function(|lua, (texto, duracao): (String, Option<i64>)| {
             let texto: String = texto.chars().take(MAX_TEXTO_MENSAGEM).collect();
             if texto.trim().is_empty() {
-                return Err(mlua::Error::runtime("mostrar_mensagem: texto vazio"));
+                return Err(mlua::Error::runtime(tr!("lua.mensagem.vazia")));
             }
             let duracao = match duracao {
                 None => None,
                 Some(d @ 1..=10_000) => Some(d as u32),
-                Some(d) => return Err(mlua::Error::runtime(format!("mostrar_mensagem: duração fora de 1..10000: {d}"))),
+                Some(d) => return Err(mlua::Error::runtime(tr!("lua.mensagem.duracao", duracao = d))),
             };
             if let Some(mut c) = lua.app_data_mut::<Contexto>() {
                 c.mensagens.push(MensagemScript { texto, duracao });
@@ -785,7 +802,7 @@ fn nova_maquina(nome: &str, tabelas: Rc<TabelasScripts>, limites: Limites) -> ml
         })?,
     )?;
     let aleatorio = lua.create_function(|lua, (a, b): (Option<i64>, Option<i64>)| {
-        let mut c = lua.app_data_mut::<Contexto>().ok_or_else(|| mlua::Error::runtime("sem contexto"))?;
+        let mut c = lua.app_data_mut::<Contexto>().ok_or_else(|| mlua::Error::runtime("no context"))?;
         let x = c.proximo();
         let (lo, hi) = match (a, b) {
             (None, _) => return Ok(Value::Number(f64::from(x) / (f64::from(u32::MAX) + 1.0))),
@@ -793,7 +810,7 @@ fn nova_maquina(nome: &str, tabelas: Rc<TabelasScripts>, limites: Limites) -> ml
             (Some(a), Some(b)) => (a, b),
         };
         if lo > hi {
-            return Err(mlua::Error::runtime(format!("aleatorio: intervalo vazio ({lo}, {hi})")));
+            return Err(mlua::Error::runtime(tr!("lua.aleatorio.vazio", de = lo, ate = hi)));
         }
         let largura = (hi - lo) as u64 + 1;
         Ok(Value::Integer(lo + (u64::from(x) % largura) as i64))
@@ -810,6 +827,26 @@ fn nova_maquina(nome: &str, tabelas: Rc<TabelasScripts>, limites: Limites) -> ml
     math.raw_set("random", aleatorio)?;
     math.raw_set("randomseed", semear)?;
     registrar_globais_017(&lua, &g)?;
+    // Idiomas (API 0.43).
+    g.set(
+        "idioma",
+        lua.create_function(|lua, ()| Ok(tabelas_do_mod(lua)?.textos.codigo().to_string()))?,
+    )?;
+    g.set(
+        "traduzir",
+        lua.create_function(|lua, (chave, params): (String, Option<Table>)| {
+            let tostring: Function = lua.globals().get("tostring")?;
+            let mut p = Vec::new();
+            if let Some(t) = params {
+                for par in t.pairs::<Value, Value>() {
+                    let (k, v) = par?;
+                    let Value::String(k) = k else { return Err(erro(tr!("lua.traduzir.params"))) };
+                    p.push((k.to_str()?.to_string(), tostring.call::<String>(v)?));
+                }
+            }
+            Ok(tabelas_do_mod(lua)?.textos.f_texto(&chave, &p))
+        })?,
+    )?;
     g.set("API_VERSAO", VERSAO_API)?;
     g.set("MOD_NOME", nome)?;
 
@@ -827,11 +864,7 @@ fn nova_maquina(nome: &str, tabelas: Rc<TabelasScripts>, limites: Limites) -> ml
             o.estourou.set(true);
         }
         if o.estourou.get() {
-            return Err(mlua::Error::runtime(format!(
-                "limite excedido ({} instruções ou {} ms por chamada)",
-                limites.instrucoes,
-                limites.tempo.as_millis()
-            )));
+            return Err(mlua::Error::runtime(tr!("lua.limite", instrucoes = limites.instrucoes, ms = limites.tempo.as_millis())));
         }
         Ok(VmState::Continue)
     })?;
@@ -878,9 +911,7 @@ impl Plano {
             "superficie" => Ok(Plano::Superficie),
             "ninho_preto" => Ok(Plano::NinhoPreto),
             "ninho_vermelho" => Ok(Plano::NinhoVermelho),
-            _ => Err(mlua::Error::runtime(format!(
-                "plano desconhecido: {nome} (use \"superficie\", \"ninho_preto\" ou \"ninho_vermelho\")"
-            ))),
+            _ => Err(mlua::Error::runtime(tr!("lua.plano", plano = nome))),
         }
     }
 
@@ -931,7 +962,7 @@ fn cor_de_nome(nome: &str) -> mlua::Result<Cor> {
     match nome {
         "preta" => Ok(Cor::Preta),
         "vermelha" => Ok(Cor::Vermelha),
-        _ => Err(mlua::Error::runtime(format!("cor desconhecida: {nome} (use \"preta\" ou \"vermelha\")"))),
+        _ => Err(mlua::Error::runtime(tr!("lua.cor", cor = nome))),
     }
 }
 
@@ -1074,7 +1105,7 @@ fn registrar_api(reg: &mut mlua::UserDataRegistry<Estado>) {
     });
     reg.add_method_mut("definir_velocidade", |_, e, v: i64| {
         if !(0..=3).contains(&v) {
-            return Err(mlua::Error::runtime(format!("definir_velocidade: use 0..3, não {v}")));
+            return Err(mlua::Error::runtime(tr!("lua.velocidade", valor = v)));
         }
         e.partida.velocidade = v as i16;
         Ok(())
@@ -1085,7 +1116,7 @@ fn registrar_api(reg: &mut mlua::UserDataRegistry<Estado>) {
 
 /// As tabelas das regras guardadas na máquina do mod.
 fn tabelas_do_mod(lua: &Lua) -> mlua::Result<Rc<TabelasScripts>> {
-    lua.app_data_ref::<Contexto>().map(|c| c.tabelas.clone()).ok_or_else(|| mlua::Error::runtime("sem contexto"))
+    lua.app_data_ref::<Contexto>().map(|c| c.tabelas.clone()).ok_or_else(|| mlua::Error::runtime("no context"))
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1101,9 +1132,7 @@ fn cheiro_de_nome(nome: &str) -> mlua::Result<u8> {
         "ninho_vermelho" => Ok(s::NINHO_VERMELHO),
         "trilha_vermelha" => Ok(s::TRILHA_VERMELHA),
         "alarme" => Ok(s::ALARME),
-        _ => Err(erro(format!(
-            "cheiro desconhecido: {nome} (use \"ninho_preto\", \"trilha_preta\", \"ninho_vermelho\", \"trilha_vermelha\" ou \"alarme\")"
-        ))),
+        _ => Err(erro(tr!("lua.cheiro", cheiro = nome))),
     }
 }
 
@@ -1131,9 +1160,7 @@ fn grupo_da_casta(nome: Option<&str>) -> mlua::Result<u8> {
         Some("soldado") => Ok(6),
         Some("macho") => Ok(4),
         Some("rainha_nova") => Ok(8),
-        Some(outro) => Err(erro(format!(
-            "casta desconhecida: {outro} (use \"operaria\", \"soldado\", \"macho\" ou \"rainha_nova\")"
-        ))),
+        Some(outro) => Err(erro(tr!("lua.casta.reprodutores", casta = outro))),
     }
 }
 
@@ -1142,11 +1169,11 @@ fn grupo_da_casta(nome: Option<&str>) -> mlua::Result<u8> {
 /// (o nível 1 é o resto).
 fn niveis_do_triangulo(funcao: &str, pesos: [f64; 3]) -> mlua::Result<[u16; 3]> {
     if pesos.iter().any(|p| !p.is_finite() || *p < 0.0) {
-        return Err(erro(format!("{funcao}: os três valores precisam ser números ≥ 0")));
+        return Err(erro(tr!("lua.triangulo.negativo", funcao = funcao)));
     }
     let soma: f64 = pesos.iter().sum();
     if soma <= 0.0 {
-        return Err(erro(format!("{funcao}: a soma dos três valores precisa ser > 0")));
+        return Err(erro(tr!("lua.triangulo.soma", funcao = funcao)));
     }
     let n = |p: f64| ((p * 65535.0 / soma).floor() as u32).min(0xFFFF) as u16;
     let (n0, n2) = (n(pesos[0]), n(pesos[2]));
@@ -1419,7 +1446,7 @@ pub fn arquivo_lateral(save: &Path) -> std::path::PathBuf {
 pub fn lua_para_json(v: &Value, profundidade: usize) -> mlua::Result<serde_json::Value> {
     use serde_json::Value as J;
     if profundidade > MAX_PROFUNDIDADE {
-        return Err(erro(format!("ao_salvar: tabelas aninhadas demais (mais de {MAX_PROFUNDIDADE})")));
+        return Err(erro(tr!("lua.salvar.profundidade", maximo = MAX_PROFUNDIDADE)));
     }
     Ok(match v {
         Value::Nil => J::Null,
@@ -1427,8 +1454,8 @@ pub fn lua_para_json(v: &Value, profundidade: usize) -> mlua::Result<serde_json:
         Value::Integer(i) => J::from(*i),
         Value::Number(f) => serde_json::Number::from_f64(*f)
             .map(J::Number)
-            .ok_or_else(|| erro(format!("ao_salvar: número não finito ({f})")))?,
-        Value::String(s) => J::String(s.to_str().map_err(|_| erro("ao_salvar: texto que não é UTF-8".into()))?.to_string()),
+            .ok_or_else(|| erro(tr!("lua.salvar.numero", numero = f)))?,
+        Value::String(s) => J::String(s.to_str().map_err(|_| erro(tr!("lua.salvar.texto_utf8")))?.to_string()),
         Value::Table(t) => {
             let n = t.raw_len();
             let mut pares = Vec::new();
@@ -1445,17 +1472,15 @@ pub fn lua_para_json(v: &Value, profundidade: usize) -> mlua::Result<serde_json:
                 let mut obj = serde_json::Map::new();
                 for (k, v) in pares {
                     let Value::String(k) = k else {
-                        return Err(erro(
-                            "ao_salvar: uma tabela precisa ser uma lista 1..n sem buracos ou ter só chaves de texto".into(),
-                        ));
+                        return Err(erro(tr!("lua.salvar.tabela")));
                     };
-                    let k = k.to_str().map_err(|_| erro("ao_salvar: chave que não é UTF-8".into()))?.to_string();
+                    let k = k.to_str().map_err(|_| erro(tr!("lua.salvar.chave_utf8")))?.to_string();
                     obj.insert(k, lua_para_json(&v, profundidade + 1)?);
                 }
                 J::Object(obj)
             }
         }
-        outro => return Err(erro(format!("ao_salvar: valor que não vai para o save ({})", outro.type_name()))),
+        outro => return Err(erro(tr!("lua.salvar.valor", tipo = outro.type_name()))),
     })
 }
 
@@ -1500,9 +1525,9 @@ fn erro(texto: String) -> mlua::Error {
 
 /// Guarda um pedido de ação (devolve `true`: aceito para execução).
 fn pedir(lua: &Lua, p: PedidoMod) -> mlua::Result<bool> {
-    let mut c = lua.app_data_mut::<Contexto>().ok_or_else(|| erro("sem contexto".into()))?;
+    let mut c = lua.app_data_mut::<Contexto>().ok_or_else(|| erro("no context".into()))?;
     if c.pedidos.len() >= MAX_PEDIDOS {
-        return Err(erro(format!("mais de {MAX_PEDIDOS} ações numa só chamada")));
+        return Err(erro(tr!("lua.acoes_demais", maximo = MAX_PEDIDOS)));
     }
     c.pedidos.push(p);
     Ok(true)
@@ -1515,14 +1540,14 @@ fn texto_curto(t: &str, max: usize) -> String {
 /// Patch do quintal (x 0..11, y 0..15).
 fn patch(funcao: &str, x: i64, y: i64) -> mlua::Result<(i16, i16)> {
     if !(0..12).contains(&x) || !(0..16).contains(&y) {
-        return Err(erro(format!("{funcao}: patch fora do quintal ({x}, {y}); use x 0..11 e y 0..15")));
+        return Err(erro(tr!("lua.patch_fora", funcao = funcao, x = x, y = y)));
     }
     Ok((x as i16, y as i16))
 }
 
 fn faixa(funcao: &str, nome: &str, v: i64, min: i64, max: i64) -> mlua::Result<i64> {
     if !(min..=max).contains(&v) {
-        return Err(erro(format!("{funcao}: {nome} fora de {min}..{max}: {v}")));
+        return Err(erro(tr!("lua.fora_da_faixa", funcao = funcao, nome = nome, min = min, max = max, valor = v)));
     }
     Ok(v)
 }
@@ -1536,11 +1561,11 @@ fn registrar_globais_017(lua: &Lua, g: &Table) -> mlua::Result<()> {
                 None => None,
                 Some(t) => {
                     let titulo: String = t.get::<Option<String>>("titulo")?.unwrap_or_default();
-                    let tecla: String = t.get::<Option<String>>("tecla")?.ok_or_else(|| erro("definir_menu: falta a tecla".into()))?;
+                    let tecla: String = t.get::<Option<String>>("tecla")?.ok_or_else(|| erro(tr!("lua.menu.sem_tecla")))?;
                     let tecla = TeclaMod::de_texto(&tecla).map_err(|e| erro(format!("definir_menu: {e}")))?;
                     let itens: Vec<String> = t.get::<Option<Vec<String>>>("itens")?.unwrap_or_default();
                     if itens.is_empty() || itens.len() > MAX_ITENS_MENU {
-                        return Err(erro(format!("definir_menu: de 1 a {MAX_ITENS_MENU} itens, não {}", itens.len())));
+                        return Err(erro(tr!("lua.menu.itens", maximo = MAX_ITENS_MENU, n = itens.len())));
                     }
                     let itens = itens.iter().map(|i| texto_curto(i, MAX_TEXTO_ITEM)).collect();
                     Some(MenuMod { titulo: texto_curto(&titulo, MAX_TEXTO_ITEM), tecla, itens })
@@ -1651,7 +1676,7 @@ fn registrar_api_017(reg: &mut mlua::UserDataRegistry<Estado>) {
         let vitoria = match resultado.as_str() {
             "vitoria" => true,
             "derrota" => false,
-            _ => return Err(erro(format!("terminar_jogo: use \"vitoria\" ou \"derrota\", não {resultado}"))),
+            _ => return Err(erro(tr!("lua.terminar_jogo", resultado = resultado))),
         };
         pedir(lua, PedidoMod::TerminarJogo { vitoria })
     });
@@ -1662,7 +1687,7 @@ fn casta_de_nome(nome: Option<&str>) -> mlua::Result<CastaMod> {
     match nome {
         None | Some("operaria") => Ok(CastaMod::Operaria),
         Some("soldado") => Ok(CastaMod::Soldado),
-        Some(outro) => Err(erro(format!("casta desconhecida: {outro} (use \"operaria\" ou \"soldado\")"))),
+        Some(outro) => Err(erro(tr!("lua.casta.adultos", casta = outro))),
     }
 }
 

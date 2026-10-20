@@ -124,20 +124,20 @@ impl TabelasTrapaca {
     /// As tabelas embutidas (cópia de `data/codigos_trapaca.json` da compilação).
     pub fn padrao() -> &'static TabelasTrapaca {
         static PADRAO: OnceLock<TabelasTrapaca> = OnceLock::new();
-        PADRAO.get_or_init(|| TabelasTrapaca::de_json(JSON_PADRAO).expect("data/codigos_trapaca.json embutido"))
+        PADRAO.get_or_init(|| TabelasTrapaca::de_json(JSON_PADRAO).expect("embedded data/codigos_trapaca.json"))
     }
 
     fn validar(&self) -> Result<(), String> {
         for c in &self.codigos {
             if c.codigo.len() != 4 || !c.codigo.bytes().all(|b| b.is_ascii_alphabetic()) {
-                return Err(format!("{ARQUIVO_TABELAS}: código inválido \"{}\" (4 letras A–Z ou a–z)", c.codigo));
+                return Err(format!("{ARQUIVO_TABELAS}: invalid code \"{}\" (4 letters A–Z or a–z)", c.codigo));
             }
         }
         if self.valores.ovos_sorteio < 1 {
-            return Err(format!("{ARQUIVO_TABELAS}: valores.ovos_sorteio deve ser ≥ 1"));
+            return Err(format!("{ARQUIVO_TABELAS}: valores.ovos_sorteio must be ≥ 1"));
         }
         if !(0..=64).contains(&self.valores.buracos) {
-            return Err(format!("{ARQUIVO_TABELAS}: valores.buracos fora de 0..64"));
+            return Err(format!("{ARQUIVO_TABELAS}: valores.buracos out of 0..64"));
         }
         Ok(())
     }

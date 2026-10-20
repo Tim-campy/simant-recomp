@@ -142,7 +142,7 @@ impl PopupCastas {
             return pendentes;
         };
         let Some(f) = interface.fontes.get(c.fonte).and_then(|f| f.as_ref()) else {
-            pendentes.push(format!("fonte {}", c.fonte));
+            pendentes.push(format!("font {}", c.fonte));
             return pendentes;
         };
         // Área do gráfico na área cliente da janela (origem no objeto 0).

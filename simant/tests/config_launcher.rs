@@ -65,8 +65,37 @@ fn configuracao_invalida_e_ignorada_com_aviso() {
     let dir = tmp("invalida");
     let s = rodar(&dir, "{ não é json", &["--novo-jogo", "--ticks", "1", "--sem-som", "--jogo", dir.join("x").to_str().unwrap()]);
     let erro = String::from_utf8_lossy(&s.stderr);
-    assert!(erro.contains("configuração do launcher ignorada"), "{erro}");
+    assert!(erro.contains("launcher settings ignored"), "{erro}");
     assert_eq!(s.status.code(), Some(1), "sem o jogo, termina com erro (sem pânico)");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// `--capturar-launcher` em inglês e em português (`--idioma`, ou o `idioma` de `launcher.json`):
+/// as duas telas existem e são diferentes; `--help` sai em inglês (o jogo só tem inglês).
+#[test]
+fn captura_do_launcher_em_ingles_e_portugues() {
+    let dir = tmp("idiomas");
+    let (en, pt, pt_cfg) = (dir.join("en.png"), dir.join("pt.png"), dir.join("pt_cfg.png"));
+    let s = rodar(&dir, "{}", &["--idioma", "en", "--capturar-launcher", en.to_str().unwrap()]);
+    assert!(s.status.success(), "{}", String::from_utf8_lossy(&s.stderr));
+    let s = rodar(&dir, "{}", &["--idioma", "pt-BR", "--capturar-launcher", pt.to_str().unwrap()]);
+    assert!(s.status.success(), "{}", String::from_utf8_lossy(&s.stderr));
+    let s = rodar(&dir, r#"{"idioma": "pt-BR"}"#, &["--capturar-launcher", pt_cfg.to_str().unwrap()]);
+    assert!(s.status.success(), "{}", String::from_utf8_lossy(&s.stderr));
+    let (a, b, c) = (std::fs::read(&en).unwrap(), std::fs::read(&pt).unwrap(), std::fs::read(&pt_cfg).unwrap());
+    assert_ne!(a, b, "a tela muda com o idioma");
+    assert_eq!(b, c, "o idioma de launcher.json vale como --idioma");
+    if let Some(saida) = std::env::var_os("SIMANT_SAIDA_TESTE") {
+        let saida = PathBuf::from(saida);
+        let _ = std::fs::create_dir_all(&saida);
+        std::fs::copy(&en, saida.join("launcher_en.png")).unwrap();
+        std::fs::copy(&pt, saida.join("launcher_pt-BR.png")).unwrap();
+    }
+    let s = rodar(&dir, "{}", &["--idioma", "pt-BR", "--help"]);
+    let ajuda = String::from_utf8_lossy(&s.stdout);
+    assert!(s.status.success() && ajuda.contains("Usage:") && ajuda.contains("--idioma CODE"), "{ajuda}");
+    let s = rodar(&dir, "{}", &["--opcao-que-nao-existe"]);
+    assert!(String::from_utf8_lossy(&s.stderr).contains("unknown option: --opcao-que-nao-existe"));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

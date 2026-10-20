@@ -60,7 +60,7 @@ pub(crate) fn tratar_tecla(s: &mut Sessao, ev: &EventoNav, tab: bool, o: &Opcoes
     if let Some(vk) = s.partida.cfg.tecla_virtual(nome) {
         let r = s.partida.tecla_amarela(vk, Modificadores { shift: *shift, ctrl: *ctrl, tab });
         if r != RespostaTecla::Ignorada {
-            println!("tecla {nome} (VK 0x{vk:02X}): {r:?}");
+            println!("key {nome} (VK 0x{vk:02X}): {r:?}");
             return None;
         }
     }
@@ -117,7 +117,7 @@ pub(crate) fn aplicar_preferencias(s: &mut Sessao, o: &Opcoes, de_save: bool) {
     let prefs = match (&o.preferencias, &o.win_ini) {
         (Some(arq), Some(ini)) if !arq.exists() => match std::fs::read(ini) {
             Ok(bytes) => {
-                println!("preferências: {} (seção [SimAnt]), até a primeira gravação", ini.display());
+                println!("{}", tr!("jogo.preferencias.do_win_ini", arquivo = ini.display()));
                 let p = &s.partida;
                 Some(preferencias::Preferencias::do_win_ini(
                     &String::from_utf8_lossy(&bytes),
@@ -127,7 +127,7 @@ pub(crate) fn aplicar_preferencias(s: &mut Sessao, o: &Opcoes, de_save: bool) {
                 ))
             }
             Err(e) => {
-                eprintln!("preferências: {}: {e}", ini.display());
+                eprintln!("{}", tr!("jogo.preferencias.erro", erro = format!("{}: {e}", ini.display())));
                 None
             }
         },
@@ -155,8 +155,8 @@ pub(crate) fn executar_partida(mut s: Sessao, titulo: &str, o: &Opcoes, jogo_nov
     if let Some(caminho) = &o.preferencias {
         let p = preferencias::Preferencias::do_momento(&s.partida.estado.partida.opcoes, &s.partida.funcoes_botoes, &s.partida.funcoes_botoes_quintal);
         match p.gravar(caminho) {
-            Ok(()) => println!("preferências gravadas em {}", caminho.display()),
-            Err(e) => eprintln!("preferências: {e}"),
+            Ok(()) => println!("{}", tr!("jogo.preferencias.gravadas", arquivo = caminho.display())),
+            Err(e) => eprintln!("{}", tr!("jogo.preferencias.erro", erro = e)),
         }
     }
     r
@@ -199,7 +199,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
     let mut vitoria_na_tela = false;
     let inicio = Instant::now();
     let mut antes = inicio;
-    println!("partida: {} (Shift+0 pausa, Shift+1..4 velocidade, Ctrl+G AutoTrack)", s.situacao());
+    println!("{}", tr!("jogo.partida_iniciada", situacao = s.situacao()));
 
     loop {
         let lote: Vec<Event> = eventos.poll_iter().collect();
@@ -238,7 +238,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 menus_ui::Filtro::Sistema(c) => {
                     // Menu de sistema e botões da janela principal (docs/spec/telas/menus.md §8).
                     use engine::core::moldura_principal::ComandoPrincipal as C;
-                    println!("menu de sistema: {c:?}");
+                    println!("system menu: {c:?}");
                     match c {
                         C::Minimizar => canvas.window_mut().minimize(),
                         C::Restaurar if canvas.window().is_maximized() => canvas.window_mut().restore(),
@@ -332,7 +332,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 match r {
                     arquivos::RespostaDialogo::Carregar(p) => match arquivos::carregar(s, &p, o) {
                         Ok(nova) => *s = nova,
-                        Err(e) => eprintln!("erro no Load: {e}"),
+                        Err(e) => eprintln!("{}", tr!("jogo.erro.load", erro = e)),
                     },
                     arquivos::RespostaDialogo::Sair => return Ok(()),
                     arquivos::RespostaDialogo::Nada => {}
@@ -346,7 +346,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 }
                 if tratar_modal(s, &ev).is_some_and(|m| m.abre_selecao_de_jogo()) {
                     // _EndGameDialog → _NewGame(0): abre o "Select a Game" (simant/src/modos.rs).
-                    println!("fim de jogo: Select a Game");
+                    println!("game over: Select a Game");
                     s.modos.escolhendo = true;
                 }
                 redesenhar = true;
@@ -557,9 +557,9 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     }
                     if let Some(f) = s.botao_usuario_em(x, y) {
                         match s.botao_usuario(f) {
-                            RespostaBotao::Feito => println!("botão {f}: {}", s.situacao()),
+                            RespostaBotao::Feito => println!("button {f}: {}", s.situacao()),
                             RespostaBotao::Salvar => s.salvar_com_dialogo(false, o.salvar.as_deref()),
-                            RespostaBotao::NaoImplementado(n) => println!("botão {n}: janela ainda não implementada"),
+                            RespostaBotao::NaoImplementado(n) => println!("button {n}: window not implemented yet"),
                         }
                         redesenhar = true;
                     } else if let Some(a) = s.acao_do_clique(x, y) {
@@ -609,7 +609,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
         let ativa = janela_ativa(canvas.window());
         if foco != Some(ativa) {
             foco = Some(ativa);
-            println!("janela {}", if ativa { "ativa" } else { "inativa: som desligado" });
+            println!("window {}", if ativa { "active" } else { "inactive: sound off" });
             s.partida.definir_foco(ativa);
             // O título do Windows 3.1 (se desenhado) fica inativo sem o foco.
             redesenhar = true;
@@ -726,7 +726,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 salvar_png(c, w, h, &px)?;
                 println!("{} ({w} × {h})", c.display());
             }
-            println!("saindo: GameTime = {}, {}", s.partida.estado.partida.tempo, s.situacao());
+            println!("leaving: GameTime = {}, {}", s.partida.estado.partida.tempo, s.situacao());
             return Ok(());
         }
         canvas.present();
@@ -755,10 +755,10 @@ pub(crate) fn ctrl_apertado(eventos: &sdl2::EventPump) -> bool {
 
 /// Jogo novo escolhido no "Select a Game" do Ctrl+N: nova sessão com a semente do relógio.
 pub(crate) fn novo_jogo<'a>(s: &Sessao<'a>, e: engine::core::selecao::Escolha, o: &Opcoes) -> Result<Sessao<'a>, String> {
-    let tipo = e.tipo_jogo().ok_or("escolha sem jogo novo")?;
+    let tipo = e.tipo_jogo().ok_or("choice without a new game")?;
     // _NewGame não ressemeia: o mundo sai do R da partida aberta (geracao-mundo.md §1; conferido no
     // vetor inseticida_morte/21, engine/tests/fim_de_jogo_interface.rs).
-    println!("novo jogo {e:?} com R = {:#010x}", s.partida.estado.r.estado());
+    println!("new game {e:?} with R = {:#010x}", s.partida.estado.r.estado());
     let mut nova = Sessao::abrir_na_tela(s.recursos, &o.dados, Origem::NovoNaPartida(&s.partida.estado, tipo), s.cores.clone(), o.tela_virtual)?;
     nova.herdar_janelas(s);
     nova.herdar_opcoes(s, false);

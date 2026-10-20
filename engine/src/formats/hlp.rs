@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 
 fn u16_em(d: &[u8], o: usize) -> Result<u16, String> {
-    d.get(o..o + 2).map(|s| u16::from_le_bytes([s[0], s[1]])).ok_or_else(|| "HLP truncado".into())
+    d.get(o..o + 2).map(|s| u16::from_le_bytes([s[0], s[1]])).ok_or_else(|| "HLP truncated".into())
 }
 
 fn i16_em(d: &[u8], o: usize) -> Result<i16, String> {
@@ -15,7 +15,7 @@ fn i16_em(d: &[u8], o: usize) -> Result<i16, String> {
 }
 
 fn u32_em(d: &[u8], o: usize) -> Result<u32, String> {
-    d.get(o..o + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]])).ok_or_else(|| "HLP truncado".into())
+    d.get(o..o + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]])).ok_or_else(|| "HLP truncated".into())
 }
 
 fn i32_em(d: &[u8], o: usize) -> Result<i32, String> {
@@ -23,7 +23,7 @@ fn i32_em(d: &[u8], o: usize) -> Result<i32, String> {
 }
 
 fn byte_em(d: &[u8], o: usize) -> Result<u8, String> {
-    d.get(o).copied().ok_or_else(|| "HLP truncado".into())
+    d.get(o).copied().ok_or_else(|| "HLP truncated".into())
 }
 
 /// Valores comprimidos do WinHelp (o bit 0 do primeiro byte diz se o valor ocupa o dobro).
@@ -250,7 +250,7 @@ const CABECALHO_BLOCO: usize = 12;
 impl ArquivoAjuda {
     pub fn ler(dados: Vec<u8>) -> Result<ArquivoAjuda, String> {
         if u32_em(&dados, 0)? != 0x0003_5F3F {
-            return Err("não é um arquivo de ajuda do WinHelp".into());
+            return Err("not a WinHelp help file".into());
         }
         let dir = i32_em(&dados, 4)? as usize;
         let arquivos = diretorio(&dados, dir)?;
@@ -291,7 +291,7 @@ impl ArquivoAjuda {
     /// referências de texto de `data/ajuda.json` (recursos.rs).
     pub fn titulo_de(dados: &[u8]) -> Result<String, String> {
         if u32_em(dados, 0)? != 0x0003_5F3F {
-            return Err("não é um arquivo de ajuda do WinHelp".into());
+            return Err("not a WinHelp help file".into());
         }
         let arquivos = diretorio(dados, i32_em(dados, 4)? as usize)?;
         titulo_do_sistema(interno(dados, &arquivos, "|SYSTEM")?)
@@ -303,7 +303,7 @@ impl ArquivoAjuda {
     pub fn palavras_chave(&self) -> Result<Vec<PalavraChave>, String> {
         let (Ok(k), Ok(dados)) = (self.interno("|KWBTREE"), self.interno("|KWDATA")) else { return Ok(Vec::new()) };
         if u16_em(k, 0)? != 0x293B {
-            return Err("|KWBTREE inválido".into());
+            return Err("invalid |KWBTREE".into());
         }
         let pagina = u16_em(k, 4)? as usize;
         let raiz = i16_em(k, 26)?;
@@ -323,7 +323,7 @@ impl ArquivoAjuda {
             let prox = i16_em(k, b + 6)?;
             let mut e = b + 8;
             for _ in 0..n {
-                let fim = k.get(e..).and_then(|s| s.iter().position(|&c| c == 0)).ok_or("palavra sem fim no |KWBTREE")? + e;
+                let fim = k.get(e..).and_then(|s| s.iter().position(|&c| c == 0)).ok_or("unterminated word in |KWBTREE")? + e;
                 let palavra = k[e..fim].iter().map(|&c| c as char).collect();
                 let quantos = u16_em(k, fim + 1)? as usize;
                 let desl = i32_em(k, fim + 3)? as usize;
@@ -366,7 +366,7 @@ impl ArquivoAjuda {
         let n = u16_em(p, 0)? as usize;
         // HC30: tabela de n + 1 deslocamentos a partir do byte 4, relativos ao início da tabela.
         let offs = (0..=n).map(|k| u16_em(p, 4 + 2 * k).map(|v| v as usize + 4)).collect::<Result<Vec<_>, _>>()?;
-        (0..n).map(|k| p.get(offs[k]..offs[k + 1]).map(<[u8]>::to_vec).ok_or_else(|| "|Phrases truncado".to_string())).collect()
+        (0..n).map(|k| p.get(offs[k]..offs[k + 1]).map(<[u8]>::to_vec).ok_or_else(|| "|Phrases truncated".to_string())).collect()
     }
 
     fn ler_fontes(&self) -> Result<Vec<FonteAjuda>, String> {
@@ -430,7 +430,7 @@ impl ArquivoAjuda {
             let d1len = i32_em(&cab, 16)? as usize;
             let tipo = cab[20];
             if tam < 21 || d1len < 21 || d1len > tam {
-                return Err(format!("TOPICLINK inválido em {pos}"));
+                return Err(format!("invalid TOPICLINK at {pos}"));
             }
             let dados = Self::ler_topic(t, pos, tam);
             let d1 = &dados[21..d1len.min(dados.len())];
@@ -450,7 +450,7 @@ impl ArquivoAjuda {
                 }
                 1 => {
                     if let Some(top) = topicos.last_mut() {
-                        let ps = paragrafos(d1, &d2, &mut fonte).map_err(|e| format!("tópico {}: {e}", top.titulo))?;
+                        let ps = paragrafos(d1, &d2, &mut fonte).map_err(|e| format!("topic {}: {e}", top.titulo))?;
                         top.paragrafos.extend(ps);
                     }
                 }
@@ -468,13 +468,13 @@ impl ArquivoAjuda {
     pub fn figura(&self, n: u16) -> Result<Figura, String> {
         let d = self.interno(&format!("bm{n}"))?;
         if u16_em(d, 0)? != 0x706C {
-            return Err(format!("bm{n}: não é MRB/SHG"));
+            return Err(format!("bm{n}: not MRB/SHG"));
         }
         let base = u32_em(d, 4)? as usize;
         let tipo = byte_em(d, base)?;
         let empacotamento = byte_em(d, base + 1)?;
         if tipo != 5 && tipo != 6 {
-            return Err(format!("bm{n}: tipo de figura {tipo} não suportado"));
+            return Err(format!("bm{n}: picture type {tipo} not supported"));
         }
         let mut o = base + 2;
         let _xdpi = cul(d, &mut o)?;
@@ -495,7 +495,7 @@ impl ArquivoAjuda {
         } else {
             Vec::new()
         };
-        let comp = d.get(base + off_dados..base + off_dados + tam).ok_or(format!("bm{n}: dados fora do arquivo"))?;
+        let comp = d.get(base + off_dados..base + off_dados + tam).ok_or(format!("bm{n}: data outside the file"))?;
         let linha = (largura * bits).div_ceil(32) * 4;
         let total = linha * altura;
         let crus = match empacotamento {
@@ -503,10 +503,10 @@ impl ArquivoAjuda {
             1 => runlen(comp),
             2 => lz77(comp, total),
             3 => runlen(&lz77(comp, usize::MAX)),
-            e => return Err(format!("bm{n}: empacotamento {e}")),
+            e => return Err(format!("bm{n}: packing {e}")),
         };
         if tipo == 5 || !matches!(bits, 1 | 4 | 8) {
-            return Err(format!("bm{n}: {bits} bits por pixel (tipo {tipo}) não suportado"));
+            return Err(format!("bm{n}: {bits} bits per pixel (type {tipo}) not supported"));
         }
         let mut rgb = vec![[0u8; 3]; largura * altura];
         for y in 0..altura {
@@ -527,20 +527,20 @@ impl ArquivoAjuda {
 
 /// Diretório (árvore B+ de nomes → posição do arquivo interno).
 fn interno<'a>(dados: &'a [u8], arquivos: &HashMap<String, usize>, nome: &str) -> Result<&'a [u8], String> {
-    let &o = arquivos.get(nome).ok_or_else(|| format!("arquivo interno {nome} não existe"))?;
+    let &o = arquivos.get(nome).ok_or_else(|| format!("internal file {nome} does not exist"))?;
     let usado = i32_em(dados, o + 4)? as usize;
-    dados.get(o + 9..o + 9 + usado).ok_or_else(|| format!("{nome} truncado"))
+    dados.get(o + 9..o + 9 + usado).ok_or_else(|| format!("{nome} truncated"))
 }
 
 /// Título do |SYSTEM do HC30: cabeçalho de 12 bytes (0x036C, versão menor até 16, ...) e o texto
 /// ASCIIZ. Os bytes viram caracteres Latin-1, como nas listas de strings do banco.
 fn titulo_do_sistema(sistema: &[u8]) -> Result<String, String> {
     if u16_em(sistema, 0)? != 0x036C {
-        return Err("|SYSTEM inválido".into());
+        return Err("invalid |SYSTEM".into());
     }
     let menor = u16_em(sistema, 2)?;
     if menor > 16 {
-        return Err(format!("ajuda do WinHelp 3.1 (|SYSTEM menor {menor}) não suportada; só HC30"));
+        return Err(format!("WinHelp 3.1 help (|SYSTEM minor {menor}) not supported; only HC30"));
     }
     Ok(sistema.get(12..).unwrap_or(&[]).iter().take_while(|&&b| b != 0).map(|&b| b as char).collect())
 }
@@ -548,7 +548,7 @@ fn titulo_do_sistema(sistema: &[u8]) -> Result<String, String> {
 fn diretorio(d: &[u8], inicio: usize) -> Result<HashMap<String, usize>, String> {
     let o = inicio + 9;
     if u16_em(d, o)? != 0x293B {
-        return Err("diretório do HLP inválido".into());
+        return Err("invalid HLP directory".into());
     }
     let pagina = u16_em(d, o + 4)? as usize;
     let raiz = i16_em(d, o + 26)?;
@@ -567,7 +567,7 @@ fn diretorio(d: &[u8], inicio: usize) -> Result<HashMap<String, usize>, String> 
         let prox = i16_em(d, b + 6)?;
         let mut e = b + 8;
         for _ in 0..n {
-            let fim = d.get(e..).and_then(|s| s.iter().position(|&c| c == 0)).ok_or("nome sem fim no diretório")? + e;
+            let fim = d.get(e..).and_then(|s| s.iter().position(|&c| c == 0)).ok_or("unterminated name in the directory")? + e;
             let nome = String::from_utf8_lossy(&d[e..fim]).into_owned();
             saida.insert(nome, i32_em(d, fim + 1)? as usize);
             e = fim + 5;
@@ -709,7 +709,7 @@ fn paragrafos(d1: &[u8], d2: &[u8], fonte: &mut u16) -> Result<Vec<Paragrafo>, S
                 let n = u16_em(d1, o)? as usize;
                 o += 2 + n;
             }
-            outro => return Err(format!("comando de formatação 0x{outro:02X} desconhecido")),
+            outro => return Err(format!("unknown formatting command 0x{outro:02X}")),
         }
     }
     if !atual.itens.is_empty() {

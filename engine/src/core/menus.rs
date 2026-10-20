@@ -88,7 +88,7 @@ impl MenuAberto {
                 })
             })
             .collect::<Option<Vec<_>>>()
-            .ok_or(format!("janela {}: item do menu ausente", cfg.janela))?;
+            .ok_or(format!("window {}: menu item missing", cfg.janela))?;
         Ok(MenuAberto { janela: cfg.janela, externo, interior, itens, codigos: cfg.codigos.clone(), realcado: None })
     }
 

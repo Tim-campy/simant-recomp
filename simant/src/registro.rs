@@ -47,16 +47,16 @@ pub fn preparar(console: bool, sem_opcoes: bool) -> Saida {
 
 /// Mostra um erro fatal: na saída de erros e, sem terminal, numa caixa de mensagem.
 pub fn erro_fatal(saida: &Saida, mensagem: &str) {
-    eprintln!("erro: {mensagem}");
+    eprintln!("{}", engine::tr!("programa.erro", erro = mensagem));
     if saida.sem_terminal() {
         let mut texto = mensagem.to_string();
         if mensagem.contains("SHARED") {
-            texto += "
-
-A pasta do jogo original não foi encontrada. Abra o simant sem opções (ou com --launcher) para escolhê-la.";
+            texto += "\n\n";
+            texto += &engine::tr!("programa.sem_jogo");
         }
         if let Some(log) = &saida.log {
-            texto += &format!("\n\nRegistro da execução: {}", log.display());
+            texto += "\n\n";
+            texto += &engine::tr!("programa.registro", arquivo = log.display());
         }
         caixa_de_erro(&texto);
     }
@@ -76,9 +76,10 @@ pub fn avisar_panico(saida: &Saida) {
     let padrao = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         padrao(info);
-        let mut texto = format!("Erro interno do SimAnt recomp:\n{info}");
+        let mut texto = engine::tr!("programa.erro_interno", erro = info);
         if let Some(l) = &log {
-            texto += &format!("\n\nRegistro da execução: {}", l.display());
+            texto += "\n\n";
+            texto += &engine::tr!("programa.registro", arquivo = l.display());
         }
         caixa_de_erro(&texto);
     }));

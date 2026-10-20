@@ -26,7 +26,7 @@ impl VistaEdicao {
     /// Vista com o `_MapPlane` e o `_MapPnt` salvos, já limitada.
     pub fn do_save(jogo: &JogoSalvo, largura: i32, altura: i32) -> Result<VistaEdicao, String> {
         let n = jogo.i16("MapPlane")?;
-        let plano = super::vida::plano_de(n).ok_or(format!("_MapPlane = {n} desconhecido"))?;
+        let plano = super::vida::plano_de(n).ok_or(format!("unknown _MapPlane = {n}"))?;
         let (x, y) = jogo.par_i16("MapPnt")?;
         let mut v = VistaEdicao { plano, x: x as i32, y: y as i32, largura, altura };
         v.limitar();
@@ -113,7 +113,7 @@ pub struct CenaEdicao<'a> {
 /// o que aparece. Devolve erro se algum tile não existir no tileset.
 pub fn desenhar_vista(q: &mut Quadro, vista: &VistaEdicao, cena: &CenaEdicao, destino: (i32, i32)) -> Result<(), String> {
     if cena.chao.plano != vista.plano {
-        return Err(format!("mapa do plano {:?} para a vista do plano {:?}", cena.chao.plano, vista.plano));
+        return Err(format!("map of plane {:?} for the view of plane {:?}", cena.chao.plano, vista.plano));
     }
     for lin in 0..vista.altura {
         for col in 0..vista.largura {
@@ -121,14 +121,14 @@ pub fn desenhar_vista(q: &mut Quadro, vista: &VistaEdicao, cena: &CenaEdicao, de
             let px = destino.0 + col * LADO as i32;
             let py = destino.1 + lin * LADO as i32;
             let i = cena.chao.tile(x, y);
-            let t = cena.tiles_chao.tile(i as usize).ok_or_else(|| format!("tile de chão {i} ausente em ({x}, {y})"))?;
+            let t = cena.tiles_chao.tile(i as usize).ok_or_else(|| format!("floor tile {i} missing at ({x}, {y})"))?;
             desenhar_tile(q, t, px, py, None);
             let v = cena.vida.valor(vista.plano, x, y);
             if let Some(iv) = tile_de_vida(v, &cena.amarela) {
                 let t = cena
                     .tiles_vida
                     .tile(iv)
-                    .ok_or_else(|| format!("tile de vida {iv} (byte {v}) ausente em ({x}, {y})"))?;
+                    .ok_or_else(|| format!("life tile {iv} (byte {v}) missing at ({x}, {y})"))?;
                 desenhar_tile_de_vida(q, t, px, py);
             }
         }

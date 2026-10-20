@@ -38,11 +38,11 @@ pub(crate) enum RespostaDialogo {
 /// Nome do diálogo para o terminal.
 fn nome_do_dialogo(d: &Dialogo) -> &'static str {
     match d {
-        Dialogo::PerguntaLoad(_) => "pergunta do Load",
+        Dialogo::PerguntaLoad(_) => "Load question",
         Dialogo::SalvarAntesDoLoad(_) | Dialogo::SalvarComo(_) | Dialogo::SalvarAntesDeSair(_) => "Save As",
         Dialogo::Load(_) => "Load",
         Dialogo::Salvo(..) => "Saved correctly",
-        Dialogo::PerguntaSair(_) => "pergunta do Quit",
+        Dialogo::PerguntaSair(_) => "Quit question",
     }
 }
 
@@ -90,7 +90,7 @@ impl Sessao<'_> {
             return false;
         }
         if let Some(d) = &self.dialogo {
-            println!("fechar: o diálogo aberto ({}) é cancelado", nome_do_dialogo(d));
+            println!("close: the open dialog ({}) is canceled", nome_do_dialogo(d));
         }
         self.menus.barra.fechar();
         self.menu = None;
@@ -132,7 +132,7 @@ impl Sessao<'_> {
                 true
             }
             Err(e) => {
-                eprintln!("erro ao salvar: {e}");
+                eprintln!("{}", engine::tr!("jogo.erro.salvar", erro = e));
                 false
             }
         }
@@ -180,7 +180,7 @@ impl Sessao<'_> {
                         RespostaDialogo::Sair
                     }
                     Err(e) => {
-                        eprintln!("erro ao salvar: {e}");
+                        eprintln!("{}", engine::tr!("jogo.erro.salvar", erro = e));
                         RespostaDialogo::Nada
                     }
                 };
@@ -367,12 +367,12 @@ impl LoadNaAbertura {
 pub(crate) fn carregar<'a>(s: &Sessao<'a>, arquivo: &Path, o: &Opcoes) -> Result<Sessao<'a>, String> {
     let r = s.partida.estado.r;
     let tipo = TipoJogo::de_i16(s.partida.estado.partida.tipo_jogo).unwrap_or(TipoJogo::Tutorial);
-    println!("Load: {} (R da sessão, tipo {tipo:?})", arquivo.display());
+    println!("Load: {} (session R, type {tipo:?})", arquivo.display());
     let tut: engine::core::carregar::ConfigTutorialArquivo = s.recursos.dados("tutorial_arquivo.json")?;
     if engine::core::carregar::e_o_tutorial(arquivo, &tut) {
         // _LoadGame com o nome do tutorial: não lê o arquivo, gera o tutorial (_SeedSRand pelo relógio).
         let semente = semente(&Opcoes { semente: None, ..o.clone() }) as u16;
-        println!("Load: {} é o tutorial: _GenerateTutorial", arquivo.display());
+        println!("Load: {} is the tutorial: _GenerateTutorial", arquivo.display());
         let mut nova = Sessao::abrir_na_tela(s.recursos, &o.dados, Origem::Tutorial(&s.partida.estado, semente), s.cores.clone(), o.tela_virtual)?;
         nova.herdar_janelas(s);
         nova.herdar_opcoes(s, false);

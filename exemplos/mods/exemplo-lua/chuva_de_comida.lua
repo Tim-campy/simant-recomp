@@ -1,12 +1,18 @@
--- Exemplo de mod com script (API de mods 0.12, docs/api-mods.md, "Scripts Lua").
--- A cada 500 ticks cai uma "chuva de comida" na superfície: 30 tentativas em células sorteadas
--- pelo gerador do próprio script (não mexe nos sorteios do jogo) e uma mensagem na faixa.
+-- Example of a mod with a script (mod API 0.12; 0.43 for the texts; docs/api-mods.md, "Lua scripts").
+-- Every 500 ticks a "food rain" falls on the surface: 30 tries on cells drawn by the script's own
+-- generator (it does not touch the game's random draws) and a message in the strip.
+-- The texts come from data/idiomas/<language>.json inside the mod (keys "mod.exemplo-lua.*"),
+-- read with traduzir(); English is the fallback and pt-BR is a second example.
 
 local INTERVALO = 500
 local TENTATIVAS = 30
 
+local function t(chave, params)
+  return traduzir("mod.exemplo-lua." .. chave, params)
+end
+
 function ao_iniciar(estado)
-  registrar("chuva de comida ligada; API " .. API_VERSAO .. ", jogo " .. estado:tipo_jogo())
+  registrar(t("ligada", { api = API_VERSAO, jogo = estado:tipo_jogo(), idioma = idioma() }))
 end
 
 function depois_do_tick(estado)
@@ -22,6 +28,6 @@ function depois_do_tick(estado)
       caidas = caidas + 1
     end
   end
-  mostrar_mensagem("Choveu comida! (" .. caidas .. " pedaços)")
-  registrar("tick " .. estado:tempo() .. ": " .. caidas .. " pedaços de comida")
+  mostrar_mensagem(t("choveu", { n = caidas }))
+  registrar(t("registro", { tick = estado:tempo(), n = caidas }))
 end

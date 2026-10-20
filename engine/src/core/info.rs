@@ -355,7 +355,7 @@ impl JanelaInfo {
         if self.carta.is_none() {
             match Carta::ler(recursos, &self.cfg, self.atual) {
                 Ok(c) => self.carta = Some(c),
-                Err(e) => eprintln!("info: cartão {}: {e}", self.atual),
+                Err(e) => eprintln!("info: card {}: {e}", self.atual),
             }
         }
     }

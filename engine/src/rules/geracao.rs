@@ -132,13 +132,13 @@ impl TabelasGeracao {
     fn validar(&self) -> Result<(), String> {
         comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx8, &self.dy8)?;
         if self.pedras5.len() != 6 || self.pedras5.iter().any(|f| f.len() != 25) {
-            return Err("pedras5 deve ter 6 formas de 25 bytes".into());
+            return Err("pedras5 must have 6 shapes of 25 bytes".into());
         }
         if self.pedras3.len() != 6 || self.pedras3.iter().any(|f| f.len() != 9) {
-            return Err("pedras3 deve ter 6 formas de 9 bytes".into());
+            return Err("pedras3 must have 6 shapes of 9 bytes".into());
         }
         if self.seno.len() != 64 {
-            return Err("tabela de seno deve ter 64 valores".into());
+            return Err("sine table must have 64 values".into());
         }
         Ok(())
     }
@@ -175,7 +175,7 @@ impl Direcoes for TabelasGeracao {
 
 fn seno_do_objeto(b: &[u8]) -> Result<Vec<i16>, String> {
     if b.len() < 128 {
-        return Err(format!("objeto 9/1000 (seno) com {} bytes, esperado 128", b.len()));
+        return Err(format!("object 9/1000 (sine) has {} bytes, expected 128", b.len()));
     }
     Ok(b[..128].chunks(2).map(|p| i16::from_be_bytes([p[0], p[1]])).collect())
 }
@@ -558,7 +558,7 @@ impl Mundo {
             self.gerar_quintal(s, tab);
             Ok(())
         } else if n < 0 {
-            Err(format!("patch ({px}, {py}) fora do quintal"))
+            Err(format!("patch ({px}, {py}) outside the yard"))
         } else {
             self.gerar_casa(s, tab, n as usize)
         }
@@ -934,7 +934,7 @@ impl Mundo {
         if plano >= 2 {
             let v = self.mapa_b[ix(x, y)];
             if e_terra(v) || (0x1C..=0x1F).contains(&v) {
-                return Err(format!("formiga amarela em ({x}, {y}) cairia em terra: _DigMyTile não implementado"));
+                return Err(format!("yellow ant at ({x}, {y}) would land on dirt: _DigMyTile not implemented"));
             }
         }
         let vida = if plano < 2 { &mut self.vida_a } else { &mut self.vida_b };

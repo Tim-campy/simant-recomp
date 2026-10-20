@@ -396,7 +396,7 @@ impl JanelasControle {
     /// Geometria da janela `c` (layout + deslocamento medido + onde o jogador a pôs).
     pub fn geometria(&self, _recursos: &Recursos, c: Controle) -> Result<GeometriaControle, String> {
         let id = self.cfg.id(c);
-        self.geometria_atual(id).ok_or(format!("janela {id} sem geometria"))
+        self.geometria_atual(id).ok_or(format!("window {id} has no geometry"))
     }
 
     fn geometria_atual(&self, id: u16) -> Option<GeometriaControle> {

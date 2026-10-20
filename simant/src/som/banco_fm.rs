@@ -68,7 +68,7 @@ impl Operador {
     pub fn validar(&self) -> Result<(), String> {
         let faixas = [(self.mult, 15), (self.ksl, 3), (self.tl, 63), (self.ar, 15), (self.dr, 15), (self.sl, 15), (self.rr, 15), (self.onda, 7)];
         if faixas.iter().any(|&(v, max)| v > max) {
-            return Err(format!("operador fora das faixas do OPL: {self:?}"));
+            return Err(format!("operator outside the OPL ranges: {self:?}"));
         }
         Ok(())
     }
@@ -132,20 +132,20 @@ impl Banco {
     /// Lê o JSON do port e confere as faixas (o executável lê pelo `Recursos::dados`, com mods).
     #[cfg(test)]
     pub fn de_json(bytes: &[u8]) -> Result<Banco, String> {
-        let b: Banco = serde_json::from_slice(bytes).map_err(|e| format!("banco FM: {e}"))?;
+        let b: Banco = serde_json::from_slice(bytes).map_err(|e| format!("FM bank: {e}"))?;
         b.validar()?;
         Ok(b)
     }
 
     pub fn validar(&self) -> Result<(), String> {
         if self.melodicos.len() != 128 {
-            return Err(format!("banco FM: {} timbres melódicos (precisa de 128)", self.melodicos.len()));
+            return Err(format!("FM bank: {} melodic instruments (needs 128)", self.melodicos.len()));
         }
         for t in self.melodicos.iter().chain(self.percussao.values()) {
             t.modulador.validar()?;
             t.portadora.validar()?;
             if t.realimentacao > 7 {
-                return Err(format!("banco FM: realimentação {} em '{}'", t.realimentacao, t.nome));
+                return Err(format!("FM bank: feedback {} in '{}'", t.realimentacao, t.nome));
             }
         }
         Ok(())
@@ -158,7 +158,7 @@ impl Banco {
         const CAB: &[u8] = b"#OPL_II#";
         const N: usize = 175;
         if bytes.len() < CAB.len() + N * 36 || &bytes[..CAB.len()] != CAB {
-            return Err("banco .op2: cabeçalho #OPL_II# ausente ou arquivo curto".into());
+            return Err(".op2 bank: #OPL_II# header missing or file too short".into());
         }
         let nome = |i: usize| -> String {
             let o = CAB.len() + N * 36 + i * 32;

@@ -37,7 +37,7 @@ pub struct LayoutSave {
 
 impl LayoutSave {
     pub fn de_json(texto: &str) -> Result<LayoutSave, String> {
-        let l: LayoutSave = serde_json::from_str(texto).map_err(|e| format!("layout do save: {e}"))?;
+        let l: LayoutSave = serde_json::from_str(texto).map_err(|e| format!("save layout: {e}"))?;
         l.validar()?;
         Ok(l)
     }
@@ -52,12 +52,12 @@ impl LayoutSave {
         let mut vistos = HashMap::new();
         for (i, b) in self.blocos.iter().enumerate() {
             if let Some(j) = vistos.insert(b.simbolo.as_str(), i) {
-                return Err(format!("símbolo {} repetido nos blocos {j} e {i}", b.simbolo));
+                return Err(format!("symbol {} repeated in blocks {j} and {i}", b.simbolo));
             }
         }
         let soma: usize = self.blocos.iter().map(BlocoLayout::bytes).sum();
         if soma != self.total_bytes {
-            return Err(format!("soma dos blocos ({soma}) difere de total_bytes ({})", self.total_bytes));
+            return Err(format!("sum of the blocks ({soma}) differs from total_bytes ({})", self.total_bytes));
         }
         Ok(())
     }
@@ -165,7 +165,7 @@ impl JogoSalvo {
         layout.validar()?;
         if dados.len() != layout.total_bytes {
             return Err(format!(
-                "save com {} bytes; o layout espera {}",
+                "save has {} bytes; the layout expects {}",
                 dados.len(),
                 layout.total_bytes
             ));
@@ -211,17 +211,17 @@ impl JogoSalvo {
     }
 
     fn exigir(&self, simbolo: &str, tamanho: usize) -> Result<&[u8], String> {
-        let b = self.bloco(simbolo).ok_or_else(|| format!("bloco {simbolo} não existe no layout"))?;
+        let b = self.bloco(simbolo).ok_or_else(|| format!("block {simbolo} does not exist in the layout"))?;
         if b.len() != tamanho {
-            return Err(format!("bloco {simbolo} tem {} bytes; esperado {tamanho}", b.len()));
+            return Err(format!("block {simbolo} has {} bytes; expected {tamanho}", b.len()));
         }
         Ok(b)
     }
 
     fn exigir_mut(&mut self, simbolo: &str, tamanho: usize) -> Result<&mut [u8], String> {
-        let b = self.bloco_mut(simbolo).ok_or_else(|| format!("bloco {simbolo} não existe no layout"))?;
+        let b = self.bloco_mut(simbolo).ok_or_else(|| format!("block {simbolo} does not exist in the layout"))?;
         if b.len() != tamanho {
-            return Err(format!("bloco {simbolo} tem {} bytes; esperado {tamanho}", b.len()));
+            return Err(format!("block {simbolo} has {} bytes; expected {tamanho}", b.len()));
         }
         Ok(b)
     }
@@ -254,9 +254,9 @@ impl JogoSalvo {
 
     /// Bloco inteiro lido como vetor de palavras (ex.: `CastePopB`, `H_BPop`).
     pub fn vetor_i16(&self, simbolo: &str) -> Result<Vec<i16>, String> {
-        let b = self.bloco(simbolo).ok_or_else(|| format!("bloco {simbolo} não existe no layout"))?;
+        let b = self.bloco(simbolo).ok_or_else(|| format!("block {simbolo} does not exist in the layout"))?;
         if b.len() % 2 != 0 {
-            return Err(format!("bloco {simbolo} tem tamanho ímpar ({})", b.len()));
+            return Err(format!("block {simbolo} has odd size ({})", b.len()));
         }
         Ok(b.as_chunks::<2>().0.iter().map(|&c| i16::from_le_bytes(c)).collect())
     }
@@ -325,14 +325,14 @@ impl JogoSalvo {
     /// Capacidade da lista: 1000 (A) ou 500 (B, R), segundo o layout.
     pub fn capacidade(&self, lista: Lista) -> Result<usize, String> {
         let s = lista.simbolo('X');
-        Ok(self.bloco(&s).ok_or_else(|| format!("bloco {s} não existe no layout"))?.len())
+        Ok(self.bloco(&s).ok_or_else(|| format!("block {s} does not exist in the layout"))?.len())
     }
 
     /// Entrada `i` da lista (sem checar se está em uso).
     pub fn formiga(&self, lista: Lista, i: usize) -> Result<Formiga, String> {
         let cap = self.capacidade(lista)?;
         if i >= cap {
-            return Err(format!("índice {i} fora da lista {} ({cap})", lista.letra()));
+            return Err(format!("index {i} outside list {} ({cap})", lista.letra()));
         }
         let campo = |c: char| -> Result<u8, String> { Ok(self.exigir(&lista.simbolo(c), cap)?[i]) };
         Ok(Formiga { x: campo('X')?, y: campo('Y')?, modo: campo('M')?, tipo: campo('T')?, s: campo('S')? })

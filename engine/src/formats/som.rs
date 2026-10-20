@@ -15,7 +15,7 @@ const TAM_TABELA: usize = 16;
 /// Cada byte depois da tabela gera duas amostras: nibble alto, depois baixo; a soma estoura em 8 bits.
 pub fn decodificar_efeito(dados: &[u8]) -> Result<Vec<u8>, String> {
     if dados.len() < TAM_TABELA {
-        return Err(format!("efeito com {} bytes, menor que a tabela de deltas", dados.len()));
+        return Err(format!("effect has {} bytes, smaller than the delta table", dados.len()));
     }
     let (tabela, corpo) = dados.split_at(TAM_TABELA);
     let mut amostra: u8 = 0x80;
@@ -43,7 +43,7 @@ pub struct CabecalhoMusica {
 impl CabecalhoMusica {
     pub fn de_bytes(b: &[u8]) -> Result<CabecalhoMusica, String> {
         if b.len() < 18 {
-            return Err(format!("cabeçalho de música com {} bytes (esperado 18)", b.len()));
+            return Err(format!("music header has {} bytes (expected 18)", b.len()));
         }
         let mut palavras = [0i16; 9];
         for (i, p) in palavras.iter_mut().enumerate() {

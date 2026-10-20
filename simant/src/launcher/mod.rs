@@ -4,6 +4,10 @@
 //! `launcher.json` na pasta de dados do usuário (`config_launcher.rs`). Desenhada em SDL2 por
 //! software, sem nada do jogo original. Decisão em docs/decisoes.md (2026-10-19, "Launcher dentro
 //! do simant").
+//!
+//! Todos os textos vêm do frame de idiomas (`data/idiomas/`, docs/i18n.md), no idioma escolhido
+//! no seletor da faixa do título (contexto `launcher`): `--idioma`, senão o de `launcher.json`,
+//! senão o do sistema (se disponível), senão inglês.
 
 pub mod desenho;
 pub mod dialogo_nativo;
@@ -13,6 +17,7 @@ use std::path::{Path, PathBuf};
 
 use crate::config_launcher::{self as cfgl, ConfigLauncher, InfoMod, Inicio, Validacao};
 use desenho::*;
+use engine::idiomas::{self, Textos};
 
 pub const LARGURA: i32 = 640;
 pub const ALTURA: i32 = 480;
@@ -62,6 +67,8 @@ pub enum Acao {
     /// Lenta sem foco (padrão) ou o ritmo do original (`--sem-foco original`).
     LentaSemFoco,
     MostrarLauncher,
+    /// Índice em [`Estado::idiomas`].
+    Idioma(usize),
     Jogar,
     Salvar,
     Sair,
@@ -83,6 +90,8 @@ enum Tipo {
     Opcao(String, Acao, bool, bool),
     Caixa(String, Acao, bool, bool),
     Campo(IdCampo, usize),
+    /// Opção do seletor de idioma, na faixa azul do título (texto branco).
+    OpcaoTitulo(String, Acao, bool),
 }
 
 #[derive(Clone, Debug)]
@@ -105,13 +114,32 @@ pub struct Estado {
     /// Mensagem da última linha e a cor.
     status: (String, Cor),
     apertado: Option<Acao>,
+    /// Os textos no idioma do launcher.
+    pub textos: Textos,
+    /// Idiomas do contexto `launcher` (código, nome), de `data/idiomas/idiomas.json`.
+    idiomas: Vec<(String, String)>,
 }
 
 const EXEMPLOS: &str = "exemplos/mods";
 
 impl Estado {
-    pub fn novo(cfg: Option<ConfigLauncher>, caminho: Option<PathBuf>, base: PathBuf) -> Estado {
+    /// `idioma`: o de `--idioma` (vence o da configuração); sem ele, o da configuração ou o do
+    /// sistema.
+    pub fn novo(cfg: Option<ConfigLauncher>, caminho: Option<PathBuf>, base: PathBuf, idioma: Option<&str>) -> Estado {
+        Estado::novo_com(cfg, caminho, base, idioma, &crate::idioma_sistema::preferidos())
+    }
+
+    /// Como [`Estado::novo`], com os idiomas do sistema dados (testes).
+    pub fn novo_com(cfg: Option<ConfigLauncher>, caminho: Option<PathBuf>, base: PathBuf, idioma: Option<&str>, sistema: &[String]) -> Estado {
         let mut cfg = cfg.unwrap_or_default();
+        let dados = base.join("data");
+        let idiomas = idiomas::indice_de_pasta(&dados).disponiveis(idiomas::CONTEXTO_LAUNCHER);
+        let codigos: Vec<String> = idiomas.iter().map(|(c, _)| c.clone()).collect();
+        if let Some(i) = idioma {
+            cfg.idioma = Some(i.to_string());
+        }
+        let codigo = idiomas::escolher(cfg.idioma.as_deref(), sistema, &codigos);
+        let textos = Textos::de_pastas(&dados, &[], &codigo);
         // Sem pasta escolhida: a que o jogo usaria (SIMANT_DIR ou SimAnt-T/MAXIS/ANTWIN), se for válida.
         if cfg.jogo.is_none() {
             let padrao = crate::opcoes::pasta_jogo_padrao(&base);
@@ -125,21 +153,57 @@ impl Estado {
             caminho,
             base,
             perfis,
-            validacao: Validacao { ok: false, mensagem: String::new() },
+            validacao: Validacao::sem_pasta(),
             mods: Vec::new(),
             win_ini_auto: None,
             campos: vec![Campo::default(); CAMPOS.len()],
             foco: None,
             status: (String::new(), PRETO),
             apertado: None,
+            textos,
+            idiomas,
         };
         e.campos_da_config();
         e.atualizar();
         e.status = match &e.caminho {
-            Some(c) if c.is_file() => (format!("Configuração: {}", c.display()), CINZA),
-            _ => ("Escolha a pasta do SimAnt e clique em Jogar.".into(), CINZA),
+            Some(c) if c.is_file() => (e.tf("launcher.status.configuracao", &[("arquivo", &c.display())]), CINZA),
+            _ => (e.t("launcher.status.inicial"), CINZA),
         };
         e
+    }
+
+    fn t(&self, chave: &str) -> String {
+        self.textos.t(chave)
+    }
+
+    fn tf(&self, chave: &str, params: &[(&str, &dyn std::fmt::Display)]) -> String {
+        self.textos.f(chave, params)
+    }
+
+    /// O código do idioma mostrado.
+    pub fn idioma(&self) -> &str {
+        self.textos.codigo()
+    }
+
+    /// Título da janela do launcher, no idioma.
+    pub fn titulo_janela(&self) -> String {
+        self.t("launcher.titulo_janela")
+    }
+
+    /// Troca o idioma do launcher (índice em `idiomas`): textos, configuração e `launcher.json`
+    /// (só a chave `idioma`, para não gravar o resto antes de Salvar ou Jogar).
+    fn trocar_idioma(&mut self, i: usize) {
+        let Some((codigo, nome)) = self.idiomas.get(i).cloned() else { return };
+        self.textos = Textos::de_pastas(&self.base.join("data"), &[], &codigo);
+        self.cfg.idioma = Some(codigo.clone());
+        self.status = (self.tf("launcher.status.idioma", &[("idioma", &nome)]), CINZA);
+        if let Some(c) = &self.caminho {
+            let mut gravada = ConfigLauncher::ler(c).ok().flatten().unwrap_or_default();
+            gravada.idioma = Some(codigo);
+            if let Err(e) = gravada.gravar(c) {
+                self.status = (self.tf("launcher.status.nao_salvou", &[("erro", &e)]), VERMELHO);
+            }
+        }
     }
 
     fn campo(&self, id: IdCampo) -> &Campo {
@@ -194,7 +258,7 @@ impl Estado {
     /// Recalcula o que depende da configuração: conferência da pasta, mods, WIN.INI e a linha.
     fn atualizar(&mut self) {
         self.validacao = match &self.cfg.jogo {
-            None => Validacao { ok: false, mensagem: "Escolha a pasta onde está o SimAnt (com SHARED.NDX e WINGANT.NDX).".into() },
+            None => Validacao::sem_pasta(),
             Some(_) => cfgl::validar_pasta_jogo(&self.pasta_jogo()),
         };
         self.mods = cfgl::listar_mods(&self.pasta_mods());
@@ -224,10 +288,10 @@ impl Estado {
                 if t.is_empty() {
                     self.cfg.janela = None;
                 } else {
-                    match crate::video::ler_tamanho("Janela", &t) {
+                    match crate::video::ler_tamanho("--janela", &t, &self.textos) {
                         Ok((l, a)) => self.cfg.janela = Some([l, a]),
                         Err(_) => {
-                            self.status = ("Janela: use LARGURAxALTURA (ex.: 1280x960) ou deixe vazio.".into(), VERMELHO);
+                            self.status = (self.t("launcher.erro.janela"), VERMELHO);
                             return;
                         }
                     }
@@ -244,7 +308,7 @@ impl Estado {
     /// Aplica a linha de comando editada à configuração (e aos outros campos).
     fn confirmar_linha(&mut self) -> bool {
         let texto = self.campo(IdCampo::Linha).texto.clone();
-        match cfgl::dividir_linha(&texto).and_then(|a| self.cfg.de_argumentos(&a)) {
+        match cfgl::dividir_linha(&texto, &self.textos).and_then(|a| self.cfg.de_argumentos(&a, &self.textos)) {
             Ok(c) => {
                 self.cfg = c;
                 let foco = self.foco.take();
@@ -254,7 +318,7 @@ impl Estado {
                 true
             }
             Err(e) => {
-                self.status = (format!("Linha de comando: {e}"), VERMELHO);
+                self.status = (self.tf("launcher.erro.linha", &[("erro", &e)]), VERMELHO);
                 false
             }
         }
@@ -293,7 +357,7 @@ impl Estado {
             Acao::Procurar(id) => self.procurar(id),
             Acao::Inicio(i) => self.cfg.inicio = i,
             Acao::Tipo(t) => {
-                self.cfg.tipo = cfgl::TIPOS[t].0.into();
+                self.cfg.tipo = cfgl::TIPOS[t].into();
                 self.cfg.inicio = Inicio::NovoJogo;
             }
             Acao::Resolucao(r) => self.cfg.resolucao = r.map(|i| cfgl::RESOLUCOES[i]),
@@ -302,7 +366,7 @@ impl Estado {
             Acao::Moldura => self.cfg.moldura = if self.cfg.moldura != Some(false) { Some(false) } else { None },
             Acao::Perfil(p) => self.cfg.perfil_driver = p.map(|i| self.perfis[i].clone()),
             Acao::Som => self.cfg.som = !self.cfg.som,
-            Acao::Sintetizador(s) => self.cfg.sintetizador = s.map(|i| cfgl::SINTETIZADORES[i].0.into()),
+            Acao::Sintetizador(s) => self.cfg.sintetizador = s.map(|i| cfgl::SINTETIZADORES[i].into()),
             Acao::PastaMods(p) => {
                 self.cfg.mods = match p {
                     0 => None,
@@ -330,6 +394,7 @@ impl Estado {
             }
             Acao::LentaSemFoco => self.cfg.sem_foco = if self.cfg.sem_foco.as_deref() == Some("original") { None } else { Some("original".into()) },
             Acao::MostrarLauncher => self.cfg.mostrar_launcher = !self.cfg.mostrar_launcher,
+            Acao::Idioma(i) => self.trocar_idioma(i),
             Acao::Jogar => return self.jogar(),
             Acao::Salvar => {
                 self.salvar();
@@ -342,17 +407,17 @@ impl Estado {
     }
 
     fn salvar(&mut self) -> bool {
-        let Some(c) = &self.caminho else {
-            self.status = ("Sem pasta de dados do usuário: a configuração não pode ser gravada.".into(), VERMELHO);
+        let Some(c) = self.caminho.clone() else {
+            self.status = (self.t("launcher.status.sem_pasta_usuario"), VERMELHO);
             return false;
         };
-        match self.cfg.gravar(c) {
+        match self.cfg.gravar(&c) {
             Ok(()) => {
-                self.status = (format!("Configuração salva em {}", c.display()), VERDE);
+                self.status = (self.tf("launcher.status.salva", &[("arquivo", &c.display())]), VERDE);
                 true
             }
             Err(e) => {
-                self.status = (format!("Não foi possível salvar: {e}"), VERMELHO);
+                self.status = (self.tf("launcher.status.nao_salvou", &[("erro", &e)]), VERMELHO);
                 false
             }
         }
@@ -360,11 +425,11 @@ impl Estado {
 
     fn jogar(&mut self) -> Option<Saida> {
         if !self.validacao.ok {
-            self.status = (format!("Pasta do jogo: {}", self.validacao.mensagem), VERMELHO);
+            self.status = (self.tf("launcher.erro.pasta_jogo", &[("motivo", &self.validacao.mensagem(&self.textos))]), VERMELHO);
             return None;
         }
         if self.cfg.inicio == Inicio::Save && self.cfg.save.is_none() {
-            self.status = ("Escolha o arquivo do jogo salvo (.ANT).".into(), VERMELHO);
+            self.status = (self.t("launcher.erro.sem_save"), VERMELHO);
             return None;
         }
         if self.caminho.is_some() {
@@ -378,21 +443,31 @@ impl Estado {
         let atual = self.campo(id).texto.trim().to_string();
         let inicial = (!atual.is_empty()).then(|| crate::pastas::resolver(Path::new(&atual), &self.base));
         let inicial = inicial.as_deref();
+        let todos = self.t("launcher.dialogo.todos_arquivos");
+        let filtro = |nome: &'static str, padroes: &'static [&'static str]| (self.t(nome), padroes);
         let r = match id {
-            IdCampo::Jogo => escolher_pasta("Pasta da instalação do SimAnt (com SHARED.NDX)", inicial.or(Some(&self.base))),
-            IdCampo::Mods => escolher_pasta("Pasta de mods", inicial.or(Some(&self.base))),
+            IdCampo::Jogo => escolher_pasta(&self.t("launcher.dialogo.pasta_jogo"), inicial.or(Some(&self.base))),
+            IdCampo::Mods => escolher_pasta(&self.t("launcher.dialogo.pasta_mods"), inicial.or(Some(&self.base))),
             IdCampo::Save => {
                 let jogo = self.pasta_jogo();
-                escolher_arquivo("Jogo salvo do SimAnt", inicial.or(Some(&jogo)), Filtro { nome: "Jogos do SimAnt (*.ANT)", padroes: &["*.ANT"] })
+                let (nome, padroes) = filtro("launcher.dialogo.filtro_save", &["*.ANT"]);
+                escolher_arquivo(&self.t("launcher.dialogo.save"), inicial.or(Some(&jogo)), Filtro { nome: &nome, padroes, todos: &todos })
             }
-            IdCampo::SoundFont => escolher_arquivo("SoundFont General MIDI", inicial, Filtro { nome: "SoundFont (*.sf2)", padroes: &["*.sf2"] }),
-            IdCampo::WinIni => escolher_arquivo("WIN.INI do Windows 3.1", inicial, Filtro { nome: "WIN.INI", padroes: &["*.INI"] }),
+            IdCampo::SoundFont => {
+                let (nome, padroes) = filtro("launcher.dialogo.filtro_soundfont", &["*.sf2"]);
+                escolher_arquivo(&self.t("launcher.dialogo.soundfont"), inicial, Filtro { nome: &nome, padroes, todos: &todos })
+            }
+            IdCampo::WinIni => {
+                let (nome, padroes) = filtro("launcher.dialogo.filtro_win_ini", &["*.INI"]);
+                escolher_arquivo(&self.t("launcher.dialogo.win_ini"), inicial, Filtro { nome: &nome, padroes, todos: &todos })
+            }
             IdCampo::Janela | IdCampo::Linha => return,
         };
         match r {
             Ok(Some(p)) => self.definir_caminho(id, &p),
             Ok(None) => {}
-            Err(e) => self.status = (e, VERMELHO),
+            Err(e) if e == dialogo_nativo::SEM_SELETOR => self.status = (self.t("launcher.erro.sem_seletor"), VERMELHO),
+            Err(e) => self.status = (self.tf("launcher.erro.dialogo", &[("erro", &e)]), VERMELHO),
         }
     }
 
@@ -407,7 +482,7 @@ impl Estado {
         }
         self.campo_mudou(id);
         if id == IdCampo::Jogo {
-            self.status = (self.validacao.mensagem.clone(), if self.validacao.ok { VERDE } else { VERMELHO });
+            self.status = (self.validacao.mensagem(&self.textos), if self.validacao.ok { VERDE } else { VERMELHO });
         }
         self.campos_da_config();
         self.atualizar();
@@ -434,7 +509,7 @@ impl Estado {
                 "sf2" => IdCampo::SoundFont,
                 "ini" => IdCampo::WinIni,
                 _ => {
-                    self.status = (format!("Não sei o que fazer com {}", p.display()), VERMELHO);
+                    self.status = (self.tf("launcher.erro.arrastado", &[("arquivo", &p.display())]), VERMELHO);
                     return;
                 }
             }
@@ -533,7 +608,7 @@ impl Estado {
         let alvo = w.iter().rev().find(|w| w.r.contem(x, y)).map(|w| (w.tipo.clone(), w.r));
         match alvo {
             Some((Tipo::Botao(_, a, _), _)) => self.apertado = Some(a),
-            Some((Tipo::Opcao(_, a, _, _) | Tipo::Caixa(_, a, _, _), _)) => return self.acao(a),
+            Some((Tipo::Opcao(_, a, _, _) | Tipo::Caixa(_, a, _, _) | Tipo::OpcaoTitulo(_, a, _), _)) => return self.acao(a),
             Some((Tipo::Campo(id, linhas), r)) => {
                 self.acao(Acao::Focar(id));
                 if self.foco == Some(id) {
@@ -595,70 +670,91 @@ impl Estado {
             w.push(Widget { r: Ret { x, y: y - 1, w: largura, h: 10 }, tipo: Tipo::Caixa(t.into(), a, m, true) });
             x + largura
         };
+        let procurar = self.t("launcher.botao.procurar");
         let campo = |w: &mut Vec<Widget>, id: IdCampo| {
             let (_, r, linhas) = posicao_campo(id);
             w.push(Widget { r, tipo: Tipo::Campo(id, linhas) });
             if let Some(b) = botao_procurar(id) {
-                w.push(Widget { r: b, tipo: Tipo::Botao("Procurar...".into(), Acao::Procurar(id), false) });
+                w.push(Widget { r: b, tipo: Tipo::Botao(procurar.clone(), Acao::Procurar(id), false) });
             }
         };
         let c = &self.cfg;
+        let t = |k: &str| self.t(k);
+        let padrao = t("launcher.opcao.padrao");
+
+        // Seletor de idioma, na faixa do título (à direita, na segunda linha). Com idiomas demais
+        // para os nomes caberem, os códigos.
+        let largura_itens = |nomes: &[String]| nomes.iter().map(|n| 14 + n.chars().count() as i32 * CAR + 10).sum::<i32>();
+        let mut nomes: Vec<String> = self.idiomas.iter().map(|(_, n)| n.clone()).collect();
+        if largura_itens(&nomes) > LARGURA - 240 {
+            nomes = self.idiomas.iter().map(|(c, _)| c.clone()).collect();
+        }
+        let mut x = LARGURA - x0 - largura_itens(&nomes) + 10;
+        for (i, n) in nomes.iter().enumerate() {
+            let largura = 14 + n.chars().count() as i32 * CAR;
+            let marcado = self.idiomas[i].0 == self.idioma();
+            w.push(Widget { r: Ret { x, y: 16, w: largura, h: 10 }, tipo: Tipo::OpcaoTitulo(n.clone(), Acao::Idioma(i), marcado) });
+            x += largura + 10;
+        }
 
         // Pasta do jogo.
-        secao(&mut w, 36, "Pasta da instalação do SimAnt (Windows 3.x)");
+        secao(&mut w, 36, &t("launcher.secao.jogo"));
         campo(&mut w, IdCampo::Jogo);
         let cor = if self.validacao.ok { VERDE } else { VERMELHO };
-        texto(&mut w, x0, 70, &encurtar(&self.validacao.mensagem, 77), cor);
+        texto(&mut w, x0, 70, &encurtar(&self.validacao.mensagem(&self.textos), 77), cor);
 
         // Início.
-        secao(&mut w, 86, "Início");
-        let inicios = [("Abertura e \"Select a Game\"", Inicio::Abertura), ("Jogo novo", Inicio::NovoJogo), ("Jogo salvo", Inicio::Save)];
-        let itens: Vec<_> = inicios.iter().map(|(t, i)| (t.to_string(), Acao::Inicio(*i), c.inicio == *i)).collect();
+        secao(&mut w, 86, &t("launcher.secao.inicio"));
+        let inicios = [("launcher.inicio.abertura", Inicio::Abertura), ("launcher.inicio.novo_jogo", Inicio::NovoJogo), ("launcher.inicio.save", Inicio::Save)];
+        let itens: Vec<_> = inicios.iter().map(|(k, i)| (t(k), Acao::Inicio(*i), c.inicio == *i)).collect();
         opcoes(&mut w, x0, 101, &itens, true);
-        texto(&mut w, x0 + 16, 117, "Tipo:", PRETO);
-        let itens: Vec<_> = cfgl::TIPOS.iter().enumerate().map(|(i, (n, t))| (t.to_string(), Acao::Tipo(i), c.tipo == *n)).collect();
+        texto(&mut w, x0 + 16, 117, &t("launcher.rotulo.tipo"), PRETO);
+        let itens: Vec<_> = cfgl::TIPOS.iter().enumerate().map(|(i, n)| (t(&format!("launcher.tipo.{n}")), Acao::Tipo(i), c.tipo == *n)).collect();
         opcoes(&mut w, x0 + rotulo_w, 117, &itens, c.inicio == Inicio::NovoJogo);
-        texto(&mut w, x0 + 16, 133, "Arquivo:", if c.inicio == Inicio::Save { PRETO } else { CINZA });
+        texto(&mut w, x0 + 16, 133, &t("launcher.rotulo.arquivo"), if c.inicio == Inicio::Save { PRETO } else { CINZA });
         campo(&mut w, IdCampo::Save);
 
         // Vídeo.
-        secao(&mut w, 152, "Vídeo");
-        texto(&mut w, x0, 167, "Resolução:", PRETO);
-        let mut itens = vec![("Padrão".to_string(), Acao::Resolucao(None), c.resolucao.is_none())];
+        secao(&mut w, 152, &t("launcher.secao.video"));
+        texto(&mut w, x0, 167, &t("launcher.rotulo.resolucao"), PRETO);
+        let mut itens = vec![(padrao.clone(), Acao::Resolucao(None), c.resolucao.is_none())];
         itens.extend(cfgl::RESOLUCOES.iter().enumerate().map(|(i, [l, a])| (format!("{l}x{a}"), Acao::Resolucao(Some(i)), c.resolucao == Some([*l, *a]))));
         opcoes(&mut w, x0 + rotulo_w, 167, &itens, true);
-        caixa(&mut w, 452, 167, "Moldura Win 3.1", Acao::Moldura, c.moldura != Some(false));
-        texto(&mut w, x0, 183, "Escala:", PRETO);
-        let mut itens = vec![("Padrão".to_string(), Acao::Escala(None), c.escala.is_none())];
+        caixa(&mut w, 452, 167, &t("launcher.caixa.moldura"), Acao::Moldura, c.moldura != Some(false));
+        texto(&mut w, x0, 183, &t("launcher.rotulo.escala"), PRETO);
+        let mut itens = vec![(padrao.clone(), Acao::Escala(None), c.escala.is_none())];
         itens.extend((1..=4).map(|e| (format!("{e}x"), Acao::Escala(Some(e)), c.escala == Some(e))));
-        itens.push(("Máxima".to_string(), Acao::Escala(Some(0)), c.escala == Some(0)));
+        itens.push((t("launcher.opcao.maxima"), Acao::Escala(Some(0)), c.escala == Some(0)));
         opcoes(&mut w, x0 + rotulo_w, 183, &itens, true);
-        texto(&mut w, 452, 183, "Janela:", PRETO);
+        texto(&mut w, 452, 183, &t("launcher.rotulo.janela"), PRETO);
         campo(&mut w, IdCampo::Janela);
-        texto(&mut w, x0, 199, "Driver:", PRETO);
-        let mut itens = vec![("Padrão".to_string(), Acao::Perfil(None), c.perfil_driver.is_none())];
-        itens.extend(self.perfis.iter().enumerate().map(|(i, p)| (nome_perfil(p), Acao::Perfil(Some(i)), c.perfil_driver.as_deref() == Some(p))));
+        texto(&mut w, x0, 199, &t("launcher.rotulo.driver"), PRETO);
+        let mut itens = vec![(padrao.clone(), Acao::Perfil(None), c.perfil_driver.is_none())];
+        itens.extend(self.perfis.iter().enumerate().map(|(i, p)| (nome_perfil(&self.textos, p), Acao::Perfil(Some(i)), c.perfil_driver.as_deref() == Some(p))));
         opcoes(&mut w, x0 + rotulo_w, 199, &itens, true);
 
         // Som.
-        secao(&mut w, 218, "Som");
-        let fim = caixa(&mut w, x0, 233, "Som ligado", Acao::Som, c.som);
-        let x = texto(&mut w, fim + 24, 233, "Sintetizador:", if c.som { PRETO } else { CINZA });
-        let mut itens = vec![("Padrão".to_string(), Acao::Sintetizador(None), c.sintetizador.is_none())];
-        itens.extend(cfgl::SINTETIZADORES.iter().enumerate().map(|(i, (n, t))| (t.to_string(), Acao::Sintetizador(Some(i)), c.sintetizador.as_deref() == Some(n))));
+        secao(&mut w, 218, &t("launcher.secao.som"));
+        let fim = caixa(&mut w, x0, 233, &t("launcher.caixa.som"), Acao::Som, c.som);
+        let x = texto(&mut w, fim + 24, 233, &t("launcher.rotulo.sintetizador"), if c.som { PRETO } else { CINZA });
+        let mut itens = vec![(padrao.clone(), Acao::Sintetizador(None), c.sintetizador.is_none())];
+        itens.extend(
+            cfgl::SINTETIZADORES.iter().enumerate().map(|(i, n)| (t(&format!("launcher.sintetizador.{n}")), Acao::Sintetizador(Some(i)), c.sintetizador.as_deref() == Some(n))),
+        );
         opcoes(&mut w, x + CAR, 233, &itens, c.som);
-        texto(&mut w, x0 + 16, 249, "SoundFont:", if c.som { PRETO } else { CINZA });
+        texto(&mut w, x0 + 16, 249, &t("launcher.rotulo.soundfont"), if c.som { PRETO } else { CINZA });
         campo(&mut w, IdCampo::SoundFont);
 
         // Mods.
-        secao(&mut w, 268, "Mods");
-        texto(&mut w, x0, 283, "Pasta:", PRETO);
+        secao(&mut w, 268, &t("launcher.secao.mods"));
+        texto(&mut w, x0, 283, &t("launcher.rotulo.pasta"), PRETO);
         let tp = self.tipo_pasta_mods();
-        let itens = [("mods".to_string(), Acao::PastaMods(0), tp == 0), ("exemplos/mods".to_string(), Acao::PastaMods(1), tp == 1), ("Outra:".to_string(), Acao::PastaMods(2), tp == 2)];
+        let itens = [("mods".to_string(), Acao::PastaMods(0), tp == 0), ("exemplos/mods".to_string(), Acao::PastaMods(1), tp == 1), (t("launcher.opcao.outra"), Acao::PastaMods(2), tp == 2)];
         opcoes(&mut w, x0 + 7 * CAR, 283, &itens, true);
         campo(&mut w, IdCampo::Mods);
         if self.mods.is_empty() {
-            texto(&mut w, x0 + 16, 299, &format!("(nenhum mod em {})", encurtar(&self.pasta_mods().display().to_string(), 60)), CINZA);
+            let pasta = encurtar(&self.pasta_mods().display().to_string(), 60);
+            texto(&mut w, x0 + 16, 299, &self.tf("launcher.mods.nenhum", &[("pasta", &pasta)]), CINZA);
         } else {
             for (i, m) in self.mods.iter().take(8).enumerate() {
                 let (x, y) = (x0 + 16 + (i as i32 % 4) * 150, 299 + (i as i32 / 4) * 14);
@@ -666,35 +762,40 @@ impl Estado {
                 caixa(&mut w, x, y, &t, Acao::Mod(i), !c.mods_desligados.contains(&m.nome));
             }
             if self.mods.len() > 8 {
-                texto(&mut w, x0 + 16, 327, &format!("... e mais {} (ligados)", self.mods.len() - 8), CINZA);
+                texto(&mut w, x0 + 16, 327, &self.tf("launcher.mods.mais", &[("n", &(self.mods.len() - 8))]), CINZA);
             }
         }
 
         // Preferências.
-        secao(&mut w, 340, "Preferências do jogador");
-        caixa(&mut w, x0, 355, "Guardar opções entre partidas", Acao::Preferencias, c.preferencias);
+        secao(&mut w, 340, &t("launcher.secao.preferencias"));
+        caixa(&mut w, x0, 355, &t("launcher.caixa.preferencias"), Acao::Preferencias, c.preferencias);
         texto(&mut w, 300, 355, "WIN.INI:", if c.preferencias { PRETO } else { CINZA });
         campo(&mut w, IdCampo::WinIni);
         let auto = match (&c.win_ini, &self.win_ini_auto) {
-            (Some(_), _) => "Lido só na 1a partida; nunca gravado.".to_string(),
-            (None, Some(p)) => format!("Auto: {}", encurtar(&p.display().to_string(), 33)),
-            (None, None) => "Auto: nenhum WIN.INI perto do jogo.".to_string(),
+            (Some(_), _) => t("launcher.win_ini.escolhido"),
+            (None, Some(p)) => self.tf("launcher.win_ini.auto", &[("arquivo", &encurtar(&p.display().to_string(), 33))]),
+            (None, None) => t("launcher.win_ini.nenhum"),
         };
         // Ritmo (extensões do port, data/partida.json): marcado = o do original.
-        let fim = caixa(&mut w, x0, 371, "Fast/Ultra do 486", Acao::VelocidadesOriginais, c.velocidades.as_deref() == Some("original"));
-        caixa(&mut w, fim + 10, 371, "Lenta sem foco", Acao::LentaSemFoco, c.sem_foco.as_deref() != Some("original"));
-        texto(&mut w, 316, 371, &encurtar(&auto, 39), CINZA);
+        let fim = caixa(&mut w, x0, 371, &t("launcher.caixa.velocidades"), Acao::VelocidadesOriginais, c.velocidades.as_deref() == Some("original"));
+        let fim = caixa(&mut w, fim + 10, 371, &t("launcher.caixa.lenta_sem_foco"), Acao::LentaSemFoco, c.sem_foco.as_deref() != Some("original"));
+        // O texto do WIN.INI automático depois das caixas (o tamanho delas muda com o idioma).
+        let x = (fim + 2 * CAR).max(316);
+        texto(&mut w, x, 371, &encurtar(&auto, ((LARGURA - x0 - x) / CAR).max(4) as usize), CINZA);
 
         // Linha de comando.
-        secao(&mut w, 388, "Linha de comando equivalente (editável; Enter aplica)");
+        secao(&mut w, 388, &t("launcher.secao.linha"));
         campo(&mut w, IdCampo::Linha);
 
-        caixa(&mut w, x0, 441, "Abrir esta tela ao iniciar", Acao::MostrarLauncher, c.mostrar_launcher);
-        let botoes = [("Jogar", Acao::Jogar, true, 72), ("Salvar configuração", Acao::Salvar, false, 168), ("Sair", Acao::Sair, false, 64)];
+        caixa(&mut w, x0, 441, &t("launcher.caixa.mostrar_launcher"), Acao::MostrarLauncher, c.mostrar_launcher);
+        // Botões: largura pelo texto (no mínimo a de antes), da direita para a esquerda.
+        let botoes = [("launcher.botao.jogar", Acao::Jogar, true, 72), ("launcher.botao.salvar", Acao::Salvar, false, 64), ("launcher.botao.sair", Acao::Sair, false, 64)];
         let mut x = LARGURA - x0;
-        for (t, a, padrao, largura) in botoes.iter().rev() {
+        for (k, a, padrao, minima) in botoes.iter().rev() {
+            let rotulo = t(k);
+            let largura = (rotulo.chars().count() as i32 * CAR + 24).max(*minima);
             x -= largura;
-            w.push(Widget { r: Ret { x, y: 434, w: *largura, h: 22 }, tipo: Tipo::Botao(t.to_string(), *a, *padrao) });
+            w.push(Widget { r: Ret { x, y: 434, w: largura, h: 22 }, tipo: Tipo::Botao(rotulo, *a, *padrao) });
             x -= 8;
         }
         let (s, cor) = &self.status;
@@ -708,8 +809,8 @@ impl Estado {
         // Faixa do título.
         t.cheio(Ret { x: 0, y: 0, w: LARGURA, h: 28 }, AZUL);
         t.texto(12, 6, "SimAnt recomp", BRANCO, 2);
-        let sub = format!("Opções de inicialização - versão {}", env!("CARGO_PKG_VERSION"));
-        t.texto(LARGURA - 12 - sub.chars().count() as i32 * CAR, 14, &sub, BRANCO, 1);
+        let sub = self.tf("launcher.subtitulo", &[("versao", &env!("CARGO_PKG_VERSION"))]);
+        t.texto(LARGURA - 12 - sub.chars().count() as i32 * CAR, 4, &sub, BRANCO, 1);
         t.horizontal(0, 28, LARGURA, PRETO);
         // Rolagem dos campos para o cursor ficar visível.
         for id in CAMPOS {
@@ -752,6 +853,10 @@ impl Estado {
                     t.caixa(w.r.x, w.r.y, *m, *ativa);
                     t.texto(w.r.x + 14, w.r.y + 1, s, if *ativa { PRETO } else { CINZA }, 1);
                 }
+                Tipo::OpcaoTitulo(s, _, m) => {
+                    t.opcao(w.r.x, w.r.y, *m, true);
+                    t.texto(w.r.x + 14, w.r.y + 1, s, BRANCO, 1);
+                }
                 Tipo::Campo(id, linhas) => {
                     let focado = self.foco == Some(*id);
                     t.cheio(w.r, BRANCO);
@@ -765,7 +870,7 @@ impl Estado {
                     let vazio = chars.is_empty() && !focado;
                     if vazio {
                         if let Some(dica) = dica_campo(*id) {
-                            t.texto(w.r.x + 3, w.r.y + 3, &encurtar(dica, colunas), CINZA, 1);
+                            t.texto(w.r.x + 3, w.r.y + 3, &encurtar(&self.t(dica), colunas), CINZA, 1);
                         }
                     }
                     for lin in 0..*linhas {
@@ -813,24 +918,27 @@ fn botao_procurar(id: IdCampo) -> Option<Ret> {
         .then_some(Ret { x: LARGURA - 12 - 104, y: r.y - 2, w: 104, h: 18 })
 }
 
+/// A chave (em `data/idiomas/`) da dica de um campo vazio.
 fn dica_campo(id: IdCampo) -> Option<&'static str> {
     match id {
-        IdCampo::Jogo => Some("Ex.: C:\\MAXIS\\ANTWIN (ou arraste a pasta para esta janela)"),
-        IdCampo::Save => Some("Arquivo .ANT"),
-        IdCampo::Janela => Some("LxA"),
-        IdCampo::SoundFont => Some("Arquivo .sf2 (com o sintetizador SoundFont)"),
-        IdCampo::Mods => Some("Pasta"),
-        IdCampo::WinIni => Some("Automático"),
+        IdCampo::Jogo => Some("launcher.dica.jogo"),
+        IdCampo::Save => Some("launcher.dica.save"),
+        IdCampo::Janela => Some("launcher.dica.janela"),
+        IdCampo::SoundFont => Some("launcher.dica.soundfont"),
+        IdCampo::Mods => Some("launcher.dica.mods"),
+        IdCampo::WinIni => Some("launcher.dica.win_ini"),
         IdCampo::Linha => None,
     }
 }
 
-fn nome_perfil(p: &str) -> String {
-    match p {
-        "vga" => "VGA 16 cores".into(),
-        "svga256" => "SVGA 256".into(),
-        "s3_dosbox" => "S3 (DOSBox-X)".into(),
-        outro => outro.into(),
+/// Nome de um perfil de driver: `launcher.perfil.<perfil>` (um perfil de mod sem tradução fica
+/// com o próprio nome).
+fn nome_perfil(t: &Textos, p: &str) -> String {
+    let chave = format!("launcher.perfil.{p}");
+    if t.tem(&chave) {
+        t.t(&chave)
+    } else {
+        p.to_string()
     }
 }
 
@@ -902,8 +1010,9 @@ pub fn executar(estado: &mut Estado, aviso: Option<String>, jogar_apos_ms: Optio
     let (_, (w, h)) = cfg_video.tamanho_inicial(LARGURA as u32, ALTURA as u32, area);
     // A escala máxima pode ocupar a tela toda; o launcher fica em no máximo 2x.
     let (w, h) = (w.min(LARGURA as u32 * 2), h.min(ALTURA as u32 * 2));
+    let mut titulo = estado.titulo_janela();
     let janela = video
-        .window("SimAnt recomp - opções de inicialização", w, h)
+        .window(&titulo, w, h)
         .position_centered()
         .resizable()
         .build()
@@ -971,6 +1080,10 @@ pub fn executar(estado: &mut Estado, aviso: Option<String>, jogar_apos_ms: Optio
                 return Ok(s);
             }
         }
+        if estado.titulo_janela() != titulo {
+            titulo = estado.titulo_janela();
+            let _ = canvas.window_mut().set_title(&titulo);
+        }
         let piscar = (inicio.elapsed().as_millis() / 500).is_multiple_of(2);
         let tela = estado.desenhar(piscar);
         textura.update(None, &tela.rgb, LARGURA as usize * 3).map_err(|e| e.to_string())?;
@@ -994,11 +1107,15 @@ mod testes {
         }
         let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let cfg = ConfigLauncher { jogo: Some(jogo.display().to_string()), ..ConfigLauncher::default() };
-        (Estado::novo(Some(cfg), Some(dir.join(cfgl::ARQUIVO)), base), dir)
+        (Estado::novo_com(Some(cfg), Some(dir.join(cfgl::ARQUIVO)), base, None, &[]), dir)
     }
 
     fn clicar_em(e: &mut Estado, a: Acao) -> Option<Saida> {
-        let w = e.widgets().into_iter().find(|w| matches!(&w.tipo, Tipo::Opcao(_, b, ..) | Tipo::Caixa(_, b, ..) | Tipo::Botao(_, b, _) if *b == a)).expect("widget");
+        let w = e
+            .widgets()
+            .into_iter()
+            .find(|w| matches!(&w.tipo, Tipo::Opcao(_, b, ..) | Tipo::Caixa(_, b, ..) | Tipo::Botao(_, b, _) | Tipo::OpcaoTitulo(_, b, _) if *b == a))
+            .expect("widget");
         let (x, y) = (w.r.x + 2, w.r.y + 2);
         e.apertar(x, y).or_else(|| e.soltar_botao(x, y))
     }
@@ -1057,6 +1174,79 @@ mod testes {
         e.digitar("x");
         assert!(!e.validacao.ok);
         assert_eq!(e.acao(Acao::Jogar), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Textos visíveis da tela (rótulos, opções, botões, seções e o título).
+    fn textos_da_tela(e: &Estado) -> Vec<String> {
+        let mut v: Vec<String> = e
+            .widgets()
+            .into_iter()
+            .filter_map(|w| match w.tipo {
+                Tipo::Texto(s, ..) | Tipo::Secao(s) | Tipo::Botao(s, ..) | Tipo::Opcao(s, ..) | Tipo::Caixa(s, ..) | Tipo::OpcaoTitulo(s, ..) => Some(s),
+                Tipo::Campo(..) => None,
+            })
+            .collect();
+        v.push(e.titulo_janela());
+        v
+    }
+
+    #[test]
+    fn idioma_do_sistema_da_configuracao_e_da_opcao() {
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let novo = |cfg: Option<ConfigLauncher>, pedido: Option<&str>, sistema: &[&str]| {
+            let sistema: Vec<String> = sistema.iter().map(|s| s.to_string()).collect();
+            Estado::novo_com(cfg, None, base.clone(), pedido, &sistema).idioma().to_string()
+        };
+        assert_eq!(novo(None, None, &[]), "en", "sem nada: inglês");
+        assert_eq!(novo(None, None, &["pt-BR"]), "pt-BR", "o do sistema");
+        assert_eq!(novo(None, None, &["pt_PT.UTF-8"]), "pt-BR", "a mesma língua");
+        assert_eq!(novo(None, None, &["ja-JP"]), "en", "sistema sem tradução: inglês");
+        let en = ConfigLauncher { idioma: Some("en".into()), ..ConfigLauncher::default() };
+        assert_eq!(novo(Some(en.clone()), None, &["pt-BR"]), "en", "a configuração vence o sistema");
+        assert_eq!(novo(Some(en), Some("pt-BR"), &[]), "pt-BR", "--idioma vence a configuração");
+    }
+
+    #[test]
+    fn troca_de_idioma_muda_os_textos_e_fica_gravada() {
+        let (mut e, dir) = estado();
+        assert_eq!(e.idioma(), "en");
+        let ingles = textos_da_tela(&e);
+        assert!(ingles.iter().any(|s| s == "Play") && ingles.iter().any(|s| s.contains("Video")), "{ingles:?}");
+        let i = e.idiomas.iter().position(|(c, _)| c == "pt-BR").expect("pt-BR no contexto launcher");
+        clicar_em(&mut e, Acao::Idioma(i));
+        assert_eq!(e.idioma(), "pt-BR");
+        let portugues = textos_da_tela(&e);
+        assert!(portugues.iter().any(|s| s == "Jogar") && portugues.iter().any(|s| s == "Vídeo"), "{portugues:?}");
+        assert!(e.campo(IdCampo::Linha).texto.contains("--idioma pt-BR"));
+        // Gravado em launcher.json sem esperar Salvar.
+        let gravada = ConfigLauncher::ler(&dir.join(cfgl::ARQUIVO)).unwrap().unwrap();
+        assert_eq!(gravada.idioma.as_deref(), Some("pt-BR"));
+        // Nenhum texto da tela ficou igual ao inglês, salvo nomes próprios e números.
+        let iguais: Vec<&String> = portugues.iter().filter(|s| ingles.contains(s)).collect();
+        for s in &iguais {
+            assert!(
+                ["SimAnt recomp", "English", "Português (Brasil)", "Tutorial", "Experimental", "FM", "SoundFont", "Mods", "WIN.INI:", "Driver:", "mods", "exemplos/mods", "SoundFont:", "SVGA 256", "S3 (DOSBox-X)"]
+                    .contains(&s.as_str())
+                    || s.chars().any(|c| c.is_ascii_digit()),
+                "não traduzido: {s:?}"
+            );
+        }
+        // Todos os caracteres têm desenho na fonte 8 × 8 (nada vira '?').
+        for s in &portugues {
+            for c in s.chars() {
+                assert!(c == '?' || fonte8x8::glifo(c) != fonte8x8::glifo('?'), "sem glifo: {c:?} em {s:?}");
+            }
+        }
+        // E de volta.
+        let i = e.idiomas.iter().position(|(c, _)| c == "en").unwrap();
+        clicar_em(&mut e, Acao::Idioma(i));
+        let mut de_volta = textos_da_tela(&e);
+        let mut antes = ingles.clone();
+        // A linha de status (penúltima) diz o idioma escolhido; o resto volta igual.
+        assert_eq!(de_volta.remove(de_volta.len() - 2), "Language: English");
+        antes.remove(antes.len() - 2);
+        assert_eq!(de_volta, antes);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

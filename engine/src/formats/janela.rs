@@ -139,11 +139,11 @@ impl Janela {
     /// `layout`: objeto tipo 0; `nomes`: objeto tipo 1 correspondente (pode faltar).
     pub fn decodificar(layout: &[u8], nomes: Option<&[u8]>) -> Result<Janela, String> {
         if layout.len() < CABECALHO {
-            return Err("layout de janela menor que o cabeçalho".into());
+            return Err("window layout smaller than the header".into());
         }
         let n = i16_le(layout, 0x0C);
         if n < 1 {
-            return Err(format!("janela com {n} objetos"));
+            return Err(format!("window with {n} objects"));
         }
         let n = n as usize;
         let nome = |i: usize| {
@@ -156,11 +156,11 @@ impl Janela {
         let mut objetos = Vec::with_capacity(n);
         for i in 0..n {
             if o + 0x28 > layout.len() {
-                return Err(format!("objeto {i} passa do fim do layout"));
+                return Err(format!("object {i} runs past the end of the layout"));
             }
             let tamanho = u16_le(layout, o + CAMPO_TAMANHO) as usize;
             if tamanho < 0x28 || o + tamanho > layout.len() {
-                return Err(format!("objeto {i} com tamanho inválido ({tamanho})"));
+                return Err(format!("object {i} has invalid size ({tamanho})"));
             }
             let ob = &layout[o..o + tamanho];
             objetos.push(Objeto {
@@ -176,7 +176,7 @@ impl Janela {
             o += tamanho;
         }
         if o != layout.len() {
-            return Err(format!("sobraram {} bytes depois do último objeto", layout.len() - o));
+            return Err(format!("{} bytes left over after the last object", layout.len() - o));
         }
         Ok(Janela { objetos, flags: [layout[0x1C], layout[0x1D]] })
     }
@@ -189,11 +189,11 @@ impl Janela {
 /// Tabela de cores: `cabecalho` = objeto 0/0x80, `tabela` = objeto 0/0x81.
 pub fn decodificar_cores(cabecalho: &[u8], tabela: &[u8]) -> Result<Vec<Cor>, String> {
     if cabecalho.len() < 4 {
-        return Err("cabeçalho de cores curto".into());
+        return Err("color header too short".into());
     }
     let n = u16_le(cabecalho, 2) as usize;
     if tabela.len() < n * 6 {
-        return Err(format!("tabela de cores com {} bytes, esperava {}", tabela.len(), n * 6));
+        return Err(format!("color table has {} bytes, expected {}", tabela.len(), n * 6));
     }
     Ok((0..n)
         .map(|i| Cor { frente: tabela[i * 6], fundo: tabela[i * 6 + 2], fundo2: tabela[i * 6 + 3] })
@@ -203,7 +203,7 @@ pub fn decodificar_cores(cabecalho: &[u8], tabela: &[u8]) -> Result<Vec<Cor>, St
 /// Posição (x, y, largura, altura) de cada janela, a partir de um objeto tipo 9 (ids 0/5/7/8).
 pub fn decodificar_posicoes(d: &[u8]) -> Result<Vec<[i16; 4]>, String> {
     if d.len() < ENTRADAS_POSICAO * 8 {
-        return Err("tabela de posições curta".into());
+        return Err("position table too short".into());
     }
     Ok((0..ENTRADAS_POSICAO)
         .map(|i| [i16_le(d, i * 8), i16_le(d, i * 8 + 2), i16_le(d, i * 8 + 4), i16_le(d, i * 8 + 6)])
