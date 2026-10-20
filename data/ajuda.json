@@ -5,7 +5,7 @@
   "externo": [213, 0, 638, 442],
   "_posicao_padrao": "Lugar padrão do WinHelp 3.1 sem posição guardada no WIN.INI, medido na bancada VGA (640x480: x 213..637, y 2..477) e na SVGA (800x600: 266..797 e 2..597; 1024x768: 341..1021 e 2..765; re_trabalho/svga/ag*_ajuda.png, disco preparado com --ajuda-padrao): da coluna largura/3 até largura - 3, da linha 2 até altura - 3 da tela. O port põe o visor da coluna largura/divisor_x até largura - margem_direita (exclusivo) e do topo à base da área cliente (a parte de cima da tela não existe no port). O WIN.INI do usuário guarda [Windows Help] H_WindowPosition=[266,200,266,200,0], de uma sessão em 800x600: com ela o original abre o visor nesse lugar [hipótese: não testado].",
   "posicao_padrao": {"divisor_x": 3, "margem_direita": 2},
-  "_janela": "A janela do WinHelp como janela de nível superior do Windows 3.1 (telas/ajuda.md §2.1; bancada 2026-10-19, qemu_ajuda_janela.txt e qemu_ajuda_janela2.txt, capturas re_trabalho/ag_dlgaj/aj/h*, k*): clique na caixa abre o menu de sistema (h01: 167 de largura com o canto na caixa, atalhos na coluna 98, sombra cinza-clara de 1 pixel), duplo clique fecha, o título arrasta (contorno de 3 pixels, h03), as bordas redimensionam até 103 x 26 (k01, k02: a barra de menus e os botões quebram em linhas), maximizar ocupa a tela (h05; no port, a área cliente), minimizar vira ícone atrás do SimAnt maximizado (h11) e um pedido de ajuda novo a restaura (h14). fase_pontilhado: os pontos invertidos do contorno onde x + y da janela, contada do canto, é par.",
+  "_janela": "A janela do WinHelp como janela de nível superior do Windows 3.1 (telas/ajuda.md §2.1; bancada 2026-10-19, qemu_ajuda_janela.txt e qemu_ajuda_janela2.txt, capturas re_trabalho/ag_dlgaj/aj/h*, k*): clique na caixa abre o menu de sistema (h01: 167 de largura com o canto na caixa, atalhos na coluna 98, sombra cinza-clara de 1 pixel), duplo clique fecha, o título arrasta (contorno de 3 pixels, h03), as bordas redimensionam até 103 x 26 (k01, k02: a barra de menus e os botões quebram em linhas), maximizar ocupa a tela (h05; no port, a área cliente), minimizar vira ícone atrás do SimAnt maximizado (h11) e um pedido de ajuda novo a restaura (h14). fase_pontilhado: os pontos invertidos do contorno onde x + y da janela, contada do canto, é par. Extensão do port (escolha do usuário, 2026-10-19): o Close do WinHelp é Ctrl+F4, não Alt+F4 (o do original), para o Alt+F4 ficar só com o executável (fecha o SimAnt com a pergunta do Quit); o atalho mostrado no menu é o deste arquivo.",
   "janela": {
     "tamanho_minimo": [102, 26],
     "itens": [
@@ -15,7 +15,7 @@
       {"texto": "Mi&nimize", "comando": "minimizar"},
       {"texto": "Ma&ximize", "comando": "maximizar"},
       {"comando": "separador"},
-      {"texto": "&Close", "atalho": "Alt+F4", "comando": "fechar"},
+      {"texto": "&Close", "atalho": "Ctrl+F4", "comando": "fechar"},
       {"comando": "separador"},
       {"texto": "S&witch To...", "atalho": "Ctrl+Esc", "comando": "alternar"}
     ],

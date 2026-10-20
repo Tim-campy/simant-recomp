@@ -413,6 +413,20 @@ impl Sessao<'_> {
         }
     }
 
+    /// Há uma janela modal por cima do jogo (diálogo do Windows, aviso modal, About, Status, menu
+    /// aberto da barra, "Select a Game", mini mapa, menu de um mod): o cursor é a seta e nada das
+    /// ferramentas (lente do Experimental, modo de ajuda) age por baixo dela.
+    pub(crate) fn com_janela_modal(&self) -> bool {
+        self.dialogo.is_some()
+            || self.partida.avisos.tem_modal()
+            || self.menus.sobre.is_some()
+            || self.menus.status
+            || self.menus.barra.ativa()
+            || self.modos.escolhendo
+            || self.mini.aberto()
+            || self.menu_mod.is_some()
+    }
+
     /// `_OpenInfoWindow`: com a janela fechada, volta ao cartão inicial; sempre a traz para a frente.
     pub(crate) fn abrir_info(&mut self) {
         if !self.janelas.aberta(Controle::Info) {

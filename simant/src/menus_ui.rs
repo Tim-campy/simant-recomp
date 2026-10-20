@@ -95,6 +95,13 @@ impl MenusUi {
         }
     }
 
+    /// Estado da barra de título para o desenho: ativa, caixa realçada (menu de sistema aberto),
+    /// botão apertado com o cursor em cima e o botão de maximizar da janela restaurada.
+    pub fn estado_titulo(&self, ativa: bool) -> EstadoTitulo {
+        let apertado = self.apertado.filter(|&(_, dentro)| dentro).map(|(p, _)| p);
+        EstadoTitulo { ativa, caixa_realcada: self.barra.sistema_realcado(), apertado, restaurada: self.restaurada }
+    }
+
     /// Linhas em cima da área cliente (barra e linha preta).
     pub fn altura(&self) -> i32 {
         i32::from(self.barra.altura_total())
@@ -166,43 +173,45 @@ fn resposta(r: Resposta) -> Option<Filtro> {
 
 /// Mouse nos botões da barra de título (caixa: duplo clique fecha; minimizar e restaurar: apertar,
 /// arrastar e soltar dentro). A caixa sozinha é tratada pela barra de menus (abre o menu de sistema).
-fn evento_no_titulo(s: &mut Sessao, ev: &Event, livre: bool) -> Option<Filtro> {
+/// Os botões respondem sempre, também com um diálogo ou aviso modal aberto e no "Select a Game": com
+/// a moldura do Windows 3.1 no lugar da do sistema, eles são os controles da janela do executável
+/// (extensão do port; docs/decisoes.md, 2026-10-19).
+fn evento_no_titulo(menus: &mut MenusUi, largura: i16, ev: &Event) -> Option<Filtro> {
     use sdl2::mouse::MouseButton;
-    let largura = s.tela.cfg.largura as i16;
     let (x, y) = match *ev {
         Event::MouseButtonDown { x, y, .. } | Event::MouseMotion { x, y, .. } | Event::MouseButtonUp { x, y, .. } => (x, y),
         _ => return None,
     };
-    let parte = s.menus.moldura.as_ref()?.parte_em(largura, x, y);
+    let parte = menus.moldura.as_ref()?.parte_em(largura, x, y);
     match *ev {
-        Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, .. } if livre || s.menus.barra.ativa() => match parte? {
+        Event::MouseButtonDown { mouse_btn: MouseButton::Left, clicks, .. } => match parte? {
             ParteTitulo::Caixa if clicks >= 2 => {
                 // Duplo clique na caixa: SC_CLOSE.
-                s.menus.barra.fechar();
+                menus.barra.fechar();
                 Some(Filtro::Sistema(ComandoPrincipal::Fechar))
             }
             ParteTitulo::Caixa => None,
             p @ (ParteTitulo::Minimizar | ParteTitulo::Restaurar) => {
-                s.menus.barra.fechar();
-                s.menus.apertado = Some((p, true));
+                menus.barra.fechar();
+                menus.apertado = Some((p, true));
                 Some(Filtro::Tratada(true))
             }
             ParteTitulo::Faixa => {
-                s.menus.barra.fechar();
+                menus.barra.fechar();
                 // Duplo clique no título da janela maximizada: SC_RESTORE.
                 Some(if clicks >= 2 { Filtro::Sistema(ComandoPrincipal::Restaurar) } else { Filtro::Tratada(true) })
             }
         },
-        // Com um diálogo ou menu do jogo aberto, o título não responde (o clique não vai ao jogo).
-        Event::MouseButtonDown { .. } if parte.is_some() && !s.menus.barra.ativa() => Some(Filtro::Tratada(false)),
+        // Outros botões no título: nada (o clique não vai ao jogo).
+        Event::MouseButtonDown { .. } if parte.is_some() => Some(Filtro::Tratada(false)),
         Event::MouseMotion { .. } => {
-            let (p, dentro) = s.menus.apertado?;
+            let (p, dentro) = menus.apertado?;
             let agora = parte == Some(p);
-            s.menus.apertado = Some((p, agora));
+            menus.apertado = Some((p, agora));
             Some(Filtro::Tratada(agora != dentro))
         }
         Event::MouseButtonUp { mouse_btn: MouseButton::Left, .. } => {
-            let (p, _) = s.menus.apertado.take()?;
+            let (p, _) = menus.apertado.take()?;
             if parte != Some(p) {
                 return Some(Filtro::Tratada(true));
             }
@@ -212,18 +221,54 @@ fn evento_no_titulo(s: &mut Sessao, ev: &Event, livre: bool) -> Option<Filtro> {
     }
 }
 
+/// Só a barra de título e o menu de sistema da janela principal, com o resto da janela parado (um
+/// diálogo ou aviso modal aberto, o About, o Status, o "Select a Game" da abertura): os botões, a
+/// caixa (o menu de sistema abre e se percorre pelo mouse e, aberto, pelo teclado) e nada da barra
+/// de menus. `None` = o evento não é da moldura (segue para quem estiver com a entrada).
+pub fn evento_da_moldura(menus: &mut MenusUi, interface: &Interface, largura: i16, ev: &Event) -> Option<Filtro> {
+    use sdl2::mouse::MouseButton;
+    menus.moldura.as_ref()?;
+    if let Some(f) = evento_no_titulo(menus, largura, ev) {
+        return Some(f);
+    }
+    let f = fonte(&menus.barra.cfg, interface)?;
+    let e = EstadoMenus::default();
+    let barra = &mut menus.barra;
+    barra.so_sistema = true;
+    let r = match ev {
+        Event::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => resposta(barra.apertar(f, &e, *x, *y)),
+        Event::MouseMotion { x, y, .. } if barra.ativa() => Some(Filtro::Tratada(barra.mover(f, &e, *x, *y))),
+        Event::MouseButtonUp { mouse_btn: MouseButton::Left, x, y, .. } => resposta(barra.soltar(f, &e, *x, *y)),
+        Event::KeyDown { keycode: Some(k), keymod, .. } if barra.ativa() => {
+            let alt = keymod.intersects(sdl2::keyboard::Mod::LALTMOD | sdl2::keyboard::Mod::RALTMOD);
+            Some(resposta(barra.tecla(&k.name(), alt)).unwrap_or(Filtro::Tratada(false)))
+        }
+        Event::KeyUp { .. } | Event::TextInput { .. } | Event::MouseButtonDown { .. } if barra.ativa() => Some(Filtro::Tratada(false)),
+        _ => None,
+    };
+    barra.so_sistema = false;
+    r
+}
+
 /// Primeira parada de cada evento da partida. `modal`: há um diálogo, aviso ou menu do jogo aberto
-/// (a barra não abre por cima deles, como o Windows com a captura do mouse do jogo).
+/// (a barra de menus não abre por cima deles, como o Windows com a captura do mouse do jogo; só a
+/// barra de título e o menu de sistema, os controles da janela, respondem).
 pub fn evento(s: &mut Sessao, ev: Event, modal: bool) -> Filtro {
     use sdl2::keyboard::Keycode;
     use sdl2::mouse::MouseButton;
     let h = s.menus.altura();
-    // Janelas modais dos menus: About e Status recebem tudo.
-    if s.menus.sobre.is_some() || s.menus.status {
-        return modal_dos_menus(s, ev);
-    }
-    if let Some(f) = evento_no_titulo(s, &ev, !modal) {
+    let largura = s.tela.cfg.largura as i16;
+    let janela_dos_menus = s.menus.sobre.is_some() || s.menus.status;
+    if modal || janela_dos_menus {
+        if let Some(f) = evento_da_moldura(&mut s.menus, &s.interface, largura, &ev) {
+            return f;
+        }
+    } else if let Some(f) = evento_no_titulo(&mut s.menus, largura, &ev) {
         return f;
+    }
+    // Janelas modais dos menus: About e Status recebem tudo.
+    if janela_dos_menus {
+        return modal_dos_menus(s, ev);
     }
     let e = estado_menus(s);
     let Some(f) = fonte(&s.menus.barra.cfg, &s.interface) else { return Filtro::Passar(deslocar(ev, h)) };
@@ -454,8 +499,7 @@ pub fn compor(s: &Sessao, cliente: &[u8], foco: bool) -> Vec<u8> {
     // Inativa também com um diálogo do Windows por cima (a pergunta do Quit, s12; os diálogos de
     // arquivo) ou com o WinHelp (outro aplicativo) com o foco.
     let ativa = foco && s.dialogo.is_none() && !(s.ajuda.aberto && s.ajuda.foco);
-    let apertado = s.menus.apertado.filter(|&(_, dentro)| dentro).map(|(p, _)| p);
-    let titulo = EstadoTitulo { ativa, caixa_realcada: s.menus.barra.sistema_realcado(), apertado, restaurada: s.menus.restaurada };
+    let titulo = s.menus.estado_titulo(ativa);
     let (w, hc) = (s.tela.cfg.largura as usize, s.tela.cfg.altura as usize);
     compor_barras(&s.menus, &s.interface, &s.cores, &titulo, &estado_menus(s), cliente, w, hc)
 }
@@ -675,6 +719,68 @@ mod testes {
             // Desenho: o título (100% contra m00 no exemplo barra_menus) fica nas linhas 0–18.
             let rgb = compor(s, &vec![0u8; (s.tela.cfg.largura * s.tela.cfg.altura * 3) as usize], true);
             assert_eq!(rgb.len(), (s.tela.cfg.largura as usize) * (s.tela.cfg.altura as usize + s.menus.altura() as usize) * 3);
+        });
+    }
+
+    /// Com um diálogo aberto (a pergunta do Quit, o Save As), os controles da janela continuam
+    /// funcionando: minimizar, o menu de sistema (Close fecha a janela: a pergunta já aberta fica) e
+    /// o duplo clique na caixa; a barra de menus não abre. Fechar com o Save As aberto o cancela e
+    /// abre a pergunta do Quit; com a pergunta aberta, nada.
+    #[test]
+    fn controles_da_janela_com_um_dialogo_aberto() {
+        use sdl2::keyboard::{Keycode, Mod};
+        com_sessao(|s| {
+            s.menus.ligar_moldura(s.recursos, s.tela.cfg.largura).unwrap();
+            let k = s.menus.barra.indice_sistema().unwrap();
+            s.salvar_com_dialogo(true, None);
+            assert!(matches!(s.dialogo, Some(crate::arquivos::Dialogo::SalvarComo(_))));
+            assert!(s.com_janela_modal());
+            // Minimizar.
+            assert!(matches!(evento(s, clique(611, 8), true), Filtro::Tratada(true)));
+            assert!(matches!(evento(s, soltar(612, 9), true), Filtro::Sistema(ComandoPrincipal::Minimizar)));
+            // O File não abre.
+            let file = s.menus.altura() - 10;
+            assert!(matches!(evento(s, clique(15, file), true), Filtro::Tratada(false)));
+            assert!(!s.menus.barra.ativa());
+            // A caixa abre o menu de sistema; ← e → ficam nele; Esc e Esc fecham.
+            evento(s, clique(8, 8), true);
+            evento(s, soltar(8, 8), true);
+            assert_eq!(s.menus.barra.estado, Estado::Aberto { menu: k, item: Some(0) });
+            evento(s, tecla(Keycode::Right, Mod::NOMOD), true);
+            assert_eq!(s.menus.barra.estado, Estado::Aberto { menu: k, item: Some(0) }, "só o menu de sistema");
+            evento(s, clique(30, 125), true);
+            assert!(matches!(evento(s, soltar(30, 125), true), Filtro::Sistema(ComandoPrincipal::Fechar)));
+            // Fechar: o Save As é cancelado e a pergunta do Quit abre; de novo, nada.
+            assert!(s.pedir_para_fechar());
+            assert!(matches!(s.dialogo, Some(crate::arquivos::Dialogo::PerguntaSair(_))));
+            assert!(!s.pedir_para_fechar());
+            // Duplo clique na caixa com a pergunta aberta: Close.
+            let duplo = Event::MouseButtonDown { timestamp: 0, window_id: 0, which: 0, mouse_btn: sdl2::mouse::MouseButton::Left, clicks: 2, x: 8, y: 8 };
+            assert!(matches!(evento(s, duplo, true), Filtro::Sistema(ComandoPrincipal::Fechar)));
+            // Fora da moldura, o evento segue para o diálogo, com o y da área cliente.
+            match evento(s, clique(300, 200), true) {
+                Filtro::Passar(Event::MouseButtonDown { y, .. }) => assert_eq!(y, 200 - s.menus.altura()),
+                f => panic!("{f:?}"),
+            }
+        });
+    }
+
+    /// Com um diálogo por cima, o cursor é a seta: no Experimental, a lente do ANT INFO (desenhada
+    /// pelo port, que esconde a do sistema) não fica sobre a pergunta do Quit.
+    #[test]
+    fn cursor_e_a_seta_com_um_dialogo_aberto() {
+        com_sessao(|s| {
+            s.partida.estado.partida.tipo_jogo = 3;
+            s.janelas.trazer_para_frente(None);
+            let j = s.janelas.gerente.janela(engine::core::janelas::ID_EDICAO).unwrap();
+            let c = j.geometria().cliente;
+            let (x, y) = (i32::from(c.esq) + 20, i32::from(c.topo) + 20);
+            let ferramenta = crate::ajuda_ui::cursor_em(s, x, y);
+            assert!(ferramenta.is_some(), "sem diálogo, o cursor da ferramenta");
+            s.abrir_pergunta_sair();
+            assert_eq!(crate::ajuda_ui::cursor_em(s, x, y), None);
+            s.dialogo = None;
+            assert_eq!(crate::ajuda_ui::cursor_em(s, x, y), ferramenta);
         });
     }
 

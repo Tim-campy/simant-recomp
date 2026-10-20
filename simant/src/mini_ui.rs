@@ -23,7 +23,7 @@ pub(crate) fn abrir_pelo_botao(s: &mut Sessao, x: i32, y: i32) -> bool {
 }
 
 /// Fecha e volta à pausa de antes (`_SetPause(local_8)`).
-fn fechar(s: &mut Sessao) {
+pub(crate) fn fechar(s: &mut Sessao) {
     s.mini.fechar();
     s.sincronizar_janelas();
     let antes = s.mini.pausa_antes;

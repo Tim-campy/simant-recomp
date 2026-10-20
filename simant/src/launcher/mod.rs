@@ -298,7 +298,8 @@ impl Estado {
             }
             Acao::Resolucao(r) => self.cfg.resolucao = r.map(|i| cfgl::RESOLUCOES[i]),
             Acao::Escala(e) => self.cfg.escala = e,
-            Acao::Moldura => self.cfg.moldura = if self.cfg.moldura == Some(true) { None } else { Some(true) },
+            // Ligada por padrão (data/video.json): desmarcar grava --sem-moldura; marcar volta ao padrão.
+            Acao::Moldura => self.cfg.moldura = if self.cfg.moldura != Some(false) { Some(false) } else { None },
             Acao::Perfil(p) => self.cfg.perfil_driver = p.map(|i| self.perfis[i].clone()),
             Acao::Som => self.cfg.som = !self.cfg.som,
             Acao::Sintetizador(s) => self.cfg.sintetizador = s.map(|i| cfgl::SINTETIZADORES[i].0.into()),
@@ -626,7 +627,7 @@ impl Estado {
         let mut itens = vec![("Padrão".to_string(), Acao::Resolucao(None), c.resolucao.is_none())];
         itens.extend(cfgl::RESOLUCOES.iter().enumerate().map(|(i, [l, a])| (format!("{l}x{a}"), Acao::Resolucao(Some(i)), c.resolucao == Some([*l, *a]))));
         opcoes(&mut w, x0 + rotulo_w, 167, &itens, true);
-        caixa(&mut w, 452, 167, "Moldura Win 3.1", Acao::Moldura, c.moldura == Some(true));
+        caixa(&mut w, 452, 167, "Moldura Win 3.1", Acao::Moldura, c.moldura != Some(false));
         texto(&mut w, x0, 183, "Escala:", PRETO);
         let mut itens = vec![("Padrão".to_string(), Acao::Escala(None), c.escala.is_none())];
         itens.extend((1..=4).map(|e| (format!("{e}x"), Acao::Escala(Some(e)), c.escala == Some(e))));

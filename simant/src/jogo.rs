@@ -211,6 +211,11 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
             if let Event::MouseButtonDown { mouse_btn: MouseButton::Left, .. } = ev {
                 s.partida.botao_esquerdo_apertado();
             }
+            if matches!(ev, Event::MouseButtonUp { .. }) && s.com_janela_modal() {
+                // Uma ferramenta do Experimental arrastada quando o diálogo abriu (Alt+F4, Ctrl+S)
+                // termina aqui: o soltar vai para o diálogo e a ferramenta não pode continuar.
+                modos::soltar(s);
+            }
             // Barra de menus (e About/Status) primeiro; o resto segue com y na área cliente.
             let modal = s.dialogo.is_some()
                 || s.partida.avisos.tem_modal()
@@ -239,8 +244,11 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                         C::Restaurar if canvas.window().is_maximized() => canvas.window_mut().restore(),
                         // Sem a borda do sistema e restaurada: o botão é o de maximizar (moldura_janela.rs).
                         C::Restaurar | C::Maximizar if moldura.restaurada() => canvas.window_mut().maximize(),
-                        // SC_CLOSE: MAINWNDPROC chama _MenuQuit (s12).
-                        C::Fechar => s.abrir_pergunta_sair(),
+                        // SC_CLOSE: MAINWNDPROC chama _MenuQuit (s12); com um diálogo aberto, ver
+                        // `pedir_para_fechar` (arquivos.rs).
+                        C::Fechar => {
+                            s.pedir_para_fechar();
+                        }
                         // Switch To… (a Task List do Windows) e os acinzentados: nada no port.
                         _ => {}
                     }
@@ -255,21 +263,25 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     continue;
                 }
             };
+            if let Event::Quit { .. } = ev {
+                // Fechar a janela (Alt+F4, o fechar do sistema, WM_QUERYENDSESSION → _MenuQuit): a
+                // pergunta do Quit, também com um diálogo, menu ou aviso aberto (arquivos.rs).
+                s.pedir_para_fechar();
+                redesenhar = true;
+                continue;
+            }
             if s.exame.is_some() || modos::segurando(s) {
                 // _MagnifyMenu e _DrawCastePopUp: a janela fica enquanto o botão (ou Espaço/Insert)
                 // estiver apertado; a simulação não anda.
                 let solta = matches!(ev, Event::MouseButtonUp { .. } | Event::KeyUp { .. });
-                if solta || matches!(ev, Event::Quit { .. }) {
+                if solta {
                     s.exame = None;
                     modos::soltar_segurado(s);
                     redesenhar = true;
                 }
-                if matches!(ev, Event::Quit { .. }) {
-                    return Ok(());
-                }
                 continue;
             }
-            if !matches!(ev, Event::Quit { .. } | Event::Window { .. }) {
+            if !matches!(ev, Event::Window { .. }) {
                 if let Some(r) = mini_ui::evento(s, &ev) {
                     // Mini mapa aberto (_OpenMiniMapWin): modal, recebe todo o mouse.
                     if let Event::MouseMotion { x, y, .. } = ev {
@@ -279,9 +291,6 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     continue;
                 }
             }
-            if matches!(ev, Event::Quit { .. }) && s.menu_mod.is_some() {
-                return Ok(());
-            }
             if let Some(mudou) = mods_ui::evento(s, &ev) {
                 // Menu de um script de mod aberto (API 0.17): recebe toda a entrada.
                 redesenhar |= mudou;
@@ -290,7 +299,6 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
             if s.dialogo.is_some() && !matches!(ev, Event::Window { .. }) {
                 // Diálogo do Windows aberto: modal, recebe toda a entrada.
                 let r = match ev {
-                    Event::Quit { .. } => return Ok(()),
                     Event::MouseMotion { x, y, mousestate, .. } => {
                         cursor = (x, y);
                         if mousestate.left() && s.mover_no_dialogo(x, y) {
@@ -332,7 +340,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                 redesenhar = true;
                 continue;
             }
-            if s.partida.avisos.tem_modal() && !matches!(ev, Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } | Event::Window { .. }) {
+            if s.partida.avisos.tem_modal() && !matches!(ev, Event::KeyDown { keycode: Some(Keycode::Escape), .. } | Event::Window { .. }) {
                 if let Event::MouseMotion { x, y, .. } = ev {
                     cursor = (x, y);
                 }
@@ -353,6 +361,7 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                         &k.name(),
                         keymod.intersects(sdl2::keyboard::Mod::LALTMOD | sdl2::keyboard::Mod::RALTMOD),
                         keymod.intersects(sdl2::keyboard::Mod::LSHIFTMOD | sdl2::keyboard::Mod::RSHIFTMOD),
+                        keymod.intersects(sdl2::keyboard::Mod::LCTRLMOD | sdl2::keyboard::Mod::RCTRLMOD),
                     ) || ajuda_ui::tecla(s, &evento_de_tecla(k, keymod)) =>
                 {
                     redesenhar = true
@@ -367,9 +376,8 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                     }
                     redesenhar = true;
                 }
-                // Fechar a janela (SC_CLOSE/WM_QUERYENDSESSION → _MenuQuit) e Esc (extensão do port):
-                // a pergunta do Quit.
-                Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+                // Esc (extensão do port): a pergunta do Quit, como fechar a janela.
+                Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     s.abrir_pergunta_sair();
                     redesenhar = true;
                 }
@@ -451,6 +459,10 @@ fn laco_partida(s: &mut Sessao, titulo: &str, o: &Opcoes, jogo_novo: bool) -> Re
                             continue;
                         }
                     }
+                    // Aceleradores (Ctrl+S, Ctrl+L, Ctrl+A, Ctrl+T…) podem abrir um diálogo ou uma
+                    // janela: o quadro é refeito já, não no próximo evento (com o diálogo aberto a
+                    // simulação para e nada mais pediria o redesenho).
+                    redesenhar = true;
                     if let Some(b) = tratar_tecla(s, &ev, tab, o) {
                         let agora = Instant::now();
                         let duplo = ultima_tecla_clique.is_some_and(|(ub, t)| {
