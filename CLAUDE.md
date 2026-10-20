@@ -47,7 +47,9 @@ Linguagem e bibliotecas: definir no primeiro marco e registrar em `docs/decisoes
 - Ao propor mudanças de formato ou arquitetura, explique o impacto nos mods.
 - Ao terminar uma tarefa, diga o que foi verificado (testes executados, comparação com o original) e o que não foi.
 - Não invente nomes de funções, endereços ou formatos. Se não souber, diga e proponha como descobrir.
-- Mantenha as respostas e os documentos do projeto em português, salvo nomes técnicos consagrados.
+- Responda ao usuário em português.
+- Documentação pública (decisão do usuário, 2026-10-20): **inglês** nos caminhos principais (`README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `docs/**`), com cópia em **português** em `README.pt-BR.md`, `CHANGELOG.pt-BR.md` e `docs/pt-BR/<mesmo caminho>`; a primeira linha de cada arquivo liga à outra língua. Ao mudar um documento, atualize as duas versões. Mensagens de commit em inglês.
+- Textos exibidos pelo port passam pelo frame de idiomas (`data/idiomas/`, ver `docs/i18n.md`): launcher em inglês e português; o jogo, por enquanto, só em inglês.
 
 ## Mods
 
