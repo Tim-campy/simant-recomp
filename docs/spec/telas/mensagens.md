@@ -276,7 +276,7 @@ O `_SRand1(2)` é do gerador S e acontece **dentro do tick**, antes do `_SRand1(
 
 Chamado por `_YellowDeath(2)` só com Events [código]:
 
-1. Abre a janela 26 com o bitmap 9200 (200 × 161); `_myBeginSound(0x26)` (38) e **espera o som acabar** num laço sem eventos (`_mySoundIsDone`): o efeito 38 tem 2880 amostras a 4096 Hz = 703 ms [medido no banco SOUND].
+1. Abre a janela 26 com o bitmap 9200 (200 × 161); `_myBeginSound(0x26)` (38) e **espera o som acabar** num laço sem eventos (`_mySoundIsDone`), que no modo multimídia volta verdadeiro na hora (regras/som.md): **sem espera**. Medido na sessão gravada no DOSBox-X (2026-10-19): o primeiro 0x25 sai 562 ms depois do 0x26, o intervalo normal do laço (30 do Mac); até 2026-10-19 o port esperava 703 ms (as 2880 amostras do 0x26 a 4096 Hz) antes do laço (`espera_som_ms`, agora 0).
 2. Laço por 300 unidades do Mac (≈ 5,5 s), ou até um evento: a cada 30 unidades do Mac (10 de `_TickCount`), desenha o quadro `9200 + n` com n = 1, 2, 3, 2, 3, 2, 3… no canto do bitmap, com `_myBeginSound(0x25)` (37) quando n é ímpar. Fora do modo colorido (`_displayType` ≠ 10) os quadros ganham os deslocamentos da tabela `8:895c` = ((0, 0), (38, 39), (38, 52), (38, 52)); no modo colorido, nenhum [código; tabela lida na bancada].
 3. Fecha a janela e redesenha tudo. São 9 quadros em 100 unidades de `_TickCount` depois do som.
 

@@ -37,7 +37,8 @@ arquivo do jogo é distribuído; os textos do jogo também são lidos da instala
 - **Códigos de trapaça** do original (`heal`, `just`, `qeen`, `eggs`...).
 - **Som e música:** os efeitos e as 28 músicas do original. Sintetizador FM próprio no estilo do OPL
   da Sound Blaster (padrão), com o banco de timbres ajustado contra gravações do original; opção de
-  SoundFont General MIDI (`--soundfont`) e de um sintetizador simples.
+  SoundFont General MIDI (`--soundfont`) e de um sintetizador simples. Os efeitos soam como na Sound
+  Blaster 16 do original (5000 Hz, nos blocos do driver), medidos numa partida gravada.
 - **Ritmo do original:** relógio de 55 ms do Windows 3.1, velocidades lenta/normal medidas no original
   (3 e 6 ticks/s), rápida e ultra.
 

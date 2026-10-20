@@ -69,8 +69,15 @@ pub enum FonteMusica {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigSom {
-    /// Taxa dos efeitos tipo 5 (o original abre o `waveOut` a 4096 Hz).
+    /// Taxa em que os efeitos tipo 5 soam. O original abre o `waveOut` a 4096 Hz, mas na Sound
+    /// Blaster 16 (`sb16snd.drv`) eles saem a 5000 Hz (medido; docs/spec/regras/som.md).
     pub taxa_efeitos: u32,
+    /// (API 0.42) Blocos do driver da Sound Blaster 16: com um efeito pedido a 4096 Hz, só tocam
+    /// blocos inteiros desse número de amostras (504, medido); o resto do último bloco se perde e um
+    /// efeito menor que um bloco não soa (mas ainda corta o que estava tocando). Ausente ou 0: o
+    /// efeito toca inteiro.
+    #[serde(default)]
+    pub bloco_efeitos: Option<u32>,
     /// Taxa pedida ao dispositivo de áudio e usada ao exportar músicas.
     pub taxa_saida: u32,
     /// 0 a 1.

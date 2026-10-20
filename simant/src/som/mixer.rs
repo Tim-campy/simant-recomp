@@ -104,7 +104,18 @@ impl Mixer {
     }
 }
 
-/// PCM de 8 bits sem sinal em `de` Hz → mono em ponto flutuante a `para` Hz (interpolação linear).
+/// O trecho do efeito que o driver da Sound Blaster 16 toca: só blocos inteiros de `bloco` amostras
+/// (o resto do último se perde; menos de um bloco = nada). `None` ou 0: o efeito inteiro.
+/// Medido no DOSBox-X (docs/spec/regras/som.md, "Efeitos dentro do jogo, gravados numa sessão").
+pub fn blocos_do_driver(pcm: &[u8], bloco: Option<u32>) -> &[u8] {
+    match bloco {
+        Some(b) if b > 0 => &pcm[..pcm.len() / b as usize * b as usize],
+        _ => pcm,
+    }
+}
+
+/// PCM de 8 bits sem sinal em `de` Hz → mono em ponto flutuante a `para` Hz (interpolação linear,
+/// como o DOSBox-X faz com a saída da Sound Blaster: casa melhor que o degrau, medido).
 pub fn reamostrar(pcm: &[u8], de: u32, para: u32) -> Vec<f32> {
     if pcm.is_empty() || de == 0 || para == 0 {
         return Vec::new();
@@ -136,6 +147,29 @@ mod testes {
         assert_eq!(r[0], 0.0);
         assert!((r[2] - 127.0 / 128.0).abs() < 1e-6);
         assert!(r[1] > 0.0 && r[1] < r[2], "meio do caminho");
+    }
+
+    #[test]
+    fn driver_toca_so_blocos_inteiros() {
+        let pcm: Vec<u8> = (0..2100u32).map(|i| i as u8).collect();
+        // Efeito 0x2C (1824 amostras): 3 blocos de 504 = 1512, como na gravação do original.
+        assert_eq!(blocos_do_driver(&pcm[..1824], Some(504)).len(), 1512);
+        assert_eq!(blocos_do_driver(&pcm[..2016], Some(504)).len(), 2016, "múltiplo exato toca inteiro");
+        assert!(blocos_do_driver(&pcm[..436], Some(504)).is_empty(), "menor que um bloco não soa");
+        assert_eq!(blocos_do_driver(&pcm[..1824], None).len(), 1824);
+        assert_eq!(blocos_do_driver(&pcm[..1824], Some(0)).len(), 1824);
+    }
+
+    #[test]
+    fn efeito_mudo_ainda_corta_o_anterior() {
+        let mut m = Mixer::new(1000, Box::new(SintSimples::new(1000, 10)), 1.0, 1.0);
+        m.tocar_efeito(vec![0.5; 100]);
+        let mut s = vec![0.0; 2 * 10];
+        m.render(&mut s);
+        m.tocar_efeito(reamostrar(blocos_do_driver(&[200; 436], Some(504)), 5000, 1000));
+        m.render(&mut s);
+        assert!(s.iter().all(|&x| x == 0.0));
+        assert!(!m.efeito_tocando());
     }
 
     #[test]

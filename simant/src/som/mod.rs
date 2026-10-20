@@ -258,7 +258,8 @@ impl<'a> Audio<'a> {
         if !self.efeitos.contains_key(&id) {
             match efeito_pcm(self.recursos, id) {
                 Ok(pcm) => {
-                    self.efeitos.insert(id, mixer::reamostrar(&pcm, cfg.taxa_efeitos, self.taxa));
+                    let tocado = mixer::blocos_do_driver(&pcm, cfg.bloco_efeitos);
+                    self.efeitos.insert(id, mixer::reamostrar(tocado, cfg.taxa_efeitos, self.taxa));
                 }
                 Err(e) => return eprintln!("som: efeito {id}: {e}"),
             }
@@ -360,13 +361,15 @@ pub fn renderizar_musica(eventos: Vec<EventoMidi>, sint: Box<dyn Sintetizador>, 
     saida
 }
 
-/// Grava `DIR/efeitos/efeito_NNN.wav` (PCM decodificado, exato, na taxa do original) e
-/// `DIR/musicas/<id>_<nome>.wav` (sintetizado, com `volume_musica`, o nível em que toca no jogo; os
+/// Grava `DIR/efeitos/efeito_NNN.wav` (PCM decodificado, exato, na taxa em que soa, `taxa_efeitos`),
+/// `DIR/efeitos_tocados/efeito_NNN.wav` (o trecho que o driver toca, com `bloco_efeitos`; só se a
+/// chave existir) e `DIR/musicas/<id>_<nome>.wav` (sintetizado, com `volume_musica`, o nível em que toca no jogo; os
 /// efeitos saem sem o `volume_efeitos`). Não toca nada.
 pub fn exportar(recursos: &Recursos, opcoes: &OpcoesSom, dir: &Path) -> Result<(), String> {
     let cfg: ConfigSom = recursos.dados(config::ARQUIVO)?;
-    let (dir_e, dir_m) = (dir.join("efeitos"), dir.join("musicas"));
-    for d in [&dir_e, &dir_m] {
+    let (dir_e, dir_m, dir_t) = (dir.join("efeitos"), dir.join("musicas"), dir.join("efeitos_tocados"));
+    let blocos = cfg.bloco_efeitos.filter(|&b| b > 0 && opcoes.so_musica.is_none());
+    for d in [&dir_e, &dir_m].into_iter().chain(blocos.map(|_| &dir_t)) {
         std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
     }
     let gravar = |c: PathBuf, b: Vec<u8>| std::fs::write(&c, b).map_err(|e| format!("{}: {e}", c.display()));
@@ -374,6 +377,10 @@ pub fn exportar(recursos: &Recursos, opcoes: &OpcoesSom, dir: &Path) -> Result<(
     for id in (0..=1023u16).filter(|_| opcoes.so_musica.is_none()) {
         let Ok(pcm) = efeito_pcm(recursos, id) else { continue };
         gravar(dir_e.join(format!("efeito_{id:03}.wav")), som::wav(&pcm, cfg.taxa_efeitos, 1, 8))?;
+        if blocos.is_some() {
+            let tocado = mixer::blocos_do_driver(&pcm, blocos);
+            gravar(dir_t.join(format!("efeito_{id:03}.wav")), som::wav(tocado, cfg.taxa_efeitos, 1, 8))?;
+        }
         n += 1;
     }
     println!("{n} efeitos em {}", dir_e.display());
@@ -505,5 +512,25 @@ mod testes {
         let pcm = efeito_pcm(&r, 15).unwrap();
         assert_eq!(pcm.len(), 102);
         assert_eq!(mixer::reamostrar(&pcm, 4096, 44100).len(), 102 * 44100 / 4096);
+    }
+
+    /// Os efeitos soam como na sessão gravada no DOSBox-X (SB16): a 5000 Hz, em blocos de 504
+    /// amostras (docs/spec/regras/som.md, "Efeitos dentro do jogo, gravados numa sessão").
+    #[test]
+    fn efeitos_soam_como_na_sound_blaster_16() {
+        let Some(r) = recursos() else { return };
+        let cfg: ConfigSom = r.dados(config::ARQUIVO).unwrap();
+        assert_eq!(cfg.taxa_efeitos, 5000);
+        assert_eq!(cfg.bloco_efeitos, Some(504));
+        let tocado = |id: u16| mixer::blocos_do_driver(&efeito_pcm(&r, id).unwrap(), cfg.bloco_efeitos).len();
+        // Medido (amostras tocadas): 0x2C 1512 de 1824, luta 0x25 1512 de 1888, erro 1 504 de 752,
+        // formiga-leão 0x26 2520 de 2880, comida 0x20 3024 de 3374, gato 0xD inteiro (2016).
+        for (id, n) in [(0x2C, 1512), (0x25, 1512), (1, 504), (0x26, 2520), (0x20, 3024), (0xD, 2016)] {
+            assert_eq!(tocado(id), n, "efeito {id}");
+        }
+        // Nenhum dos efeitos com menos de 504 amostras apareceu na sessão (Home, cavar, comida, ovo).
+        for id in [15u16, 17, 18, 19, 28, 29, 40] {
+            assert_eq!(tocado(id), 0, "efeito {id}");
+        }
     }
 }
