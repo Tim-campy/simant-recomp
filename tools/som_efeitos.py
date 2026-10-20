@@ -402,7 +402,9 @@ def achar_musicas(arq, pasta):
             k = int(np.argmax(v))
             if v[k] < 0.45:
                 break
-            achados.append((round((k - k0) / F2, 2), nome[:-4], round(float(v[k]), 3), round(db(c[k] / (h @ h)), 1)))
+            g = db(c[k] / (h @ h))
+            if g > -20:  # no silêncio (componente contínua) a correlação casa com qualquer coisa
+                achados.append((round((k - k0) / F2, 2), nome[:-4], round(float(v[k]), 3), round(g, 1)))
             v[max(0, k - 5 * F2):k + 5 * F2] = 0
     achados.sort()
     print("início (s)  música     NCC   ganho em relação à gravação sem input (dB)")

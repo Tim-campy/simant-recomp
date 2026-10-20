@@ -53,7 +53,8 @@ para cada byte b dos dados:
 - Resultado: PCM **8 bits sem sinal** (0x80 = silêncio), mono, **2 × (N − 16)** amostras.
 - A soma é em 8 bits com estouro (aritmética de `char`), sem saturação.
 - **Taxa:** o `WAVEFORMAT` montado para `waveOutOpen` tem `nSamplesPerSec` = `nAvgBytesPerSec` = **0x1000 = 4096 Hz**, `nChannels` = 1, `nBlockAlign` = 1, `wBitsPerSample` = 8 (fato visto na desmontagem: `mov word [bx+4], 0x1000` em `1008:9d7e`). O caminho Sound Blaster também passa 0x1000 a `vocPlayMemUnFormat` (`1008:9b01`) e o caminho `sndPlaySound` monta um cabeçalho RIFF com os mesmos valores.
-- Observação: comparando com as versões Mac (tipo 51), o número de amostras de vários sons bate com uma taxa de ~5563 Hz (ex.: id 41 tem 12 896 amostras aqui e 13 184 no `snd ` a 5563,6 Hz; id 15 tem 102 amostras contra 205 a 11 127 Hz). Ou seja, o Windows toca os efeitos cerca de 26 % mais lentos e graves que o Mac. O port segue o Windows (4096 Hz) por padrão; a taxa fica em `data/som.json`.
+- **Taxa real na Sound Blaster 16 (medida em 2026-10-19):** o `sb16snd.drv` toca esses bytes a **5000 Hz** (o mínimo da placa), sem reamostrar, e só em **blocos inteiros de 504 amostras**: o resto do último bloco se perde e um efeito com menos de 504 amostras (15, 17, 18, 19, 28, 29, 40, 47 e outros) não soa. Medido numa sessão jogada no DOSBox-X e num teste controlado com um WAV de 4096 Hz pelo mesmo driver (a 5000 Hz o mesmo efeito sai inteiro); ver [regras/som.md](../regras/som.md), "Efeitos dentro do jogo, gravados numa sessão jogada pelo usuário". O port segue a SB16: `taxa_efeitos` = 5000 e `bloco_efeitos` = 504 em `data/som.json` (4096 e 0 dão o que o código pede).
+- Observação: comparando com as versões Mac (tipo 51), o número de amostras de vários sons bate com uma taxa de ~5563 Hz (ex.: id 41 tem 12 896 amostras aqui e 13 184 no `snd ` a 5563,6 Hz; id 15 tem 102 amostras contra 205 a 11 127 Hz). Ou seja, o código do Windows pede os efeitos cerca de 26 % mais lentos e graves que o Mac; na SB16 (5000 Hz) ficam ~10 % mais lentos. O port segue a SB16 medida (5000 Hz) por padrão; a taxa fica em `data/som.json`.
 
 ## Tipo 51: efeito sonoro em formato Mac
 
@@ -126,7 +127,7 @@ MIDI padrão também (assinatura `MThd`), com LZSS em parte deles. Não são có
 
 - **Leitura:** `engine/src/formats/som.rs` (tipo 5 → PCM, tipo 18 → `CabecalhoMusica`, gravação de WAV) e `engine/src/formats/midi.rs` (SMF → lista de eventos com tempo em segundos, filtro de canais e transposição). Testes em `engine/tests/som_reais.rs`, contra os arquivos do usuário.
 - **Reprodução:** `simant/src/som/` (SDL2 + sintetizador), ver [regras/som.md](../regras/som.md) e `docs/decisoes.md`.
-- **Mods:** um efeito pode ser trocado com `objetos/5/<id>.bin` (mesmo formato DAC); uma música com `arquivos/sound/<nome>.mid`; a tabela id → arquivo, a taxa, os volumes, os canais e o sintetizador ficam em `data/som.json`; o banco FM em `data/opl_banco.json`.
+- **Mods:** um efeito pode ser trocado com `objetos/5/<id>.bin` (mesmo formato DAC); uma música com `arquivos/sound/<nome>.mid`; a tabela id → arquivo, a taxa e os blocos do driver dos efeitos, os volumes, os canais e o sintetizador ficam em `data/som.json`; o banco FM em `data/opl_banco.json`.
 
 ### MIDI Mapper da instalação de referência
 
