@@ -1,10 +1,12 @@
+*Read in English: [CHANGELOG.md](CHANGELOG.md)*
+
 # Histórico de versões
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); as versões seguem o
 [Versionamento Semântico](https://semver.org/lang/pt-BR/). A versão do port e a versão da **API de mods**
-(`docs/api-mods.md`) são numeradas separadamente.
+(`docs/pt-BR/api-mods.md`) são numeradas separadamente.
 
-> **Rascunho** para revisão (ver `docs/lancamento.md`). A data e o número só ficam valendo quando a tag
+> **Rascunho** para revisão (ver `docs/pt-BR/lancamento.md`). A data e o número só ficam valendo quando a tag
 > `v1.0.0` for criada; até lá os `Cargo.toml` continuam em `0.1.0`.
 
 ## [1.0.0] — não lançado
@@ -69,10 +71,12 @@ arquivo do jogo é distribuído; os textos do jogo também são lidos da instala
 - O pacote funciona de qualquer pasta: `data/` e `mods/` são procurados ao lado do executável.
 - Opções novas: `--launcher`, `--config`, `--sem-config`, `--console`, `--perfil-driver`,
   `--desligar-mods`, `--com-som`, `--capturar-launcher`.
+- Documentação no GitHub em inglês, com todos os documentos também em português
+  (`README.pt-BR.md`, `docs/pt-BR/`).
 
 ### Mods
 
-- **API de mods 1.0** (era 0.35 durante o desenvolvimento; ver `docs/api-mods.md`): substituição de
+- **API de mods 1.0** (era 0.35 durante o desenvolvimento; ver `docs/pt-BR/api-mods.md`): substituição de
   objetos do banco original, dos arquivos soltos do jogo e de 42 arquivos `data/*.json` do port,
   mesclados por chave; scripts **Lua 5.4** em sandbox, com ganchos fora e dentro do tick, leitura e
   escritas validadas do estado (comida, cheiros, castas, formigas nos ninhos), menu e painel próprios e
@@ -88,12 +92,12 @@ arquivo do jogo é distribuído; os textos do jogo também são lidos da instala
   History) e o realce do menu em 256 cores ainda diferem do original.
 - Ritmo das velocidades rápida e ultra não foi medido numa máquina real.
 - Rede (NetBIOS/DDE) do original fora do escopo.
-- A lista completa está em `docs/estado-do-projeto.md` §3–§5 e `docs/divergencias.md`.
+- A lista completa está em `docs/pt-BR/estado-do-projeto.md` §3–§5 e `docs/pt-BR/divergencias.md`.
 
 ## Desenvolvimento (0.x, sem lançamento)
 
 Resumo do histórico do repositório (338 commits, 16 a 19 de outubro de 2026); os detalhes estão em
-`git log`, `docs/decisoes.md` e no histórico de compatibilidade de `docs/api-mods.md`.
+`git log`, `docs/pt-BR/decisoes.md` e no histórico de compatibilidade de `docs/pt-BR/api-mods.md`.
 
 - **2026-10-16 — Marco 1:** especificação inicial, parsers do banco `.NDX/.DAT` com LZSS, bitmaps,
   fontes e save `.ANT`; abertura em Rust + SDL2; escolha de Rust + SDL2 e Lua; bancada automática QEMU
