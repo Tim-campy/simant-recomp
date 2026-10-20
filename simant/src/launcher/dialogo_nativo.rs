@@ -4,12 +4,19 @@
 
 use std::path::{Path, PathBuf};
 
-/// Filtro de arquivo: nome mostrado e padrões (`*.ANT;*.ant`).
+/// Filtro de arquivo: nome mostrado e padrões (`*.ANT;*.ant`); `todos`: o nome do filtro "todos os
+/// arquivos" (no idioma do launcher).
 #[derive(Clone, Copy, Debug)]
 pub struct Filtro<'a> {
     pub nome: &'a str,
     pub padroes: &'a [&'a str],
+    pub todos: &'a str,
 }
+
+/// Erro de [`escolher_pasta`]/[`escolher_arquivo`] quando o sistema não tem seletor (Linux sem
+/// zenity nem kdialog); o launcher mostra `launcher.erro.sem_seletor`. Outros erros são técnicos
+/// (em inglês).
+pub const SEM_SELETOR: &str = "no file chooser";
 
 /// `Ok(None)` = o usuário cancelou.
 pub fn escolher_pasta(titulo: &str, inicial: Option<&Path>) -> Result<Option<PathBuf>, String> {
@@ -106,7 +113,7 @@ mod sistema {
 
     fn verificar(hr: Hresult, o_que: &str) -> Result<(), String> {
         if hr < 0 {
-            Err(format!("diálogo do Windows: {o_que} falhou (0x{:08X})", hr as u32))
+            Err(format!("Windows dialog: {o_que} failed (0x{:08X})", hr as u32))
         } else {
             Ok(())
         }
@@ -116,7 +123,7 @@ mod sistema {
         // SAFETY: inicialização do COM nesta thread, desfeita no fim se foi feita aqui.
         let hr = unsafe { CoInitializeEx(std::ptr::null_mut(), COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) };
         if hr < 0 && hr != RPC_E_CHANGED_MODE {
-            return Err(format!("diálogo do Windows: CoInitializeEx falhou (0x{:08X})", hr as u32));
+            return Err(format!("Windows dialog: CoInitializeEx failed (0x{:08X})", hr as u32));
         }
         let r = mostrar(titulo, inicial, filtro, None);
         if hr >= 0 {
@@ -148,9 +155,9 @@ mod sistema {
             let set_title: extern "system" fn(*mut c_void, *const u16) -> Hresult = std::mem::transmute(metodo(d, SET_TITLE));
             verificar(set_title(d, t.as_ptr()), "SetTitle")?;
 
-            // Filtro de arquivos: o pedido e "Todos os arquivos".
+            // Filtro de arquivos: o pedido e "todos os arquivos".
             let (fnome, fpadrao, tnome, tpadrao) = match filtro {
-                Some(f) => (largo(f.nome), largo(&f.padroes.join(";")), largo("Todos os arquivos"), largo("*.*")),
+                Some(f) => (largo(f.nome), largo(&f.padroes.join(";")), largo(f.todos), largo("*.*")),
                 None => (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
             };
             if filtro.is_some() {
@@ -249,7 +256,7 @@ mod sistema {
             assert_eq!(p.map(|p| p.canonicalize().unwrap()), Some(dir.canonicalize().unwrap()));
 
             let r = responder("SimAnt teste arquivo", WM_COMMAND, 1);
-            let filtro = Filtro { nome: "Jogos do SimAnt (*.ANT)", padroes: &["*.ANT"] };
+            let filtro = Filtro { nome: "SimAnt games (*.ANT)", padroes: &["*.ANT"], todos: "All files" };
             let p = mostrar("SimAnt teste arquivo", Some(&dir), Some(filtro), Some("TESTE.ANT")).unwrap();
             assert!(r.join().unwrap());
             assert_eq!(p.map(|p| p.canonicalize().unwrap()), Some(dir.join("TESTE.ANT").canonicalize().unwrap()));
@@ -306,6 +313,6 @@ mod sistema {
                 Ok(_) | Err(_) => continue,
             }
         }
-        Err("sem seletor de arquivos (instale zenity ou kdialog); digite o caminho no campo".into())
+        Err(super::SEM_SELETOR.into())
     }
 }

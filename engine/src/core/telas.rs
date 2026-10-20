@@ -167,7 +167,7 @@ fn carregar_fonte(recursos: &crate::recursos::Recursos, nome: &str) -> Result<cr
                 None => (face, false),
             };
             let (face, altura) = match face.split_once('@') {
-                Some((f, a)) => (f, Some(a.parse::<usize>().map_err(|_| format!("fonte {nome}: altura inválida"))?)),
+                Some((f, a)) => (f, Some(a.parse::<usize>().map_err(|_| format!("font {nome}: invalid height"))?)),
                 None => (face, None),
             };
             fontes_de_fon(&recursos.arquivo(arquivo)?)?
@@ -177,7 +177,7 @@ fn carregar_fonte(recursos: &crate::recursos::Recursos, nome: &str) -> Result<cr
                     f.negrito = negrito;
                     Fonte::Fnt(f)
                 })
-                .ok_or(format!("fonte {face} não encontrada em {arquivo}"))
+                .ok_or(format!("font {face} not found in {arquivo}"))
         }
         None => Ok(Fonte::Mac(FonteMac::decodificar(&recursos.arquivo(nome)?)?)),
     }
@@ -342,7 +342,7 @@ pub fn desenhar_janela_deslocada(
 ) -> Result<Vec<String>, String> {
     use crate::formats::janela::Retangulo;
     let m = &interface.moldura;
-    let mut g = interface.posicionar(id, janela).ok_or(format!("janela {id} sem posição"))?;
+    let mut g = interface.posicionar(id, janela).ok_or(format!("window {id} has no position"))?;
     let mover = |r: Retangulo| Retangulo { esq: r.esq + dx, topo: r.topo + dy, dir: r.dir + dx, base: r.base + dy };
     g.origem = (g.origem.0 + dx, g.origem.1 + dy);
     g.externo = g.externo.map(mover);

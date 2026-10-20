@@ -94,7 +94,7 @@ impl TabelasFeromonio {
     fn validar(&self) -> Result<(), String> {
         if self.turn_tab.iter().flatten().any(|&d| d > 7) {
             return Err(format!(
-                "{ARQUIVO_TABELAS}: turn_tab com direção fora de 0–7"
+                "{ARQUIVO_TABELAS}: turn_tab with direction out of 0–7"
             ));
         }
         comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx8, &self.dy8)
@@ -205,7 +205,7 @@ impl std::fmt::Debug for MapaCheiro {
             .collect();
         write!(
             f,
-            "MapaCheiro {{ não nulas (cx, cy, valor): {nao_nulas:?} }}"
+            "MapaCheiro {{ non-zero (cx, cy, value): {nao_nulas:?} }}"
         )
     }
 }
@@ -214,7 +214,7 @@ impl MapaCheiro {
     pub fn de_bytes(b: &[u8]) -> Result<MapaCheiro, String> {
         let celulas: [u8; CELULAS] = b
             .try_into()
-            .map_err(|_| format!("mapa de cheiro com {} bytes; esperado {CELULAS}", b.len()))?;
+            .map_err(|_| format!("scent map has {} bytes; expected {CELULAS}", b.len()))?;
         Ok(MapaCheiro { celulas })
     }
 
@@ -419,7 +419,7 @@ impl Feromonios {
         for c in Camada::TODAS {
             let b = save
                 .bloco(c.simbolo())
-                .ok_or_else(|| format!("bloco {} não existe no layout", c.simbolo()))?;
+                .ok_or_else(|| format!("block {} does not exist in the layout", c.simbolo()))?;
             *f.camada_mut(c) =
                 MapaCheiro::de_bytes(b).map_err(|e| format!("{}: {e}", c.simbolo()))?;
         }
@@ -431,10 +431,10 @@ impl Feromonios {
         for c in Camada::TODAS {
             let b = save
                 .bloco_mut(c.simbolo())
-                .ok_or_else(|| format!("bloco {} não existe no layout", c.simbolo()))?;
+                .ok_or_else(|| format!("block {} does not exist in the layout", c.simbolo()))?;
             if b.len() != CELULAS {
                 return Err(format!(
-                    "bloco {} tem {} bytes; esperado {CELULAS}",
+                    "block {} has {} bytes; expected {CELULAS}",
                     c.simbolo(),
                     b.len()
                 ));

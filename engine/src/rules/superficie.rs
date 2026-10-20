@@ -141,10 +141,10 @@ impl TabelasSuperficie {
         let t = self;
         // As tabelas comuns já vêm de comum.json; uma cópia antiga no superficie.json também passa aqui.
         if t.classe_luta.iter().any(|&c| c > 3) {
-            return Err(format!("{ARQUIVO_TABELAS}: classe_luta fora de 0–3"));
+            return Err(format!("{ARQUIVO_TABELAS}: classe_luta out of 0–3"));
         }
         if t.grupo_sem_carga.iter().any(|&g| !(0..16).contains(&g)) {
-            return Err(format!("{ARQUIVO_TABELAS}: grupo_sem_carga fora de 0–15"));
+            return Err(format!("{ARQUIVO_TABELAS}: grupo_sem_carga out of 0–15"));
         }
         Ok(t)
     }
@@ -418,7 +418,7 @@ struct Sim<'a> {
 
 /// Cópia dos mapas do `Estado` para o tipo de `feromonios.rs`.
 pub(crate) fn copiar_cheiros(m: &MapasDoEstado) -> fer::Feromonios {
-    let c = |g: &Grade| MapaCheiro::de_bytes(&g.dados).expect("mapa de cheiro 64 × 32");
+    let c = |g: &Grade| MapaCheiro::de_bytes(&g.dados).expect("scent map 64 × 32");
     fer::Feromonios {
         alarme: c(&m.alarme),
         ninho_preto: c(&m.ninho_b),

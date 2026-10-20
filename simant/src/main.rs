@@ -38,6 +38,7 @@
 mod ajuda_ui;
 mod arquivos;
 mod config_launcher;
+mod idioma_sistema;
 mod jogo;
 mod launcher;
 mod moldura_janela;
@@ -63,6 +64,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use engine::core::avisos::{self, ConfigAvisos, Modal};
+use engine::tr;
 use engine::core::janelas::{self, Controle, JanelasControle};
 use engine::core::menus::{self, ConfigMenus, MenuAberto};
 use engine::rules::amarela::RespostaClique;
@@ -109,7 +111,7 @@ fn salvar_png(caminho: &Path, largura: u32, altura: u32, rgb: &[u8]) -> Result<(
 fn compor_rgb(t: &engine::core::telas::Tela, recursos: &Recursos, interface: &Interface, cores: &[[u8; 3]]) -> Result<Vec<u8>, String> {
     let (quadro, pendentes) = compor(t, recursos, interface)?;
     if !pendentes.is_empty() {
-        eprintln!("tela {}: não desenhado ainda: {}", t.nome, pendentes.join(", "));
+        eprintln!("screen {}: not drawn yet: {}", t.nome, pendentes.join(", "));
     }
     Ok(para_rgb(&quadro.pixels, cores))
 }
@@ -194,8 +196,8 @@ fn abrir_janela(
         None => moldura_janela::MolduraJanela::desligada(),
     };
     let (pw, ph) = canvas.output_size()?;
-    let tipo = if moldura.ligada() { ", moldura do Windows 3.1 no lugar da do sistema" } else { "" };
-    println!("janela: {largura}x{altura} em escala {escala} ({pw}x{ph} pixels{tipo})");
+    let tipo = if moldura.ligada() { ", Windows 3.1 frame instead of the system's" } else { "" };
+    println!("window: {largura}x{altura} at scale {escala} ({pw}x{ph} pixels{tipo})");
     Ok(Janela { sdl, canvas, moldura })
 }
 
@@ -262,7 +264,7 @@ fn executar(seq: Sequencia, recursos: &Recursos, interface: &Interface, cores: &
                 use engine::core::moldura_principal::ComandoPrincipal as C;
                 match f {
                     menus_ui::Filtro::Sistema(c) => {
-                        println!("menu de sistema: {c:?}");
+                        println!("system menu: {c:?}");
                         match c {
                             C::Minimizar => canvas.window_mut().minimize(),
                             C::Restaurar if canvas.window().is_maximized() => canvas.window_mut().restore(),
@@ -389,6 +391,8 @@ fn principal(o: Opcoes) -> Result<(), String> {
     // mods antes de abrir os bancos.
     let config: ConfigJogo = Recursos::abrir_sem(&o.jogo, &[], &o.dados, Some(&o.mods), &o.mods_desligados)?.dados("jogo.json")?;
     let mut recursos = Recursos::abrir_sem(&o.jogo, &config.bancos, &o.dados, Some(&o.mods), &o.mods_desligados)?;
+    // Os textos do port no idioma do jogo, com as chaves dos mods (data/idiomas/, docs/i18n.md).
+    instalar_idioma_do_jogo(Some(&recursos), &o.dados, o.idioma.as_deref());
     if let Some(p) = &o.perfil_driver {
         // --perfil-driver: por cima de data/resolucao.json (e dos mods), conferido já aqui.
         recursos.sobrepor_dados(engine::core::resolucao::ARQUIVO, serde_json::json!({ "perfil_driver": p }));
@@ -399,7 +403,7 @@ fn principal(o: Opcoes) -> Result<(), String> {
         recursos.sobrepor_dados(engine::core::partida::ARQUIVO_CONFIG, v);
     }
     for m in recursos.mods() {
-        println!("mod carregado: {} {}", m.manifesto.nome, m.manifesto.versao);
+        println!("{}", tr!("programa.mod_carregado", nome = m.manifesto.nome, versao = m.manifesto.versao));
     }
     let cores = engine::paleta::carregar_rgb(&recursos)?;
     if let Some(dir) = &o.som.exportar {
@@ -445,7 +449,7 @@ fn principal(o: Opcoes) -> Result<(), String> {
                     o.tipo = tipo;
                 }
                 None => {
-                    println!("Select a Game: {e:?} (sem jogo novo)");
+                    println!("Select a Game: {e:?} (no new game)");
                     return Ok(());
                 }
             },
@@ -472,7 +476,7 @@ fn principal(o: Opcoes) -> Result<(), String> {
         }
         (None, true) => {
             let n = semente(&o);
-            println!("{:?} com semente {n}", o.tipo);
+            println!("{:?} with seed {n}", o.tipo);
             Some(Origem::Novo(n, o.tipo))
         }
         _ => None,
@@ -495,7 +499,7 @@ fn principal(o: Opcoes) -> Result<(), String> {
         }
         if let Some(m) = o.quintal {
             let a = [AcaoQuintal::ModoQuintal, AcaoQuintal::ModoCasa, AcaoQuintal::ModoEstrategico, AcaoQuintal::ModoGrafico];
-            let a = *a.get(m as usize).ok_or("--quintal: modo 0 a 3")?;
+            let a = *a.get(m as usize).ok_or("--quintal: mode 0 to 3")?;
             modos::aplicar_acao_quintal(&mut s, a, true);
         }
         if let Some(m) = o.janela_mapa {
@@ -542,21 +546,21 @@ fn principal(o: Opcoes) -> Result<(), String> {
                     y: -1,
                 });
             }
-            let r = s.tela.retangulo_da_faixa(&s.mini.cfg.botao).ok_or("--mini-mapa: botão sem retângulo")?;
+            let r = s.tela.retangulo_da_faixa(&s.mini.cfg.botao).ok_or("--mini-mapa: button without a rectangle")?;
             let (x, y) = (i32::from(r.esq + r.dir) / 2, i32::from(r.topo + r.base) / 2);
             if !mini_ui::abrir_pelo_botao(&mut s, x, y) {
-                return Err("--mini-mapa: o botão não abriu o mini mapa".into());
+                return Err("--mini-mapa: the button did not open the mini map".into());
             }
             s.mini.soltar(-1, -1);
         }
         if let Some(ms) = o.avancar_ms {
             let av = s.partida.avancar(ms);
             s.registrar_eventos();
-            let quadro = s.partida.quadro_animado().map(|(p, q)| format!(", animação no plano {p}: tipo {:#x} dir {}", q.tipo, q.dir));
+            let quadro = s.partida.quadro_animado().map(|(p, q)| format!(", animation on plane {p}: type {:#x} dir {}", q.tipo, q.dir));
             println!("{ms} ms: {} ticks{}", av.ticks, quadro.unwrap_or_default());
         }
         for &b in &o.botoes {
-            println!("botão {b}: {:?}", s.botao_usuario(b));
+            println!("button {b}: {:?}", s.botao_usuario(b));
         }
         if !o.historico.is_empty() {
             s.botao_usuario(2);
@@ -574,7 +578,7 @@ fn principal(o: Opcoes) -> Result<(), String> {
                 s.abrir_menu_da_amarela(x, y);
             }
             Some(("icones", nome)) => {
-                let (r, _) = s.tela.objeto_da_faixa(nome).ok_or("--menu: botão desconhecido")?;
+                let (r, _) = s.tela.objeto_da_faixa(nome).ok_or("--menu: unknown button")?;
                 s.abrir_menu_de_icones(i32::from(r.esq) + 2, i32::from(r.topo) + 2);
             }
             Some(("mod", tecla)) => mods_ui::menu_pela_linha_de_comando(&mut s, tecla)?,
@@ -585,7 +589,7 @@ fn principal(o: Opcoes) -> Result<(), String> {
                     s.botao_usuario(1);
                 }
                 if !s.janelas.gerente.abrir_menu(id) {
-                    return Err(format!("--menu sistema@{id}: janela fechada"));
+                    return Err(format!("--menu sistema@{id}: window closed"));
                 }
             }
             Some(("barra", m)) => {
@@ -594,7 +598,7 @@ fn principal(o: Opcoes) -> Result<(), String> {
                 let menu = m.parse().map_err(|_| "--menu barra@M[,ITEM]")?;
                 s.menus.barra.estado = engine::core::barra_menus::Estado::Aberto { menu, item: i };
             }
-            Some(_) => return Err("--menu amarela@X,Y, icones@OBJETO, mod@TECLA[#ITEM], sistema@ID ou barra@M[,ITEM]".into()),
+            Some(_) => return Err("--menu amarela@X,Y, icones@OBJECT, mod@KEY[#ITEM], sistema@ID or barra@M[,ITEM]".into()),
             None => {}
         }
         match o.dialogo.as_deref() {
@@ -613,7 +617,7 @@ fn principal(o: Opcoes) -> Result<(), String> {
                 menus_ui::executar(&mut s, engine::core::barra_menus::ComandoMenu::Sobre, None);
             }
             Some("status") => s.menus.status = true,
-            Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como, salvo, sair, sobre ou status")),
+            Some(d) => return Err(format!("--dialogo {d}: load, pergunta, salvar_como, salvo, sair, sobre or status")),
             None => {}
         }
         for e in &o.cliques_dialogo {
@@ -642,20 +646,20 @@ fn principal(o: Opcoes) -> Result<(), String> {
             let plano = i32::from(s.partida.nav.plano_mapa);
             match engine::rules::experimental::examinar(&s.partida.estado, plano, x, y) {
                 Some(ex) => s.abrir_exame(ex),
-                None => println!("Examine ({x}, {y}): célula sem vida"),
+                None => println!("Examine ({x}, {y}): cell without life"),
             }
         }
         for _ in 0..o.fechar_avisos {
             s.partida.fechar_modal();
         }
         if let Some(Modal::FimDeJogo { pontos, .. }) = s.partida.avisos.modal() {
-            println!("fim de jogo: {pontos} pontos");
+            println!("game over: {pontos} points");
         }
         if let Some(png) = &o.exportar_tela_jogo {
             let rgb = s.quadro_rgb()?;
             salvar_png(png, s.tela.cfg.largura, s.tela.cfg.altura, &rgb)?;
             let (p, v) = (&s.partida.nav, &s.partida.nav.vista);
-            println!("{} (plano {}, vista em ({}, {}), {} × {} tiles)", png.display(), p.plano_mapa, v.x, v.y, v.largura, v.altura);
+            println!("{} (plane {}, view at ({}, {}), {} × {} tiles)", png.display(), p.plano_mapa, v.x, v.y, v.largura, v.altura);
         }
         if let Some(arq) = &o.salvar {
             s.partida.estado.para_save(&s.layout)?.gravar(arq)?;
@@ -700,28 +704,56 @@ struct OpcoesPrograma {
     capturar_launcher: Option<PathBuf>,
     /// Teste: abre o launcher e aperta Jogar depois de N ms.
     launcher_jogar_apos_ms: Option<u64>,
+    /// `--idioma CÓDIGO` (também fica nas opções do jogo).
+    idioma: Option<String>,
+    /// `--help` / `-h`: mostra a ajuda da linha de comando e sai.
+    ajuda: bool,
 }
 
 fn separar_opcoes(args: Vec<String>) -> Result<(OpcoesPrograma, Vec<String>), String> {
     let mut p = OpcoesPrograma::default();
     let mut resto = Vec::new();
     let mut it = args.into_iter();
+    let falta = |o: &str| tr!("cli.erro.falta_valor", opcao = o);
     while let Some(a) = it.next() {
         match a.as_str() {
-            "--config" => p.config = Some(it.next().ok_or("falta o valor de --config")?.into()),
+            "--config" => p.config = Some(it.next().ok_or_else(|| falta(&a))?.into()),
             "--sem-config" => p.sem_config = true,
             "--launcher" => p.launcher = true,
             "--console" => p.console = true,
-            "--capturar-launcher" => p.capturar_launcher = Some(it.next().ok_or("falta o valor de --capturar-launcher")?.into()),
+            "--help" | "-h" | "/?" => p.ajuda = true,
+            "--capturar-launcher" => p.capturar_launcher = Some(it.next().ok_or_else(|| falta(&a))?.into()),
             "--launcher-jogar-apos-ms" => {
-                let v = it.next().ok_or("falta o valor de --launcher-jogar-apos-ms")?;
-                p.launcher_jogar_apos_ms = Some(v.parse().map_err(|_| "--launcher-jogar-apos-ms: número inválido")?);
+                let v = it.next().ok_or_else(|| falta(&a))?;
+                p.launcher_jogar_apos_ms = Some(v.parse().map_err(|_| tr!("cli.erro.numero", opcao = a))?);
                 p.launcher = true;
+            }
+            "--idioma" => {
+                let v = it.next().ok_or_else(|| falta(&a))?;
+                p.idioma = Some(v.clone());
+                resto.push(a);
+                resto.push(v);
             }
             _ => resto.push(a),
         }
     }
     Ok((p, resto))
+}
+
+/// Escolhe e instala os textos do jogo (contexto `jogo` de `data/idiomas/idiomas.json`): o
+/// `pedido` (`--idioma` ou o da configuração do launcher) se disponível, senão o do sistema, senão
+/// inglês. Com `recursos`, os arquivos de idioma dos mods entram por cima (mesclados por chave).
+fn instalar_idioma_do_jogo(recursos: Option<&Recursos>, dados: &Path, pedido: Option<&str>) {
+    use engine::idiomas::{self, Textos, CONTEXTO_JOGO};
+    let indice = match recursos {
+        Some(r) => idiomas::indice_do_jogo(r),
+        None => idiomas::indice_de_pasta(dados),
+    };
+    let codigo = idiomas::escolher(pedido, &idioma_sistema::preferidos(), &indice.codigos(CONTEXTO_JOGO));
+    idiomas::instalar(match recursos {
+        Some(r) => Textos::do_jogo(r, &codigo),
+        None => Textos::de_pastas(dados, &[], &codigo),
+    });
 }
 
 /// A pasta do jogo que a configuração do launcher faria o jogo usar tem os arquivos do SimAnt?
@@ -737,29 +769,36 @@ fn jogo_da_config_valido(c: &config_launcher::ConfigLauncher, base: &Path) -> bo
 fn iniciar(p: OpcoesPrograma, cli: Vec<String>) -> Result<(), String> {
     use config_launcher::ConfigLauncher;
     let caminho = if p.sem_config { None } else { p.config.clone().or_else(ConfigLauncher::caminho_padrao) };
-    let (cfg, mut aviso) = match caminho.as_deref().map(ConfigLauncher::ler) {
+    let (cfg, erro_cfg) = match caminho.as_deref().map(ConfigLauncher::ler) {
         Some(Ok(c)) => (c, None),
         Some(Err(e)) => {
-            eprintln!("aviso: configuração do launcher ignorada: {e}");
-            (None, Some(format!("Configuração ignorada (inválida): {e}")))
+            eprintln!("{}", tr!("programa.config_ignorada", erro = e));
+            (None, Some(e))
         }
         None => (None, None),
     };
     let base = pastas::base();
+    // O idioma do jogo, agora com o da configuração (o principal o refaz com os mods).
+    let pedido = p.idioma.clone().or_else(|| cfg.as_ref().and_then(|c| c.idioma.clone()));
+    instalar_idioma_do_jogo(None, &base.join("data"), pedido.as_deref());
     if let Some(png) = &p.capturar_launcher {
-        let mut e = launcher::Estado::novo(cfg, caminho, base);
+        let mut e = launcher::Estado::novo(cfg, caminho, base, p.idioma.as_deref());
         launcher::capturar(&mut e, png)?;
         println!("{}", png.display());
         return Ok(());
     }
     // Sem opções de jogo: o launcher, salvo se a configuração pede o jogo direto e a pasta vale.
-    let sem_opcoes = cli.is_empty() && !p.sem_config;
+    let sem_opcoes = (cli.is_empty() || cli.iter().all(|a| p.idioma.as_deref() == Some(a.as_str()) || a == "--idioma")) && !p.sem_config;
     let direto = cfg.as_ref().is_some_and(|c| !c.mostrar_launcher && jogo_da_config_valido(c, &base));
     if p.launcher || (sem_opcoes && !direto) {
-        if cfg.as_ref().is_some_and(|c| !c.mostrar_launcher) && !direto {
-            aviso.get_or_insert("A pasta do jogo da configuração não tem os arquivos do SimAnt; escolha outra.".into());
-        }
-        let mut e = launcher::Estado::novo(cfg, caminho, base);
+        let pasta_invalida = cfg.as_ref().is_some_and(|c| !c.mostrar_launcher) && !direto;
+        let mut e = launcher::Estado::novo(cfg, caminho, base, p.idioma.as_deref());
+        // Avisos na linha de status, no idioma do launcher.
+        let aviso = match (erro_cfg, pasta_invalida) {
+            (Some(erro), _) => Some(e.textos.f("launcher.status.config_ignorada", &[("erro", &erro)])),
+            (None, true) => Some(e.textos.t("launcher.status.pasta_da_config")),
+            (None, false) => None,
+        };
         return match launcher::executar(&mut e, aviso, p.launcher_jogar_apos_ms)? {
             launcher::Saida::Jogar(mut args) => {
                 println!("launcher: simant {}", config_launcher::formatar_linha(&args));
@@ -770,17 +809,30 @@ fn iniciar(p: OpcoesPrograma, cli: Vec<String>) -> Result<(), String> {
             launcher::Saida::Sair => Ok(()),
         };
     }
-    principal(ler_opcoes(config_launcher::combinar(cfg.as_ref(), &cli))?)
+    // Só `--idioma` na linha conta como "sem opções": a configuração inteira, com ele depois.
+    let mut args = config_launcher::combinar(cfg.as_ref(), if sem_opcoes { &[] } else { &cli });
+    if sem_opcoes {
+        args.extend(cli);
+    }
+    principal(ler_opcoes(args)?)
 }
 
 fn main() {
-    let (p, cli) = match separar_opcoes(std::env::args().skip(1).collect()) {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    // Antes de tudo, os textos do port (para os erros da linha de comando e a ajuda).
+    let pedido = args.iter().position(|a| a == "--idioma").and_then(|i| args.get(i + 1)).cloned();
+    instalar_idioma_do_jogo(None, &pastas::base().join("data"), pedido.as_deref());
+    let (p, cli) = match separar_opcoes(args) {
         Ok(x) => x,
         Err(e) => {
-            eprintln!("erro: {e}");
+            eprintln!("{}", tr!("programa.erro", erro = e));
             std::process::exit(1);
         }
     };
+    if p.ajuda {
+        println!("{}", tr!("cli.ajuda", versao = env!("CARGO_PKG_VERSION")));
+        return;
+    }
     let saida = registro::preparar(p.console, cli.is_empty());
     registro::avisar_panico(&saida);
     if let Err(e) = iniciar(p, cli) {

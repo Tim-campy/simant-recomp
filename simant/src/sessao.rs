@@ -269,7 +269,7 @@ impl Sessao<'_> {
             _ => (1..1000)
                 .map(|n| PathBuf::from(format!("SALVO{n:02}.ANT")))
                 .find(|p| !p.exists())
-                .ok_or("nenhum nome livre para salvar")?,
+                .ok_or_else(|| tr!("jogo.erro.sem_nome_livre"))?,
         };
         self.partida.estado.para_save(&self.layout)?.gravar(&caminho)?;
         // Estado dos scripts dos mods no arquivo lateral (API de mods 0.26); o .ANT não muda.
@@ -371,7 +371,7 @@ impl Sessao<'_> {
         pendentes.extend(menus_ui::desenhar_no_cliente(self, &mut q));
         self.desenhar_dialogo(&mut q);
         if !pendentes.is_empty() {
-            eprintln!("tela de jogo: não desenhado ainda: {}", pendentes.join(", "));
+            eprintln!("game screen: not drawn yet: {}", pendentes.join(", "));
         }
         Ok(para_rgb(&q.pixels, &self.cores))
     }
@@ -407,7 +407,7 @@ impl Sessao<'_> {
         if let Some((x, y)) = self.janelas.clique_info.take() {
             if let Some(a) = self.janelas.area_do_info(self.recursos) {
                 if self.info.clicar(x - i32::from(a.esq), y - i32::from(a.topo)) {
-                    println!("info: cartão {}", self.info.atual);
+                    println!("info: card {}", self.info.atual);
                 }
             }
         }
@@ -471,7 +471,7 @@ impl Sessao<'_> {
             return;
         }
         let r = if duplo { self.partida.clicar(cx, cy, true) } else { self.partida.clicar_depois_da_espera(cx, cy, false) };
-        println!("Shift+clique {} no mapa em ({cx}, {cy}), plano {}: {r:?}", if duplo { "duplo" } else { "simples" }, self.partida.nav.plano_mapa);
+        println!("Shift+{} click on the map at ({cx}, {cy}), plane {}: {r:?}", if duplo { "double" } else { "single" }, self.partida.nav.plano_mapa);
     }
 
     /// `_OpenMapYard` (Window → Map/Yard, Ctrl+M, mini mapa): com o quintal aberto, ele vem para a
@@ -489,7 +489,7 @@ impl Sessao<'_> {
         let objetos = self.tela.objetos_da_faixa_em(x, y);
         let Some(n) = objetos.iter().find_map(|o| self.mapa.cfg.botoes_cheiro.get(*o).copied()) else { return false };
         self.partida.botao_de_cheiro(n);
-        println!("mapa: modo {}", self.partida.estado.vistas.modo_mapa);
+        println!("map: mode {}", self.partida.estado.vistas.modo_mapa);
         true
     }
 
@@ -532,7 +532,7 @@ impl Sessao<'_> {
                 true
             }
             Err(e) => {
-                eprintln!("menu de ícones: {e}");
+                eprintln!("icon menu: {e}");
                 false
             }
         }
@@ -552,7 +552,7 @@ impl Sessao<'_> {
         let limite = Retangulo { esq: 0, topo: 0, dir: self.tela.cfg.largura as i16, base: self.tela.cfg.altura as i16 };
         match MenuAberto::abrir(self.recursos, &self.interface, cfg, x + i32::from(dx), y + i32::from(dy), limite) {
             Ok(m) => self.menu = Some((m, AlvoMenu::Amarela)),
-            Err(e) => eprintln!("menu da amarela: {e}"),
+            Err(e) => eprintln!("yellow ant menu: {e}"),
         }
     }
 
@@ -567,11 +567,11 @@ impl Sessao<'_> {
                     c = para;
                 }
                 let ok = self.partida.comando_amarela(c);
-                println!("menu da amarela: comando {c}{}", if ok { "" } else { " (erro)" });
+                println!("yellow ant menu: command {c}{}", if ok { "" } else { " (error)" });
             }
             AlvoMenu::Botao(nome) => {
                 self.partida.definir_funcao_do_botao(&nome, u16::from(c), shift);
-                println!("botão {nome}: função {c}");
+                println!("button {nome}: function {c}");
             }
         }
     }
@@ -581,7 +581,7 @@ impl Sessao<'_> {
     pub(crate) fn decidir_clique_pendente(&mut self, segurando: bool) {
         let Some((_, x, y, (cx, cy))) = self.clique_pendente.take() else { return };
         let r = self.partida.clicar_depois_da_espera(cx, cy, segurando);
-        println!("clique simples em ({cx}, {cy}), plano {}{}: {r:?}", self.partida.nav.plano_mapa, if segurando { " segurando" } else { "" });
+        println!("single click at ({cx}, {cy}), plane {}{}: {r:?}", self.partida.nav.plano_mapa, if segurando { " holding" } else { "" });
         match r {
             RespostaClique::MenuAmarela => self.abrir_menu_da_amarela(x, y),
             RespostaClique::Examinar => {
@@ -620,7 +620,7 @@ impl Sessao<'_> {
     pub(crate) fn clicar_no_mapa(&mut self, x: i32, y: i32, duplo: bool) {
         if let Some((cx, cy)) = self.tela.celula_em(x, y, &self.partida.nav) {
             let r = self.partida.clicar(cx, cy, duplo);
-            println!("clique {} em ({cx}, {cy}), plano {}: {r:?}", if duplo { "duplo" } else { "simples" }, self.partida.nav.plano_mapa);
+            println!("{} click at ({cx}, {cy}), plane {}: {r:?}", if duplo { "double" } else { "single" }, self.partida.nav.plano_mapa);
         }
     }
 
@@ -637,17 +637,17 @@ impl Sessao<'_> {
                 EventoRegras::Mensagem(id) => {
                     let texto: Vec<String> =
                         avisos::linhas_do_texto(self.recursos, id).iter().map(|l| l.iter().map(|&b| b as char).collect()).collect();
-                    println!("[tick {t}] mensagem {id}: {}", texto.join(" / "));
+                    println!("[tick {t}] message {id}: {}", texto.join(" / "));
                 }
-                EventoRegras::DialogoAranha { texto } => println!("[tick {t}] quadro da aranha, texto {texto} (_SpiderDialog)"),
-                EventoRegras::Musica(id) => println!("[tick {t}] música {id}"),
+                EventoRegras::DialogoAranha { texto } => println!("[tick {t}] spider box, text {texto} (_SpiderDialog)"),
+                EventoRegras::Musica(id) => println!("[tick {t}] music {id}"),
                 EventoRegras::Som(_) | EventoRegras::TemaDoNinho | EventoRegras::Espera(_) => {} // tocados por som::Audio
                 EventoRegras::Animacao(_) | EventoRegras::Instantaneo { .. } => {} // a Partida guarda e mostra os quadros
-                EventoRegras::DialogoFimDeJogo => println!("[tick {t}] fim de jogo (_EndGameDialog)"),
-                EventoRegras::EscolherColonia => println!("[tick {t}] escolher outra colônia (_SpecialXfer)"),
-                EventoRegras::QuadroAmarela { imagem, .. } => println!("[tick {t}] quadro da amarela {imagem} (_YellowDialog)"),
-                EventoRegras::QuadroFormigaLeao => println!("[tick {t}] quadro da formiga-leão (_LionDialog)"),
-                EventoRegras::AnimacaoVitoria => println!("[tick {t}] animação da vitória (_DrawSimPayoff)"),
+                EventoRegras::DialogoFimDeJogo => println!("[tick {t}] game over (_EndGameDialog)"),
+                EventoRegras::EscolherColonia => println!("[tick {t}] choose another colony (_SpecialXfer)"),
+                EventoRegras::QuadroAmarela { imagem, .. } => println!("[tick {t}] yellow ant box {imagem} (_YellowDialog)"),
+                EventoRegras::QuadroFormigaLeao => println!("[tick {t}] antlion box (_LionDialog)"),
+                EventoRegras::AnimacaoVitoria => println!("[tick {t}] victory animation (_DrawSimPayoff)"),
                 EventoRegras::CentralizarNaAmarela { .. } | EventoRegras::MensagemFaixa(_) => {} // a faixa é da Partida
             }
         }
@@ -692,9 +692,9 @@ impl Sessao<'_> {
     /// Velocidade e pausa, para o título da janela.
     pub(crate) fn situacao(&self) -> String {
         let p = &self.partida.estado.partida;
-        let vel = ["lenta", "normal", "rápida", "ultra"].get(p.velocidade as usize).copied().unwrap_or("?");
-        let pausa = if p.pausado != 0 { ", pausado" } else { "" };
-        let track = if p.opcoes[0] != 0 { ", AutoTrack" } else { "" };
+        let vel = if p.velocidade <= 3 { tr!(&format!("jogo.titulo.velocidade.{}", p.velocidade)) } else { "?".into() };
+        let pausa = if p.pausado != 0 { tr!("jogo.titulo.pausado") } else { String::new() };
+        let track = if p.opcoes[0] != 0 { tr!("jogo.titulo.autotrack") } else { String::new() };
         format!("{vel}{pausa}{track}")
     }
 }

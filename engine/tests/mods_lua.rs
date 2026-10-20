@@ -50,8 +50,37 @@ fn sandbox_nao_tem_io_os_nem_carga_de_codigo() {
     s.ao_iniciar(&mut e);
     assert_eq!(s.ativo("teste"), Some(false), "os.execute não existe: erro desliga o script");
     let reg = s.retirar_registro().join("\n");
-    assert!(reg.contains("script desligado em ao_iniciar"), "{reg}");
+    assert!(reg.contains("script turned off in ao_iniciar"), "{reg}");
     assert_eq!(s.retirar_mensagens().len(), 1, "aviso na faixa");
+}
+
+/// API 0.43: `idioma()` e `traduzir(chave, params)` leem os textos do jogo (inglês aqui); chave
+/// ausente devolve a própria chave; parâmetros que não são texto viram texto; chaves da tabela de
+/// parâmetros que não são texto são erro.
+#[test]
+fn idioma_e_traduzir() {
+    let mut s = scripts(
+        r#"
+        registrar(idioma())
+        registrar(traduzir("mods.script_desligado", { nome = "x" }))
+        registrar(traduzir("mods.recusa.leao_sem_lugar", { x = 3, y = 4.5 }))
+        registrar(traduzir("nao.existe"))
+        registrar(traduzir("lua.mensagem.vazia", nil))
+        traduzir("mods.script_desligado", { "posicional" })
+        "#,
+    );
+    let reg = s.retirar_registro();
+    assert_eq!(
+        &reg[..5],
+        &[
+            "[teste] en".to_string(),
+            "[teste] Mod x: script turned off by an error".into(),
+            "[teste] no free spot at (3, 4.5) or too many antlions".into(),
+            "[teste] nao.existe".into(),
+            "[teste] mostrar_mensagem: empty text".into(),
+        ]
+    );
+    assert!(reg[5].contains("traduzir: the parameters must be a table with text keys ({nome = valor})"), "{reg:?}");
 }
 
 #[test]
@@ -59,7 +88,7 @@ fn bytecode_e_recusado() {
     // Um chunk binário (começa com ESC) não carrega: só texto.
     let mut s = scripts("\x1bLua");
     assert_eq!(s.ativo("teste"), None, "o mod não chega a ser carregado");
-    assert!(s.retirar_registro()[0].contains("script desligado"));
+    assert!(s.retirar_registro()[0].contains("script turned off"));
 }
 
 #[test]
@@ -77,7 +106,7 @@ fn limite_de_instrucoes_interrompe_laco_infinito() {
     s.depois_do_tick(&mut e);
     assert_eq!(s.ativo("laco"), Some(false));
     assert_eq!(s.ativo("teimoso"), Some(false));
-    assert!(s.retirar_registro().iter().all(|l| l.contains("limite excedido")));
+    assert!(s.retirar_registro().iter().all(|l| l.contains("limit exceeded")));
     assert!(!s.tem_gancho(Gancho::DepoisDoTick));
 }
 
@@ -109,7 +138,7 @@ fn erro_desliga_so_o_script_que_falhou() {
     assert_eq!(s.ativo("argumento"), Some(false), "plano desconhecido é erro");
     let reg = s.retirar_registro();
     assert_eq!(reg.iter().filter(|l| l.starts_with("[bom]")).count(), 3);
-    assert!(reg.iter().any(|l| l.starts_with("[ruim] script desligado") && l.contains("falhei")));
+    assert!(reg.iter().any(|l| l.starts_with("[ruim] script turned off") && l.contains("falhei")));
     assert_eq!(s.retirar_mensagens().len(), 2);
 }
 
@@ -207,7 +236,7 @@ fn mod_de_exemplo_chove_comida_a_cada_500_ticks() {
     e.ambiente.proxima_comida = -1; // sem a alimentação periódica do jogo, para isolar o script
     let mut regras = RegrasOriginais::default();
     s.ao_iniciar(&mut e);
-    let esperado = format!("chuva de comida ligada; API {}, jogo rapido", engine::scripts::VERSAO_API);
+    let esperado = format!("food rain on; API {}, game rapido, language en", engine::scripts::VERSAO_API);
     assert!(s.retirar_registro()[0].contains(&esperado));
     let mut sem_script = e.clone();
     for _ in 0..499 {
@@ -227,7 +256,7 @@ fn mod_de_exemplo_chove_comida_a_cada_500_ticks() {
     assert_eq!(pedacos, i32::from(comida), "cada pedaço contado em _FoodA está no mapa");
     let msgs = s.retirar_mensagens();
     assert_eq!(msgs.len(), 1);
-    assert_eq!(msgs[0].texto, format!("Choveu comida! ({comida} pedaços)"));
+    assert_eq!(msgs[0].texto, format!("It rained food! ({comida} pieces)"));
 }
 
 /// Superfície de um patch de carpete da casa (`_CarpetFloorR`: chão 0x03, `_TERRAINset` = 1) num
@@ -328,7 +357,7 @@ fn caminho_de_script_invalido_desliga_o_mod() {
     let r = recursos_com_mods(&dir);
     let mut s = Scripts::carregar(&r, Limites::default()).unwrap().unwrap();
     assert!(s.situacao().is_empty());
-    assert!(s.retirar_registro()[0].contains("caminho de script inválido"));
+    assert!(s.retirar_registro()[0].contains("invalid script path"));
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -452,7 +481,7 @@ pub(crate) mod api017 {
         assert!(p.estado.ambiente.lencol < lencol, "_WaterTable sobe nos ninhos ({lencol} → {})", p.estado.ambiente.lencol);
         // Chover de novo é recusado; parar desliga no tick seguinte.
         escolher(&mut p, 1);
-        assert!(p.retirar_registro_scripts().iter().any(|l| l.contains("já está chovendo")));
+        assert!(p.retirar_registro_scripts().iter().any(|l| l.contains("it is already raining")));
         escolher(&mut p, 2);
         rodar(&mut p, 1);
         assert_eq!(p.estado.ambiente.chovendo, 0);
@@ -537,14 +566,14 @@ pub(crate) mod api017 {
         }
         assert!(decolaram, "alados decolam");
         escolher(&mut p, 2);
-        assert!(p.retirar_registro_scripts().iter().any(|l| l.contains("sem machos")));
+        assert!(p.retirar_registro_scripts().iter().any(|l| l.contains("no males")));
     }
 
     #[test]
     fn fim_de_jogo_licao_e_misterio() {
         let mut p = partida_com(&["e:terminar_jogo('vitoria')", "e:avancar_licao()", "e:misterio()"]);
         escolher(&mut p, 2);
-        assert!(p.retirar_registro_scripts().iter().any(|l| l.contains("só no tutorial")));
+        assert!(p.retirar_registro_scripts().iter().any(|l| l.contains("only in the tutorial")));
         let r0 = p.estado.r;
         escolher(&mut p, 3);
         assert!(p.ultimo_misterio.is_some());
@@ -820,7 +849,7 @@ mod api026 {
         r.retirar_registro_scripts();
         r.ler_estado_dos_mods(&save);
         let reg = r.retirar_registro_scripts();
-        assert!(reg.len() == 1 && reg[0].contains("outra gravação"), "{reg:?}");
+        assert!(reg.len() == 1 && reg[0].contains("another save"), "{reg:?}");
 
         // Sem dados de mod, o arquivo lateral antigo é apagado.
         let mut sem = partida();

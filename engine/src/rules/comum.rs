@@ -193,7 +193,7 @@ pub type UsoComum = (&'static str, &'static str);
 /// `comum.json` embutido na compilação (sem mods), para os `padrao()` e os `de_json` das partes.
 pub fn comuns_embutidas() -> &'static serde_json::Value {
     static C: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
-    C.get_or_init(|| serde_json::from_str(include_str!("../../../data/comum.json")).expect("data/comum.json inválido"))
+    C.get_or_init(|| serde_json::from_str(include_str!("../../../data/comum.json")).expect("invalid data/comum.json"))
 }
 
 /// Põe no JSON de uma parte as tabelas comuns que ela usa, tiradas de `comuns`.
@@ -207,18 +207,18 @@ pub fn completar_com_comuns(
     comuns: &serde_json::Value,
     usos: &[UsoComum],
 ) -> Result<(), String> {
-    let obj = parte.as_object_mut().ok_or_else(|| format!("{arquivo}: esperado um objeto JSON"))?;
+    let obj = parte.as_object_mut().ok_or_else(|| format!("{arquivo}: expected a JSON object"))?;
     for &(chave, chave_comum) in usos {
         if obj.contains_key(chave) {
             eprintln!(
-                "aviso: {arquivo} traz \"{chave}\", que desde a API de mods 0.20 fica em {ARQUIVO_COMUNS} \
-                 (\"{chave_comum}\"); a cópia vale só para esta parte"
+                "warning: {arquivo} has \"{chave}\", which since mod API 0.20 lives in {ARQUIVO_COMUNS} \
+                 (\"{chave_comum}\"); the copy applies to this part only"
             );
             continue;
         }
         let v = comuns
             .get(chave_comum)
-            .ok_or_else(|| format!("{ARQUIVO_COMUNS}: falta a tabela \"{chave_comum}\" (usada por {arquivo})"))?;
+            .ok_or_else(|| format!("{ARQUIVO_COMUNS}: missing table \"{chave_comum}\" (used by {arquivo})"))?;
         obj.insert(chave.to_string(), v.clone());
     }
     Ok(())
@@ -269,7 +269,7 @@ pub trait Direcoes {
 /// Validação comum de `dx8`/`dy8` dos arquivos de dados: cada deslocamento em −1..1.
 pub fn validar_direcoes(arquivo: &str, dx: &[i8], dy: &[i8]) -> Result<(), String> {
     if dx.iter().chain(dy).any(|d| !(-1..=1).contains(d)) {
-        return Err(format!("{arquivo}: dx8/dy8 (e dx9/dy9) devem estar em −1..1"));
+        return Err(format!("{arquivo}: dx8/dy8 (and dx9/dy9) must be in −1..1"));
     }
     Ok(())
 }

@@ -7,7 +7,8 @@
 //! rotina (menino cortando no patch atual, reprodutores), escreve os mesmos campos que a rotina do
 //! original escreveria naquela situação (as preparações de `tools/cenarios_tick.py`, conferidas na
 //! bancada). Nenhuma ação sorteia S ou R além do que a rotina sorteia. Recusas voltam como `Err`
-//! com o motivo (vão para o registro do mod) e não mudam nada.
+//! com o motivo (vão para o registro do mod e para a faixa) e não mudam nada; os motivos vêm de
+//! `mods.recusa.*` em `data/idiomas/` (docs/i18n.md).
 
 use super::partida::Partida;
 use crate::formats::save::Lista;
@@ -18,6 +19,7 @@ use crate::rules::quintal::{self, Relogios};
 use crate::rules::troca_patch::{self, ResultadoTroca};
 use crate::rules::{inimigos, misterio};
 use crate::scripts::PedidoMod;
+use crate::tr;
 
 /// Nó do menino dentro de casa onde ele fica parado com o inseticida (quintal.md §4; cenário
 /// `inseticida` da bancada: patch (0, 12)).
@@ -56,16 +58,16 @@ pub fn aplicar(p: &mut Partida, pedido: &PedidoMod) -> Result<(), String> {
     match *pedido {
         PedidoMod::ComecarChuva => {
             if e.ambiente.chovendo != 0 {
-                return Err("já está chovendo".into());
+                return Err(tr!("mods.recusa.ja_chove"));
             }
             if e.ambiente.terreno == 1 {
-                return Err("não chove dentro de casa".into());
+                return Err(tr!("mods.recusa.chuva_em_casa"));
             }
             quintal::comecar_chuva(e, &p.regras.quintal, rel);
         }
         PedidoMod::PararChuva => {
             if e.ambiente.chovendo == 0 {
-                return Err("não está chovendo".into());
+                return Err(tr!("mods.recusa.nao_chove"));
             }
             // `_DoSimYard` desliga a chuva no tick em que a contagem chega a 0.
             e.ambiente.chuva_contagem = 0;
@@ -73,28 +75,28 @@ pub fn aplicar(p: &mut Partida, pedido: &PedidoMod) -> Result<(), String> {
         PedidoMod::MeninoCortarGrama => {
             let (px, py) = e.ambiente.patch;
             if troca_patch::e_casa(px, py) {
-                return Err("o patch atual é da casa".into());
+                return Err(tr!("mods.recusa.patch_da_casa"));
             }
             menino_cortando_aqui(e, px, py);
         }
         PedidoMod::MeninoInseticida => {
             if e.ambiente.casa_a_venda == 1 {
-                return Err("a casa está à venda (o menino não está lá)".into());
+                return Err(tr!("mods.recusa.casa_a_venda"));
             }
             e.menino.no_numero = NO_INSETICIDA;
             e.menino.no_contagem = 0;
         }
         PedidoMod::CriarReprodutores { cor, n } => {
             if criar_reprodutores(e, cor, n) == 0 {
-                return Err("nenhuma operária ou soldado da cor".into());
+                return Err(tr!("mods.recusa.sem_adultos"));
             }
         }
         PedidoMod::ArmarRevoada(cor) => {
             if e.colonia(cor).revoada != 0 {
-                return Err("a revoada já está armada".into());
+                return Err(tr!("mods.recusa.revoada_armada"));
             }
             if reprodutores(e, cor) == 0 {
-                return Err("sem machos nem rainhas aladas".into());
+                return Err(tr!("mods.recusa.sem_reprodutores"));
             }
             e.colonia_mut(cor).revoada = p.regras.superficie.regras.revoada_vermelha_contagem;
         }
@@ -103,20 +105,20 @@ pub fn aplicar(p: &mut Partida, pedido: &PedidoMod) -> Result<(), String> {
             *q = q.saturating_add(n);
         }
         PedidoMod::PovoarPatch { cor, x, y, n } => {
-            let i = troca_patch::indice_patch(x, y).ok_or("patch fora do quintal")?;
+            let i = troca_patch::indice_patch(x, y).ok_or_else(|| tr!("mods.recusa.patch_fora"))?;
             e.colonia_mut(cor).populacao_quintal.0[i] = n;
         }
         PedidoMod::TrocarPatch { x, y } => return trocar_patch(p, x, y),
         PedidoMod::TrazerGato => {
             if e.bichos.gato_ligado != 0 {
-                return Err("o gato já está no quintal".into());
+                return Err(tr!("mods.recusa.gato"));
             }
             quintal::gato_aparece(e);
         }
         PedidoMod::Latir => quintal::latido(e, &p.regras.quintal, rel),
         PedidoMod::TrazerAranha => {
             if e.aranha.ligada != 0 {
-                return Err("a aranha já está no patch".into());
+                return Err(tr!("mods.recusa.aranha"));
             }
             inimigos::aranha_entra(e);
         }
@@ -124,10 +126,10 @@ pub fn aplicar(p: &mut Partida, pedido: &PedidoMod) -> Result<(), String> {
             // `_MakeHousePatch` → `_InitAntLions(0)`: a casa não tem formigas-leão, e os tiles delas
             // são outros desenhos no conjunto da casa.
             if e.ambiente.terreno == 1 {
-                return Err("não há formiga-leão dentro de casa".into());
+                return Err(tr!("mods.recusa.leao_em_casa"));
             }
             if !inimigos::nova_formiga_leao(e, &p.regras.inimigos, x, y) {
-                return Err(format!("sem lugar livre em ({x}, {y}) ou formigas-leão demais"));
+                return Err(tr!("mods.recusa.leao_sem_lugar", x = x, y = y));
             }
         }
         PedidoMod::SaudeAmarela(v) => amarela::definir_saude(e, &p.tabelas_amarela, v),
@@ -135,7 +137,7 @@ pub fn aplicar(p: &mut Partida, pedido: &PedidoMod) -> Result<(), String> {
         PedidoMod::SaudeColonia { cor, v } => e.colonia_mut(cor).saude = v,
         PedidoMod::AvancarLicao => {
             if e.partida.tipo_jogo != 0 {
-                return Err("só no tutorial".into());
+                return Err(tr!("mods.recusa.so_tutorial"));
             }
             // O que `_RunTutor` faz quando `_LessonDone` é verdadeiro.
             e.tutorial.licao += 1;
@@ -143,7 +145,7 @@ pub fn aplicar(p: &mut Partida, pedido: &PedidoMod) -> Result<(), String> {
         }
         PedidoMod::TerminarJogo { vitoria } => {
             if e.partida.fim_de_jogo != 0 {
-                return Err("o jogo já acabou".into());
+                return Err(tr!("mods.recusa.jogo_acabou"));
             }
             // Como `_SimColonies` no fim do Jogo Completo (vitória) e `_CutGrass` (derrota).
             let m = &p.regras.quintal.mensagens;
@@ -224,7 +226,7 @@ fn reprodutores(e: &Estado, cor: Cor) -> usize {
 
 /// `_XferPatch` para (x, y), como o duplo clique na janela do quintal (`core::quintal_mapa::clicar`).
 fn trocar_patch(p: &mut Partida, x: i16, y: i16) -> Result<(), String> {
-    let geracao = p.regras.geracao.as_ref().ok_or("tabelas de geração não carregadas")?;
+    let geracao = p.regras.geracao.as_ref().ok_or("generation tables not loaded")?;
     p.nav.pontos[0] = (i32::from(x), i32::from(y));
     p.estado.vistas.ponto_quintal = (x, y);
     match troca_patch::trocar_patch(&mut p.estado, geracao, &p.cfg_simulacao)? {
@@ -235,7 +237,7 @@ fn trocar_patch(p: &mut Partida, x: i16, y: i16) -> Result<(), String> {
             p.nav.pontos = [par(e.vistas.ponto_quintal), par(e.vistas.ponto_superficie), par(e.preta.vista_ninho), par(e.vermelha.vista_ninho)];
             Ok(())
         }
-        ResultadoTroca::MesmoPatch => Err("já está neste patch".into()),
-        ResultadoTroca::Recusada(id) => Err(format!("recusada pelo jogo (texto {id})")),
+        ResultadoTroca::MesmoPatch => Err(tr!("mods.recusa.mesmo_patch")),
+        ResultadoTroca::Recusada(id) => Err(tr!("mods.recusa.troca_recusada", id = id)),
     }
 }

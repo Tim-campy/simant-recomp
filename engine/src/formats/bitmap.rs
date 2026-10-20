@@ -24,7 +24,7 @@ fn bytes_por_linha(largura: usize, bpp: usize) -> usize {
 impl Bitmap {
     pub fn decodificar(d: &[u8]) -> Result<Bitmap, String> {
         if d.len() < CABECALHO {
-            return Err("bitmap menor que o cabeçalho".into());
+            return Err("bitmap smaller than the header".into());
         }
         if u16::from_le_bytes([d[0], d[1]]) == KIND_EMPACOTADO {
             // u16 em +2 = tamanho aberto (cabeçalho de 12 bytes + pixels); LZSS a partir de +4. O
@@ -34,7 +34,7 @@ impl Bitmap {
             let mut aberto = crate::formats::lzss::descomprimir(&d[4..], tamanho.saturating_sub(4))?;
             aberto.resize(tamanho.max(CABECALHO), 0);
             if aberto.len() >= 2 && u16::from_le_bytes([aberto[0], aberto[1]]) == KIND_EMPACOTADO {
-                return Err("bitmap empacotado dentro de outro".into());
+                return Err("packed bitmap inside another".into());
             }
             return Bitmap::decodificar(&aberto);
         }
@@ -56,7 +56,7 @@ impl Bitmap {
         }
         if dados.len() < stride * altura {
             return Err(format!(
-                "bitmap {largura}x{altura}: esperava {} bytes de pixels, há {}",
+                "bitmap {largura}x{altura}: expected {} bytes of pixels, got {}",
                 stride * altura,
                 dados.len()
             ));

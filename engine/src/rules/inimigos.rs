@@ -166,7 +166,7 @@ impl TabelasInimigos {
         comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx8, &self.dy8)?;
         comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx9, &self.dy9)?;
         if self.turn_tab.iter().flatten().any(|&d| d > 7) {
-            return Err(format!("{ARQUIVO_TABELAS}: turn_tab com direção fora de 0–7"));
+            return Err(format!("{ARQUIVO_TABELAS}: turn_tab with direction out of 0–7"));
         }
         Ok(())
     }
@@ -175,7 +175,7 @@ impl TabelasInimigos {
     pub fn padrao() -> &'static TabelasInimigos {
         static PADRAO: OnceLock<TabelasInimigos> = OnceLock::new();
         PADRAO.get_or_init(|| {
-            TabelasInimigos::de_json(JSON_PADRAO).expect("data/inimigos.json embutido")
+            TabelasInimigos::de_json(JSON_PADRAO).expect("embedded data/inimigos.json")
         })
     }
 

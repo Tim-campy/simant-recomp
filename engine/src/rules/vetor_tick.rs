@@ -172,7 +172,7 @@ fn ler_arquivo(dir: &Path, nome: &str) -> Result<Vec<u8>, String> {
 /// Separa `_LifeA` + `_LifeB` + `_LifeR` (16.384 bytes, todos em colunas, índice x × 64 + y).
 pub fn vida_de_bytes(d: &[u8]) -> Result<CamadasVida, String> {
     if d.len() != VIDA_A + 2 * VIDA_NINHO {
-        return Err(format!("vida com {} bytes; esperado {}", d.len(), VIDA_A + 2 * VIDA_NINHO));
+        return Err(format!("life has {} bytes; expected {}", d.len(), VIDA_A + 2 * VIDA_NINHO));
     }
     Ok(CamadasVida {
         a: d[..VIDA_A].to_vec(),
@@ -445,8 +445,8 @@ impl RelatorioTick {
     /// Uma linha de placar: `tick_000079 (GameTime 79): 290/307 blocos iguais ...`.
     pub fn placar(&self) -> String {
         format!(
-            "{} (GameTime {} → {}): {}/{} blocos iguais; dos {} que o original mudou, {} iguais; \
-             extras {}/{}; vida {} células diferentes",
+            "{} (GameTime {} → {}): {}/{} blocks equal; of the {} the original changed, {} equal; \
+             extras {}/{}; life {} cells differ",
             self.nome,
             self.game_time,
             self.game_time.wrapping_add(1),
@@ -511,13 +511,13 @@ fn comparar_bloco(
         if let Some(campo) = eh_lista(simbolo) {
             for (i, (a, b)) in original.iter().zip(port).enumerate() {
                 if a != b {
-                    anotar(format!("formiga {i} campo {campo}: original {a}, port {b} (antes {})", antes[i]));
+                    anotar(format!("ant {i} field {campo}: original {a}, port {b} (before {})", antes[i]));
                 }
             }
         } else if let Some(h) = altura_mapa(simbolo) {
             for (i, (a, b)) in original.iter().zip(port).enumerate() {
                 if a != b {
-                    anotar(format!("célula ({}, {}): original {a}, port {b} (antes {})", i / h, i % h, antes[i]));
+                    anotar(format!("cell ({}, {}): original {a}, port {b} (before {})", i / h, i % h, antes[i]));
                 }
             }
         } else {
@@ -532,7 +532,7 @@ fn comparar_bloco(
                 if original[r.clone()] != port[r.clone()] {
                     let onde = if n == 1 { String::new() } else { format!("[{i}] ") };
                     anotar(format!(
-                        "{onde}original {}, port {} (antes {})",
+                        "{onde}original {}, port {} (before {})",
                         valor(&original[r.clone()], t),
                         valor(&port[r.clone()], t),
                         valor(&antes[r], t)
@@ -633,7 +633,7 @@ pub fn comparar_com(
     for b in &layout.blocos {
         let s = b.simbolo.as_str();
         fn pega<'a>(j: &'a JogoSalvo, s: &str) -> Result<&'a [u8], String> {
-            j.bloco(s).ok_or_else(|| format!("bloco {s} ausente"))
+            j.bloco(s).ok_or_else(|| format!("block {s} missing"))
         }
         blocos.push(comparar_bloco(s, b.count, pega(&v.antes, s)?, pega(&v.depois, s)?, pega(&port, s)?));
     }
@@ -673,7 +673,7 @@ fn escrever_celulas(f: &mut fmt::Formatter<'_>, d: &[DiferencaCelula]) -> fmt::R
         writeln!(f, "      Life{} ({}, {}): original {}, port {}", c.plano, c.x, c.y, c.original, c.port)?;
     }
     if d.len() > MAX_DETALHES {
-        writeln!(f, "      ... mais {}", d.len() - MAX_DETALHES)?;
+        writeln!(f, "      ... {} more", d.len() - MAX_DETALHES)?;
     }
     Ok(())
 }
@@ -683,58 +683,58 @@ impl fmt::Display for RelatorioTick {
         writeln!(f, "== {} (GameTime {}, Cycle {}) ==", self.nome, self.game_time, self.cycle)?;
         writeln!(f, "{}", self.placar())?;
         if !self.ida_e_volta.is_empty() {
-            writeln!(f, "ATENÇÃO: ida e volta do save diferente em {:?}", self.ida_e_volta)?;
+            writeln!(f, "WARNING: save round trip differs in {:?}", self.ida_e_volta)?;
         }
 
         for (titulo, d) in [
-            ("Entrada: vida reconstruída das listas × vida_antes.bin", &self.vida_reconstruida),
-            ("Saída do original: vida reconstruída das listas × vida_depois.bin", &self.vida_reconstruida_depois),
+            ("Input: life rebuilt from the lists × vida_antes.bin", &self.vida_reconstruida),
+            ("Original output: life rebuilt from the lists × vida_depois.bin", &self.vida_reconstruida_depois),
         ] {
             writeln!(f, "\n{titulo}")?;
             if d.is_empty() {
-                writeln!(f, "    igual")?;
+                writeln!(f, "    equal")?;
             } else {
-                writeln!(f, "    {} células diferentes", d.len())?;
+                writeln!(f, "    {} cells differ", d.len())?;
                 escrever_celulas(f, d)?;
             }
         }
         for p in &self.pendencias_vida {
-            writeln!(f, "    pendência: {p}")?;
+            writeln!(f, "    pending: {p}")?;
         }
 
-        writeln!(f, "\nExtras depois do tick:")?;
+        writeln!(f, "\nExtras after the tick:")?;
         for x in &self.extras {
-            let s = if x.original == x.port { "igual" } else { "DIFERENTE" };
+            let s = if x.original == x.port { "equal" } else { "DIFFERENT" };
             writeln!(f, "    {:<11} {s}: original {}, port {}", x.nome, x.original, x.port)?;
         }
 
-        writeln!(f, "\nVida depois do tick:")?;
+        writeln!(f, "\nLife after the tick:")?;
         if self.vida.is_empty() {
-            writeln!(f, "    igual")?;
+            writeln!(f, "    equal")?;
         } else {
-            writeln!(f, "    {} células diferentes", self.vida.len())?;
+            writeln!(f, "    {} cells differ", self.vida.len())?;
             escrever_celulas(f, &self.vida)?;
         }
 
         let acertados: Vec<&str> =
             self.blocos.iter().filter(|b| b.original_mudou && b.igual()).map(|b| b.simbolo.as_str()).collect();
-        writeln!(f, "\nBlocos que o original mudou e o port acertou ({}): {}", acertados.len(), acertados.join(", "))?;
+        writeln!(f, "\nBlocks the original changed and the port matched ({}): {}", acertados.len(), acertados.join(", "))?;
 
         let difs: Vec<&ComparacaoBloco> = self.diferentes().collect();
-        writeln!(f, "\nBlocos diferentes ({}):", difs.len())?;
+        writeln!(f, "\nDifferent blocks ({}):", difs.len())?;
         for b in difs {
             let quem = match (b.original_mudou, b.port_mudou) {
-                (true, true) => "os dois mudaram",
-                (true, false) => "só o original mudou",
-                (false, true) => "só o port mudou",
-                (false, false) => "nenhum mudou",
+                (true, true) => "both changed",
+                (true, false) => "only the original changed",
+                (false, true) => "only the port changed",
+                (false, false) => "neither changed",
             };
-            writeln!(f, "  {} — {} bytes diferentes ({quem})", b.simbolo, b.bytes_diferentes)?;
+            writeln!(f, "  {} — {} bytes differ ({quem})", b.simbolo, b.bytes_diferentes)?;
             for d in &b.detalhes {
                 writeln!(f, "      {d}")?;
             }
             if b.total_detalhes > b.detalhes.len() {
-                writeln!(f, "      ... mais {}", b.total_detalhes - b.detalhes.len())?;
+                writeln!(f, "      ... {} more", b.total_detalhes - b.detalhes.len())?;
             }
         }
         Ok(())
@@ -781,7 +781,7 @@ pub fn aplicar_acao(
         let r = e.transferencia_no_tick.take().and_then(|t| t.resultado);
         return match r {
             Some(r) => Ok(format!("{:?}", r?)),
-            None => Err("o tick não chamou _SpecialXfer".into()),
+            None => Err("the tick did not call _SpecialXfer".into()),
         };
     }
     if acao.get("misterio").is_some() {
@@ -801,14 +801,14 @@ pub fn aplicar_acao(
         let mut ctl = super::amarela::ControleJogador::default();
         let mut ok = Vec::new();
         for c in cs {
-            let c = c.as_u64().ok_or("comando inválido")? as u8;
+            let c = c.as_u64().ok_or("invalid command")? as u8;
             ok.push(super::amarela::comando(e, t, &mut ctl, c));
         }
         return Ok(format!("{ok:?}"));
     }
     if let Some(m) = acao.get("desenho_quintal").and_then(|v| v.as_i64()) {
         // Entre dois ticks com a Yard/House View aberta e na frente: um redesenho do quintal.
-        return Ok(format!("{} passos de S", super::desenho::desenhar_quintal(e, m as i16)));
+        return Ok(format!("{} S steps", super::desenho::desenhar_quintal(e, m as i16)));
     }
     use super::experimental::{self as exp, Contexto, ControleExperimental, Ferramenta, TabelasExperimental};
     let c = Contexto::padrao();
@@ -830,19 +830,19 @@ pub fn aplicar_acao(
             e.leao_x_vaga_menos_1 = Some(x as u8);
         }
         for p in passos {
-            let f = p["f"].as_i64().ok_or("passo sem f")? as i16;
-            let fer = Ferramenta::de_i16(f).ok_or(format!("ferramenta {f}"))?;
+            let f = p["f"].as_i64().ok_or("step without f")? as i16;
+            let fer = Ferramenta::de_i16(f).ok_or(format!("tool {f}"))?;
             e.partida.ferramenta_experimental = f;
             ctl.subopcoes[fer.indice()] = p["sub"].as_u64().unwrap_or(0) as u8;
             let ctrl = p["ctrl"].as_bool().unwrap_or(false);
             let plano = e.vistas.plano as i32;
             let pontos: Vec<(i32, i32)> = p["pontos"]
                 .as_array()
-                .ok_or("passo sem pontos")?
+                .ok_or("step without pontos")?
                 .iter()
                 .map(|q| (q[0].as_i64().unwrap_or(-1) as i32, q[1].as_i64().unwrap_or(-1) as i32))
                 .collect();
-            let ((x0, y0), resto) = pontos.split_first().ok_or("passo sem pontos")?;
+            let ((x0, y0), resto) = pontos.split_first().ok_or("step without pontos")?;
             efeitos.extend(exp::pressionar(e, c, &mut ctl, plano, *x0, *y0, ctrl));
             for &(x, y) in resto {
                 efeitos.extend(exp::arrastar(e, c, &mut ctl, plano, x, y, ctrl));
@@ -857,7 +857,7 @@ pub fn aplicar_acao(
         }
         return Ok(format!("{efeitos:?}"));
     }
-    Err(format!("ação desconhecida: {acao}"))
+    Err(format!("unknown action: {acao}"))
 }
 
 /// `extras.json["acao"]` de um vetor de ação.
@@ -905,7 +905,7 @@ pub fn rodar_sequencia(dir: &Path, layout: &LayoutSave, regras: &mut dyn Regras)
     let texto = String::from_utf8(ler_arquivo(dir, "extras.json")?).map_err(|e| e.to_string())?;
     let lista: Vec<ExtrasArquivo> = serde_json::from_str(&texto).map_err(|e| format!("extras.json: {e}"))?;
     let extras: Vec<(Extras, Extras)> = lista.into_iter().map(|x| (x.antes.into(), x.depois.into())).collect();
-    let (x0, d0) = *extras.first().ok_or("extras.json vazio")?;
+    let (x0, d0) = *extras.first().ok_or("empty extras.json")?;
     let v = VetorTick {
         nome: "inicio".into(),
         antes: inicio.clone(),
@@ -960,7 +960,7 @@ pub fn rodar_sequencia(dir: &Path, layout: &LayoutSave, regras: &mut dyn Regras)
             let mut blocos = Vec::new();
             for b in &layout.blocos {
                 let s = b.simbolo.as_str();
-                let pega = |j: &JogoSalvo| j.bloco(s).map(<[u8]>::to_vec).ok_or_else(|| format!("bloco {s} ausente"));
+                let pega = |j: &JogoSalvo| j.bloco(s).map(<[u8]>::to_vec).ok_or_else(|| format!("block {s} missing"));
                 let c = comparar_bloco(s, b.count, &pega(&inicio)?, &pega(&original)?, &pega(&port)?);
                 if !c.igual() {
                     blocos.push(c);
@@ -1006,16 +1006,16 @@ mod testes {
     fn detalhes_de_lista_mapa_e_escalar() {
         let b = comparar_bloco("BlistT", 1, &[0, 0, 0], &[0, 5, 0], &[0, 6, 0]);
         assert_eq!((b.bytes_diferentes, b.original_mudou, b.port_mudou), (1, true, true));
-        assert_eq!(b.detalhes, vec!["formiga 1 campo T: original 5, port 6 (antes 0)"]);
+        assert_eq!(b.detalhes, vec!["ant 1 field T: original 5, port 6 (before 0)"]);
 
         let mut m = vec![0u8; 4096];
         m[64 * 3 + 7] = 9;
         let b = comparar_bloco("MapB", 1, &vec![0; 4096], &vec![0; 4096], &m);
-        assert_eq!(b.detalhes, vec!["célula (3, 7): original 0, port 9 (antes 0)"]);
+        assert_eq!(b.detalhes, vec!["cell (3, 7): original 0, port 9 (before 0)"]);
         assert!(!b.original_mudou && b.port_mudou);
 
         let b = comparar_bloco("CastePopB", 2, &[1, 0, 2, 0], &[1, 0, 3, 0], &[1, 0, 2, 0]);
-        assert_eq!(b.detalhes, vec!["[1] original 3, port 2 (antes 2)"]);
+        assert_eq!(b.detalhes, vec!["[1] original 3, port 2 (before 2)"]);
         let b = comparar_bloco("GameTime", 4, &[79, 0, 0, 0], &[80, 0, 0, 0], &[80, 0, 0, 0]);
         assert!(b.igual() && b.original_mudou);
     }

@@ -108,14 +108,14 @@ pub fn abrir_contexto(s: &mut Sessao, ctx: u32) {
                 s.ajuda.visor = Some(v)
             }
             Err(e) => {
-                eprintln!("ajuda: {e}");
+                eprintln!("help: {e}");
                 return;
             }
         }
     }
     let Some(v) = s.ajuda.visor.as_mut() else { return };
     if !v.abrir_contexto(ctx) {
-        println!("ajuda: contexto 0x{ctx:X} não existe no arquivo; índice");
+        println!("help: context 0x{ctx:X} is not in the file; index");
         v.abrir_indice();
     }
     println!("ajuda: contexto 0x{ctx:X}: {}", v.topico_atual().titulo);
@@ -138,7 +138,7 @@ fn tratar_clique(s: &mut Sessao, c: Clique) {
         Clique::Minimizou(_) => {
             // O SimAnt fica com o foco (h11).
             s.ajuda.foco = false;
-            println!("ajuda minimizada");
+            println!("help minimized");
         }
         _ => {}
     }
@@ -331,7 +331,7 @@ pub fn botao_de_janela(s: &mut Sessao, x: i32, y: i32) -> bool {
 /// Liga ou desliga o modo de ajuda.
 pub fn alternar_modo(s: &mut Sessao) {
     s.ajuda.modo = !s.ajuda.modo;
-    println!("modo de ajuda {}", if s.ajuda.modo { "ligado" } else { "desligado" });
+    println!("help mode {}", if s.ajuda.modo { "on" } else { "off" });
 }
 
 /// Teclas da ajuda (`_HelpKeyDown`): F1 abre o índice; Shift+F1 e Delete alternam o modo; Esc o
@@ -386,7 +386,7 @@ pub fn clique(s: &mut Sessao, x: i32, y: i32) -> bool {
     s.ajuda.modo = false;
     match s.ajuda.cfg.contexto(id, &s.partida.funcoes_botoes) {
         Some(ctx) => abrir_contexto(s, ctx),
-        None => println!("ajuda: objeto 0x{id:04X} sem ajuda"),
+        None => println!("help: object 0x{id:04X} has no help"),
     }
     true
 }

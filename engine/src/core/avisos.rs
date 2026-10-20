@@ -679,7 +679,7 @@ pub fn bytes_da_faixa(recursos: &Recursos, t: &TextoFaixa) -> Vec<u8> {
 // --- desenho -------------------------------------------------------------------------------------
 
 fn objeto<'a>(j: &'a Janela, nome: &str) -> Result<&'a crate::formats::janela::Objeto, String> {
-    j.objetos.iter().find(|o| o.nome == nome).ok_or(format!("objeto {nome} não existe"))
+    j.objetos.iter().find(|o| o.nome == nome).ok_or(format!("object {nome} does not exist"))
 }
 
 /// Mensagem da faixa no retângulo do objeto (já em coordenadas da área cliente), como
@@ -764,10 +764,10 @@ pub fn desenhar_quadro(
 ) -> Result<(GeometriaQuadro, Vec<String>), String> {
     let janela = carregar_janela(recursos, cfg.janela)?;
     let mut pendentes = Vec::new();
-    let fonte = interface.fontes.get(cfg.fonte).and_then(|f| f.as_ref()).ok_or(format!("fonte {} ausente", cfg.fonte))?;
+    let fonte = interface.fontes.get(cfg.fonte).and_then(|f| f.as_ref()).ok_or(format!("font {} missing", cfg.fonte))?;
     let linhas = linhas_do_texto(recursos, texto);
     if linhas.is_empty() {
-        pendentes.push(format!("texto SHARED 4/{texto} ausente"));
+        pendentes.push(format!("text SHARED 4/{texto} missing"));
     }
     let bm = imagem.and_then(|id| match recursos.objeto(Chave { tipo: TIPO_BITMAP, id }).and_then(|d| Bitmap::decodificar(&d)) {
         Ok(b) => Some(b),
@@ -820,7 +820,7 @@ pub fn desenhar_quadro(
 
 /// Retângulo do objeto `nome` da janela já posicionada na tela (coordenadas da área cliente).
 pub(crate) fn objeto_na_tela(interface: &Interface, id: u16, janela: &Janela, nome: &str, ajuste: [i16; 2]) -> Result<(Retangulo, u8), String> {
-    let g = interface.posicionar(id, janela).ok_or(format!("janela {id} sem posição"))?;
+    let g = interface.posicionar(id, janela).ok_or(format!("window {id} has no position"))?;
     let base = janela.retangulo();
     let (dx, dy) = (g.origem.0 - base.esq + ajuste[0], g.origem.1 - base.topo + ajuste[1]);
     let o = objeto(janela, nome)?;
@@ -841,7 +841,7 @@ pub fn desenhar_fim_de_jogo(
 ) -> Result<(Retangulo, Vec<String>), String> {
     let janela = carregar_janela(recursos, cfg.janela)?;
     let pendentes = desenhar_janela_deslocada(q, recursos, interface, cfg.janela, &janela, (cfg.ajuste[0], cfg.ajuste[1]))?;
-    let fonte = interface.fontes.get(cfg.fonte).and_then(|f| f.as_ref()).ok_or(format!("fonte {} ausente", cfg.fonte))?;
+    let fonte = interface.fontes.get(cfg.fonte).and_then(|f| f.as_ref()).ok_or(format!("font {} missing", cfg.fonte))?;
     let tipos = linhas_do_texto(recursos, cfg.lista_tipos);
     let tipo = usize::try_from(tipo_jogo).ok().filter(|&t| t < 4).unwrap_or(cfg.tipo_padrao);
     let avaliacoes = linhas_do_texto(recursos, cfg.lista_avaliacoes);
@@ -881,7 +881,7 @@ pub fn desenhar_modal(q: &mut Quadro, recursos: &Recursos, interface: &Interface
             Ok((Some(r), p))
         }
         Some(Modal::Amarela { imagem, indice }) => {
-            let (c, s) = avisos.sequencia_amarela().ok_or("quadro da amarela sem configuração")?;
+            let (c, s) = avisos.sequencia_amarela().ok_or("yellow ant frame has no configuration")?;
             let sobreposta = if avisos.sobreposta_visivel { s.sobreposta.map(|id| (id, s.deslocamento)) } else { None };
             let externo = desenhar_quadro_amarela(q, recursos, c, *imagem, avisos.ajuste_janela_imagem(c, s.ajuste, avisos.alinhar_frente()), sobreposta)?;
             if let Some(t) = &s.texto {

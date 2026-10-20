@@ -48,11 +48,13 @@ impl OpcoesSom {
             "--exportar-som" => self.exportar = Some(valor()?.into()),
             "--exportar-musica" => {
                 let v = valor()?;
-                self.so_musica = Some(v.parse().map_err(|_| format!("--exportar-musica: '{v}' não é um id"))?);
+                self.so_musica = Some(v.parse().map_err(|_| format!("--exportar-musica: '{v}' is not an id"))?);
             }
             "--sintetizador" => {
                 let v = valor()?;
-                self.sintetizador = Some(TipoSintetizador::de_nome(&v).ok_or(format!("--sintetizador: '{v}' (simples, soundfont ou fm)"))?);
+                self.sintetizador = Some(
+                    TipoSintetizador::de_nome(&v).ok_or_else(|| engine::tr!("cli.erro.escolha", opcao = "--sintetizador", valor = v, validos = "simples, soundfont, fm"))?,
+                );
             }
             _ => return Ok(false),
         }
@@ -77,23 +79,23 @@ pub fn musica(recursos: &Recursos, cfg: &ConfigSom, id: u16) -> Result<Result<Ve
         Err(_) => None,
     };
     if cfg.exigir_cabecalho && cabecalho.is_none() {
-        return Ok(Err(format!("música {id}: sem cabeçalho tipo 18")));
+        return Ok(Err(format!("music {id}: no type 18 header")));
     }
     let (bytes, transposicao) = match cfg.fonte_musica {
         FonteMusica::Arquivos => {
             let Some(nome) = cfg.musicas.get(&id) else {
-                return Ok(Err(format!("música {id}: fora da tabela 'musicas'")));
+                return Ok(Err(format!("music {id}: not in the 'musicas' table")));
             };
             (recursos.arquivo(&format!("{}/{nome}.mid", cfg.pasta_musicas))?, 0)
         }
         FonteMusica::Banco => {
             let Some(c) = cabecalho else {
-                return Ok(Err(format!("música {id}: sem cabeçalho tipo 18")));
+                return Ok(Err(format!("music {id}: no type 18 header")));
             };
             (recursos.objeto(Chave { tipo: TIPO_MIDI_SOUNDBLASTER, id: c.midi })?, c.transposicao)
         }
     };
-    let midi = Midi::de_bytes(&bytes).map_err(|e| format!("música {id}: {e}"))?;
+    let midi = Midi::de_bytes(&bytes).map_err(|e| format!("music {id}: {e}"))?;
     Ok(Ok(midi.sequencia(&cfg.canais_midi, transposicao, cfg.canal_percussao)))
 }
 
@@ -133,16 +135,16 @@ pub fn sintetizador(recursos: &Recursos, cfg: &ConfigSom, opcoes: &OpcoesSom, ta
         TipoSintetizador::Soundfont => match sf {
             Some(sf) => match SintSoundFont::abrir(&sf, taxa) {
                 Ok(s) => {
-                    println!("som: SoundFont {}", sf.display());
+                    println!("{}", engine::tr!("jogo.som.soundfont", arquivo = sf.display()));
                     return Box::new(s);
                 }
-                Err(e) => eprintln!("som: SoundFont não carregada ({e}); usando o sintetizador simples"),
+                Err(e) => eprintln!("{}", engine::tr!("jogo.som.soundfont_erro", erro = e)),
             },
-            None => eprintln!("som: nenhuma SoundFont indicada; usando o sintetizador simples"),
+            None => eprintln!("{}", engine::tr!("jogo.som.sem_soundfont")),
         },
         TipoSintetizador::Fm => match banco_fm(recursos, cfg) {
             Ok(b) => return Box::new(SintFm::new(b, taxa, cfg.canal_percussao)),
-            Err(e) => eprintln!("som: banco FM não carregado ({e}); usando o sintetizador simples"),
+            Err(e) => eprintln!("{}", engine::tr!("jogo.som.fm_erro", erro = e)),
         },
         TipoSintetizador::Simples => {}
     }
@@ -194,7 +196,7 @@ impl<'a> Audio<'a> {
             return a;
         }
         if let Err(e) = a.iniciar(sdl, opcoes) {
-            eprintln!("som: desligado ({e})");
+            eprintln!("{}", engine::tr!("jogo.som.desligado", erro = e));
         }
         a
     }
@@ -244,8 +246,8 @@ impl<'a> Audio<'a> {
                     d.lock().0.tocar_musica(eventos);
                 }
             }
-            Ok(Err(motivo)) => println!("som: {motivo} (o original também não toca)"),
-            Err(e) => eprintln!("som: {e}"),
+            Ok(Err(motivo)) => println!("sound: {motivo} (the original does not play it either)"),
+            Err(e) => eprintln!("sound: {e}"),
         }
     }
 
@@ -261,7 +263,7 @@ impl<'a> Audio<'a> {
                     let tocado = mixer::blocos_do_driver(&pcm, cfg.bloco_efeitos);
                     self.efeitos.insert(id, mixer::reamostrar(tocado, cfg.taxa_efeitos, self.taxa));
                 }
-                Err(e) => return eprintln!("som: efeito {id}: {e}"),
+                Err(e) => return eprintln!("sound: effect {id}: {e}"),
             }
         }
         if let (Some(d), Some(a)) = (&mut self.dispositivo, self.efeitos.get(&id)) {
@@ -383,7 +385,7 @@ pub fn exportar(recursos: &Recursos, opcoes: &OpcoesSom, dir: &Path) -> Result<(
         }
         n += 1;
     }
-    println!("{n} efeitos em {}", dir_e.display());
+    println!("{n} effects in {}", dir_e.display());
     let mut ids: Vec<u16> = cfg.musicas.keys().copied().collect();
     if cfg.fonte_musica == FonteMusica::Banco {
         ids.extend((10000..=20999).filter(|&id| recursos.objeto(Chave { tipo: TIPO_CABECALHO_MUSICA, id }).is_ok()));
@@ -408,7 +410,7 @@ pub fn exportar(recursos: &Recursos, opcoes: &OpcoesSom, dir: &Path) -> Result<(
                 println!("{} ({:.1} s)", c.display(), pcm.len() as f64 / 2.0 / cfg.taxa_saida as f64);
                 gravar(c, som::wav_estereo_f32(&pcm, cfg.taxa_saida))?;
             }
-            Err(motivo) => println!("{motivo}: não exportada (o original não toca)"),
+            Err(motivo) => println!("{motivo}: not exported (the original does not play it)"),
         }
     }
     Ok(())

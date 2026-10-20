@@ -134,7 +134,7 @@ pub fn tecla(s: &mut Sessao, ev: &EventoNav) -> Resposta {
         if a == AcaoQuintal::Abrir && !s.janelas.aberta(Controle::Quintal) {
             // _OpenMapYard: sem o quintal aberto, Ctrl+M abre a janela do mapa (_YardToMap).
             s.abrir_mapa();
-            println!("mapa aberto (modo {})", s.partida.estado.vistas.modo_mapa);
+            println!("map opened (mode {})", s.partida.estado.vistas.modo_mapa);
             return Resposta::Tratada;
         }
         aplicar_acao_quintal(s, a, true);
@@ -191,7 +191,7 @@ fn botao_ferramentas(s: &mut Sessao) {
             s.modos.menu.abrir(r, atual, &s.interface.driver);
             s.modos.menu_aberto = true;
         }
-        _ => println!("ferramentas: nada neste tipo de jogo"),
+        _ => println!("tools: nothing in this game type"),
     }
 }
 
@@ -225,7 +225,7 @@ fn clique_no_menu(s: &mut Sessao, x: i32, y: i32) {
     let e = &mut s.partida.estado;
     let efeitos = experimental::escolher_ferramenta(e, c, &mut ctl, f, sub, plano);
     s.modos.controle_exp = ctl;
-    println!("ferramenta {f:?} (subopção {:?})", sub.unwrap_or(s.modos.controle_exp.subopcao(f)));
+    println!("tool {f:?} (sub-option {:?})", sub.unwrap_or(s.modos.controle_exp.subopcao(f)));
     if fecha {
         s.modos.menu_aberto = false;
     }
@@ -318,7 +318,7 @@ pub fn aplicar_acao_quintal(s: &mut Sessao, a: AcaoQuintal, trazer: bool) {
         }
         AcaoQuintal::Revoada => {
             let armou = s.partida.botao_revoada();
-            println!("quintal: MATE {}", if armou { "armou a revoada" } else { "recusado" });
+            println!("yard: MATE {}", if armou { "armed the mating flight" } else { "refused" });
         }
         _ => {
             let aberta = s.janelas.aberta(Controle::Quintal);
@@ -346,7 +346,7 @@ pub fn aplicar_acao_quintal(s: &mut Sessao, a: AcaoQuintal, trazer: bool) {
             }
         }
     }
-    println!("quintal: {a:?} (modo {})", s.partida.estado.vistas.modo_quintal);
+    println!("yard: {a:?} (mode {})", s.partida.estado.vistas.modo_quintal);
 }
 
 /// Clique fora das janelas (na faixa): botão de ferramentas e botão Yard na faixa 34; os botões da
@@ -387,7 +387,7 @@ pub fn clique_na_faixa(s: &mut Sessao, x: i32, y: i32) -> Resposta {
         Some(engine::core::navegacao::BotaoFaixa::Aranha) => {
             // _GotoSpider (ribToSpider, 0x2207).
             let foi = s.partida.ir_para_aranha();
-            println!("botão da aranha: {}", if foi { "vista na aranha" } else { "sem aranha (som de erro)" });
+            println!("spider button: {}", if foi { "view on the spider" } else { "no spider (error sound)" });
             Resposta::Tratada
         }
         Some(engine::core::navegacao::BotaoFaixa::Status) => {
@@ -449,7 +449,7 @@ pub fn clique_no_quintal(s: &mut Sessao, x: i32, y: i32, duplo: bool, shift: boo
     let vista_antiga = s.partida.nav.vista;
     match quintal_mapa::clicar(&mut m.janela, &m.quintal.cfg, &mut s.partida, x, y, duplo, shift) {
         Ok(r) => {
-            println!("quintal: clique {} em ({x}, {y}): {r:?}", if duplo { "duplo" } else { "simples" });
+            println!("yard: {} click at ({x}, {y}): {r:?}", if duplo { "double" } else { "single" });
             if let quintal_mapa::RespostaQuintal::Troca(engine::rules::troca_patch::ResultadoTroca::Trocou { .. }) = r {
                 // A troca deixa o jogo pausado e o original mantém o patch antigo na edição até o
                 // próximo redesenho (bancada, vista_xfer: edicao_na_frente.png).
@@ -460,7 +460,7 @@ pub fn clique_no_quintal(s: &mut Sessao, x: i32, y: i32, duplo: bool, shift: boo
                 });
             }
         }
-        Err(e) => eprintln!("quintal: {e}"),
+        Err(e) => eprintln!("yard: {e}"),
     }
 }
 
@@ -479,7 +479,7 @@ mod testes {
             janelas_ui::Roteamento::Fora => {
                 clique_na_faixa(s, x, y);
             }
-            _ => println!("roteado para uma janela"),
+            _ => println!("routed to a window"),
         }
     }
 

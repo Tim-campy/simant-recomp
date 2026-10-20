@@ -17,14 +17,14 @@ pub struct ListaStrings {
 impl ListaStrings {
     pub fn decodificar(d: &[u8]) -> Result<ListaStrings, String> {
         if d.len() < 2 {
-            return Err("lista de strings sem contagem".into());
+            return Err("string list without a count".into());
         }
         let n = d[1] as usize;
         let mut strings = Vec::with_capacity(n);
         let mut o = 2;
         for i in 0..n {
-            let tam = *d.get(o).ok_or(format!("string {i} passa do fim da lista"))? as usize;
-            let s = d.get(o + 1..o + 1 + tam).ok_or(format!("string {i} passa do fim da lista"))?;
+            let tam = *d.get(o).ok_or(format!("string {i} runs past the end of the list"))? as usize;
+            let s = d.get(o + 1..o + 1 + tam).ok_or(format!("string {i} runs past the end of the list"))?;
             strings.push(s.to_vec());
             o += 1 + tam;
         }

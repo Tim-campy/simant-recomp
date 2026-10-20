@@ -315,7 +315,7 @@ pub fn vista_do_save(jogo: &JogoSalvo, posicao: PosicaoVista, largura: i32, altu
         let centro = if me.plano == plano_mapa {
             (me.x as i32, me.y as i32)
         } else {
-            let s = ponto_lembrado(plano_mapa).ok_or("plano sem ponto lembrado")?;
+            let s = ponto_lembrado(plano_mapa).ok_or("plane has no remembered point")?;
             let (x, y) = jogo.par_i16(s)?;
             (x as i32, y as i32)
         };
@@ -409,7 +409,7 @@ impl TelaDeJogo {
     pub fn carregar(cfg: &ConfigTelaJogo, recursos: &Recursos, interface: &Interface, jogo: &JogoSalvo) -> Result<TelaDeJogo, String> {
         let id_faixa = interface.moldura.faixa.janela;
         let faixa = carregar_janela(recursos, id_faixa)?;
-        let origem_faixa = interface.posicionar(id_faixa, &faixa).ok_or(format!("janela {id_faixa} sem posição"))?.origem;
+        let origem_faixa = interface.posicionar(id_faixa, &faixa).ok_or(format!("window {id_faixa} has no position"))?.origem;
         let e = &cfg.edicao;
         let edicao = carregar_janela(recursos, e.janela)?;
         let area = area_de_edicao(&edicao, e)?;
@@ -428,14 +428,14 @@ impl TelaDeJogo {
         let baloes = match BaloesDaEdicao::carregar(recursos) {
             Ok(b) => Some(b),
             Err(erro) => {
-                pendencias.push(format!("balões da edição: {erro}"));
+                pendencias.push(format!("edit window balloons: {erro}"));
                 None
             }
         };
         let desenho_aranha = match super::aranha_edicao::DesenhoAranha::carregar(recursos) {
             Ok(d) => Some(d),
             Err(erro) => {
-                pendencias.push(format!("aranha da edição: {erro}"));
+                pendencias.push(format!("edit window spider: {erro}"));
                 None
             }
         };
@@ -454,7 +454,7 @@ impl TelaDeJogo {
         };
         let mapa = |p: Plano| -> Result<Vec<u8>, String> {
             let s = bloco_do_mapa(p);
-            let bytes = jogo.bloco(s).ok_or(format!("bloco {s} ausente"))?;
+            let bytes = jogo.bloco(s).ok_or(format!("block {s} missing"))?;
             MapaChao::new(p, bytes)?;
             Ok(bytes.to_vec())
         };
@@ -636,7 +636,7 @@ impl TelaDeJogo {
                 .objetos
                 .iter_mut()
                 .find(|o| &o.nome == nome)
-                .ok_or(format!("janela {id_faixa}: objeto {nome} não existe"))?;
+                .ok_or(format!("window {id_faixa}: object {nome} does not exist"))?;
             ob.flags |= FLAG_SELECIONADO;
         }
         let mut pendentes = desenhar_janela_carregada_na_tela(&mut q, recursos, interface, id_faixa, &faixa)?;
@@ -783,7 +783,7 @@ impl TelaDeJogo {
         agora: u64,
     ) -> Result<(), String> {
         let cfg = avisos.cfg.faixa.clone();
-        let (r, cor) = self.objeto_da_faixa(&cfg.objeto).ok_or(format!("faixa sem o objeto {}", cfg.objeto))?;
+        let (r, cor) = self.objeto_da_faixa(&cfg.objeto).ok_or(format!("strip has no object {}", cfg.objeto))?;
         let texto = avisos.texto_da_faixa(agora).cloned();
         desenhar_faixa(q, recursos, interface, &cfg, r, cor, texto.as_ref());
         Ok(())
@@ -809,7 +809,7 @@ fn area_de_edicao(janela: &Janela, e: &ConfigEdicao) -> Result<Retangulo, String
         .iter()
         .find(|o| o.nome == e.area)
         .map(|o| o.retangulo)
-        .ok_or(format!("janela {}: objeto {} não existe", e.janela, e.area))
+        .ok_or(format!("window {}: object {} does not exist", e.janela, e.area))
 }
 
 /// Área cliente da janela de edição sem as barras de rolagem (a mesma geometria de `desenhar_moldura`).

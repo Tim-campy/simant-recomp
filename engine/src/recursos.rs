@@ -111,7 +111,7 @@ impl Recursos {
                 return r;
             }
         }
-        Err(format!("objeto não encontrado: tipo {} id {}", chave.tipo, chave.id))
+        Err(format!("object not found: type {} id {}", chave.tipo, chave.id))
     }
 
     /// Arquivo solto da pasta do jogo (ex.: `font1`, `FONTRES.FON`, `sound/antthme1.mid`), sem
@@ -125,7 +125,7 @@ impl Recursos {
         }
         match achar_sem_caixa(&self.dir_jogo, nome) {
             Some(c) => std::fs::read(&c).map_err(|e| format!("{}: {e}", c.display())),
-            None => Err(format!("arquivo do jogo não encontrado: {nome}")),
+            None => Err(crate::tr!("programa.arquivo_do_jogo", arquivo = nome)),
         }
     }
 
@@ -169,17 +169,17 @@ impl Recursos {
             dos_mods.push(m.manifesto.nome.clone());
         }
         if !dos_mods.is_empty() {
-            origem = format!("{origem} (mesclado com os mods {})", dos_mods.join(", "));
+            origem = crate::tr!("mods.mesclado", arquivo = origem, mods = dos_mods.join(", "));
         }
         for (n, v) in &self.sobreposicoes {
             if n == nome {
                 if let Some(atual) = valor.as_mut() {
                     mesclar(atual, v.clone());
-                    origem = format!("{origem} (com opções da linha de comando)");
+                    origem = format!("{origem} (with command line options)");
                 }
             }
         }
-        let mut valor = valor.ok_or_else(|| format!("{}: arquivo de dados não encontrado", base.display()))?;
+        let mut valor = valor.ok_or_else(|| crate::tr!("programa.arquivo_de_dados", arquivo = base.display()))?;
         self.resolver_referencias(&mut valor).map_err(|e| format!("{origem}: {e}"))?;
         Ok((valor, origem))
     }
@@ -190,7 +190,7 @@ impl Recursos {
     pub fn resolver_referencias(&self, v: &mut serde_json::Value) -> Result<(), String> {
         percorrer_referencias(v, &mut String::new(), &mut |r, caminho| {
             self.resolver(r).map_err(|e| {
-                format!("{caminho}: texto do original {} não resolvido: {e} (um mod pode trazer o texto no lugar da referência)", r.alvo.descrever())
+                format!("{caminho}: original text {} not resolved: {e} (a mod can bring the text in place of the reference)", r.alvo.descrever())
             })
         })
     }
@@ -201,7 +201,7 @@ impl Recursos {
             Alvo::Lista { banco, id, indice } => {
                 let d = self.objeto_de(banco, Chave { tipo: crate::formats::textos::TIPO_STRINGS, id: *id })?;
                 let l = ListaStrings::decodificar(&d)?;
-                l.strings.get(*indice).cloned().ok_or_else(|| format!("a lista tem {} strings", l.strings.len()))?
+                l.strings.get(*indice).cloned().ok_or_else(|| format!("the list has {} strings", l.strings.len()))?
             }
             Alvo::ObjetoJanela { banco, id, objeto } => {
                 let d = self.objeto_de(banco, Chave { tipo: crate::formats::janela::TIPO_LAYOUT, id: *id })?;
@@ -210,19 +210,19 @@ impl Recursos {
                     Some(crate::formats::janela::Conteudo::Titulo { texto } | crate::formats::janela::Conteudo::Texto { texto, .. }) => {
                         return Ok(serde_json::Value::String(r.formatar(texto)));
                     }
-                    Some(_) => return Err(format!("o objeto {objeto} não tem texto")),
-                    None => return Err(format!("a janela tem {} objetos", j.objetos.len())),
+                    Some(_) => return Err(format!("object {objeto} has no text")),
+                    None => return Err(format!("the window has {} objects", j.objetos.len())),
                 }
             }
             Alvo::Executavel { arquivo, segmento, offset, tamanho, pecas } => {
                 let exe = self.arquivo_em_cache(arquivo)?;
                 let seg = crate::formats::ne::segmento(&exe, *segmento)?;
-                let resto = seg.get(*offset..).ok_or_else(|| format!("offset fora do segmento ({} bytes)", seg.len()))?;
+                let resto = seg.get(*offset..).ok_or_else(|| format!("offset outside the segment ({} bytes)", seg.len()))?;
                 if let Some(nomes) = pecas {
                     return pecas_8x8(resto, nomes);
                 }
                 match tamanho {
-                    Some(t) => resto.get(..*t).ok_or("tamanho passa do fim do segmento")?.to_vec(),
+                    Some(t) => resto.get(..*t).ok_or("size goes past the end of the segment")?.to_vec(),
                     None => resto.iter().take_while(|&&b| b != 0).copied().collect(),
                 }
             }
@@ -242,19 +242,19 @@ impl Recursos {
             }
         }
         if let Some(b) = self.bancos.iter().find(|b| b.nome.eq_ignore_ascii_case(banco)) {
-            return b.objeto(chave).unwrap_or_else(|| Err(format!("{banco} não tem o objeto {}/{}", chave.tipo, chave.id)));
+            return b.objeto(chave).unwrap_or_else(|| Err(format!("{banco} does not have object {}/{}", chave.tipo, chave.id)));
         }
-        let mut cache = self.cache_textos.lock().map_err(|_| "cache de textos envenenado")?;
+        let mut cache = self.cache_textos.lock().map_err(|_| "text cache poisoned")?;
         if !cache.bancos.contains_key(banco) {
             let b = Banco::abrir(&self.dir_jogo.join(banco))?;
             cache.bancos.insert(banco.to_string(), b);
         }
-        cache.bancos[banco].objeto(chave).unwrap_or_else(|| Err(format!("{banco} não tem o objeto {}/{}", chave.tipo, chave.id)))
+        cache.bancos[banco].objeto(chave).unwrap_or_else(|| Err(format!("{banco} does not have object {}/{}", chave.tipo, chave.id)))
     }
 
     /// [`Recursos::arquivo`] guardado em memória (o executável é lido uma vez por sessão).
     fn arquivo_em_cache(&self, nome: &str) -> Result<std::sync::Arc<Vec<u8>>, String> {
-        let mut cache = self.cache_textos.lock().map_err(|_| "cache de textos envenenado")?;
+        let mut cache = self.cache_textos.lock().map_err(|_| "text cache poisoned")?;
         if let Some(d) = cache.arquivos.get(nome) {
             return Ok(d.clone());
         }
@@ -271,7 +271,7 @@ impl Recursos {
         if dos_mods.is_empty() {
             nome.to_string()
         } else {
-            format!("{nome} (mesclado com os mods {})", dos_mods.join(", "))
+            crate::tr!("mods.mesclado", arquivo = nome, mods = dos_mods.join(", "))
         }
     }
 
@@ -368,7 +368,7 @@ impl Alvo {
             Alvo::Lista { banco, id, indice } => format!("{banco} 4/{id}[{indice}]"),
             Alvo::ObjetoJanela { banco, id, objeto } => format!("{banco} 0/{id} objeto {objeto}"),
             Alvo::Executavel { arquivo, segmento, offset, .. } => format!("{arquivo} {segmento}:{offset:04x}"),
-            Alvo::TituloAjuda { arquivo } => format!("{arquivo} título"),
+            Alvo::TituloAjuda { arquivo } => format!("{arquivo} title"),
         }
     }
 }
@@ -387,23 +387,23 @@ impl Referencia {
     fn ler(o: &serde_json::Map<String, serde_json::Value>) -> Result<Referencia, String> {
         let numero = |k: &str| -> Result<u64, String> {
             match o.get(k) {
-                Some(serde_json::Value::Number(n)) => n.as_u64().ok_or_else(|| format!("\"{k}\" não é um inteiro positivo")),
+                Some(serde_json::Value::Number(n)) => n.as_u64().ok_or_else(|| format!("\"{k}\" is not a positive integer")),
                 Some(serde_json::Value::String(s)) => {
                     let s = s.trim();
                     let r = match s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
                         Some(h) => u64::from_str_radix(h, 16),
                         None => s.parse(),
                     };
-                    r.map_err(|_| format!("\"{k}\" inválido: {s}"))
+                    r.map_err(|_| format!("invalid \"{k}\": {s}"))
                 }
-                Some(_) => Err(format!("\"{k}\" deve ser número ou texto em hexadecimal")),
-                None => Err(format!("falta \"{k}\"")),
+                Some(_) => Err(format!("\"{k}\" must be a number or a hexadecimal text")),
+                None => Err(format!("missing \"{k}\"")),
             }
         };
         let texto = |k: &str| -> Result<String, String> {
-            o.get(k).and_then(serde_json::Value::as_str).map(str::to_string).ok_or_else(|| format!("falta \"{k}\" (texto)"))
+            o.get(k).and_then(serde_json::Value::as_str).map(str::to_string).ok_or_else(|| format!("missing \"{k}\" (text)"))
         };
-        let u16_de = |k: &str| -> Result<u16, String> { numero(k).and_then(|n| u16::try_from(n).map_err(|_| format!("\"{k}\" grande demais"))) };
+        let u16_de = |k: &str| -> Result<u16, String> { numero(k).and_then(|n| u16::try_from(n).map_err(|_| format!("\"{k}\" too large"))) };
         let (alvo, chaves): (Alvo, &[&str]) = if o.contains_key("exe") {
             let pecas = match o.get("pecas_8x8") {
                 None => None,
@@ -417,7 +417,7 @@ impl Referencia {
                                 })
                                 .collect::<Option<Vec<_>>>()
                         })
-                        .ok_or("\"pecas_8x8\" deve ser uma lista de nomes (ou null)")?,
+                        .ok_or("\"pecas_8x8\" must be a list of names (or null)")?,
                 ),
             };
             let tamanho = if o.contains_key("tamanho") { Some(numero("tamanho")? as usize) } else { None };
@@ -427,7 +427,7 @@ impl Referencia {
             )
         } else if o.contains_key("hlp") {
             if texto("campo")? != "titulo" {
-                return Err("\"campo\" de uma referência \"hlp\" só pode ser \"titulo\"".into());
+                return Err("\"campo\" of an \"hlp\" reference can only be \"titulo\"".into());
             }
             (Alvo::TituloAjuda { arquivo: texto("hlp")? }, &["hlp", "campo", "formato"])
         } else {
@@ -435,15 +435,15 @@ impl Referencia {
             match numero("tipo")? {
                 4 => (Alvo::Lista { banco, id, indice: numero("indice")? as usize }, &["banco", "tipo", "id", "indice", "formato"]),
                 0 => (Alvo::ObjetoJanela { banco, id, objeto: numero("objeto")? as usize }, &["banco", "tipo", "id", "objeto", "formato"]),
-                t => return Err(format!("referência a objeto tipo {t}: só 4 (lista de strings) e 0 (layout de janela)")),
+                t => return Err(format!("reference to object type {t}: only 4 (string list) and 0 (window layout)")),
             }
         };
         if let Some(k) = o.keys().find(|k| !k.starts_with('_') && !chaves.contains(&k.as_str())) {
-            return Err(format!("chave desconhecida \"{k}\" numa referência de texto"));
+            return Err(format!("unknown key \"{k}\" in a text reference"));
         }
         let formato = match o.get("formato") {
             None => None,
-            Some(f) => Some(f.as_str().filter(|f| f.contains("{}")).ok_or("\"formato\" deve ser um texto com {}")?.to_string()),
+            Some(f) => Some(f.as_str().filter(|f| f.contains("{}")).ok_or("\"formato\" must be a text with {}")?.to_string()),
         };
         Ok(Referencia { alvo, formato })
     }
@@ -495,7 +495,7 @@ fn percorrer_referencias(
 /// de bitmap por peças transparentes), para que os `data/*.json` do port ainda virem as estruturas.
 /// O texto não é o do original: testes que dependem dele precisam da instalação (`SIMANT_DIR`).
 pub fn marcar_referencias(json: &str) -> String {
-    let mut v: serde_json::Value = serde_json::from_str(json).expect("JSON inválido");
+    let mut v: serde_json::Value = serde_json::from_str(json).expect("invalid JSON");
     percorrer_referencias(&mut v, &mut String::new(), &mut |r, _| {
         Ok(match &r.alvo {
             Alvo::Executavel { pecas: Some(nomes), .. } => {
@@ -504,7 +504,7 @@ pub fn marcar_referencias(json: &str) -> String {
             a => serde_json::Value::String(r.formatar(&format!("‹{}›", a.descrever()))),
         })
     })
-    .expect("referência de texto inválida");
+    .expect("invalid text reference");
     v.to_string()
 }
 
@@ -521,7 +521,7 @@ fn pecas_8x8(d: &[u8], nomes: &[Option<String>]) -> Result<serde_json::Value, St
     let mut saida = serde_json::Map::new();
     for (i, nome) in nomes.iter().enumerate() {
         let Some(nome) = nome else { continue };
-        let p = d.get(i * 16..i * 16 + 16).ok_or("peças passam do fim do segmento")?;
+        let p = d.get(i * 16..i * 16 + 16).ok_or("pieces go past the end of the segment")?;
         let linhas: Vec<serde_json::Value> = p
             .chunks(2)
             .map(|l| {
@@ -583,7 +583,7 @@ pub fn carregar_mods_sem(dir: &Path, desligados: &[String]) -> Result<Vec<Mod>, 
         let manifesto: Manifesto =
             serde_json::from_str(&texto).map_err(|e| format!("{}: {e}", p.join("mod.json").display()))?;
         if encontrados.contains_key(&manifesto.nome) {
-            return Err(format!("mod duplicado: {}", manifesto.nome));
+            return Err(crate::tr!("mods.duplicado", nome = manifesto.nome));
         }
         if desligados.contains(&manifesto.nome) {
             continue;
@@ -593,10 +593,10 @@ pub fn carregar_mods_sem(dir: &Path, desligados: &[String]) -> Result<Vec<Mod>, 
     for m in encontrados.values() {
         for d in &m.manifesto.dependencias {
             if desligados.contains(d) {
-                return Err(format!("mod {} depende de {d}, que está desligado", m.manifesto.nome));
+                return Err(crate::tr!("mods.dependencia_desligada", nome = m.manifesto.nome, dependencia = d));
             }
             if !encontrados.contains_key(d) {
-                return Err(format!("mod {} depende de {d}, que não está instalado", m.manifesto.nome));
+                return Err(crate::tr!("mods.dependencia_ausente", nome = m.manifesto.nome, dependencia = d));
             }
         }
     }
@@ -609,7 +609,7 @@ pub fn carregar_mods_sem(dir: &Path, desligados: &[String]) -> Result<Vec<Mod>, 
         let pos = nomes
             .iter()
             .position(|n| encontrados[n].manifesto.dependencias.iter().all(|d| feitos.contains(d)))
-            .ok_or_else(|| format!("dependência circular entre mods: {nomes:?}"))?;
+            .ok_or_else(|| crate::tr!("mods.dependencia_circular", mods = format!("{nomes:?}")))?;
         let n = nomes.remove(pos);
         feitos.insert(n.clone());
         ordem.push(encontrados.remove(&n).unwrap());
@@ -698,10 +698,10 @@ mod testes {
     fn referencia_quebrada_explica_o_caminho() {
         let (base, r) = montar("erro", r#"{"a": [{"banco": "SHARED", "tipo": 4, "id": 1000, "indice": 9}]}"#, None);
         let e = r.dados::<serde_json::Value>("textos.json").unwrap_err();
-        assert!(e.contains(".a[0]") && e.contains("SHARED 4/1000[9]") && e.contains("a lista tem 2 strings"), "{e}");
+        assert!(e.contains(".a[0]") && e.contains("SHARED 4/1000[9]") && e.contains("the list has 2 strings"), "{e}");
         let (base2, r) = montar("erro2", r#"{"a": {"exe": "SIMANTW.EXE", "segmento": 1, "offset": 0, "tamnho": 3}}"#, None);
         let e = r.dados::<serde_json::Value>("textos.json").unwrap_err();
-        assert!(e.contains("chave desconhecida \"tamnho\""), "{e}");
+        assert!(e.contains("unknown key \"tamnho\""), "{e}");
         let _ = std::fs::remove_dir_all(base);
         let _ = std::fs::remove_dir_all(base2);
     }

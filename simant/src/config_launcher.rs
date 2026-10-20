@@ -9,6 +9,7 @@
 
 use std::path::{Path, PathBuf};
 
+use engine::idiomas::Textos;
 use serde::{Deserialize, Serialize};
 
 pub const ARQUIVO: &str = "launcher.json";
@@ -26,10 +27,12 @@ pub enum Inicio {
     Save,
 }
 
-/// Tipos de jogo novo (`--tipo`), na ordem da tela, com o nome mostrado.
-pub const TIPOS: [(&str, &str); 4] = [("rapido", "Rápido"), ("completo", "Completo"), ("experimental", "Experimental"), ("tutorial", "Tutorial")];
-/// Sintetizadores das músicas (`--sintetizador`); "Padrão" no launcher = o de `data/som.json` (o simples).
-pub const SINTETIZADORES: [(&str, &str); 3] = [("simples", "Simples"), ("fm", "FM"), ("soundfont", "SoundFont")];
+/// Tipos de jogo novo (`--tipo`), na ordem da tela; o nome mostrado é `launcher.tipo.<tipo>` em
+/// `data/idiomas/`.
+pub const TIPOS: [&str; 4] = ["rapido", "completo", "experimental", "tutorial"];
+/// Sintetizadores das músicas (`--sintetizador`); "Padrão" no launcher = o de `data/som.json` (o
+/// simples). Nome mostrado: `launcher.sintetizador.<nome>`.
+pub const SINTETIZADORES: [&str; 3] = ["simples", "fm", "soundfont"];
 /// Resoluções da tela virtual (`--resolucao`).
 pub const RESOLUCOES: [[u32; 2]; 3] = [[640, 480], [800, 600], [1024, 768]];
 
@@ -77,6 +80,9 @@ pub struct ConfigLauncher {
     pub extras: Vec<String>,
     /// O `simant` sem opções abre o launcher (senão, vai direto ao jogo com esta configuração).
     pub mostrar_launcher: bool,
+    /// `--idioma` (código de `data/idiomas/idiomas.json`; ausente = o do sistema, se houver, senão
+    /// inglês). Vale para o launcher e, se disponível no contexto `jogo`, para o jogo.
+    pub idioma: Option<String>,
 }
 
 impl Default for ConfigLauncher {
@@ -102,6 +108,7 @@ impl Default for ConfigLauncher {
             win_ini: None,
             extras: Vec::new(),
             mostrar_launcher: true,
+            idioma: None,
         }
     }
 }
@@ -159,6 +166,9 @@ impl ConfigLauncher {
         };
         if let Some(j) = &self.jogo {
             par("--jogo", j.clone());
+        }
+        if let Some(i) = &self.idioma {
+            par("--idioma", i.clone());
         }
         if let Some(r) = self.resolucao {
             par("--resolucao", tamanho(r));
@@ -229,22 +239,23 @@ impl ConfigLauncher {
 
     /// O inverso de [`ConfigLauncher::argumentos`]: a configuração que gera `args`. As escolhas
     /// que não estão na linha (como `mostrar_launcher`) vêm de `self`; opções desconhecidas vão,
-    /// na ordem, para `extras`.
-    pub fn de_argumentos(&self, args: &[String]) -> Result<ConfigLauncher, String> {
+    /// na ordem, para `extras`. `t`: os textos das mensagens de erro.
+    pub fn de_argumentos(&self, args: &[String], t: &Textos) -> Result<ConfigLauncher, String> {
         let mut c = ConfigLauncher { mostrar_launcher: self.mostrar_launcher, tipo: self.tipo.clone(), ..ConfigLauncher::default() };
         let mut novo_jogo = false;
         let mut it = args.iter();
         while let Some(a) = it.next() {
-            let mut valor = || it.next().cloned().ok_or(format!("falta o valor de {a}"));
+            let mut valor = || it.next().cloned().ok_or_else(|| t.f("cli.erro.falta_valor", &[("opcao", a)]));
             match a.as_str() {
                 "--jogo" => c.jogo = Some(valor()?),
+                "--idioma" => c.idioma = Some(valor()?),
                 "--resolucao" => {
-                    let (l, h) = crate::video::ler_tamanho(a, &valor()?)?;
+                    let (l, h) = crate::video::ler_tamanho(a, &valor()?, t)?;
                     c.resolucao = Some([l, h]);
                 }
-                "--escala" => c.escala = Some(valor()?.parse().map_err(|_| format!("{a}: inteiro (0 = a maior que cabe)"))?),
+                "--escala" => c.escala = Some(valor()?.parse().map_err(|_| t.f("cli.erro.escala", &[("opcao", a)]))?),
                 "--janela" => {
-                    let (l, h) = crate::video::ler_tamanho(a, &valor()?)?;
+                    let (l, h) = crate::video::ler_tamanho(a, &valor()?, t)?;
                     c.janela = Some([l, h]);
                 }
                 "--perfil-driver" => c.perfil_driver = Some(valor()?),
@@ -262,11 +273,11 @@ impl ConfigLauncher {
                 "--sem-preferencias" => c.preferencias = false,
                 "--novo-jogo" => novo_jogo = true,
                 "--tipo" => {
-                    let t = valor()?;
-                    if !TIPOS.iter().any(|(n, _)| *n == t) {
-                        return Err(format!("--tipo: use tutorial, rapido, completo ou experimental (não '{t}')"));
+                    let v = valor()?;
+                    if !TIPOS.contains(&v.as_str()) {
+                        return Err(t.f("cli.erro.tipo", &[("opcao", a), ("valor", &v)]));
                     }
-                    c.tipo = t;
+                    c.tipo = v;
                     novo_jogo = true;
                 }
                 "--save" => {
@@ -278,7 +289,7 @@ impl ConfigLauncher {
         }
         if novo_jogo {
             if c.inicio == Inicio::Save {
-                return Err("use --save ou --novo-jogo, não os dois".into());
+                return Err(t.t("cli.erro.save_e_novo_jogo"));
             }
             c.inicio = Inicio::NovoJogo;
         }
@@ -318,7 +329,7 @@ pub fn formatar_linha(args: &[String]) -> String {
 
 /// O inverso de [`formatar_linha`]: separa por espaços, com `"..."` agrupando (sem escapes: a
 /// barra invertida dos caminhos do Windows fica como está).
-pub fn dividir_linha(linha: &str) -> Result<Vec<String>, String> {
+pub fn dividir_linha(linha: &str, t: &Textos) -> Result<Vec<String>, String> {
     let mut args = Vec::new();
     let mut atual = String::new();
     let mut tem = false;
@@ -342,7 +353,7 @@ pub fn dividir_linha(linha: &str) -> Result<Vec<String>, String> {
         }
     }
     if aspas {
-        return Err("aspas sem fechar na linha de comando".into());
+        return Err(t.t("launcher.erro.aspas"));
     }
     if tem {
         args.push(atual);
@@ -350,7 +361,8 @@ pub fn dividir_linha(linha: &str) -> Result<Vec<String>, String> {
     Ok(args)
 }
 
-/// Arquivos da instalação do SimAnt que o port lê: obrigatórios e opcionais (LEIAME §1).
+/// Arquivos da instalação do SimAnt que o port lê: obrigatórios e opcionais (LEIAME §1). O nome do
+/// que falta sem um opcional é `launcher.validacao.parte.<parte>` em `data/idiomas/`.
 pub const OBRIGATORIOS: [&str; 4] = ["SHARED.NDX", "SHARED.DAT", "WINGANT.NDX", "WINGANT.DAT"];
 pub const OPCIONAIS: [(&str, &str); 5] =
     [("SOUND.NDX", "sons"), ("SOUND.DAT", "sons"), ("SIMANTW.EXE", "cursores"), ("SIMANT.HLP", "ajuda"), ("FONTRES.FON", "fontes")];
@@ -360,14 +372,50 @@ pub const OPCIONAIS: [(&str, &str); 5] =
 pub struct Validacao {
     /// Tem todos os obrigatórios (dá para jogar).
     pub ok: bool,
-    /// Uma linha para mostrar ao usuário.
-    pub mensagem: String,
+    pub motivo: Motivo,
+}
+
+/// O que a conferência achou (o texto vem do idioma: [`Validacao::mensagem`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Motivo {
+    /// Nenhuma pasta escolhida.
+    SemPasta,
+    NaoEncontrada,
+    /// Nenhum dos obrigatórios.
+    NaoEPasta,
+    /// Faltam estes obrigatórios.
+    Faltam(Vec<String>),
+    /// Tudo encontrado.
+    Ok,
+    /// Dá para jogar, mas sem estas partes opcionais (`sons`, `cursores`, `ajuda`, `fontes`).
+    OkSem(Vec<String>),
+}
+
+impl Validacao {
+    pub fn sem_pasta() -> Validacao {
+        Validacao { ok: false, motivo: Motivo::SemPasta }
+    }
+
+    /// Uma linha para mostrar ao usuário, no idioma de `t`.
+    pub fn mensagem(&self, t: &Textos) -> String {
+        match &self.motivo {
+            Motivo::SemPasta => t.t("launcher.validacao.sem_pasta"),
+            Motivo::NaoEncontrada => t.t("launcher.validacao.nao_encontrada"),
+            Motivo::NaoEPasta => t.t("launcher.validacao.nao_e_pasta"),
+            Motivo::Faltam(f) => t.f("launcher.validacao.faltam", &[("arquivos", &f.join(", "))]),
+            Motivo::Ok => t.t("launcher.validacao.ok"),
+            Motivo::OkSem(s) => {
+                let partes: Vec<String> = s.iter().map(|p| t.t(&format!("launcher.validacao.parte.{p}"))).collect();
+                t.f("launcher.validacao.ok_sem", &[("partes", &partes.join(", "))])
+            }
+        }
+    }
 }
 
 /// Confere se `pasta` tem os arquivos do SimAnt (sem diferença de maiúsculas, como o port os lê).
 pub fn validar_pasta_jogo(pasta: &Path) -> Validacao {
     if !pasta.is_dir() {
-        return Validacao { ok: false, mensagem: "Pasta não encontrada.".into() };
+        return Validacao { ok: false, motivo: Motivo::NaoEncontrada };
     }
     let nomes: Vec<String> = std::fs::read_dir(pasta)
         .map(|l| l.filter_map(Result::ok).map(|e| e.file_name().to_string_lossy().to_uppercase()).collect())
@@ -375,21 +423,13 @@ pub fn validar_pasta_jogo(pasta: &Path) -> Validacao {
     let tem = |n: &str| nomes.iter().any(|x| x == n);
     let faltam: Vec<&str> = OBRIGATORIOS.iter().copied().filter(|n| !tem(n)).collect();
     if !faltam.is_empty() {
-        let mensagem = if faltam.len() == OBRIGATORIOS.len() {
-            "Não é a pasta do SimAnt: faltam SHARED.NDX/.DAT e WINGANT.NDX/.DAT.".to_string()
-        } else {
-            format!("Faltam arquivos obrigatórios: {}.", faltam.join(", "))
-        };
-        return Validacao { ok: false, mensagem };
+        let motivo = if faltam.len() == OBRIGATORIOS.len() { Motivo::NaoEPasta } else { Motivo::Faltam(faltam.iter().map(|s| s.to_string()).collect()) };
+        return Validacao { ok: false, motivo };
     }
-    let mut sem: Vec<&str> = OPCIONAIS.iter().filter(|(n, _)| !tem(n)).map(|(_, para)| *para).collect();
+    let mut sem: Vec<String> = OPCIONAIS.iter().filter(|(n, _)| !tem(n)).map(|(_, para)| para.to_string()).collect();
     sem.dedup();
-    let mensagem = if sem.is_empty() {
-        "OK: arquivos do SimAnt encontrados.".to_string()
-    } else {
-        format!("OK, mas sem: {} (o jogo roda sem eles).", sem.join(", "))
-    };
-    Validacao { ok: true, mensagem }
+    let motivo = if sem.is_empty() { Motivo::Ok } else { Motivo::OkSem(sem) };
+    Validacao { ok: true, motivo }
 }
 
 /// Um mod encontrado numa pasta de mods (para a lista do launcher).
@@ -420,6 +460,10 @@ mod testes {
         v.iter().map(|x| x.to_string()).collect()
     }
 
+    fn en() -> Textos {
+        Textos::embutido()
+    }
+
     fn completa() -> ConfigLauncher {
         ConfigLauncher {
             jogo: Some(r"C:\Jogos\MAXIS\ANTWIN".into()),
@@ -442,6 +486,7 @@ mod testes {
             win_ini: Some(r"C:\WINDOWS\WIN.INI".into()),
             extras: s(&["--semente", "42"]),
             mostrar_launcher: false,
+            idioma: Some("pt-BR".into()),
         }
     }
 
@@ -460,7 +505,7 @@ mod testes {
         assert_eq!(
             c.argumentos(),
             s(&[
-                "--jogo", r"C:\Jogos\MAXIS\ANTWIN", "--resolucao", "800x600", "--escala", "2", "--janela", "1300x1000",
+                "--jogo", r"C:\Jogos\MAXIS\ANTWIN", "--idioma", "pt-BR", "--resolucao", "800x600", "--escala", "2", "--janela", "1300x1000",
                 "--perfil-driver", "svga256", "--velocidades", "original", "--sem-foco", "original", "--sintetizador", "soundfont", "--soundfont", "/home/eu/GM.sf2", "--mods",
                 "exemplos/mods", "--desligar-mods", "trapacas", "--win-ini", r"C:\WINDOWS\WIN.INI", "--moldura", "--sem-som",
                 "--sem-preferencias", "--novo-jogo", "--tipo", "completo", "--semente", "42",
@@ -478,24 +523,24 @@ mod testes {
     fn linha_editada_volta_para_a_configuracao() {
         let c = completa();
         let base = ConfigLauncher { mostrar_launcher: false, ..ConfigLauncher::default() };
-        assert_eq!(base.de_argumentos(&c.argumentos()).unwrap(), c, "ida e volta");
+        assert_eq!(base.de_argumentos(&c.argumentos(), &en()).unwrap(), c, "ida e volta");
         let linha = formatar_linha(&c.argumentos());
-        assert_eq!(dividir_linha(&linha).unwrap(), c.argumentos());
+        assert_eq!(dividir_linha(&linha, &en()).unwrap(), c.argumentos());
         // --tipo sozinho já é jogo novo; opções desconhecidas ficam nos extras, na ordem.
-        let d = ConfigLauncher::default().de_argumentos(&s(&["--tipo", "tutorial", "--trilhas", "--semente", "7"])).unwrap();
+        let d = ConfigLauncher::default().de_argumentos(&s(&["--tipo", "tutorial", "--trilhas", "--semente", "7"]), &en()).unwrap();
         assert_eq!((d.inicio, d.tipo.as_str()), (Inicio::NovoJogo, "tutorial"));
         assert_eq!(d.extras, s(&["--trilhas", "--semente", "7"]));
-        assert!(ConfigLauncher::default().de_argumentos(&s(&["--save", "a.ANT", "--novo-jogo"])).is_err());
-        assert!(ConfigLauncher::default().de_argumentos(&s(&["--tipo", "facil"])).is_err());
-        assert!(ConfigLauncher::default().de_argumentos(&s(&["--escala", "x"])).is_err());
-        assert!(ConfigLauncher::default().de_argumentos(&s(&["--jogo"])).is_err());
+        assert!(ConfigLauncher::default().de_argumentos(&s(&["--save", "a.ANT", "--novo-jogo"]), &en()).is_err());
+        assert!(ConfigLauncher::default().de_argumentos(&s(&["--tipo", "facil"]), &en()).is_err());
+        assert!(ConfigLauncher::default().de_argumentos(&s(&["--escala", "x"]), &en()).is_err());
+        assert!(ConfigLauncher::default().de_argumentos(&s(&["--jogo"]), &en()).is_err());
     }
 
     #[test]
     fn aspas_da_linha() {
-        assert_eq!(dividir_linha(r#"  --jogo "C:\Meus Jogos\ANTWIN"   --sem-som "" "#).unwrap(), s(&["--jogo", r"C:\Meus Jogos\ANTWIN", "--sem-som", ""]));
-        assert_eq!(dividir_linha("").unwrap(), Vec::<String>::new());
-        assert!(dividir_linha(r#"--jogo "C:\x"#).is_err());
+        assert_eq!(dividir_linha(r#"  --jogo "C:\Meus Jogos\ANTWIN"   --sem-som "" "#, &en()).unwrap(), s(&["--jogo", r"C:\Meus Jogos\ANTWIN", "--sem-som", ""]));
+        assert_eq!(dividir_linha("", &en()).unwrap(), Vec::<String>::new());
+        assert!(dividir_linha(r#"--jogo "C:\x"#, &en()).is_err());
         assert_eq!(formatar_linha(&s(&["--jogo", r"C:\Meus Jogos", ""])), r#"--jogo "C:\Meus Jogos" """#);
     }
 
@@ -537,20 +582,23 @@ mod testes {
         assert!(!validar_pasta_jogo(&dir).ok, "não existe");
         std::fs::create_dir_all(&dir).unwrap();
         let v = validar_pasta_jogo(&dir);
-        assert!(!v.ok && v.mensagem.contains("Não é a pasta"), "{v:?}");
+        assert!(!v.ok && v.motivo == Motivo::NaoEPasta, "{v:?}");
+        assert!(v.mensagem(&en()).contains("SHARED.NDX"), "{v:?}");
         // Nomes em minúsculas (cópias de CD no Linux) valem.
         for n in ["shared.ndx", "SHARED.DAT", "WINGANT.NDX"] {
             std::fs::write(dir.join(n), b"").unwrap();
         }
         let v = validar_pasta_jogo(&dir);
-        assert!(!v.ok && v.mensagem.contains("WINGANT.DAT") && !v.mensagem.contains("SHARED"), "{v:?}");
+        assert_eq!(v, Validacao { ok: false, motivo: Motivo::Faltam(s(&["WINGANT.DAT"])) });
         std::fs::write(dir.join("WinGant.Dat"), b"").unwrap();
         let v = validar_pasta_jogo(&dir);
-        assert!(v.ok && v.mensagem.contains("sons") && v.mensagem.contains("ajuda"), "{v:?}");
+        assert_eq!(v.motivo, Motivo::OkSem(s(&["sons", "cursores", "ajuda", "fontes"])));
+        let m = v.mensagem(&en());
+        assert!(v.ok && m.contains("sounds") && m.contains("help"), "{m}");
         for n in ["SOUND.NDX", "SOUND.DAT", "SIMANTW.EXE", "SIMANT.HLP", "FONTRES.FON"] {
             std::fs::write(dir.join(n), b"").unwrap();
         }
-        assert_eq!(validar_pasta_jogo(&dir), Validacao { ok: true, mensagem: "OK: arquivos do SimAnt encontrados.".into() });
+        assert_eq!(validar_pasta_jogo(&dir), Validacao { ok: true, motivo: Motivo::Ok });
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -46,7 +46,7 @@ impl Tileset {
     /// Decodifica um objeto de tiles: o tamanho deve ser múltiplo de 128 bytes.
     pub fn decodificar(d: &[u8]) -> Result<Tileset, String> {
         if d.is_empty() || !d.len().is_multiple_of(BYTES_POR_TILE) {
-            return Err(format!("tileset com {} bytes, que não é múltiplo de {BYTES_POR_TILE}", d.len()));
+            return Err(format!("tileset has {} bytes, which is not a multiple of {BYTES_POR_TILE}", d.len()));
         }
         Ok(Tileset { tiles: d.as_chunks::<BYTES_POR_TILE>().0.iter().map(|b| decodificar_tile(b)).collect() })
     }
@@ -57,9 +57,9 @@ impl Tileset {
         let vazio = [TRANSPARENTE; LADO * LADO];
         let mut tiles = Vec::with_capacity(partes.len() * TILES_POR_PARTE_DE_VIDA);
         for (i, p) in partes.iter().enumerate() {
-            let mut t = Tileset::decodificar(p).map_err(|e| format!("parte {i}: {e}"))?.tiles;
+            let mut t = Tileset::decodificar(p).map_err(|e| format!("part {i}: {e}"))?.tiles;
             if t.len() > TILES_POR_PARTE_DE_VIDA {
-                return Err(format!("parte {i}: {} tiles, máximo {TILES_POR_PARTE_DE_VIDA}", t.len()));
+                return Err(format!("part {i}: {} tiles, maximum {TILES_POR_PARTE_DE_VIDA}", t.len()));
             }
             t.resize(TILES_POR_PARTE_DE_VIDA, vazio);
             tiles.extend(t);
@@ -83,7 +83,7 @@ impl Tileset {
 fn objeto(banco: &Banco, id: u16) -> Result<Vec<u8>, String> {
     banco
         .objeto(Chave { tipo: TIPO_TILES, id })
-        .ok_or_else(|| format!("{}: falta o objeto {TIPO_TILES}/{id}", banco.nome))?
+        .ok_or_else(|| format!("{}: missing object {TIPO_TILES}/{id}", banco.nome))?
 }
 
 /// Tileset de chão: `ID_CHAO_QUINTAL` ou `ID_CHAO_CASA`.

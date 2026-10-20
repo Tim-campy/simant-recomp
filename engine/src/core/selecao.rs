@@ -108,12 +108,12 @@ pub struct SelecaoDeJogo {
 impl SelecaoDeJogo {
     pub fn carregar(cfg: ConfigModos, recursos: &Recursos, interface: &Interface) -> Result<SelecaoDeJogo, String> {
         let janela = carregar_janela(recursos, cfg.janela)?;
-        let g = interface.posicionar(cfg.janela, &janela).ok_or(format!("janela {} sem posição", cfg.janela))?;
+        let g = interface.posicionar(cfg.janela, &janela).ok_or(format!("window {} has no position", cfg.janela))?;
         let base = janela.retangulo();
         let desloc = (i32::from(g.origem.0 - base.esq), i32::from(g.origem.1 - base.topo));
         for nome in cfg.botoes.keys() {
             if !janela.objetos.iter().any(|o| &o.nome == nome) {
-                return Err(format!("{ARQUIVO_CONFIG}: a janela {} não tem o objeto {nome}", cfg.janela));
+                return Err(format!("{ARQUIVO_CONFIG}: window {} does not have object {nome}", cfg.janela));
             }
         }
         Ok(SelecaoDeJogo { cfg, janela, desloc })

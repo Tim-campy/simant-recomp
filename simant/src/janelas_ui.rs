@@ -56,7 +56,7 @@ impl Sessao<'_> {
             if j.externo != self.tela.cfg.edicao.moldura.retangulo() {
                 let (w, h) = self.tela.ajustar_moldura(j.externo);
                 if self.partida.nav.redimensionar_vista(w, h) {
-                    println!("janela de edição: vista de {w} × {h}");
+                    println!("edit window: {w} × {h} view");
                 }
             }
         }
@@ -105,7 +105,7 @@ impl Sessao<'_> {
         let c = match self.janelas.clicar(self.recursos, &mut self.partida.estado, x, y, duplo) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("janelas: {e}");
+                eprintln!("windows: {e}");
                 Clique::Nada
             }
         };
@@ -153,7 +153,7 @@ impl Sessao<'_> {
                 _ => Roteamento::Tratado,
             },
             Clique::Ativou(id) => {
-                println!("janela {id} na frente");
+                println!("window {id} in front");
                 Roteamento::Tratado
             }
             Clique::Tamanho(_) | Clique::Moveu(_) | Clique::Minimizou(_) | Clique::Nada | Clique::Rolar(..) => Roteamento::Tratado,
@@ -252,7 +252,7 @@ impl Sessao<'_> {
                 }
             }
         }
-        println!("janela: {a:?}");
+        println!("window: {a:?}");
         self.depois_do_gerente(antes);
         true
     }
@@ -267,7 +267,7 @@ impl Sessao<'_> {
             alvo = self.janelas.cfg.id(Controle::Mapa);
         }
         self.janelas.gerente.fechar(alvo);
-        println!("janela {id} fechada");
+        println!("window {id} closed");
         self.depois_do_gerente(antes);
     }
 
@@ -297,7 +297,7 @@ impl Sessao<'_> {
             self.janelas.abrir(Controle::Mapa);
         }
         self.mapa.atualizar(&self.partida.estado, self.partida.mostrar_trilhas);
-        println!("Patch: mapa da superfície (plano {})", self.partida.nav.plano_mapa);
+        println!("Patch: surface map (plane {})", self.partida.nav.plano_mapa);
         self.depois_do_gerente(antes);
     }
 

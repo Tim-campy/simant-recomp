@@ -96,7 +96,7 @@ fn mods_desligados_ficam_de_fora() {
     assert_eq!(nomes(carregar_mods_sem(&dir, &["c".into(), "nenhum".into()]).unwrap()), vec!["a", "b"]);
     assert_eq!(nomes(carregar_mods_sem(&dir, &["b".into()]).unwrap()), vec!["a", "c"]);
     let erro = carregar_mods_sem(&dir, &["a".into()]).unwrap_err();
-    assert!(erro.contains("desligado"), "{erro}");
+    assert!(erro.contains("turned off"), "{erro}");
     let _ = fs::remove_dir_all(&dir);
 }
 

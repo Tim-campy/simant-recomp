@@ -297,7 +297,7 @@ impl TabelasAmarela {
     pub fn padrao() -> &'static TabelasAmarela {
         static TABELAS: OnceLock<TabelasAmarela> = OnceLock::new();
         TABELAS.get_or_init(|| {
-            TabelasAmarela::de_json(include_str!("../../../data/amarela.json")).expect("data/amarela.json inválido")
+            TabelasAmarela::de_json(include_str!("../../../data/amarela.json")).expect("invalid data/amarela.json")
         })
     }
 
@@ -305,13 +305,13 @@ impl TabelasAmarela {
         comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx8, &self.dy8)?;
         comum::validar_direcoes(ARQUIVO_TABELAS, &self.dx9, &self.dy9)?;
         if self.classe_luta.iter().any(|&c| c > 3) {
-            return Err(format!("{ARQUIVO_TABELAS}: classe_luta fora de 0–3"));
+            return Err(format!("{ARQUIVO_TABELAS}: classe_luta out of 0–3"));
         }
         if self.descarregar_grupo.iter().any(|&g| g > 15) {
-            return Err(format!("{ARQUIVO_TABELAS}: descarregar_grupo fora de 0–15"));
+            return Err(format!("{ARQUIVO_TABELAS}: descarregar_grupo out of 0–15"));
         }
         if self.musicas.morte_variacoes == 0 {
-            return Err(format!("{ARQUIVO_TABELAS}: morte_variacoes deve ser > 0"));
+            return Err(format!("{ARQUIVO_TABELAS}: morte_variacoes must be > 0"));
         }
         Ok(())
     }

@@ -118,19 +118,19 @@ impl TabelasBaloes {
     /// Cópia embutida de `data/baloes.json` (sem mods).
     pub fn padrao() -> &'static TabelasBaloes {
         static PADRAO: OnceLock<TabelasBaloes> = OnceLock::new();
-        PADRAO.get_or_init(|| TabelasBaloes::de_json(include_str!("../../../data/baloes.json")).expect("data/baloes.json inválido"))
+        PADRAO.get_or_init(|| TabelasBaloes::de_json(include_str!("../../../data/baloes.json")).expect("invalid data/baloes.json"))
     }
 
     fn validar(&self) -> Result<(), String> {
         let k_ok = |k: u16| k.is_power_of_two() && (2..=256).contains(&k);
         for f in Fala::TODAS {
-            let c = self.falas.get(&f).ok_or(format!("{ARQUIVO_TABELAS}: falta a fala {f:?}"))?;
+            let c = self.falas.get(&f).ok_or(format!("{ARQUIVO_TABELAS}: missing speech {f:?}"))?;
             if !k_ok(c.sorteio_espera) || !k_ok(c.chance) {
-                return Err(format!("{ARQUIVO_TABELAS}: {f:?}: sorteio_espera e chance devem ser potências de 2 entre 2 e 256"));
+                return Err(format!("{ARQUIVO_TABELAS}: {f:?}: sorteio_espera and chance must be powers of 2 between 2 and 256"));
             }
         }
         if !k_ok(self.aranha.sorteio_troca) || self.aranha.falas_por_modo < 1 {
-            return Err(format!("{ARQUIVO_TABELAS}: aranha inválida"));
+            return Err(format!("{ARQUIVO_TABELAS}: invalid aranha"));
         }
         Ok(())
     }

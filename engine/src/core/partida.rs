@@ -707,7 +707,7 @@ impl Partida {
     pub fn concluir_transferencia_especial(&mut self, x: i16, y: i16) -> Option<Result<ResultadoTroca, String>> {
         let foto = self.foto_colonia.take()?;
         let Some(geracao) = self.regras.geracao.clone() else {
-            return Some(Err("tabelas de geração não carregadas (troca de patch)".into()));
+            return Some(Err("generation tables not loaded (patch change)".into()));
         };
         let FotoColonia { estado, memoria_tutor, eventos } = *foto;
         self.estado = estado;
@@ -729,7 +729,7 @@ impl Partida {
         }
         self.terminar_tick();
         self.redesenhar = true;
-        Some(r.unwrap_or_else(|| Err("o tick repetido não chegou a _SpecialXfer".into())))
+        Some(r.unwrap_or_else(|| Err("the repeated tick did not reach _SpecialXfer".into())))
     }
 
     /// O tick pelas regras, com os ganchos de parte dos scripts quando há.
@@ -1133,23 +1133,24 @@ impl Partida {
         let lido = std::fs::read_to_string(&lateral)
             .map_err(|e| e.to_string())
             .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).map_err(|e| e.to_string()));
-        let aviso = |m: String| format!("[mods] {}: {m}; estado dos mods ignorado", lateral.display());
+        let aviso = |m: String| crate::tr!("mods.lateral.ignorado", arquivo = lateral.display(), motivo = m);
         let v = match lido {
             Ok(v) => v,
             Err(e) => return self.registro_scripts.push(aviso(e)),
         };
         if v.get("formato").and_then(|f| f.as_str()) != Some(crate::scripts::FORMATO_ARQUIVO_LATERAL) {
-            return self.registro_scripts.push(aviso("formato desconhecido".into()));
+            return self.registro_scripts.push(aviso(crate::tr!("mods.lateral.formato")));
         }
         let tempo = v.get("tempo").and_then(|t| t.as_u64());
         if tempo != Some(u64::from(self.estado.partida.tempo)) {
-            return self.registro_scripts.push(aviso(format!(
-                "é de outra gravação (tempo {tempo:?}, o save tem {})",
-                self.estado.partida.tempo
+            return self.registro_scripts.push(aviso(crate::tr!(
+                "mods.lateral.outra_gravacao",
+                tempo = format!("{tempo:?}"),
+                tempo_save = self.estado.partida.tempo
             )));
         }
         let Some(por_mod) = v.get("mods").and_then(|m| m.as_object()) else {
-            return self.registro_scripts.push(aviso("sem \"mods\"".into()));
+            return self.registro_scripts.push(aviso(crate::tr!("mods.lateral.sem_mods")));
         };
         s.ao_carregar(por_mod, &mut self.estado);
         self.aplicar_pedidos_dos_mods();
@@ -1175,7 +1176,7 @@ impl Partida {
                 PedidoMod::PararAvanco => self.ticks_de_mods = 0,
                 ref outro => {
                     if let Err(motivo) = super::acoes_mods::aplicar(self, outro) {
-                        self.registro_scripts.push(format!("[{nome}] {outro:?} recusado: {motivo}"));
+                        self.registro_scripts.push(format!("[{nome}] {}", crate::tr!("mods.recusado", acao = format!("{outro:?}"), motivo = motivo)));
                         // A recusa também aparece na faixa, como uma mensagem do script.
                         let agora = self.agora();
                         let d = self.avisos.cfg.faixa.duracao_conselho;

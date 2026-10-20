@@ -129,21 +129,21 @@ impl TabelasCasa {
     /// `data/casa.json` embutido no executável.
     pub fn padrao() -> &'static TabelasCasa {
         static TABELAS: OnceLock<TabelasCasa> = OnceLock::new();
-        TABELAS.get_or_init(|| TabelasCasa::de_json(include_str!("../../../data/casa.json")).expect("data/casa.json inválido"))
+        TABELAS.get_or_init(|| TabelasCasa::de_json(include_str!("../../../data/casa.json")).expect("invalid data/casa.json"))
     }
 
     /// Confere tamanhos, nomes e que nenhuma operação escreve fora do mapa.
     fn validar(&self) -> Result<(), String> {
         let erro = |m: String| Err(format!("{ARQUIVO_TABELAS}: {m}"));
         if self.patches.len() != PATCHES_CASA {
-            return erro(format!("esperados {PATCHES_CASA} patches, há {}", self.patches.len()));
+            return erro(format!("expected {PATCHES_CASA} patches, got {}", self.patches.len()));
         }
         for (nome, f) in &self.formas {
             if f.largura <= 0 || f.altura <= 0 || f.celulas.len() != (f.largura * f.altura) as usize {
-                return erro(format!("forma {nome}: {} células para {} × {}", f.celulas.len(), f.largura, f.altura));
+                return erro(format!("shape {nome}: {} cells for {} × {}", f.celulas.len(), f.largura, f.altura));
             }
         }
-        let ops = self.rotinas.iter().flat_map(|(n, v)| v.iter().map(move |o| (format!("rotina {n}"), o)));
+        let ops = self.rotinas.iter().flat_map(|(n, v)| v.iter().map(move |o| (format!("routine {n}"), o)));
         let ops = ops.chain(self.patches.iter().enumerate().flat_map(|(n, v)| v.iter().map(move |o| (format!("patch {n}"), o))));
         for (onde, op) in ops {
             if let Err(m) = self.validar_operacao(op) {
@@ -159,7 +159,7 @@ impl TabelasCasa {
 
     fn profundidade(&self, nome: &str, nivel: usize) -> Result<(), String> {
         if nivel > PROFUNDIDADE_MAXIMA {
-            return Err(format!("rotina {nome}: rotinas aninhadas demais (laço?)"));
+            return Err(format!("routine {nome}: routines nested too deep (loop?)"));
         }
         for op in self.rotinas.get(nome).into_iter().flatten() {
             if let Operacao::Rotina { nome } = op {
@@ -175,20 +175,20 @@ impl TabelasCasa {
             if intervalo_valido(x, w) && intervalo_valido(y, h) {
                 Ok(())
             } else {
-                Err(format!("retângulo x {x:?}, y {y:?} fora do mapa {w} × {h}"))
+                Err(format!("rectangle x {x:?}, y {y:?} outside the {w} × {h} map"))
             }
         };
         match op {
             Operacao::Preencher { x, y, .. } | Operacao::Moldura { x, y, .. } => ret(*x, *y),
             Operacao::Sortear { x, y, chance, variantes, .. } => {
                 if *chance == 0 || *variantes == 0 {
-                    return Err("sortear com chance ou variantes 0 (S(0) divide por zero no original)".into());
+                    return Err("sortear with chance or variantes 0 (S(0) divides by zero in the original)".into());
                 }
                 ret(*x, *y)
             }
             Operacao::Trocar { x, y, passo_x, .. } => {
                 if *passo_x <= 0 {
-                    return Err("trocar com passo_x ≤ 0".into());
+                    return Err("trocar with passo_x ≤ 0".into());
                 }
                 ret(*x, *y)
             }
@@ -196,34 +196,34 @@ impl TabelasCasa {
                 if dentro(*x, *y) {
                     Ok(())
                 } else {
-                    Err(format!("célula ({x}, {y}) fora do mapa"))
+                    Err(format!("cell ({x}, {y}) outside the map"))
                 }
             }
             Operacao::Forma { nome, x, y } => {
-                let f = self.formas.get(nome).ok_or(format!("forma {nome} não existe"))?;
+                let f = self.formas.get(nome).ok_or(format!("shape {nome} does not exist"))?;
                 ret([*x, x + f.largura - 1], [*y, y + f.altura - 1])
             }
             Operacao::Ladrilhos { lado, .. } => {
                 if *lado > 0 && (*lado as u32).is_power_of_two() {
                     Ok(())
                 } else {
-                    Err(format!("ladrilhos com lado {lado} (precisa ser potência de 2)"))
+                    Err(format!("ladrilhos with side {lado} (must be a power of 2)"))
                 }
             }
-            Operacao::Rotina { nome } => self.rotinas.get(nome).map(|_| ()).ok_or(format!("rotina {nome} não existe")),
+            Operacao::Rotina { nome } => self.rotinas.get(nome).map(|_| ()).ok_or(format!("routine {nome} does not exist")),
             Operacao::Queda { .. } => Ok(()),
         }
     }
 
     /// Monta o chão do patch `n` (0..37). Não mexe em `_TERRAINset`, formigas-leão nem bichos.
     pub fn gerar(&self, n: usize, chao: &mut ChaoDaCasa, s: &mut GeradorS) -> Result<(), String> {
-        let receita = self.patches.get(n).ok_or(format!("patch da casa {n} fora de 0..{}", PATCHES_CASA - 1))?;
+        let receita = self.patches.get(n).ok_or(format!("house patch {n} out of 0..{}", PATCHES_CASA - 1))?;
         self.executar(receita, chao, s, 0)
     }
 
     fn executar(&self, ops: &[Operacao], c: &mut ChaoDaCasa, s: &mut GeradorS, nivel: usize) -> Result<(), String> {
         if nivel > PROFUNDIDADE_MAXIMA {
-            return Err("rotinas aninhadas demais".into());
+            return Err("routines nested too deep".into());
         }
         let ix = |x: i32, y: i32| (x * LADO + y) as usize;
         for op in ops {
@@ -272,7 +272,7 @@ impl TabelasCasa {
                     }
                 }
                 Operacao::Forma { nome, x, y } => {
-                    let f = self.formas.get(nome).ok_or(format!("forma {nome} não existe"))?;
+                    let f = self.formas.get(nome).ok_or(format!("shape {nome} does not exist"))?;
                     for j in 0..f.altura {
                         for i in 0..f.largura {
                             let v = f.celulas[(j * f.largura + i) as usize];
@@ -305,7 +305,7 @@ impl TabelasCasa {
                 }
                 Operacao::Queda { valor } => *c.queda = *valor,
                 Operacao::Rotina { nome } => {
-                    let r = self.rotinas.get(nome).ok_or(format!("rotina {nome} não existe"))?;
+                    let r = self.rotinas.get(nome).ok_or(format!("routine {nome} does not exist"))?;
                     self.executar(r, c, s, nivel + 1)?;
                 }
             }

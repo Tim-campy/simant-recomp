@@ -1,0 +1,7 @@
+{
+  "_comentario": "Language index of the i18n frame (docs/i18n.md). One entry per language code, with the name shown in the selector (in the language itself) and the contexts where it can be chosen: 'launcher' (the startup options screen) and 'jogo' (everything the port shows after the launcher). English ('en') is the fallback and is always available. A mod adds a language by bringing data/idiomas/idiomas.json with only its entry (merged by key) and data/idiomas/<code>.json.",
+  "idiomas": {
+    "en": { "nome": "English", "contextos": ["launcher", "jogo"] },
+    "pt-BR": { "nome": "Português (Brasil)", "contextos": ["launcher"] }
+  }
+}

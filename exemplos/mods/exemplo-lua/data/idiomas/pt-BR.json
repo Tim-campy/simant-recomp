@@ -1,0 +1,6 @@
+{
+  "_comentario": "Textos do exemplo da chuva de comida em português (chaves mod.exemplo-lua.*), segunda tradução de exemplo (docs/pt-BR/i18n.md).",
+  "mod.exemplo-lua.ligada": "chuva de comida ligada; API {api}, jogo {jogo}, idioma {idioma}",
+  "mod.exemplo-lua.choveu": "Choveu comida! ({n} pedaços)",
+  "mod.exemplo-lua.registro": "tick {tick}: {n} pedaços de comida"
+}

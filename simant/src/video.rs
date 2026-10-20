@@ -100,13 +100,15 @@ impl ConfigVideo {
     }
 }
 
-/// `--janela LxA` ou `--resolucao LxA` (ex.: `1280x960`); `opcao` é o nome para as mensagens.
-pub fn ler_tamanho(opcao: &str, texto: &str) -> Result<(u32, u32), String> {
-    let (l, a) = texto.split_once(['x', 'X']).ok_or(format!("{opcao} LARGURAxALTURA (ex.: 800x600)"))?;
-    let l: u32 = l.trim().parse().map_err(|_| format!("{opcao}: largura inválida"))?;
-    let a: u32 = a.trim().parse().map_err(|_| format!("{opcao}: altura inválida"))?;
+/// `--janela LxA` ou `--resolucao LxA` (ex.: `1280x960`); `opcao` é o nome para as mensagens, no
+/// idioma de `t`.
+pub fn ler_tamanho(opcao: &str, texto: &str, t: &engine::idiomas::Textos) -> Result<(u32, u32), String> {
+    let erro = || t.f("cli.erro.tamanho", &[("opcao", &opcao)]);
+    let (l, a) = texto.split_once(['x', 'X']).ok_or_else(erro)?;
+    let l: u32 = l.trim().parse().map_err(|_| erro())?;
+    let a: u32 = a.trim().parse().map_err(|_| erro())?;
     if l == 0 || a == 0 {
-        return Err(format!("{opcao}: largura e altura positivas"));
+        return Err(erro());
     }
     Ok((l, a))
 }
@@ -149,8 +151,9 @@ mod testes {
         assert_eq!(c.tamanho_inicial(640, 480, None), (3, (800, 600)));
         let c = arq.com_linha_de_comando(Some((1024, 768)), None, None);
         assert_eq!(c.resolucao_virtual, [1024, 768]);
-        assert_eq!(ler_tamanho("--janela", "1280x960"), Ok((1280, 960)));
-        assert!(ler_tamanho("--janela", "1280").is_err());
-        assert!(ler_tamanho("--resolucao", "0x5").is_err());
+        let t = engine::idiomas::Textos::embutido();
+        assert_eq!(ler_tamanho("--janela", "1280x960", &t), Ok((1280, 960)));
+        assert_eq!(ler_tamanho("--janela", "1280", &t), Err("--janela: use WIDTHxHEIGHT with positive numbers (e.g. 800x600)".into()));
+        assert!(ler_tamanho("--resolucao", "0x5", &t).is_err());
     }
 }

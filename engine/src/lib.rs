@@ -3,6 +3,7 @@
 
 pub mod core;
 pub mod formats;
+pub mod idiomas;
 pub mod paleta;
 pub mod recursos;
 pub mod rules;

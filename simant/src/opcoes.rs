@@ -19,6 +19,8 @@ pub(crate) enum EntradaDialogo {
 pub(crate) struct Opcoes {
 
     pub(crate) jogo: PathBuf,
+    /// Idioma pedido (`--idioma`); o usado é o disponível no contexto `jogo` (docs/i18n.md).
+    pub(crate) idioma: Option<String>,
     pub(crate) dados: PathBuf,
     pub(crate) mods: PathBuf,
     /// Mods que não carregam (`--desligar-mods a,b`; nomes do `mod.json`).
@@ -112,7 +114,7 @@ fn ler_escolha(opcao: &str, v: String, validos: &[&str]) -> Result<String, Strin
     if validos.contains(&v.as_str()) {
         Ok(v)
     } else {
-        Err(format!("{opcao}: '{v}' ({})", validos.join(" ou ")))
+        Err(tr!("cli.erro.escolha", opcao = opcao, valor = v, validos = validos.join(", ")))
     }
 }
 
@@ -132,7 +134,7 @@ pub(crate) fn ler_acoes(texto: &str) -> Result<Vec<Acao>, String> {
     texto
         .split(',')
         .filter(|s| !s.trim().is_empty())
-        .map(|s| serde_json::from_value(serde_json::Value::String(s.trim().into())).map_err(|_| format!("ação desconhecida: {s}")))
+        .map(|s| serde_json::from_value(serde_json::Value::String(s.trim().into())).map_err(|_| tr!("cli.erro.acao", acao = s)))
         .collect()
 }
 
@@ -165,6 +167,7 @@ pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
     let base = crate::pastas::base();
     let mut o = Opcoes {
         jogo: pasta_jogo_padrao(&base),
+        idioma: None,
         dados: base.join("data"),
         mods: base.join("mods"),
         mods_desligados: Vec::new(),
@@ -210,9 +213,11 @@ pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
     };
     let mut args = args.into_iter();
     while let Some(a) = args.next() {
-        let mut valor = || args.next().ok_or(format!("falta o valor de {a}"));
+        let mut valor = || args.next().ok_or_else(|| tr!("cli.erro.falta_valor", opcao = a));
+        let numero = || tr!("cli.erro.numero", opcao = a);
         match a.as_str() {
             "--jogo" => o.jogo = valor()?.into(),
+            "--idioma" => o.idioma = Some(valor()?),
             "--dados" => o.dados = valor()?.into(),
             "--mods" => o.mods = valor()?.into(),
             "--desligar-mods" => o.mods_desligados = crate::config_launcher::lista(&valor()?),
@@ -222,10 +227,10 @@ pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
             "--save" => o.save = Some(valor()?.into()),
             "--exportar-tela-jogo" => o.exportar_tela_jogo = Some(valor()?.into()),
             "--acoes" => o.acoes = ler_acoes(&valor()?)?,
-            "--sair-apos-ms" => o.sair_apos_ms = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
-            "--escala" => o.escala = Some(valor()?.parse().map_err(|_| format!("{a}: inteiro (0 = a maior que cabe)"))?),
-            "--janela" => o.janela = Some(video::ler_tamanho("--janela", &valor()?)?),
-            "--resolucao" => o.resolucao = Some(video::ler_tamanho("--resolucao", &valor()?)?),
+            "--sair-apos-ms" => o.sair_apos_ms = Some(valor()?.parse().map_err(|_| numero())?),
+            "--escala" => o.escala = Some(valor()?.parse().map_err(|_| tr!("cli.erro.escala", opcao = a))?),
+            "--janela" => o.janela = Some(video::ler_tamanho("--janela", &valor()?, &engine::idiomas::atual())?),
+            "--resolucao" => o.resolucao = Some(video::ler_tamanho("--resolucao", &valor()?, &engine::idiomas::atual())?),
             "--moldura" => o.moldura = Some(true),
             "--sem-moldura" => o.moldura = Some(false),
             "--moldura-do-sistema" => o.substituir_moldura = Some(false),
@@ -237,15 +242,15 @@ pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
             "--win-ini" => o.win_ini = Some(valor()?.into()),
             "--capturar-janela" => o.capturar_janela = Some(valor()?.into()),
             "--novo-jogo" => o.novo_jogo = true,
-            "--semente" => o.semente = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
-            "--ticks" => o.ticks = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
-            "--avancar-ms" => o.avancar_ms = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
-            "--quintal" => o.quintal = Some(valor()?.parse().map_err(|_| format!("{a}: modo 0 a 3"))?),
+            "--semente" => o.semente = Some(valor()?.parse().map_err(|_| numero())?),
+            "--ticks" => o.ticks = Some(valor()?.parse().map_err(|_| numero())?),
+            "--avancar-ms" => o.avancar_ms = Some(valor()?.parse().map_err(|_| numero())?),
+            "--quintal" => o.quintal = Some(valor()?.parse().map_err(|_| format!("{a}: mode 0 to 3"))?),
             "--tipo" => {
                 let v = valor()?;
                 o.tipo = engine::core::selecao::Escolha::de_nome(&v)
                     .and_then(|e| e.tipo_jogo())
-                    .ok_or(format!("{a}: use tutorial, rapido, completo ou experimental"))?;
+                    .ok_or_else(|| tr!("cli.erro.tipo", opcao = a, valor = v))?;
                 o.novo_jogo = true;
             }
             "--salvar" => o.salvar = Some(valor()?.into()),
@@ -279,25 +284,21 @@ pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
                 o.cliques_dialogo.push(EntradaDialogo::Tecla(nome, m.contains(&"shift"), m.contains(&"ctrl"), m.contains(&"alt")));
             }
             "--digitar-dialogo" => o.cliques_dialogo.push(EntradaDialogo::Texto(valor()?)),
-            "--janela-mapa" => o.janela_mapa = Some(valor()?.parse().ok().filter(|m| (1..=8).contains(m)).ok_or(format!("{a}: modo 1 a 8"))?),
+            "--janela-mapa" => o.janela_mapa = Some(valor()?.parse().ok().filter(|m| (1..=8).contains(m)).ok_or(format!("{a}: mode 1 to 8"))?),
             "--trilhas" => o.trilhas = true,
-            "--mini-mapa" => o.mini_mapa = valor()?.parse().map_err(|_| format!("{a}: número de aberturas"))?,
+            "--mini-mapa" => o.mini_mapa = valor()?.parse().map_err(|_| format!("{a}: number of openings"))?,
             "--exame-ja-aberto" => o.exame_ja_aberto = true,
             "--examinar" => {
                 let v = valor()?;
                 let (x, y) = v.split_once(',').ok_or("--examinar X,Y")?;
                 o.examinar = Some((x.parse().map_err(|_| "--examinar: x")?, y.parse().map_err(|_| "--examinar: y")?));
             }
-            "--marcar" => o.marcar = Some(valor()?.parse().map_err(|_| format!("{a}: número inválido"))?),
-            "--historico" => {
-                o.historico = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| format!("{a}: número inválido"))).collect::<Result<_, _>>()?
-            }
-            "--botoes" => {
-                o.botoes = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| format!("{a}: número inválido"))).collect::<Result<_, _>>()?
-            }
-            "--fechar-avisos" => o.fechar_avisos = valor()?.parse().map_err(|_| format!("{a}: número inválido"))?,
+            "--marcar" => o.marcar = Some(valor()?.parse().map_err(|_| numero())?),
+            "--historico" => o.historico = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| numero())).collect::<Result<_, _>>()?,
+            "--botoes" => o.botoes = valor()?.split(',').map(|b| b.trim().parse().map_err(|_| numero())).collect::<Result<_, _>>()?,
+            "--fechar-avisos" => o.fechar_avisos = valor()?.parse().map_err(|_| numero())?,
             outro if o.som.tratar(outro, &mut valor)? => {}
-            _ => return Err(format!("opção desconhecida: {a}")),
+            _ => return Err(tr!("cli.erro.desconhecida", opcao = a)),
         }
     }
     o.jogo = crate::pastas::resolver(&o.jogo, &base);
@@ -305,13 +306,13 @@ pub(crate) fn ler_opcoes(args: Vec<String>) -> Result<Opcoes, String> {
     o.mods = crate::pastas::resolver(&o.mods, &base);
     let partida = o.save.is_some() || o.novo_jogo;
     if !partida && (o.exportar_tela_jogo.is_some() || !o.acoes.is_empty() || o.ticks.is_some() || o.salvar.is_some()) {
-        return Err("--exportar-tela-jogo, --acoes, --ticks e --salvar precisam de --save ou --novo-jogo".into());
+        return Err(tr!("cli.erro.precisa_partida"));
     }
     if o.save.is_some() && o.novo_jogo {
-        return Err("use --save ou --novo-jogo, não os dois".into());
+        return Err(tr!("cli.erro.save_e_novo_jogo"));
     }
     if o.semente.is_some() && !o.novo_jogo {
-        return Err("--semente precisa de --novo-jogo".into());
+        return Err(tr!("cli.erro.semente"));
     }
     Ok(o)
 }

@@ -55,7 +55,7 @@ struct Leitor<'a> {
 
 impl Leitor<'_> {
     fn byte(&mut self) -> Result<u8, String> {
-        let v = *self.b.get(self.i).ok_or_else(|| format!("MIDI truncado em 0x{:x}", self.i))?;
+        let v = *self.b.get(self.i).ok_or_else(|| format!("MIDI truncated at 0x{:x}", self.i))?;
         self.i += 1;
         Ok(v)
     }
@@ -68,11 +68,11 @@ impl Leitor<'_> {
                 return Ok(v);
             }
         }
-        Err(format!("quantidade variável longa demais em 0x{:x}", self.i))
+        Err(format!("variable-length quantity too long at 0x{:x}", self.i))
     }
     fn pular(&mut self, n: usize) -> Result<(), String> {
         if self.i + n > self.b.len() {
-            return Err(format!("MIDI truncado em 0x{:x}", self.i));
+            return Err(format!("MIDI truncated at 0x{:x}", self.i));
         }
         self.i += n;
         Ok(())
@@ -90,27 +90,27 @@ fn be32(b: &[u8], o: usize) -> u32 {
 impl Midi {
     pub fn de_bytes(b: &[u8]) -> Result<Midi, String> {
         if b.len() < 14 || &b[0..4] != b"MThd" {
-            return Err("não é MIDI (falta MThd)".into());
+            return Err("not MIDI (missing MThd)".into());
         }
         let tam = be32(b, 4) as usize;
         if tam < 6 || 8 + tam > b.len() {
-            return Err("cabeçalho MThd inválido".into());
+            return Err("invalid MThd header".into());
         }
         let formato = be16(b, 8);
         let trilhas = be16(b, 10);
         let divisao = be16(b, 12);
         if divisao == 0 {
-            return Err("divisão 0 no cabeçalho MIDI".into());
+            return Err("division 0 in the MIDI header".into());
         }
         let mut eventos = Vec::new();
         let mut pos = 8 + tam;
         for t in 0..trilhas {
             if pos + 8 > b.len() || &b[pos..pos + 4] != b"MTrk" {
-                return Err(format!("trilha {t}: falta MTrk em 0x{pos:x}"));
+                return Err(format!("track {t}: missing MTrk at 0x{pos:x}"));
             }
             let fim = pos + 8 + be32(b, pos + 4) as usize;
             if fim > b.len() {
-                return Err(format!("trilha {t} passa do fim do arquivo"));
+                return Err(format!("track {t} runs past the end of the file"));
             }
             ler_trilha(&b[pos + 8..fim], &mut eventos)?;
             pos = fim;
@@ -203,14 +203,14 @@ fn ler_trilha(b: &[u8], eventos: &mut Vec<Bruto>) -> Result<(), String> {
                 // Status corrente: um byte de dados no lugar do status repete o anterior.
                 let d1 = if status & 0x80 == 0 {
                     if corrente == 0 {
-                        return Err(format!("dado sem status em 0x{:x}", l.i - 1));
+                        return Err(format!("data byte without status at 0x{:x}", l.i - 1));
                     }
                     let d = status;
                     status = corrente;
                     d
                 } else {
                     if status >= 0xF0 {
-                        return Err(format!("status 0x{status:02X} não suportado em 0x{:x}", l.i - 1));
+                        return Err(format!("status 0x{status:02X} not supported at 0x{:x}", l.i - 1));
                     }
                     corrente = status;
                     l.byte()?

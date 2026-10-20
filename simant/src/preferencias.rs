@@ -59,7 +59,7 @@ impl Preferencias {
         match sdl2::filesystem::pref_path("SimAnt recomp", "SimAnt") {
             Ok(p) => Some(PathBuf::from(p).join(ARQUIVO)),
             Err(e) => {
-                eprintln!("preferências: sem pasta de dados do usuário ({e})");
+                eprintln!("{}", engine::tr!("jogo.preferencias.sem_pasta", erro = e));
                 None
             }
         }
@@ -69,7 +69,7 @@ impl Preferencias {
     pub fn ler(caminho: &Path) -> Preferencias {
         match std::fs::read_to_string(caminho) {
             Ok(texto) => serde_json::from_str(&texto).unwrap_or_else(|e| {
-                eprintln!("preferências: {} inválido ({e}); usando os padrões", caminho.display());
+                eprintln!("{}", engine::tr!("jogo.preferencias.invalido", arquivo = caminho.display(), erro = e));
                 Preferencias::default()
             }),
             Err(_) => Preferencias::default(),

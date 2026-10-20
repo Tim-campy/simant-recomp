@@ -35,17 +35,17 @@ pub trait CampoSave: Sized {
 }
 
 fn bloco<'a>(j: &'a JogoSalvo, simbolo: &str, n: usize) -> Result<&'a [u8], String> {
-    let b = j.bloco(simbolo).ok_or_else(|| format!("bloco {simbolo} não existe no layout"))?;
+    let b = j.bloco(simbolo).ok_or_else(|| format!("block {simbolo} does not exist in the layout"))?;
     if b.len() != n {
-        return Err(format!("bloco {simbolo} tem {} bytes; o estado espera {n}", b.len()));
+        return Err(format!("block {simbolo} has {} bytes; the state expects {n}", b.len()));
     }
     Ok(b)
 }
 
 fn bloco_mut<'a>(j: &'a mut JogoSalvo, simbolo: &str, n: usize) -> Result<&'a mut [u8], String> {
-    let b = j.bloco_mut(simbolo).ok_or_else(|| format!("bloco {simbolo} não existe no layout"))?;
+    let b = j.bloco_mut(simbolo).ok_or_else(|| format!("block {simbolo} does not exist in the layout"))?;
     if b.len() != n {
-        return Err(format!("bloco {simbolo} tem {} bytes; o estado espera {n}", b.len()));
+        return Err(format!("block {simbolo} has {} bytes; the state expects {n}", b.len()));
     }
     Ok(b)
 }
@@ -279,7 +279,7 @@ impl Grade {
     /// Grade a partir de bytes já em ordem coluna-major (tamanho conferido).
     pub fn de_bytes(dim: (usize, usize), dados: Vec<u8>) -> Result<Grade, String> {
         if dados.len() != dim.0 * dim.1 {
-            return Err(format!("grade {}×{} com {} bytes", dim.0, dim.1, dados.len()));
+            return Err(format!("{}×{} grid with {} bytes", dim.0, dim.1, dados.len()));
         }
         Ok(Grade { largura: dim.0, altura: dim.1, dados })
     }

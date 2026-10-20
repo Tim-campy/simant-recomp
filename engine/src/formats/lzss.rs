@@ -15,14 +15,14 @@ pub fn descomprimir(entrada: &[u8], tamanho: usize) -> Result<Vec<u8>, String> {
     let mut i = 0;
 
     while saida.len() < tamanho {
-        let controle = *entrada.get(i).ok_or("LZSS: entrada terminou antes do tamanho declarado")?;
+        let controle = *entrada.get(i).ok_or("LZSS: input ended before the declared size")?;
         i += 1;
         for bit in 0..8 {
             if saida.len() >= tamanho {
                 break;
             }
             if controle & (1 << bit) != 0 {
-                let byte = *entrada.get(i).ok_or("LZSS: literal truncado")?;
+                let byte = *entrada.get(i).ok_or("LZSS: truncated literal")?;
                 i += 1;
                 saida.push(byte);
                 janela[pos_janela] = byte;
@@ -30,7 +30,7 @@ pub fn descomprimir(entrada: &[u8], tamanho: usize) -> Result<Vec<u8>, String> {
             } else {
                 let (a, b) = match (entrada.get(i), entrada.get(i + 1)) {
                     (Some(&a), Some(&b)) => (a as usize, b as usize),
-                    _ => return Err("LZSS: referência truncada".into()),
+                    _ => return Err("LZSS: truncated reference".into()),
                 };
                 i += 2;
                 let origem = a | ((b & 0xF0) << 4);

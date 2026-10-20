@@ -22,13 +22,13 @@ pub(crate) fn tecla_abre_menu(s: &mut Sessao, ev: &EventoNav) -> bool {
 /// apertada; com `#ITEM`, escolhe o item (a partir de 1) e fecha o menu.
 pub(crate) fn menu_pela_linha_de_comando(s: &mut Sessao, arg: &str) -> Result<(), String> {
     let (tecla, item) = match arg.split_once('#') {
-        Some((t, i)) => (t, Some(i.parse::<usize>().map_err(|_| format!("--menu mod@{arg}: item inválido"))?)),
+        Some((t, i)) => (t, Some(i.parse::<usize>().map_err(|_| format!("--menu mod@{arg}: invalid item"))?)),
         None => (arg, None),
     };
     let t = engine::scripts::TeclaMod::de_texto(tecla)?;
     let ev = EventoNav::Tecla { nome: t.nome, ctrl: t.ctrl, shift: t.shift, alt: t.alt };
     if !tecla_abre_menu(s, &ev) {
-        return Err(format!("--menu mod@{tecla}: nenhum menu de mod nessa tecla"));
+        return Err(format!("--menu mod@{tecla}: no mod menu on that key"));
     }
     if let Some(i) = item {
         let dono = s.menu_mod.take().map(|m| m.dono).unwrap_or_default();
@@ -52,9 +52,9 @@ pub(crate) fn avisar_teclas_ocupadas(s: &Sessao) {
             || s.ajuda.cfg.tecla(&ev).is_some()
             || (!t.alt && s.menus.barra.cfg.acelerador(&t.nome, t.ctrl, t.shift).is_some());
         if ocupada {
-            eprintln!("[script] [{dono}] a tecla {} do menu já é um atalho do jogo; o menu não abre por ela", t.texto());
+            eprintln!("[script] [{dono}] {}", engine::tr!("mods.tecla_do_jogo", tecla = t.texto()));
         } else {
-            println!("[script] [{dono}] menu \"{}\": tecla {}", m.titulo, t.texto());
+            println!("[script] [{dono}] {}", engine::tr!("mods.menu_na_tecla", titulo = m.titulo, tecla = t.texto()));
         }
     }
 }
