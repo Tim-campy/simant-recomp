@@ -54,6 +54,35 @@ fn sandbox_nao_tem_io_os_nem_carga_de_codigo() {
     assert_eq!(s.retirar_mensagens().len(), 1, "aviso na faixa");
 }
 
+/// API 0.43: `idioma()` e `traduzir(chave, params)` leem os textos do jogo (inglês aqui); chave
+/// ausente devolve a própria chave; parâmetros que não são texto viram texto; chaves da tabela de
+/// parâmetros que não são texto são erro.
+#[test]
+fn idioma_e_traduzir() {
+    let mut s = scripts(
+        r#"
+        registrar(idioma())
+        registrar(traduzir("mods.script_desligado", { nome = "x" }))
+        registrar(traduzir("mods.recusa.leao_sem_lugar", { x = 3, y = 4.5 }))
+        registrar(traduzir("nao.existe"))
+        registrar(traduzir("lua.mensagem.vazia", nil))
+        traduzir("mods.script_desligado", { "posicional" })
+        "#,
+    );
+    let reg = s.retirar_registro();
+    assert_eq!(
+        &reg[..5],
+        &[
+            "[teste] en".to_string(),
+            "[teste] Mod x: script turned off by an error".into(),
+            "[teste] no free spot at (3, 4.5) or too many antlions".into(),
+            "[teste] nao.existe".into(),
+            "[teste] mostrar_mensagem: empty text".into(),
+        ]
+    );
+    assert!(reg[5].contains("traduzir: the parameters must be a table with text keys ({nome = valor})"), "{reg:?}");
+}
+
 #[test]
 fn bytecode_e_recusado() {
     // Um chunk binário (começa com ESC) não carrega: só texto.

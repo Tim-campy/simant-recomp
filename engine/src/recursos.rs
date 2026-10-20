@@ -403,7 +403,7 @@ impl Referencia {
         let texto = |k: &str| -> Result<String, String> {
             o.get(k).and_then(serde_json::Value::as_str).map(str::to_string).ok_or_else(|| format!("missing \"{k}\" (text)"))
         };
-        let u16_de = |k: &str| -> Result<u16, String> { numero(k).and_then(|n| u16::try_from(n).map_err(|_| format!("\"{k}\" grande demais"))) };
+        let u16_de = |k: &str| -> Result<u16, String> { numero(k).and_then(|n| u16::try_from(n).map_err(|_| format!("\"{k}\" too large"))) };
         let (alvo, chaves): (Alvo, &[&str]) = if o.contains_key("exe") {
             let pecas = match o.get("pecas_8x8") {
                 None => None,

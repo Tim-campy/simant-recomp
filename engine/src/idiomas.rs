@@ -202,7 +202,7 @@ impl Textos {
 
     /// O texto de `chave`.
     pub fn t(&self, chave: &str) -> String {
-        self.bruto(chave).to_string()
+        formatar(self.bruto(chave), &[])
     }
 
     /// O texto de `chave` com os parâmetros `{nome}` trocados.
