@@ -197,22 +197,86 @@ vai para o save). Para ligar: `--mods exemplos/mods`.
 
 ## Compilar a partir do código
 
-- Rust stable (toolchain MSVC no Windows).
-- SDL2 2.30.9 para Visual C++ extraído em `vendor/SDL2-2.30.9/` (Windows). O `build.rs` liga com essa
-  versão e copia o `SDL2.dll` para `target/<perfil>/`. Para baixar:
-  `curl -L -o vendor/SDL2-devel-2.30.9-VC.zip https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-devel-2.30.9-VC.zip`
-  e descompacte em `vendor/`. No Linux, instale o pacote de desenvolvimento do SDL2 do sistema
-  (`libsdl2-dev` no Debian/Ubuntu).
-- Os arquivos do jogo instalado (a pasta com `SIMANTW.EXE`, `SHARED.DAT`, `WINGANT.DAT`,
-  `SOUND.DAT`...) em `SimAnt-T/MAXIS/ANTWIN/`, ou em outra pasta indicada por `--jogo` ou pela variável
-  `SIMANT_DIR`.
+Só é preciso para mudar o código ou compilar para um sistema sem pacote pronto; quem só quer jogar pode
+baixar a [última versão](https://github.com/Tim-campy/simant-recomp/releases/latest). Em todos os casos
+você precisa da **sua própria cópia do SimAnt para Windows 3.x** (ver [Requisitos](#requisitos)).
+
+### 1. Instale as ferramentas
+
+**Windows 10/11 (x64)**
+
+1. [Git](https://git-scm.com/download/win).
+2. [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) com a carga de
+   trabalho **"Desenvolvimento para desktop com C++"** (o linker do MSVC e o compilador C usado para o
+   Lua embutido).
+3. [Rust](https://rustup.rs/) pelo `rustup-init.exe`, aceitando a toolchain padrão (stable, MSVC).
+
+**Linux (x64)**
+
+```bash
+# Debian / Ubuntu
+sudo apt install build-essential git curl libsdl2-dev
+# Fedora
+sudo dnf install gcc git curl SDL2-devel
+# Rust (qualquer distribuição)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+### 2. Baixe o código
+
+```bash
+git clone https://github.com/Tim-campy/simant-recomp.git
+cd simant-recomp
+```
+
+### 3. SDL2 (só no Windows)
+
+No Windows a compilação liga com o pacote oficial de desenvolvimento do SDL2 2.30.9, que não fica no
+repositório. Baixe uma vez em `vendor/` (PowerShell, dentro da pasta do projeto):
+
+```powershell
+mkdir vendor
+curl.exe -L -o vendor\SDL2-devel-2.30.9-VC.zip https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-devel-2.30.9-VC.zip
+tar -xf vendor\SDL2-devel-2.30.9-VC.zip -C vendor
+```
+
+Deve existir `vendor\SDL2-2.30.9\lib\x64\SDL2.dll`. No Linux é usado o `libsdl2-dev` do sistema,
+instalado no passo 1.
+
+### 4. Compile e rode
+
+```bash
+cargo build --release
+```
+
+A primeira compilação baixa as dependências do Rust e leva alguns minutos. O resultado é
+`target/release/simant.exe` no Windows (com o `SDL2.dll` copiado ao lado) ou `target/release/simant` no
+Linux. Para rodar:
+
+```bash
+cargo run --release -p simant                                  # abre o launcher
+cargo run --release -p simant -- --novo-jogo --tipo completo   # direto num Jogo Completo novo
+cargo run --release -p simant -- --help                        # todas as opções
+```
+
+Na primeira vez, aponte no launcher a pasta da sua instalação do SimAnt (a que tem `SIMANTW.EXE`,
+`SHARED.DAT`, `WINGANT.DAT`, `SOUND.DAT`...). Também dá para colocar essa pasta em
+`SimAnt-T/MAXIS/ANTWIN/` dentro do projeto, passar `--jogo <pasta>` ou definir a variável de ambiente
+`SIMANT_DIR`. Nada na pasta do jogo é alterado.
+
+### 5. Monte uma pasta portátil (opcional)
+
+O executável acha a pasta `data/` ao lado dele, então uma pasta jogável só precisa de:
 
 ```
-cargo run --release -p simant                              # launcher (opções de inicialização); Jogar = abertura e "Select a Game"
-cargo run --release -p simant -- --sem-config              # direto na abertura, sem o launcher nem a configuração dele
-cargo run --release -p simant -- --novo-jogo --tipo completo   # direto num jogo novo (tutorial, rapido, completo, experimental)
-cargo run --release -p simant -- --save tests/referencias/saves/QUICK2.ANT   # abre um save
+simant.exe        (ou simant no Linux)
+SDL2.dll          (só no Windows)
+data/
+exemplos/mods/    (opcional: os mods de exemplo)
 ```
+
+É o que os pacotes de lançamento contêm (montados por `.github/workflows/release.yml`, que também
+acrescenta as licenças e os avisos de terceiros).
 
 ### Testes
 

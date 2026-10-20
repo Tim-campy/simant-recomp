@@ -195,22 +195,86 @@ into the save). To turn them on: `--mods exemplos/mods`.
 
 ## Building from source
 
-- Rust stable (MSVC toolchain on Windows).
-- SDL2 2.30.9 for Visual C++ extracted into `vendor/SDL2-2.30.9/` (Windows). `build.rs` links against
-  that version and copies `SDL2.dll` to `target/<profile>/`. To download:
-  `curl -L -o vendor/SDL2-devel-2.30.9-VC.zip https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-devel-2.30.9-VC.zip`
-  and unpack it into `vendor/`. On Linux, install the system's SDL2 development package
-  (`libsdl2-dev` on Debian/Ubuntu).
-- The installed game files (the folder with `SIMANTW.EXE`, `SHARED.DAT`, `WINGANT.DAT`,
-  `SOUND.DAT`...) in `SimAnt-T/MAXIS/ANTWIN/`, or in another folder given by `--jogo` or by the
-  `SIMANT_DIR` environment variable.
+You only need this if you want to change the code or build for a system without a ready-made
+package; players can simply download the [latest release](https://github.com/Tim-campy/simant-recomp/releases/latest).
+In every case you still need **your own copy of SimAnt for Windows 3.x** (see [Requirements](#requirements)).
+
+### 1. Install the tools
+
+**Windows 10/11 (x64)**
+
+1. [Git](https://git-scm.com/download/win).
+2. [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the
+   **"Desktop development with C++"** workload (the MSVC linker, and the C compiler used to build the
+   embedded Lua).
+3. [Rust](https://rustup.rs/) through `rustup-init.exe`, accepting the default (stable, MSVC) toolchain.
+
+**Linux (x64)**
+
+```bash
+# Debian / Ubuntu
+sudo apt install build-essential git curl libsdl2-dev
+# Fedora
+sudo dnf install gcc git curl SDL2-devel
+# Rust (any distribution)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+### 2. Get the code
+
+```bash
+git clone https://github.com/Tim-campy/simant-recomp.git
+cd simant-recomp
+```
+
+### 3. SDL2 (Windows only)
+
+On Windows the build links against the official SDL2 2.30.9 development package, which is not stored
+in the repository. Download it once into `vendor/` (PowerShell, inside the project folder):
+
+```powershell
+mkdir vendor
+curl.exe -L -o vendor\SDL2-devel-2.30.9-VC.zip https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-devel-2.30.9-VC.zip
+tar -xf vendor\SDL2-devel-2.30.9-VC.zip -C vendor
+```
+
+You should end up with `vendor\SDL2-2.30.9\lib\x64\SDL2.dll`. On Linux the system's `libsdl2-dev`
+installed in step 1 is used instead.
+
+### 4. Build and run
+
+```bash
+cargo build --release
+```
+
+The first build downloads the Rust dependencies and takes a few minutes. The result is
+`target/release/simant.exe` on Windows (with `SDL2.dll` copied next to it) or `target/release/simant`
+on Linux. Run it:
+
+```bash
+cargo run --release -p simant                                  # opens the launcher
+cargo run --release -p simant -- --novo-jogo --tipo completo   # straight into a new Full Game
+cargo run --release -p simant -- --help                        # every option
+```
+
+On the first start, point the launcher to the folder of your SimAnt installation (the one with
+`SIMANTW.EXE`, `SHARED.DAT`, `WINGANT.DAT`, `SOUND.DAT`...). Alternatively put that folder in
+`SimAnt-T/MAXIS/ANTWIN/` inside the project, pass `--jogo <folder>`, or set the `SIMANT_DIR`
+environment variable. Nothing in the game folder is ever modified.
+
+### 5. Make a portable folder (optional)
+
+The executable finds `data/` next to itself, so a playable folder only needs:
 
 ```
-cargo run --release -p simant                              # launcher (startup options); Play = title screen and "Select a Game"
-cargo run --release -p simant -- --sem-config              # straight to the title screen, without the launcher or its configuration
-cargo run --release -p simant -- --novo-jogo --tipo completo   # straight into a new game (tutorial, rapido, completo, experimental)
-cargo run --release -p simant -- --save tests/referencias/saves/QUICK2.ANT   # opens a save
+simant.exe        (or simant on Linux)
+SDL2.dll          (Windows only)
+data/
+exemplos/mods/    (optional: the example mods)
 ```
+
+This is what the release packages contain (they are built by `.github/workflows/release.yml`, which
+also adds the licenses and third-party notices).
 
 ### Tests
 
