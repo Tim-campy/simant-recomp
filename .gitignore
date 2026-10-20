@@ -25,3 +25,6 @@ research_notes/
 /*.ANT
 /*.ant
 *.sf2
+/*.mods.json
+/*.ANT.mods.json
+referencia/*.png
