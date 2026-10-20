@@ -824,7 +824,7 @@ mod testes {
         let Some((recursos, dados)) = recursos_de_teste() else { return };
         let mut s = sessao_de_teste(&recursos, &dados).unwrap();
         let w = s.tela.cfg.largura as usize;
-        // Morte pela formiga-leão: o primeiro quadro (9201) sai 13 + 10 unidades depois de abrir.
+        // Morte pela formiga-leão: o primeiro quadro (9201) sai 10 unidades depois de abrir (sem esperar o som).
         assert!(s.partida.avisos.receber_animado(TipoAnimado::FormigaLeao, None));
         s.partida.avisos.passar_tempo(1000);
         let leao = s.quadro_rgb().unwrap();

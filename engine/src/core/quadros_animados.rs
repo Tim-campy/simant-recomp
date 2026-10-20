@@ -313,13 +313,14 @@ mod testes {
     }
 
     #[test]
-    fn formiga_leao_espera_o_som_e_troca_de_quadro_a_cada_30_do_mac() {
-        // Som 38 (703 ms = 13 unidades), depois um quadro a cada 10 unidades: 9201, 9202, 9203, 9202…
-        // até 100 unidades de laço (300 do Mac): 9 quadros; som 37 nos quadros de índice 0 e 2.
+    fn formiga_leao_toca_o_som_e_troca_de_quadro_a_cada_30_do_mac() {
+        // Som 38 sem espera (_mySoundIsDone é imediato no multimídia: na sessão gravada no DOSBox-X o
+        // primeiro 37 sai 562 ms depois do 38), depois um quadro a cada 10 unidades: 9201, 9202,
+        // 9203, 9202… até 100 unidades de laço (300 do Mac): 9 quadros; som 37 nos de índice 0 e 2.
         let (q, p, fim) = rodar(TipoAnimado::FormigaLeao, 400);
-        assert_eq!(q.first(), Some(&(23, 9201)));
+        assert_eq!(q.first(), Some(&(10, 9201)));
         assert_eq!(q.iter().map(|x| x.1).collect::<Vec<_>>(), vec![9201, 9202, 9203, 9202, 9203, 9202, 9203, 9202, 9203]);
-        assert_eq!(fim, Some(113));
+        assert_eq!(fim, Some(100));
         let sons: Vec<u16> = p.iter().filter_map(|(_, e)| if let Evento::Som(s) = e { Some(*s) } else { None }).collect();
         assert_eq!(sons, vec![38, 37, 37, 37, 37, 37]);
     }
