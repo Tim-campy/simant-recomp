@@ -1,3 +1,5 @@
+*Read in English: [abertura.md](../../../spec/telas/abertura.md)*
+
 # Tela de abertura
 
 ## Comportamento

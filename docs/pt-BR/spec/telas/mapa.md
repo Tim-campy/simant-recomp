@@ -1,3 +1,5 @@
+*Read in English: [mapa.md](../../../spec/telas/mapa.md)*
+
 # Janela do mapa (`mapWin`, janela 1)
 
 Visão geral do plano atual: superfície, ninho preto, ninho vermelho ou um dos cinco mapas de feromônio, com as formigas, a aranha, a pegada do menino e o retângulo da vista de edição. Fonte: pseudocódigo do Ghidra (análise de 2026-10-18; endereços abaixo), a listagem das instruções de `_OpenMiniMapWin` e `_MapAreaEvent` (script do Ghidra sobre uma cópia do projeto, material de trabalho fora do git) e os layouts do WINGANT/SHARED. **Capturas do original** (bancada, 2026-10-18; seções 6 e 7): ninho, os cinco feromônios, cliques e Shift+cliques na área, troca com o quintal e o mini mapa; trilhas ainda sem captura.

@@ -1,3 +1,5 @@
+*Read in English: [som.md](../../../spec/formatos/som.md)*
+
 # Som e música: arquivos e formatos
 
 Onde estão os sons e as músicas do SimAnt para Windows, em que formato, e por qual caminho o executável os toca. Quando cada um toca está em [regras/som.md](../regras/som.md).

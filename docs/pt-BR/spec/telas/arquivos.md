@@ -1,3 +1,5 @@
+*Read in English: [arquivos.md](../../../spec/telas/arquivos.md)*
+
 # Arquivos: Load, Save e Save As
 
 Diálogos do Windows que o SimAnt abre para carregar e salvar a partida, e o que `_LoadGame` faz fora dos blocos do save. O formato do arquivo está em [../formatos/save-ant.md](../formatos/save-ant.md); a gravação, em [mensagens.md](mensagens.md) §6; os quadros e a pausa depois do Load, em [mensagens.md](mensagens.md) §6.1.

@@ -1,3 +1,5 @@
+*Read in English: [ajuda-contexto.md](../../../spec/telas/ajuda-contexto.md)*
+
 # Ajuda: botão direito, modo de ajuda, botões "?" e cursores
 
 Como o SimAnt chega à ajuda (`SIMANT.HLP`, aberto pelo WinHelp no original). O visualizador do port (o que aparece depois) está em [ajuda.md](ajuda.md); o formato do arquivo em [../formatos/hlp.md](../formatos/hlp.md).

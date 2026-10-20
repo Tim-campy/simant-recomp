@@ -1,3 +1,5 @@
+*Read in English: [info.md](../../../spec/telas/info.md)*
+
 # Info ("Top Card", janela 5)
 
 Uma enciclopédia estática sobre formigas, em cartões com figuras, textos e áreas de clique. Não lê o estado do jogo nem sorteia. Fontes: pseudocódigo do Ghidra (análise de 2026-10-18), os recursos do SHARED/WINGANT e a captura `re_trabalho/janelas/j03_info.png`.

@@ -1,3 +1,5 @@
+*Read in English: [simant-cfg.md](../../../spec/formatos/simant-cfg.md)*
+
 # `SIMANT.CFG`
 
 Arquivo de texto na pasta do jogo. A cópia analisada contém:

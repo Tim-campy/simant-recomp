@@ -1,3 +1,5 @@
+*Read in English: [hlp.md](../../../spec/formatos/hlp.md)*
+
 # Arquivo de ajuda `SIMANT.HLP` (WinHelp 3.0)
 
 O original não desenha a própria ajuda: chama `WinHelp(hwnd, "SIMANT.HLP", comando, n)` (`_DoWinHelp` `1000:5aac`, `_DoEvent`, `_HelpKeyDown`; o nome do arquivo está em `_helpFile`, `9:76ac`) e o WinHelp do Windows mostra o tópico. O port lê o arquivo do usuário (`MAXIS/ANTWIN/SIMANT.HLP`, 197.256 bytes) e desenha a janela ele mesmo (visor: [../telas/ajuda.md](../telas/ajuda.md)).

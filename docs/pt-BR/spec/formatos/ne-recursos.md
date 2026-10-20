@@ -1,3 +1,5 @@
+*Read in English: [ne-recursos.md](../../../spec/formatos/ne-recursos.md)*
+
 # Recursos do executável NE (`SIMANTW.EXE`): cursores e aceleradores
 
 Leitor: `engine/src/formats/ne.rs` (`cursores(exe)`, `aceleradores(exe)`), testes `cursores_do_simantw` e `aceleradores_do_simantw`. Inspeção: `python tools/ne_info.py SIMANTW.EXE` lista os recursos.

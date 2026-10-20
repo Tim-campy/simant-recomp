@@ -1,3 +1,5 @@
+*Read in English: [ajuda.md](../../../spec/telas/ajuda.md)*
+
 # Ajuda (WinHelp) e o visor do port
 
 O SimAnt original abre a ajuda no WinHelp do Windows: `WinHelp(hwnd, "SIMANT.HLP", HELP_CONTEXT, n)` com o número de contexto do objeto (botão "?" da faixa, modo de ajuda, botões "?" das janelas) ou `HELP_INDEX` (F1). O WinHelp é outro programa: abre uma janela própria por cima do SimAnt, e o jogo continua rodando. Quem chama e com que contexto está nas telas do jogo (faixa, janelas, teclas); aqui fica só o que o WinHelp mostra e como o port o reproduz. Formato do arquivo: [../formatos/hlp.md](../formatos/hlp.md).

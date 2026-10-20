@@ -1,3 +1,5 @@
+*Read in English: [menu.md](../../../spec/formatos/menu.md)*
+
 # Menu da janela principal (objeto tipo 6 do banco)
 
 Leitor: `engine/src/formats/menu.rs` (`MenuBanco::decodificar`, `comando`), testes `objeto_sintetico` e `numeracao_dos_comandos`. Uso: [../telas/menus.md](../telas/menus.md).

@@ -1,3 +1,5 @@
+*Read in English: [fonte.md](../../../spec/formatos/fonte.md)*
+
 # Fontes e texto das janelas
 
 O jogo usa dois tipos de fonte, escolhidos por `_font_SetFont(n)` (`1008:611c`) a partir do byte "fonte" (0x28) dos objetos de texto:

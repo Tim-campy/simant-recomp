@@ -1,3 +1,5 @@
+*Read in English: [janela.md](../../../spec/formatos/janela.md)*
+
 # Janelas do jogo (objetos tipo 0, 1 e 9)
 
 O SimAnt tem um sistema de janelas próprio, herdado da versão Mac (funções `_win_*` em `SIMTWO_MODULE`). Cada janela do jogo (edição, mapa, título, controles de casta…) é uma lista de **objetos** retangulares desenhados por tipo. Inteiros em little-endian.

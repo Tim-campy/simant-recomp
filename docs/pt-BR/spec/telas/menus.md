@@ -1,3 +1,5 @@
+*Read in English: [menus.md](../../../spec/telas/menus.md)*
+
 # Barra de menus da janela principal (File, Window, View, Options, Speed)
 
 Fontes: pseudocódigo do Ghidra (`re_trabalho/decomp/Code1.c`, `Code2.c`, `Code7.c`), recursos do `SIMANTW.EXE` (`engine/src/formats/ne.rs`), objeto 6/0 do banco (`engine/src/formats/menu.rs`, [../formatos/menu.md](../formatos/menu.md)) e capturas da bancada QEMU (640×480, 16 cores) em `re_trabalho/agente_menus/` (fora do git), pelos roteiros `tests/referencias/roteiros/qemu_ui_menus.txt`, `qemu_ui_menus2.txt` e `qemu_ui_menus3.txt` (2026-10-18).

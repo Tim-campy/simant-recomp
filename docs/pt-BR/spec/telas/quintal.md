@@ -1,3 +1,5 @@
+*Read in English: [quintal.md](../../../spec/telas/quintal.md)*
+
 # Janela do quintal (Yard View), troca de patch e Jogo Completo
 
 Este documento descreve a janela do quintal (janela 25, aberta pelo código como `0x1900`), a faixa do quintal (janela 35, `ribbonYard`), a escolha e a troca de patch (`_XferPatch`), a colocação de rainhas (`_PlaceQueenInYard`) e o fluxo do Jogo Completo (início, objetivo e fim). As regras do quintal que rodam no tick (menino, bichos, colônias, vitória e derrota) estão em [../regras/quintal.md](../regras/quintal.md); a geração do patch novo, em [../regras/geracao-mundo.md](../regras/geracao-mundo.md).

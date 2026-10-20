@@ -1,3 +1,5 @@
+*Read in English: [bitmap.md](../../../spec/formatos/bitmap.md)*
+
 # Bitmap (objeto tipo 2 do banco)
 
 O conteúdo vem depois de descomprimir, se for o caso (ver [banco-dat-ndx.md](banco-dat-ndx.md)). Inteiros em little-endian.

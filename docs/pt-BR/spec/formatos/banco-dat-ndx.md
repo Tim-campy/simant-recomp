@@ -1,3 +1,5 @@
+*Read in English: [banco-dat-ndx.md](../../../spec/formatos/banco-dat-ndx.md)*
+
 # Banco de recursos `.NDX` / `.DAT`
 
 Os gráficos, textos, janelas, menus, sons e músicas do SimAnt para Windows ficam em pares `NOME.NDX` + `NOME.DAT` na pasta do jogo (`MAXIS\ANTWIN`).

@@ -1,3 +1,5 @@
+*Read in English: [jogo.md](../../../spec/telas/jogo.md)*
+
 # Tela de jogo (faixa + janela de edição)
 
 Este documento descreve a tela que aparece durante uma partida: a faixa de ferramentas (janela 34, `mapRibbon`) e a **janela de edição** (janela 0, `editWin`), que mostra o mapa da superfície ou de um ninho com as formigas por cima. As outras janelas abertas numa partida (mapa, controle de castas e de modos) ficam para depois.

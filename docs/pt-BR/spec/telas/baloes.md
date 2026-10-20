@@ -1,3 +1,5 @@
+*Read in English: [baloes.md](../../../spec/telas/baloes.md)*
+
 # Balões de fala da janela de edição (opção "Silly")
 
 Com Options → Silly ligado (`_OptionStates[5]`, `8:85fc`), a janela de edição mostra balões de fala sobre lutas, formigas descansando, a rainha, os ovos e a aranha. Fonte: pseudocódigo do Ghidra (endereços abaixo) [código]; listas de textos lidas do banco (`inspecionar strings`) [dado]. Conferência na bancada: ver "Verificação".

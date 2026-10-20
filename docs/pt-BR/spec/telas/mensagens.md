@@ -1,3 +1,5 @@
+*Read in English: [mensagens.md](../../../spec/telas/mensagens.md)*
+
 # Avisos ao jogador: faixa, quadros de mensagem e fim de jogo
 
 Como o original mostra ao jogador o que as regras pedem (`Evento::Mensagem`, `Evento::DialogoFimDeJogo`), a mensagem curta da faixa, o botão de velocidade e o salvamento. Complementa [jogo.md](jogo.md) ("Simulação ao vivo").

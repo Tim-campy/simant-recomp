@@ -1,3 +1,5 @@
+*Read in English: [experimental.md](../../../spec/telas/experimental.md)*
+
 # Modo Experimental: menu e ferramentas de edição
 
 Este documento descreve como o original escolhe e aplica as ferramentas do Experimental (pôr e tirar formigas, comida, pedras, muros, cheiro, inseticida, cavar e encher), como um Quick Game vira Experimental e como o Experimental vira jogo ("Start Game"). A geração do mundo do Experimental está em [../regras/geracao-mundo.md](../regras/geracao-mundo.md) (§2, tabela por tipo de jogo).

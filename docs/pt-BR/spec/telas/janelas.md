@@ -1,3 +1,5 @@
+*Read in English: [janelas.md](../../../spec/telas/janelas.md)*
+
 # Janelas de controle, History, menus de segurar o botão e botões da faixa
 
 Janelas que os botões configuráveis da faixa e o menu Window abrem durante a partida, os menus que aparecem segurando o botão do mouse e o estado desenhado dos botões. Complementa [jogo.md](jogo.md) e [mensagens.md](mensagens.md) (§5, botões da faixa).

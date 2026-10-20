@@ -1,3 +1,5 @@
+*Read in English: [menus-mods.md](../../../spec/telas/menus-mods.md)*
+
 # Menu e painel dos scripts de mods (extensão do port)
 
 **Não existe no original.** É a parte de tela da API de mods 0.17 (`docs/api-mods.md`, "Scripts Lua"): um script pode ter um menu aberto por uma tecla e um painel de texto. O mod de trapaças de exemplo (`exemplos/mods/trapacas/`) é o primeiro uso. O jogo base não tem código específico de nenhum mod.

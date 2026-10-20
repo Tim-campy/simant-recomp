@@ -1,3 +1,5 @@
+*Read in English: [save-ant.md](../../../spec/formatos/save-ant.md)*
+
 # Jogo salvo (`.ANT`)
 
 O `.ANT` não tem cabeçalho. É a concatenação, em ordem fixa, de 307 blocos de memória do jogo, num total de **48.386 bytes**, gravados crus em little-endian (memória do x86).

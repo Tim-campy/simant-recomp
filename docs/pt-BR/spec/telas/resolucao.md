@@ -1,3 +1,5 @@
+*Read in English: [resolucao.md](../../../spec/telas/resolucao.md)*
+
 # Resolução da tela e layout (640×480, 800×600, 1024×768)
 
 O SimAnt original não escala nada: os bitmaps, as fontes e as janelas têm sempre o mesmo tamanho em pixels. O que muda com a resolução do Windows é **onde** as janelas ficam e **quanto** de área cliente sobra em volta delas. Este documento descreve como o original decide isso e como o port imita com a "tela virtual" (`data/video.json`, `resolucao_virtual`).

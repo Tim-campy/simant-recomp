@@ -1,3 +1,5 @@
+*Read in English: [tiles.md](../../../spec/formatos/tiles.md)*
+
 # Tiles (objetos tipo 9) e montagem da imagem dos mapas
 
 Este documento cobre os tilesets do banco gráfico colorido (`WINGANT`, modo `W`, `_displayType = 10`) e a forma como a janela de edição monta a imagem da superfície e dos ninhos a partir dos mapas.
