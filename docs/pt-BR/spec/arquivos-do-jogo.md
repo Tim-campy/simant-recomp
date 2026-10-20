@@ -1,3 +1,5 @@
+*Read in English: [arquivos-do-jogo.md](../../spec/arquivos-do-jogo.md)*
+
 # Inventário dos arquivos (`SimAnt-T/`)
 
 A pasta fornecida pelo usuário é uma instalação completa de Windows 3.1 com o jogo instalado, no estilo dos pacotes para DOSBox. Os arquivos são do usuário e não são redistribuídos.

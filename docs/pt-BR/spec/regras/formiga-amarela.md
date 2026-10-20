@@ -1,3 +1,5 @@
+*Read in English: [formiga-amarela.md](../../../spec/regras/formiga-amarela.md)*
+
 # Formiga amarela e controles do jogador
 
 Este documento especifica, para reimplementação 1:1, a **formiga amarela** (o corpo do jogador): estado, presença no mapa, o que acontece com ela a cada tick, como anda até o destino clicado, como acha caminho, entra e sai dos ninhos, pega e larga objetos, come, luta, recruta, troca de corpo, funda uma colônia, morre e reencarna. No fim, os **controles**: como cliques, teclas, menus e aceleradores viram ordens. A formiga amarela também pode controlar a aranha; a parte da aranha está em [inimigos.md](inimigos.md#27-aranha-controlada-pelo-jogador-_memode--1). O tick está em [simulacao-visao-geral.md](simulacao-visao-geral.md) (passos 17 e 20); as formigas comuns em [superficie.md](superficie.md); a criação da amarela no novo jogo em [geracao-mundo.md](geracao-mundo.md) (3.D).

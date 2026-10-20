@@ -1,3 +1,5 @@
+*Read in English: [superficie.md](../../../spec/regras/superficie.md)*
+
 # Superfície: regras das formigas do quintal e da casa (lista A)
 
 Este documento especifica, para reimplementação 1:1, tudo o que acontece com as formigas da **lista A** (superfície) dentro de um tick: o laço `_DoAntSimA`, cada modo, as funções de direção, a luta, a morte, a entrada no ninho, a comida, a estratégia vermelha e preta e a formiga vermelha líder. Os bichos do quintal (formiga-leão, aranha, lagarta, bicho-de-conta) estão em [inimigos.md](inimigos.md); a formiga amarela e os controles em [formiga-amarela.md](formiga-amarela.md). A ordem das sub-rotinas dentro do tick está em [simulacao-visao-geral.md](simulacao-visao-geral.md); listas, codificação de T e tabelas de modo em [formigas.md](formigas.md); mapas de cheiro em [feromonios.md](feromonios.md); geradores em [rng.md](rng.md).

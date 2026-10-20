@@ -1,3 +1,5 @@
+*Read in English: [misterio.md](../../../spec/regras/misterio.md)*
+
 # Mystery (`_MysteryButton`)
 
 Fonte: pseudocódigo do Ghidra (`_MysteryButton` `1000:b0bc`, `_KillSomeAnts` `1000:9d5e`, `_AddRedAnts` `1030:6cfe`, `_AddBlackAnts` `1030:6c5a`, `_IsItYellow` `1020:96b6`), análise de 2026-10-18. Tudo [código] salvo onde marcado.

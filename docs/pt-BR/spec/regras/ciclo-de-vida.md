@@ -1,3 +1,5 @@
+*Read in English: [ciclo-de-vida.md](../../../spec/regras/ciclo-de-vida.md)*
+
 # Ciclo de vida: ovos, rainha e castas
 
 Este documento especifica, para reimplementação 1:1, como a rainha põe ovos, como o ovo se desenvolve até virar adulto, como a casta do adulto é escolhida e como a rainha (duas células, cabeça e cauda) vive, anda e morre. O comportamento das demais formigas dentro do ninho está em [ninho.md](ninho.md); listas, codificação de T, tabelas de modo e o triângulo de castas, em [formigas.md](formigas.md); a ordem do tick, em [simulacao-visao-geral.md](simulacao-visao-geral.md); os geradores, em [rng.md](rng.md).

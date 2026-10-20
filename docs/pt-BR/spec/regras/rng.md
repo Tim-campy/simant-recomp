@@ -1,3 +1,5 @@
+*Read in English: [rng.md](../../../spec/regras/rng.md)*
+
 # Geradores de números aleatórios
 
 O SimAnt usa **dois geradores independentes**:

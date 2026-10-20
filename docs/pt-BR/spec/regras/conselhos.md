@@ -1,3 +1,5 @@
+*Read in English: [conselhos.md](../../../spec/regras/conselhos.md)*
+
 # Conselhos e tutorial: `_Feedback` (`1030:78ca`)
 
 `_Feedback` roda em todo tick (passo 21 de [simulacao-visao-geral.md](simulacao-visao-geral.md) §5) e também dentro de `_FullCount` (fases 0 e 2, a cada 64 ticks). Tem duas partes: o **tutorial** (só no Tutorial, `_CurGameType = 0`) e a **mensagem de conselho** da faixa de mensagens (todos os tipos de jogo, se a opção estiver ligada).

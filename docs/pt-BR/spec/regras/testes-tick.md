@@ -1,3 +1,5 @@
+*Read in English: [testes-tick.md](../../../spec/regras/testes-tick.md)*
+
 # Testes tick a tick contra o original (determinismo e vetores)
 
 Este documento descreve como comparar a simulação do port com o SimAnt original **um tick por vez**: os experimentos de determinismo feitos na bancada QEMU, o protocolo de captura de vetores "estado antes → estado depois" e o que um vetor precisa conter além do layout do save. Bancada: [../../bancada-qemu.md](../../bancada-qemu.md). Estrutura do tick: [simulacao-visao-geral.md](simulacao-visao-geral.md). Geradores aleatórios: [rng.md](rng.md).

@@ -1,3 +1,5 @@
+*Read in English: [inimigos.md](../../../spec/regras/inimigos.md)*
+
 # Inimigos e bichos do quintal: formiga-leão, aranha, lagarta e bicho-de-conta
 
 Este documento especifica, para reimplementação 1:1, os bichos que a simulação move a cada tick fora das listas de formigas: a **formiga-leão** (`_DoAntLions`), a **aranha** (`_MoveSpider`), a **lagarta** (`_DoPillar`) e o **bicho-de-conta** (`_DoSow`). A posição de cada um no tick está em [simulacao-visao-geral.md](simulacao-visao-geral.md) (passos 8, 9 e 10); a criação no começo do jogo em [geracao-mundo.md](geracao-mundo.md) (seções 3.2, 4.2 e 4.3); as formigas em [superficie.md](superficie.md); a amarela (que pode morrer para eles ou até virar a aranha) em [formiga-amarela.md](formiga-amarela.md).

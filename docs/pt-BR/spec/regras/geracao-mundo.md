@@ -1,3 +1,5 @@
+*Read in English: [geracao-mundo.md](../../../spec/regras/geracao-mundo.md)*
+
 # Geração do mundo (novo jogo e patches do quintal)
 
 Este documento descreve como o original monta o mundo de um Tutorial, Quick Game, Full Game ou Experimental, e como gera cada patch do quintal. Os geradores aleatórios estão em [rng.md](rng.md): **S** é o LFSR (`_SRand*`) e **R** é o `rand()` do C (`_RRand`). Os valores dos mapas estão em [tiles-valores.md](tiles-valores.md).

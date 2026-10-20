@@ -1,3 +1,5 @@
+*Read in English: [ninho.md](../../../spec/regras/ninho.md)*
+
 # Regras do ninho (preto e vermelho)
 
 Este documento especifica, para reimplementação 1:1, o que as formigas fazem **dentro** dos ninhos: o laço `_DoAntSimB`/`_DoAntSimR`, o despacho por modo (M) e grupo (T), movimento, luta, comida guardada, escavação, mapa de saídas e água. Ovos, rainha e castas estão em [ciclo-de-vida.md](ciclo-de-vida.md). Listas, codificação de T, tabelas de modo e luta estão em [formigas.md](formigas.md); o tick, em [simulacao-visao-geral.md](simulacao-visao-geral.md); os geradores, em [rng.md](rng.md); os valores dos mapas, em [tiles-valores.md](tiles-valores.md).

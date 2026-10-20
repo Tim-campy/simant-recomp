@@ -1,3 +1,5 @@
+*Read in English: [feromonios.md](../../../spec/regras/feromonios.md)*
+
 # Feromônios (mapas de cheiro)
 
 Este documento descreve os cinco mapas de feromônio da superfície: formato, como os valores são depositados, como decaem e como as formigas os leem para escolher direção. O ritmo de cada operação vem do tick descrito em [simulacao-visao-geral.md](simulacao-visao-geral.md); os modos que usam cada mapa estão em [formigas.md](formigas.md).

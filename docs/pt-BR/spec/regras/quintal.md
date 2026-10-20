@@ -1,3 +1,5 @@
+*Read in English: [quintal.md](../../../spec/regras/quintal.md)*
+
 # Quintal: menino, cortador, gato, cachorro, pássaro, chuva, água e colônias
 
 Este documento descreve `_DoSimYard` (`1030:14a8`), chamado em todo tick (passo 6 de [simulacao-visao-geral.md](simulacao-visao-geral.md) §5), com tudo o que ele chama, e `_DoWater` (`1020:07c6`, passo 7). Cobre o menino (dentro e fora de casa), o cortador de grama, o pé e o inseticida, o gato, o cachorro, o pássaro, a chuva, a água e o mapa estratégico de colônias (`_SimColonies`).

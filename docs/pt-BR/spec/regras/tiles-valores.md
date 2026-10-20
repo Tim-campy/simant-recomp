@@ -1,3 +1,5 @@
+*Read in English: [tiles-valores.md](../../../spec/regras/tiles-valores.md)*
+
 # Valores das células dos mapas (`_MapA`, `_MapB`, `_MapR`)
 
 Cada célula de mapa é um byte. O mesmo byte serve de **índice do tile** desenhado e de **tipo de terreno** para as regras. Este documento lista o que cada faixa de valores significa para as regras, a partir das funções de teste do código e da geração do mundo ([geracao-mundo.md](geracao-mundo.md)).

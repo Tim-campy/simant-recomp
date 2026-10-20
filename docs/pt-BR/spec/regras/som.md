@@ -1,3 +1,5 @@
+*Read in English: [som.md](../../../spec/regras/som.md)*
+
 # Som e música: quando tocam
 
 Formatos e caminhos de reprodução: [formatos/som.md](../formatos/som.md). Aqui: as funções que o resto do jogo chama, as opções do jogador, a preempção, e o catálogo de quem toca o quê.

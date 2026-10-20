@@ -1,3 +1,5 @@
+*Read in English: [simulacao-visao-geral.md](../../../spec/regras/simulacao-visao-geral.md)*
+
 # Simulação: visão geral (tick, ordem, frequências, velocidade e pausa)
 
 Este documento descreve a **estrutura** do laço da simulação do SimAnt para Windows: quem chama a simulação, quantas vezes por segundo, em que ordem as sub-rotinas rodam dentro de um passo ("tick") e com que frequência cada uma age. As regras de cada sub-rotina ficam em documentos próprios: [formigas.md](formigas.md) (listas, castas, modos), [feromonios.md](feromonios.md) (mapas de cheiro). Gerador de números aleatórios, geração do mundo e valores de tiles estão sendo escritos em paralelo (`rng.md`, `geracao-mundo.md`, `tiles-valores.md`).

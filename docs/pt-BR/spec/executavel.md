@@ -1,3 +1,5 @@
+*Read in English: [executavel.md](../../spec/executavel.md)*
+
 # `SIMANTW.EXE`: mapa do executável
 
 Arquivo analisado: `SimAnt-T/MAXIS/ANTWIN/SIMANTW.EXE` (516.096 bytes), acompanhado de `SIMANTW.SYM` (37.060 bytes, tabela de símbolos MAPSYM).

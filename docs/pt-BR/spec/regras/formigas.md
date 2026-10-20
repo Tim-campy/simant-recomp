@@ -1,3 +1,5 @@
+*Read in English: [formigas.md](../../../spec/regras/formigas.md)*
+
 # Formigas: listas, campos, castas, modos e máquina de estados
 
 Este documento é a base para implementar o comportamento das formigas uma regra por vez. Descreve a representação (listas paralelas e mapas de "vida"), a codificação dos campos, castas e modos, a escolha de casta e modo (triângulos de controle) e a máquina de estados em alto nível. O laço que chama tudo isso está em [simulacao-visao-geral.md](simulacao-visao-geral.md); os cheiros estão em [feromonios.md](feromonios.md).

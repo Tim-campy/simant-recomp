@@ -1,3 +1,5 @@
+*Read in English: [trapacas.md](../../../spec/regras/trapacas.md)*
+
 # Códigos de trapaça do original (`_CheatKeys`)
 
 O SimAnt para Windows tem trapaças embutidas: **códigos de 4 letras digitados durante a partida**. Não há menu escondido nem combinação de teclas especial; não há nenhum aviso na tela além do som (ou do quadro de texto) de cada código. Este documento descreve a entrada (`_DoKeyDown`, `1000:0e8c`), a tabela (`_Cheats`, `8:83bc`) e os efeitos (`_CheatKeys`, `1018:67de`).
