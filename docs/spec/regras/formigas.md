@@ -4,7 +4,7 @@
 
 This document is the basis for implementing ant behavior one rule at a time. It describes the representation (parallel lists and "life" maps), the encoding of the fields, castes and modes, the choice of caste and mode (control triangles) and the state machine at a high level. The loop that calls all of this is in [simulacao-visao-geral.md](simulacao-visao-geral.md); the scents are in [feromonios.md](feromonios.md).
 
-Evidence convention: the same as in [simulacao-visao-geral.md](simulacao-visao-geral.md#convenção-de-evidência). Variable addresses in the `logical segment:offset` format of `symbols.tsv` (8 = selector `1038`, 9 = `1040`, 10 = `1048`/DGROUP). Texts quoted from SHARED type 4 were decompressed with `tools/lzss_probe.py` (function `lzss`, window filled with 0x20) from the dump of `tools/db_list.py`.
+Evidence convention: the same as in [simulacao-visao-geral.md](simulacao-visao-geral.md#evidence-convention). Variable addresses in the `logical segment:offset` format of `symbols.tsv` (8 = selector `1038`, 9 = `1040`, 10 = `1048`/DGROUP). Texts quoted from SHARED type 4 were decompressed with `tools/lzss_probe.py` (function `lzss`, window filled with 0x20) from the dump of `tools/db_list.py`.
 
 ## 1. Planes and coordinates
 
@@ -256,10 +256,10 @@ _ModeMe (8:8a58) = _ModeTabB[chosen]       (_ModeTabB 8:89b6 = 2, 4, 1: Foraging
 | 5 | 6 6 4 4 4 5 6 6 |
 | 6 | 7 7 7 5 5 5 6 7 |
 | 7 | 0 0 0 0 6 6 6 7 | The random walk uses `TurnTab[dir][SRand8()]`, which favors keeping the direction or turning 45°.
-- **Edges:** in all direction functions, an ant on the edge (x = 0 or 127, y = 0 or 63) draws a direction that points inward. `_GetForageDir` uses 3 options and fixed corners; `_GetNestDir` and `_GetAlarmDir` use 5 options in the middle of the edge and 3 in the corners (table in [feromonios.md](feromonios.md#4-leitura-escolha-de-direção)).
+- **Edges:** in all direction functions, an ant on the edge (x = 0 or 127, y = 0 or 63) draws a direction that points inward. `_GetForageDir` uses 3 options and fixed corners; `_GetNestDir` and `_GetAlarmDir` use 5 options in the middle of the edge and 3 in the corners (table in [feromonios.md](feromonios.md#4-reading-direction-choice)).
 - `_GetRandDir` (`1030:0f72`): random walk.
 - `_GetForageDir` (`1030:0ab0`): looks at the trail of its own color in the 8 neighboring cells (2×2 resolution) and picks the largest. If none has a trail, it does a random walk. If the largest is **smaller** than the current cell's, it returns −1 ("end of trail"): `_DoForageAnt` then puts the ant in Bored (7/8) or draws a new mode (1/8).
-- `_GetNestDir` (`1030:0c30`): climbs the gradient of the nest scent of the requested color (`_DoAttackAnt` requests the enemy color). Without scent on the cell: 3/4 of the time it points to the last hole made (`_LastNewHoleB/R`, `8:835a`/`8:835e`), otherwise random walk. With scent: picks the neighbor with the highest value and applies the limited turn once or, half the time (`SRand2` ≠ 0), twice in a row (up to 90°). Details and the order of the random draws in [feromonios.md](feromonios.md#4-leitura-escolha-de-direção).
+- `_GetNestDir` (`1030:0c30`): climbs the gradient of the nest scent of the requested color (`_DoAttackAnt` requests the enemy color). Without scent on the cell: 3/4 of the time it points to the last hole made (`_LastNewHoleB/R`, `8:835a`/`8:835e`), otherwise random walk. With scent: picks the neighbor with the highest value and applies the limited turn once or, half the time (`SRand2` ≠ 0), twice in a row (up to 90°). Details and the order of the random draws in [feromonios.md](feromonios.md#4-reading-direction-choice).
 - `_GetAlarmDir` (`1030:0e54`): climbs the alarm gradient (map shared by both colors).
 - `_GetDefendDir` (`1030:1026`): follows the yellow ant. If the yellow ant is in the nest, it follows that color's nest scent; if it is hunting the spider, it goes to the spider; if it is near the fuzzy position (`_FuzLocX/Y`), it wanders.
 - `_Recruit(n)` (`1030:06d2`): puts into Defense (M = 6, S = 0) up to n black workers or soldiers that are not yet in that mode. Scans list A and then B, from back to front.

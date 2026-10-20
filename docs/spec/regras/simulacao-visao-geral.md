@@ -161,7 +161,7 @@ To bound the plausible range on a real machine, the speed of the emulated CPU wa
 | 15 | `_DoAntSimB` (`1028:2d4e`): black nest | every tick |
 | 16 | `_DoAntSimR` (`1028:5344`): red nest | every tick |
 | 17 | `_DoAntSimY` (`1028:7cf6`): state of the yellow ant (life, eggs if it is a queen) | every tick |
-| 18 | mode summary (body of `_TallyModePop`): builds `_ModePopB`/`_ModePopR` from `_TemBModePop`/`_TemRModePop` (see [formigas.md](formigas.md#modos)) | every tick |
+| 18 | mode summary (body of `_TallyModePop`): builds `_ModePopB`/`_ModePopR` from `_TemBModePop`/`_TemRModePop` (see [formigas.md](formigas.md#5-modes)) | every tick |
 | 19 | if no red ant is in mode 19 ("Avenger"; `_TemRModePop[19]`, `9:7c0a`, < 1): `_MakeRedInitiator` | every tick |
 | 20 | `_DoAntMoveY` (`1028:75f4`): movement of the yellow ant | every tick; only acts with `_MeMoveMe` ≠ 0 |
 | 21 | `_Feedback` (`1030:78ca`): tutorial and advice messages | every tick |
@@ -236,7 +236,7 @@ The count only goes up to `_ListIndex − 1`; the reconstruction of life on load
 
   Reading [hypothesis]: 5/4 = hunger, 3/2 = need to dig, 1 = normal, 0 = attack with a margin.
 - `_StrategicModeR` (`9:7690`) = `_GstrR()`: same ladder for the reds, with two differences. First, a red **mating flight** trigger: if `_FlyAwayR` = 0 and red males + new queens > 20, then `_FlyAwayR = 200`. Second, a "mean" mode (`_JustToBeMean`, `9:78dc`): when red health is very low and the reds greatly outnumber, or by a rare random draw (`SRand32` and `SRand128`), it forces mode 0 for `SRand1(100) + 30` calls, plays music and shows message 4/1020 no. 6 ("The red ants are attacking!").
-- Next, `_SetCasteProd` and `_SetModeProd` choose the caste of the next egg and the mode of the next workers (see [formigas.md](formigas.md#controle-de-castas-e-modos)).
+- Next, `_SetCasteProd` and `_SetModeProd` choose the caste of the next egg and the mode of the next workers (see [formigas.md](formigas.md#4-castes-and-the-caste-triangle)).
 
 ## 8. Game over and scoring
 

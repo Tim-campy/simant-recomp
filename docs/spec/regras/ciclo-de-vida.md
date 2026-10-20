@@ -6,7 +6,7 @@ This document specifies, for a 1:1 reimplementation, how the queen lays eggs, ho
 
 ## Conventions
 
-The same as in [ninho.md](ninho.md#convenções): fact seen in the code unless noted otherwise; `S(n)`, `Sk(K)`, `SG(n)` = S generator; `RR(n)` = R generator; `D8[d]` and `inv(d) = d XOR 4`; X, Y, M, T, S of the ant being processed (index `_Tindex`); `Vida` = `_LifeB`/`_LifeR`. Our own pseudocode, not a copy of the decompiled code.
+The same as in [ninho.md](ninho.md#conventions): fact seen in the code unless noted otherwise; `S(n)`, `Sk(K)`, `SG(n)` = S generator; `RR(n)` = R generator; `D8[d]` and `inv(d) = d XOR 4`; X, Y, M, T, S of the ant being processed (index `_Tindex`); `Vida` = `_LifeB`/`_LifeR`. Our own pseudocode, not a copy of the decompiled code.
 
 ## 1. Overview
 
@@ -17,7 +17,7 @@ The same as in [ninho.md](ninho.md#convenções): fact seen in the code unless n
 | adult | T = group × 8 + direction (+ 0x80 if red) | [ninho.md](ninho.md) and `_DoAntSimA` |
 | queen | two entries: head (group 12) and tail (group 13), M = 9 | `_SimQueenB` (`1028:3dc2`) / `_SimQueenR` (`1028:6386`) |
 
-Stages (bits 0–2 of T). The names come from the SHARED 4/1100 text list, in order: Weird Egg, New Egg, Egg, 1st-Instar, 2nd-Instar, 3rd-Instar, Pupae, Hatching Pupae ([formigas.md](formigas.md#3-codificação-do-tipo-t)). [hypothesis: the index in the list is the stage; "Weird Egg" (0) never appears, since T & 0x7F = 0 is a free slot]
+Stages (bits 0–2 of T). The names come from the SHARED 4/1100 text list, in order: Weird Egg, New Egg, Egg, 1st-Instar, 2nd-Instar, 3rd-Instar, Pupae, Hatching Pupae ([formigas.md](formigas.md#3-encoding-of-type-t)). [hypothesis: the index in the list is the stage; "Weird Egg" (0) never appears, since T & 0x7F = 0 is a free slot]
 
 | T & 7 | Name | How it gets there |
 |---|---|---|
@@ -55,8 +55,8 @@ if 0 ≤ e.x ≤ 63 and 1 ≤ e.y ≤ 63 (_InNestBounds):
 ```
 
 - Chance of laying, per opportunity (every 16 ticks): (`_HealthB` + 1)/128, i.e., 101/128 ≈ 79 % with health 100.
-- `_PlaceEggB` ([ninho.md](ninho.md#76-pôr-um-ovo-_placeeggb-10201004--_placeeggr-10201068)) digs the cell if it is soil (the queen widens the chamber by laying eggs), appends the egg at the **end** of the list and does not test occupancy: several eggs can end up in the same cell. With the list full (500), the egg is not created, but health and the counter are charged anyway.
-- The health cost: while `_BpopT` < 32, `_EatCountB` goes back to 0 and **each egg costs 1 health**; the reserve only goes up by eating ([ninho.md](ninho.md#61-comer-_tryeatfoodb-102847c6-_eatfoodb-10284844)).
+- `_PlaceEggB` ([ninho.md](ninho.md#76-laying-an-egg-_placeeggb-10201004--_placeeggr-10201068)) digs the cell if it is soil (the queen widens the chamber by laying eggs), appends the egg at the **end** of the list and does not test occupancy: several eggs can end up in the same cell. With the list full (500), the egg is not created, but health and the counter are charged anyway.
+- The health cost: while `_BpopT` < 32, `_EatCountB` goes back to 0 and **each egg costs 1 health**; the reserve only goes up by eating ([ninho.md](ninho.md#61-eating-_tryeatfoodb-102847c6-_eatfoodb-10284844)).
 - `_LastBlackEgg` is updated on every tick in which the cell behind is inside the nest, whether an egg is laid or not.
 
 **Fact verified in `QUICK2.ANT`** (tick 78, by manual calculation over the saved values):
@@ -88,9 +88,9 @@ Vida[pos] = t; T = t; S = 0
 - **All eggs advance on the same tick**, since the test is on `_Cycle`, common to all of them. An egg laid on tick t advances on the next 7 ticks with `_Cycle` a multiple of P (the laying tick itself does not count: the new egg is at the end of the list and is only processed on the next tick). Duration of an egg laid by the queen (always on a tick that is a multiple of 16): between 6P + 16 and 7P ticks, that is, 784–896 ticks in a colony with 3 or more adults and 208–224 in a newborn colony (if P does not change midway). An egg dropped by a nurse, on any tick, takes between 6P + 1 and 7P from then on, counting the stage it already had.
 - P is chosen every tick with the current `_BpopT`, which only changes when `_CountAnts` runs (ticks ≡ 0 and 64 mod 128).
 - `_Cycle` goes from 0 to 0x1000 (4097 values) and back to 0: the ticks with `_Cycle` = 0x1000 and 0 are consecutive and **both** count, so once every 4097 ticks the eggs advance two stages in two consecutive ticks. The same applies to laying (section 2).
-- Death at hatching: only with `_ModeAuto` = 0 (the player touched the task triangle; [formigas.md](formigas.md#escolha-de-modo)). With L = `_modeLevels[2] >> 7` ("nurse" level, 0..511) and `SG(255)` = minimum of two random draws 0..254, the chance of dying is ((254 − L)/255)² if L < 254, and 0 if L ≥ 254. Examples: nurse 0 % → 99.2 %; 20 % (13107, L = 102) → 35.5 %; 50 % (L = 255) → 0.
-- Mode at birth (`_GetNewModeB`, tables in [formigas.md](formigas.md#escolha-de-modo)): worker → 1 (Nesting), no random draw; soldier → `_ModeTabSB[_StrategicModeB][Sk(8)]` with `_ModeAuto` = 1, or `_ModeMe` with 0; male and new queen → 14 (Pre-Flight), no random draw.
-- An egg in the list also goes through the nest's natural death random draw ([ninho.md](ninho.md#31-formiga-dona)), before `_SimEggB`.
+- Death at hatching: only with `_ModeAuto` = 0 (the player touched the task triangle; [formigas.md](formigas.md#mode-choice)). With L = `_modeLevels[2] >> 7` ("nurse" level, 0..511) and `SG(255)` = minimum of two random draws 0..254, the chance of dying is ((254 − L)/255)² if L < 254, and 0 if L ≥ 254. Examples: nurse 0 % → 99.2 %; 20 % (13107, L = 102) → 35.5 %; 50 % (L = 255) → 0.
+- Mode at birth (`_GetNewModeB`, tables in [formigas.md](formigas.md#mode-choice)): worker → 1 (Nesting), no random draw; soldier → `_ModeTabSB[_StrategicModeB][Sk(8)]` with `_ModeAuto` = 1, or `_ModeMe` with 0; male and new queen → 14 (Pre-Flight), no random draw.
+- An egg in the list also goes through the nest's natural death random draw ([ninho.md](ninho.md#31-owner-ant)), before `_SimEggB`.
 
 ### 3.2 Red nest: `_SimEggR` (`1028:62a6`)
 
@@ -133,16 +133,16 @@ Mode at birth in red: worker and soldier draw from `_ModeTabWB/SB[_StrategicMode
 | Drop | `_PlaceEggB(pos, S & 7)`: **same stage** | with chance 1/4 in a cell without food: `_PlaceEggR(pos, 0x82)`: **back to stage 2** |
 | During transport | the egg does not age | same |
 
-Details and order of random draws in [ninho.md](ninho.md#5-cuidar-das-crias-m--1-_donestingb-102844a8). Consequence: in the red nest, an egg that is carried once restarts its development; the more nurses, the slower the birth [hypothesis about the in-game effect].
+Details and order of random draws in [ninho.md](ninho.md#5-tending-the-brood-m--1-_donestingb-102844a8). Consequence: in the red nest, an egg that is carried once restarts its development; the more nurses, the slower the birth [hypothesis about the in-game effect].
 
 ## 5. Queen
 
 ### 5.1 Shape
 
 - Two entries in the nest list, both with M = 9 and S = 0: **head** T = 0x60 + d (black) / 0xE0 + d (red) and **tail** T = head + 8, in the cell behind the head: tail = head + D8[inv(d)]. The tail has the same direction d. Eggs come out behind the tail: head + 2 × D8[inv(d)].
-- Creation: at world generation (`_PlaceBlackQueen`, red queen inline in `_RandWorld`; [geracao-mundo.md](geracao-mundo.md#3c-rainhas-_placeblackqueen-103065ce-e-a-rainha-vermelha)), with T = 0x62/0x6A (0xE2/0xEA). In game: `_MakeBlkQueen(x, y, d)` (`1030:671a`) / `_MakeRedQueen` (`1030:6906`): digs (x, y), (x, y) + D8[inv(d)] and (x, y) + 2·D8[inv(d)] with `_DigTile*`, appends head and tail and adds 1 to `_BlkQueens`/`_RedQueens`. Callers: `_YellowBirth` (`1000:739e`, the yellow-queen leaves a real queen behind when switching bodies; details with the yellow ant) and `_CheatKeys`.
+- Creation: at world generation (`_PlaceBlackQueen`, red queen inline in `_RandWorld`; [geracao-mundo.md](geracao-mundo.md#3c-queens-_placeblackqueen-103065ce-and-the-red-queen)), with T = 0x62/0x6A (0xE2/0xEA). In game: `_MakeBlkQueen(x, y, d)` (`1030:671a`) / `_MakeRedQueen` (`1030:6906`): digs (x, y), (x, y) + D8[inv(d)] and (x, y) + 2·D8[inv(d)] with `_DigTile*`, appends head and tail and adds 1 to `_BlkQueens`/`_RedQueens`. Callers: `_YellowBirth` (`1000:739e`, the yellow-queen leaves a real queen behind when switching bodies; details with the yellow ant) and `_CheatKeys`.
 - Counters `_BlkQueens` (`9:78e8`) and `_RedQueens` (`9:79dc`): go up on creation; go down when the head notices the tail is gone (always) or when the tail notices the head is gone (only if the counter is > 0).
-- The queen does not suffer natural death ([ninho.md](ninho.md#31-formiga-dona): M = 9 is excluded) nor drowning (groups 12–13 are left out of `_DrownBList`).
+- The queen does not suffer natural death ([ninho.md](ninho.md#31-owner-ant): M = 9 is excluded) nor drowning (groups 12–13 are left out of `_DrownBList`).
 
 ### 5.2 Head, every tick (`_SimQueenB`, group 12)
 
@@ -162,11 +162,11 @@ else Vida[pos] = T
 queen balloon if _OptionStates[5] ≠ 0
 ```
 
-Death by starvation: with health 0, chance 1/64 per tick (the same random draw that decides whether she tries to walk). The game ending comes later, when `_CountAnts` no longer finds the queen ([simulacao-visao-geral.md](simulacao-visao-geral.md#8-fim-de-jogo-e-pontuação)).
+Death by starvation: with health 0, chance 1/64 per tick (the same random draw that decides whether she tries to walk). The game ending comes later, when `_CountAnts` no longer finds the queen ([simulacao-visao-geral.md](simulacao-visao-geral.md#8-game-over-and-scoring)).
 
 ### 5.3 Walking: `_QueenMoveB` (`1028:4154`) and `_GetBestDir` (`1028:405e`)
 
-The queen walks towards the **center of mass of the diggings** of her own nest (`_TileMassXB/YB`, `9:7c48`/`9:7c90`; R: `_TileMassXR/YR`), recalculated at every dug cell ([ninho.md](ninho.md#73-funções-de-escavação)).
+The queen walks towards the **center of mass of the diggings** of her own nest (`_TileMassXB/YB`, `9:7c48`/`9:7c90`; R: `_TileMassXR/YR`), recalculated at every dug cell ([ninho.md](ninho.md#73-digging-functions)).
 
 `_GetBestDir(plane, x, y, targetX, targetY)` returns a direction, −1 (already at target) or −2 (no neighbor gets closer):
 
@@ -192,7 +192,7 @@ d = _GetBestDir(2, X, Y, _TileMassXB, _TileMassYB)
 if d == −1: return false
 if d == −2: d = Sk(8)
 if not (Y > 2 or 3 ≤ d ≤ 5): return false                (near the surface she only walks downward)
-if not MOVE(d): return false                             ([ninho.md](ninho.md#41-andar-_trymovedirb-1028439e--_trymovedirr-10286850-e-passeio))
+if not MOVE(d): return false                             ([ninho.md](ninho.md#41-walking-_trymovedirb-1028439e--_trymovedirr-10286850-and-wander))
 c = old position + D8[inv(old dir)]                      (where the tail was)
 Vida[c] = 0
 j = _FindInBList(c, 0x68 + old dir)                      (R: 0xE8 + old dir)
@@ -206,8 +206,8 @@ The tail takes the old position of the head, with the new direction. If the quee
 
 ### 5.4 Queen in a fight
 
-- If an invader is on the head's cell, the head is erased and the entry becomes a fight cloud with `_GetWinner(0, invader)`; the queen does not come back ([ninho.md](ninho.md#32-formiga-invasora)). The tail disappears through the test in section 2.
-- If a fight cloud ends with a queen-head T (group 12), `_DoNestFightB/R` recreates the tail behind it, without touching `_BlkQueens` (inlined `_MakeNewTailB`; [ninho.md](ninho.md#44-nuvem-de-luta-_donestfightb-10283a54--_donestfightr-10286072)). This requires a queen head to be the "enemy found" in a fight check (in the black nest the checked range, 0x88–0xE7, includes the red head 0xE0–0xE7), which does not happen in normal play, since each queen only exists in her own nest's list. [hypothesis: safety code with no practical effect]
+- If an invader is on the head's cell, the head is erased and the entry becomes a fight cloud with `_GetWinner(0, invader)`; the queen does not come back ([ninho.md](ninho.md#32-invader-ant)). The tail disappears through the test in section 2.
+- If a fight cloud ends with a queen-head T (group 12), `_DoNestFightB/R` recreates the tail behind it, without touching `_BlkQueens` (inlined `_MakeNewTailB`; [ninho.md](ninho.md#44-fight-cloud-_donestfightb-10283a54--_donestfightr-10286072)). This requires a queen head to be the "enemy found" in a fight check (in the black nest the checked range, 0x88–0xE7, includes the red head 0xE0–0xE7), which does not happen in normal play, since each queen only exists in her own nest's list. [hypothesis: safety code with no practical effect]
 - `_LostHeadB` (`1028:42de`), `_LostTailB` (`1028:433c`) and `_KillTailB` (`1028:42b0`) are the tests and the removal described above, in separate functions with no caller.
 
 ## 6. Caste choice
@@ -223,7 +223,7 @@ for i = 0..3: if real[i] − ideal[i] < lowest: lowest = real[i] − ideal[i]; e
 _MakeMe = _CasteTabB[e]                                      (8:89ae = 2, 6, 4, 8)
 ```
 
-`_CastePopB` = (eggs, workers, soldiers, males, new queens, queen), updated by `_CountAnts` every 64 ticks; `_IdealCaste` comes from the caste triangle ([formigas.md](formigas.md#4-castas-e-o-triângulo-de-castas)). No random draw. The egg hatches with the `_MakeMe` of that moment.
+`_CastePopB` = (eggs, workers, soldiers, males, new queens, queen), updated by `_CountAnts` every 64 ticks; `_IdealCaste` comes from the caste triangle ([formigas.md](formigas.md#4-castes-and-the-caste-triangle)). No random draw. The egg hatches with the `_MakeMe` of that moment.
 
 ### 6.2 Red nest
 
@@ -258,7 +258,7 @@ Fact seen in `_DoAntSimY` (`1028:7cf6`); full rule with the yellow ant. With `_M
 
 ## 10. Test cases against the original
 
-Same test bench and same method as [ninho.md](ninho.md#13-casos-de-teste-contra-o-original) (edit `QUICK2.ANT`, load, run, save). D = deterministic; E = statistical.
+Same test bench and same method as [ninho.md](ninho.md#13-test-cases-against-the-original) (edit `QUICK2.ANT`, load, run, save). D = deterministic; E = statistical.
 
 | Id | Rule | Input | Expected | Type |
 |---|---|---|---|---|
@@ -293,7 +293,7 @@ Notes from the runs:
 
 ## Gaps
 
-- Tested on the test bench: C-01, C-02 and C-11 (above); C-10 runs into the modal message on load. In the port, C-11 is checked in `engine/tests/regras_ninho.rs`, and the tick vectors 79–83 (with the laying at tick 80) match the port's egg, queen and tail (see [ninho.md](ninho.md#133-observado-no-original)). C-04 to C-07 became tick vectors (2026-10-18, `tools/cenarios_regras.py`, snapshot `rico`, 307/307 with S, R and life; [testes-tick.md](testes-tick.md#quinta-rodada-2026-10-18-regras-não-verificadas-da-revisão)): `ovos_c04_c05/1791` (with `_ModeAuto` = 0 and `_modeLevels[2]` = 0 the 13 black eggs T = 7 die at hatching, `_TotalEggsDiedB` 0 → 13; with `_HealthR` = 20 the 21 red eggs 0x87 hatch into 17 workers and 4 soldiers, no male or queen), `ovos_c06/1711` (laying with `_HealthB` 100: new egg, `_TotalEggsLaidB` +1, `_HealthB` −1) and `ovos_c07/1711` (`_HealthB` 0: no egg) — **confirmed**. C-08 onward are still missing.
+- Tested on the test bench: C-01, C-02 and C-11 (above); C-10 runs into the modal message on load. In the port, C-11 is checked in `engine/tests/regras_ninho.rs`, and the tick vectors 79–83 (with the laying at tick 80) match the port's egg, queen and tail (see [ninho.md](ninho.md#133-observed-in-the-original)). C-04 to C-07 became tick vectors (2026-10-18, `tools/cenarios_regras.py`, snapshot `rico`, 307/307 with S, R and life; [testes-tick.md](testes-tick.md#fifth-round-2026-10-18-unverified-rules-from-the-review)): `ovos_c04_c05/1791` (with `_ModeAuto` = 0 and `_modeLevels[2]` = 0 the 13 black eggs T = 7 die at hatching, `_TotalEggsDiedB` 0 → 13; with `_HealthR` = 20 the 21 red eggs 0x87 hatch into 17 workers and 4 soldiers, no male or queen), `ovos_c06/1711` (laying with `_HealthB` 100: new egg, `_TotalEggsLaidB` +1, `_HealthB` −1) and `ovos_c07/1711` (`_HealthB` 0: no egg) — **confirmed**. C-08 onward are still missing.
 - The exact meaning of list 4/1100 per stage (the index used in the Examine window) has not been checked in the interface.
 - `_YellowBirth` and the yellow-queen's laying: only summarized (they belong to `formiga-amarela.md`).
 - The founding of new colonies in the Full Game (`_SimColonies`, `_QueenStorage*`, mating flight) is not here.

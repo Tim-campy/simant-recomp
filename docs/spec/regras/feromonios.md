@@ -4,7 +4,7 @@
 
 This document describes the five surface pheromone maps: format, how values are deposited, how they decay and how ants read them to choose a direction. The pace of each operation comes from the tick described in [simulacao-visao-geral.md](simulacao-visao-geral.md); the modes that use each map are in [formigas.md](formigas.md).
 
-Evidence convention: the same as in [simulacao-visao-geral.md](simulacao-visao-geral.md#convenção-de-evidência).
+Evidence convention: the same as in [simulacao-visao-geral.md](simulacao-visao-geral.md#evidence-convention).
 
 ## 1. The maps
 
@@ -90,7 +90,7 @@ The alarm spreads and loses intensity. An isolated peak of 200 becomes 100 at th
 | `_GetAlarmDir` (`1030:0e54`) | alarm | highest neighbor, with limited turn; with no alarm around, random walk |
 | `_GetSmellT` (`1028:9612`) | trail of a color in a direction | takes **cell** coordinates; returns 0 outside the map (no wraparound). No call found |
 
-Details seen in the code (our own pseudocode). `cx = x >> 1`, `cy = y >> 1`; "turn towards a" = `_TurnTab[dir][a]` (table in [formigas.md](formigas.md#7-movimento-e-escolha-de-direção), extracted to `data/feromonios.json`). "Highest neighbor" goes through directions 0 to 7 and only switches when the value is **strictly** greater: on a tie the lowest-numbered direction wins; with all neighbors at 0 the index stays 0.
+Details seen in the code (our own pseudocode). `cx = x >> 1`, `cy = y >> 1`; "turn towards a" = `_TurnTab[dir][a]` (table in [formigas.md](formigas.md#7-movement-and-direction-choice), extracted to `data/feromonios.json`). "Highest neighbor" goes through directions 0 to 7 and only switches when the value is **strictly** greater: on a tie the lowest-numbered direction wins; with all neighbors at 0 the index stays 0.
 
 Edges (before any map reading; tile x 0–127, y 0–63):
 

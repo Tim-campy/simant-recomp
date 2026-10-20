@@ -6,7 +6,7 @@ This document specifies, for a 1:1 reimplementation, everything that happens to 
 
 ## Evidence convention
 
-Same as in [simulacao-visao-geral.md](simulacao-visao-geral.md#convenção-de-evidência). Summary:
+Same as in [simulacao-visao-geral.md](simulacao-visao-geral.md#evidence-convention). Summary:
 
 - **Fact seen in the code:** Ghidra pseudocode in `re_trabalho/decomp/Code*.c`, cited as `selector:offset` and the name from `SIMANTW.SYM`. Variable addresses in the `logical segment:offset` format of `symbols.tsv` (8 = selector `1038`, 9 = `1040`, 10 = `1048`/DGROUP).
 - **Verified fact:** checked in `SIMANTW.EXE` (tables) or in the save `tests/referencias/saves/QUICK2.ANT`, with the method described.
@@ -19,7 +19,7 @@ No decompiled excerpt is reproduced: everything is in prose, tables and our own 
 
 | Notation | Meaning |
 |---|---|
-| `X[i]`, `Y[i]`, `T[i]`, `M[i]`, `S[i]` | fields of slot `i` of list A (`_AlistX/Y/T/M/S`, see [formigas.md](formigas.md#2-listas-paralelas)) |
+| `X[i]`, `Y[i]`, `T[i]`, `M[i]`, `S[i]` | fields of slot `i` of list A (`_AlistX/Y/T/M/S`, see [formigas.md](formigas.md#2-parallel-lists)) |
 | `Vida(x, y)` | `_LifeA[x·64 + y]` |
 | `Mapa(x, y)` | `_MapA[x·64 + y]` |
 | `cor(T)` | `T & 0x80` (0 = black, 0x80 = red) |
@@ -27,7 +27,7 @@ No decompiled excerpt is reproduced: everything is in prose, tables and our own 
 | `dir(T)` | `T & 7` |
 | `base(T)` | `T & 0xF8` (color + group; the direction is set again afterwards) |
 | `D8[d]` | offset `(_Dx8[d], _Dy8[d])` (`8:0000`/`8:0008`) |
-| `Giro[d][k]` | `_TurnTab[d·8 + k]` (`8:0024`, table in [formigas.md](formigas.md#7-movimento-e-escolha-de-direção)) |
+| `Giro[d][k]` | `_TurnTab[d·8 + k]` (`8:0024`, table in [formigas.md](formigas.md#7-movement-and-direction-choice)) |
 | `Barreira` | `_Barrier` (`9:7604`): 0x50 in the yard, 0x90 in the house |
 | `Casa` | `_TERRAINset` (`9:9b6e`) = 1 |
 | `S1(n)`, `S2()`, `S4()`, `S8()`, `S16()`, `S32()`, `S128()`, `S256()` | `_SRand1(n)`, `_SRand2()` … of the S generator ([rng.md](rng.md)); each call is **one** step |
@@ -316,7 +316,7 @@ Tables read from `SIMANTW.EXE` (verified fact, segment 8 in the file at 0x9600):
 
 ### 3.10 Mode 9 — queen on the surface (inlined; same as `_SimQueenA` `1028:0a74`)
 
-`Vida(x, y) = T`. Only the **tail** (`(T & 0x7F) > 0x67`, group 13) is checked: the head must be at `(x, y) + D8[dir(T)]` with `Vida = T − 8`, or, alternatively, `_FindInAList` must find any ant in that cell. If neither, the tail is removed (`T[i] = 0`, `Vida = 0`). The head is never removed here (correction to [formigas.md](formigas.md#3-codificação-do-tipo-t), which says "the remaining one is also removed"). No draw.
+`Vida(x, y) = T`. Only the **tail** (`(T & 0x7F) > 0x67`, group 13) is checked: the head must be at `(x, y) + D8[dir(T)]` with `Vida = T − 8`, or, alternatively, `_FindInAList` must find any ant in that cell. If neither, the tail is removed (`T[i] = 0`, `Vida = 0`). The head is never removed here (correction to [formigas.md](formigas.md#3-encoding-of-type-t), which says "the remaining one is also removed"). No draw.
 
 ### 3.11 Mode 11 — Alarmed: `_DoToAlarm` (`1028:1a0a`)
 
@@ -353,7 +353,7 @@ The ant does not walk and does not write `Vida`.
 
 ### 3.17 Modes with no effect: 17 and 18
 
-There is no case in the `switch`: the ant is counted in `_TemB/RModePop` and does nothing (fact seen in the code). Since these modes only appear in the nest ([formigas.md](formigas.md#5-modos)), an ant that leaves the nest with M = 17 would stay still on the surface until it dies or is recruited [hypothesis: rare case].
+There is no case in the `switch`: the ant is counted in `_TemB/RModePop` and does nothing (fact seen in the code). Since these modes only appear in the nest ([formigas.md](formigas.md#5-modes)), an ant that leaves the nest with M = 17 would stay still on the surface until it dies or is recruited [hypothesis: rare case].
 
 ## 4. Mating flight (summary of who decides)
 
@@ -396,7 +396,7 @@ else:               _BlackLost (9:79e4) += 1 ; _BAntsKilled (9:99e0, 32 bits) +=
 return winner
 ```
 
-`Classe` (`10:22c6`, 16 bytes) = `0 0 0 0 2 0 1 1 2 1 0 0 3 3 0 0`; `Matriz` (`10:22d6`, 4 × 4, chance in 10 of "a" winning) = rows `5 2 7 3`, `8 5 9 4`, `3 1 5 2`, `7 6 8 5` (classes 0 worker/egg, 1 soldier, 2 breeder, 3 queen). Same values as in [formigas.md](formigas.md#6-luta-morte-e-saúde).
+`Classe` (`10:22c6`, 16 bytes) = `0 0 0 0 2 0 1 1 2 1 0 0 3 3 0 0`; `Matriz` (`10:22d6`, 4 × 4, chance in 10 of "a" winning) = rows `5 2 7 3`, `8 5 9 4`, `3 1 5 2`, `7 6 8 5` (classes 0 worker/egg, 1 soldier, 2 breeder, 3 queen). Same values as in [formigas.md](formigas.md#6-fighting-death-and-health).
 
 The returned T is the winner's **complete** T (with load and direction); it is what goes back into the slot when the cloud dissolves.
 
@@ -575,7 +575,7 @@ return (free ≥ 0 ? free : blocked)
 
 ### 9.3 New mode: `_GetNewMode(g, T)` (`1030:0910`), `_GetNewModeB` (`1030:09d0`), `_GetNewModeR` (`1030:0a50`)
 
-As in [formigas.md](formigas.md#escolha-de-modo), with the explicit draw order: the `S8()` is only drawn for group 2 or 6 **and** (red, or black with `_ModeAuto` = 1). Black with `_ModeAuto` = 0 and group 2/6 → `_ModeMe` (`8:8a58`) without a draw. Other groups → `_CasteModeTabB[g]` without a draw. The table indices used are `_StrategicModeB` (black) and `_StrategicModeR` (red).
+As in [formigas.md](formigas.md#mode-choice), with the explicit draw order: the `S8()` is only drawn for group 2 or 6 **and** (red, or black with `_ModeAuto` = 1). Black with `_ModeAuto` = 0 and group 2/6 → `_ModeMe` (`8:8a58`) without a draw. Other groups → `_CasteModeTabB[g]` without a draw. The table indices used are `_StrategicModeB` (black) and `_StrategicModeR` (red).
 
 ### 9.4 Recruitment: `_Recruit`, `_UnRecruit`, `_RecruitRed`, `_UnRecruitRed`, `_ForceModeA/B`
 
@@ -653,7 +653,7 @@ Test bench: [docs/bancada-qemu.md](../../bancada-qemu.md). Save reading tool: `t
 
 No divergence between this specification and the original appeared in these cases.
 
-**Tick vectors of the seventh round** (2026-10-19, `tools/cenarios_raros.py`, [testes-tick.md](testes-tick.md#sétima-rodada-2026-10-19-ramos-raros); all 307/307 with S, R and life):
+**Tick vectors of the seventh round** (2026-10-19, `tools/cenarios_raros.py`, [testes-tick.md](testes-tick.md#seventh-round-2026-10-19-rare-branches); all 307/307 with S, R and life):
 
 | Case | Vector | Observed in the original |
 |---|---|---|
